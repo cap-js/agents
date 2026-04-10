@@ -1,0 +1,37 @@
+{
+  "name": "@cap-js/a2a",
+  "version": "0.1.0",
+  "description": "CDS protocol adapter for the A2A (Agent-to-Agent) protocol",
+  "license": "Apache-2.0",
+  "homepage": "https://cap.cloud.sap/",
+  "main": "cds-plugin.js",
+  "scripts": {
+    "lint": "npx eslint .",
+    "test": "npx jest --silent",
+    "test:hybrid": "cds bind --exec -- npx jest",
+    "prettier": "npx -y prettier@3 --write .",
+    "prettier:check": "npx -y prettier@3 --check ."
+  },
+  "files": [
+    "index.cds",
+    "index.js",
+    "lib",
+    "cds-plugin.js"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "@cap-js/cds-test": ">=0",
+    "@cap-js/sqlite": "^2"
+  },
+  "peerDependencies": {
+    "@sap/cds": ">=8",
+    "express": "^4 || ^5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "tests/bookshop/"
+  ],
+  "cds": {}
+}
