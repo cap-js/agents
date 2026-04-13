@@ -86,3 +86,45 @@ Content-Type: application/json
   "method": "nonexistent/method",
   "params": {}
 }
+
+### ─── HITL: Request Requiring Approval ────────────────────────────
+
+# Trigger Human-in-the-Loop — task transitions to input-required
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-hitl-001",
+      "role": "user",
+      "contextId": "hitl-demo",
+      "parts": [{ "kind": "text", "text": "Submit order for 2 copies of book 201 hitl" }]
+    }
+  }
+}
+
+### ─── HITL: Approve the Action ────────────────────────────────────
+
+# Resume the HITL task by approving (use the taskId from the input-required response)
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-hitl-002",
+      "role": "user",
+      "taskId": "f6c94980-7d4c-4834-9920-059a175a9cf4",
+      "parts": [{ "kind": "text", "text": "yes" }]
+    }
+  }
+}

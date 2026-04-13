@@ -46,6 +46,10 @@ service CatalogService {
 npm run test
 ```
 
+## Tooling
+
+- [sem-a2a-cli](https://github.tools.sap/SEM/sem-a2a-cli) for testing the A2A protocol compatibility of agents
+
 ## License
 
 This package is provided under the terms of the [Apache License 2.0](./LICENSE).

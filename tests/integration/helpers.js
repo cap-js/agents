@@ -12,13 +12,14 @@ module.exports = ({ POST, axios }) => {
     })
   }
 
-  function sendMessage(service, text, contextId) {
+  function sendMessage(service, text, { contextId, taskId } = {}) {
     return jsonrpc(service, "message/send", {
       message: {
         kind: "message",
         messageId: cds.utils.uuid(),
         role: "user",
         ...(contextId && { contextId }),
+        ...(taskId && { taskId }),
         parts: [{ kind: "text", text }],
       },
     })
