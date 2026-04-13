@@ -9,16 +9,21 @@
     "lint": "npx eslint .",
     "test": "npx jest --silent",
     "test:hybrid": "cds bind --exec -- npx jest",
+    "watch:sample": "cds w tests/bookshop",
     "prettier": "npx -y prettier@3 --write .",
-    "prettier:check": "npx -y prettier@3 --check ."
+    "prettier:check": "npx -y prettier@3 --check .",
+    "generate-sample-card": "cd tests/bookshop && cds c srv -s CatalogService -2 a2a > expected-agent-card.json",
+    "pretest": "(command -v cds >/dev/null || npm i -g @sap/cds-dk) && npm run generate-sample-card"
   },
   "files": [
     "index.cds",
-    "index.js",
     "lib",
     "cds-plugin.js"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "@a2a-js/sdk": "^0.3.12",
+    "zod": "^3.24.0"
+  },
   "devDependencies": {
     "@cap-js/cds-test": ">=0",
     "@cap-js/sqlite": "^2"
@@ -33,5 +38,11 @@
   "workspaces": [
     "tests/bookshop/"
   ],
-  "cds": {}
+  "cds": {
+    "requires": {
+      "a2a": {
+        "model": "@cap-js/a2a"
+      }
+    }
+  }
 }

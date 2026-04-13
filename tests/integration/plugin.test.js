@@ -1,14 +1,7 @@
 const cds = require("@sap/cds")
-const path = require("path")
-
-const app = path.join(__dirname, "../bookshop/")
-const { test, GET } = cds.test(app)
+const { GET } = cds.test(__dirname + "/../bookshop")
 
 describe("@cap-js/a2a plugin", () => {
-  beforeEach(async () => {
-    await test.data.reset()
-  })
-
   it("should register a2a protocol adapter", () => {
     expect(cds.env.protocols.a2a).toBeDefined()
     expect(cds.env.protocols.a2a.path).toBe("/a2a")

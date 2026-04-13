@@ -1,6 +1,6 @@
 {
   "maxDocCommentLine": 80,
-  "formatDocComments": true,
+  "formatDocComments": false,
   "tabSize": 2,
   "alignPostAnnotations": false,
   "alignColonsInAnnotations": false,

@@ -17,7 +17,7 @@ service CatalogService {
 }
 ```
 
-## What this rougly will do
+## Future outlook
 
 - "Agentify" existing CAP Services:
   - `@a2a` annotation on service level, Agent is modelled as the service itself
@@ -35,6 +35,10 @@ service CatalogService {
   - Integration of downstram MCP servers as tools with auth propagation
   - Integration of downstream Agents as tools (=> multi-agent setups) with auth propagation
   - Options for overrides (e.g. custom Graph, custom Executor) for complex use cases that still want to benefit from the rest of the infrastructure
+
+## Current Functionality
+
+- Annotating a CDS service with `@a2a` makes it discoverable as an agent via the A2A protocol with automatic creation of the agent card based on the service definition.
 
 ## Tests
 

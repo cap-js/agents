@@ -9,9 +9,7 @@
 ### Added
 
 - Initial project setup as a CDS protocol adapter
-- Plugin registration via `cds-plugin.js`
-- Protocol adapter skeleton (`lib/index.js`)
-- Bookshop test application with `@a2a` annotated CatalogService
+- Agent Card compilation during runtime and design time
 
 ### Changed
 

@@ -26,6 +26,14 @@ module.exports = class CatalogService extends cds.ApplicationService {
       return book
     })
 
+    // Get current stock level for a book
+    this.on("getStock", async (req) => {
+      const { book: id } = req.data
+      const book = await SELECT.one.from(Books, id, (b) => b.stock)
+      if (!book) return req.error(404, `Book #${id} doesn't exist`)
+      return book.stock
+    })
+
     return super.init()
   }
 }

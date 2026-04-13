@@ -1,0 +1,88 @@
+### ─── Agent Card ──────────────────────────────────────────────────
+
+# Discover the agent's capabilities
+GET http://localhost:4004/a2a/catalog/.well-known/agent-card.json
+
+### ─── Send a Message ──────────────────────────────────────────────
+
+# Send a text message to the agent (JSON-RPC 2.0)
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-001",
+      "role": "user",
+      "parts": [{ "kind": "text", "text": "What books do you have?" }]
+    }
+  }
+}
+
+### ─── Send a Message with Context ─────────────────────────────────
+
+# Continue a conversation by providing a contextId
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-002",
+      "role": "user",
+      "contextId": "conversation-1",
+      "parts": [{ "kind": "text", "text": "Tell me more about Wuthering Heights" }]
+    }
+  }
+}
+
+### ─── Get a Task ──────────────────────────────────────────────────
+
+# Retrieve a task by its ID (replace with actual task ID from a message/send response)
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tasks/get",
+  "params": {
+    "id": "REPLACE_WITH_TASK_ID"
+  }
+}
+
+### ─── Cancel a Task ───────────────────────────────────────────────
+
+# Cancel a task by its ID
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tasks/cancel",
+  "params": {
+    "id": "REPLACE_WITH_TASK_ID"
+  }
+}
+
+### ─── Error: Unknown Method ───────────────────────────────────────
+
+# Calling an unknown method returns a JSON-RPC error
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "nonexistent/method",
+  "params": {}
+}
