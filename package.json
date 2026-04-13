@@ -42,6 +42,16 @@
     "requires": {
       "a2a": {
         "model": "@cap-js/a2a"
+      },
+      "kinds": {
+        "a2a-executor-mock": {
+          "impl": "@cap-js/a2a/lib/executor/mock"
+        }
+      },
+      "[development]": {
+        "a2a-executor": {
+          "kind": "a2a-executor-mock"
+        }
       }
     }
   }
