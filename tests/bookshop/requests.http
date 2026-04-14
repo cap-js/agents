@@ -38,7 +38,7 @@ Content-Type: application/json
       "kind": "message",
       "messageId": "msg-002",
       "role": "user",
-      "contextId": "conversation-1",
+      "contextId": "af0cd916-4f21-4f23-bd35-39d541dba407",
       "parts": [{ "kind": "text", "text": "Tell me more about Wuthering Heights" }]
     }
   }
