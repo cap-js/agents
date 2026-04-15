@@ -13,6 +13,7 @@
 - A2A Protocol adapter that converts A2A requests into LangGraph execution
 - Langgraph Executor with AI Core integration to agentify CAP services
 - Mock Executor for testing purposes
+- Multi-turn conversations with checkpointing
 
 ### Changed
 

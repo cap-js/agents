@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "description": "Sample CAP bookshop for @cap-js/a2a tests",
   "dependencies": {
-    "@cap-js/a2a": "file:../../."
+    "@cap-js/hana": "^2",
+    "@cap-js/a2a": "file:../../.",
+    "@sap/xssec": "^4",
+    "@toon-format/toon": "^2.1.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2"
+  },
+  "cds": {
+    "mcp": {
+      "toon_format": false
+    }
   }
 }

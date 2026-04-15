@@ -38,7 +38,6 @@ service CatalogService {
    * Example: Order 2 copies of Wuthering Heights
    */
   @description: 'Submit an order for a book'
-  @requires   : 'authenticated-user'
   action   submitOrder(book: Books:ID @mandatory,
                        quantity: Integer @mandatory
   )                                                                              returns {

@@ -25,5 +25,33 @@ module.exports = ({ POST, axios }) => {
     })
   }
 
-  return { jsonrpc, sendMessage }
+  /**
+   * Detects silent tool/executor failures in console.error output.
+   * Catch tool execution failures, etc. that the LLM might cover up with
+   * a polite "technical issue" response while still returning "completed".
+   */
+  function setupErrorDetection() {
+    const errors = []
+    let originalError
+
+    beforeEach(() => {
+      errors.length = 0
+      originalError = console.error
+      console.error = (...args) => {
+        const msg = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")
+        errors.push(msg)
+        originalError.apply(console, args)
+      }
+    })
+
+    afterEach(() => {
+      console.error = originalError
+      const relevantErrors = errors.filter((e) => /\[a2a\]|\[mcp\]/.test(e))
+      if (relevantErrors.length > 0) {
+        throw new Error(`Errors detected during test:\n${relevantErrors.join("\n")}`)
+      }
+    })
+  }
+
+  return { jsonrpc, sendMessage, setupErrorDetection }
 }

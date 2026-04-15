@@ -27,3 +27,31 @@ jobs:
       - run: npm i
       - run: cd tests/bookshop && npm i
       - run: npm run test
+
+  test-hybrid:
+    if: contains(github.event.pull_request.labels.*.name, 'e2e') || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, solinas-medium]
+    container:
+      image: public.int.repositories.cloud.sap/ubuntu:24.04
+    name: Hybrid Tests with Node.js ${{ matrix.node-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22.x]
+        cds-version: [latest]
+    env:
+      CF_USERNAME: ${{ secrets.CF_USERNAME }}
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+    steps:
+      - run: apt-get update -y && apt-get install make -y
+      - uses: actions/checkout@v6
+      - uses: cap/.github/.github/actions/git-setup@main
+        with:
+          com-github-token: ${{ secrets.COM_GITHUB_TOKEN }}
+      - name: Run hybrid integration tests
+        uses: ./.github/actions/integration-tests
+        with:
+          CF_ORG: ${{ secrets.CF_ORG }}
+          CF_SPACE: ${{ secrets.CF_SPACE }}
+          NODE_VERSION: ${{ matrix.node-version }}
+          CDS_VERSION: ${{ matrix.cds-version }}

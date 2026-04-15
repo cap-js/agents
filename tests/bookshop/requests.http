@@ -128,3 +128,45 @@ Content-Type: application/json
     }
   }
 }
+
+### ─── Multi-Turn: First Message ──────────────────────────────────
+
+# Start a conversation (contextId groups the turns)
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-multi-001",
+      "role": "user",
+      "contextId": "multi-turn-demo",
+      "parts": [{ "kind": "text", "text": "Show me details on Wuthering Heights" }]
+    }
+  }
+}
+
+### ─── Multi-Turn: Follow-Up ─────────────────────────────────────
+
+# Continue the conversation (same contextId — agent remembers the previous turn)
+POST http://localhost:4004/a2a/catalog/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 9,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-multi-002",
+      "role": "user",
+      "contextId": "multi-turn-demo",
+      "parts": [{ "kind": "text", "text": "Order 3 copies of that book" }]
+    }
+  }
+}
