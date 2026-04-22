@@ -10,8 +10,8 @@ build-parameters:
       commands:
         - node deploy-patches.js apply
         - npm pack ../../
-        - npm pack ../../../mcp-adapter/
         - npm i cap-js-a2a-0.1.0.tgz
+        - npm i cap-js-mcp-0.0.10.tgz
         - npm ci
         - npx cds build --production
         - cp cap-js-a2a-0.1.0.tgz ./gen/srv
