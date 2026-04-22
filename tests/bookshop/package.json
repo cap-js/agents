@@ -3,18 +3,28 @@
   "version": "1.0.0",
   "description": "Sample CAP bookshop for @cap-js/a2a tests",
   "dependencies": {
-    "@cap-js/hana": "^2",
     "@cap-js/a2a": "file:../../.",
+    "@cap-js/hana": "^2",
+    "@sap/cds": "^9.8.5",
     "@sap/xssec": "^4",
     "@toon-format/toon": "^2.1.0",
     "zod": "^4.3.6"
   },
+  "scripts": {
+    "start": "cds-serve"
+  },
   "devDependencies": {
-    "@cap-js/sqlite": "^2"
+    "@cap-js/sqlite": "^2",
+    "@sap/cds-dk": "^9"
   },
   "cds": {
     "mcp": {
       "toon_format": false
+    },
+    "requires": {
+      "[production]": {
+        "auth": "xsuaa"
+      }
     }
   }
 }
