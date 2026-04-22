@@ -1,0 +1,11 @@
+ID,name,city,country,stars,pricePerNight,availableRooms,amenities
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c01,Le Marais Grand Hotel,Paris,France,5,420.00,8,WiFi, Spa, Pool, Restaurant, Room Service, Gym
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c02,Tokyo Bay Suites,Tokyo,Japan,5,380.00,12,WiFi, Onsen, Restaurant, Concierge, Garden
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c03,Manhattan Skyline Hotel,New York,USA,4,310.00,15,WiFi, Gym, Restaurant, Rooftop Bar, Business Center
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c04,The Kensington Arms,London,UK,4,275.00,10,WiFi, Restaurant, Afternoon Tea, Garden, Concierge
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c05,Barcelona Beachfront,Barcelona,Spain,4,230.00,20,WiFi, Pool, Beach Access, Restaurant, Spa
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c06,Montmartre Boutique Inn,Paris,France,3,165.00,6,WiFi, Breakfast, Garden
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c07,Shibuya Capsule Plus,Tokyo,Japan,3,85.00,40,WiFi, Laundry, Lounge
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c08,Brooklyn Bridge Hotel,New York,USA,4,280.00,9,WiFi, Gym, Restaurant, Rooftop Terrace
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c09,Camden Town Lodge,London,UK,3,145.00,14,WiFi, Breakfast, Bar
+a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c10,Gothic Quarter Hostel,Barcelona,Spain,2,60.00,30,WiFi, Shared Kitchen, Terrace

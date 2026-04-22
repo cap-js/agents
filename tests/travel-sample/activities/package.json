@@ -1,0 +1,14 @@
+{
+  "name": "a2a-sample-services",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@cap-js/a2a": "file:../../..",
+    "@cap-js/sqlite": "*"
+  },
+  "cds": {
+    "server": {
+      "port": 4006
+    }
+  }
+}

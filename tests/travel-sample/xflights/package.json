@@ -1,0 +1,16 @@
+{
+  "name": "@capire/xflights",
+  "version": "0.1.3",
+  "description": "CAP sample for master data service",
+  "private": true,
+  "dependencies": {
+    "@cap-js/mcp": "^0.0.11",
+    "@cap-js/sqlite": "*"
+  },
+  "license": "Apache-2.0",
+  "cds": {
+    "server": {
+      "port": 4005
+    }
+  }
+}

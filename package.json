@@ -4,7 +4,7 @@
   "description": "CDS protocol adapter for the A2A (Agent-to-Agent) protocol",
   "license": "Apache-2.0",
   "homepage": "https://cap.cloud.sap/",
-  "main": "cds-plugin.js",
+  "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
     "test": "npx jest --silent",
@@ -17,13 +17,14 @@
     "pretest": "(command -v cds >/dev/null || npm i -g @sap/cds-dk) && npm run generate-sample-card"
   },
   "files": [
+    "index.js",
     "index.cds",
     "lib",
     "cds-plugin.js"
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
-    "@cap-js/mcp": "file:cap-js-mcp-0.0.10.tgz",
+    "@cap-js/mcp": "^0.0.11",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
@@ -73,6 +74,9 @@
     }
   },
   "workspaces": [
-    "tests/bookshop/"
+    "tests/bookshop/",
+    "tests/travel-sample/travel-agent/",
+    "tests/travel-sample/xflights/",
+    "tests/travel-sample/activities/"
   ]
 }

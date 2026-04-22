@@ -13,6 +13,9 @@ inputs:
   CDS_VERSION:
     description: "CDS version to use for tests"
     required: true
+  NPM_REGISTRY_TOKEN:
+    description: "Auth token for internal npm registry"
+    required: false
 runs:
   using: "composite"
   steps:
@@ -26,6 +29,12 @@ runs:
       uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.NODE_VERSION }}
+
+    - name: Configure internal registry
+      shell: bash
+      run: |
+        echo "@cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/" >> .npmrc
+        echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ inputs.NPM_REGISTRY_TOKEN }}" >> .npmrc
 
     - name: Install global CDS
       shell: bash

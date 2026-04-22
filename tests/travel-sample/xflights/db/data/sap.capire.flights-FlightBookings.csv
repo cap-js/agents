@@ -1,0 +1,3 @@
+ID,flight_ID,date,passenger,seats,status,totalPrice,currency_code
+b1a2c3d4-0001-4000-8000-000000000001,SW0001,2026-05-29,Alice Smith,2,confirmed,21636,SGD
+b1a2c3d4-0002-4000-8000-000000000002,GA0018,2026-01-14,Bob Jones,1,confirmed,6000,USD

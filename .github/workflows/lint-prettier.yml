@@ -22,6 +22,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
+      - name: Configure internal registry
+        run: |
+          echo "@cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/" >> .npmrc
+          echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ secrets.NPM_REGISTRY_TOKEN }}" >> .npmrc
       - run: npm i
       - run: npm run lint
       - run: npm run prettier:check

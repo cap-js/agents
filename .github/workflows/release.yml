@@ -26,6 +26,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Configure internal registry
+        run: |
+          echo "@cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/" >> .npmrc
+          echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ secrets.NPM_REGISTRY_TOKEN }}" >> .npmrc
       - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
       - run: npm i
       - run: cd tests/bookshop && npm i
