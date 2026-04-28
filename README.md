@@ -90,12 +90,6 @@ The plugin ships two executor implementations:
 - **`development`**: Mock executor. Returns sample data from the first entity. No LLM or AI Core needed.
 - **`hybrid`, `production`**: LangGraph executor with ReAct agent with LLM, tool calling, and checkpoint persistence. Requires AI Core.
 
-Override via `cds.requires.a2a-executor`:
-
-```json
-{ "cds": { "requires": { "a2a-executor": { "kind": "a2a-executor-langgraph" } } } }
-```
-
 ## Behind the Scenes
 
 The plugin does the following in the background:
@@ -103,14 +97,14 @@ The plugin does the following in the background:
 - Creates a ReAct graph (Reason and Act) with tools auto-generated from the CDS model. These tools are shared with the [CAP MCP Adapter](https://github.tools.sap/cap/mcp-adapter):
   - `describe`: describes the data model of the service
   - `query`: retrieves data from exposed entities
-  - One tool per unbound action or function (e.g. `submitOrder`)
+  - One tool per unbound action or function
 - Serves the A2A agent card at `GET /.well-known/agent-card.json`
 - Exposes the A2A JSON-RPC endpoint at `POST /` (handled by `@a2a-js/sdk`)
 - Persists A2A tasks and LangGraph checkpoints for multi-turn conversations
 
 ## Custom Executors
 
-For advanced use cases, you can bypass the default executor by setting `this.a2a = { executor }` in your service handler:
+For advanced use cases, you can override the default executor by setting `this.a2a = { executor }` in your service handler:
 
 ```js
 const { CdsCheckpointSaver } = require("@cap-js/a2a")
@@ -128,7 +122,7 @@ See the [Travel Sample](./tests/travel-sample/) for a full example of a custom o
 ## Samples
 
 - [Bookshop](./tests/bookshop/): Basic agent. Shows the zero-code setup: annotate with `@a2a` and go.
-- [Travel Sample](./tests/travel-sample/): Multi-agent sample. Custom executor coordinating hotels (A2A), activities (A2A), and flights (MCP).
+- [Travel Sample](./tests/travel-sample/): Multi-agent sample. Custom executor coordinating hotels (A2A), local activities (A2A), and flights (MCP).
 
 ## Tests
 

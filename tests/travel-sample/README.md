@@ -4,37 +4,15 @@ Multi-agent travel planner demonstrating A2A orchestration with MCP tool access.
 
 ## Architecture
 
-```mermaid
-graph TB
-    Client["User / A2A Client"]
-
-    Client -->|"A2A (JSON-RPC)"| TravelAgent
-
-    subgraph "Travel Agent · port 4004"
-        TravelAgent["TravelAgentService<br/><i>Custom Executor + LangGraph</i>"]
-    end
-
-    subgraph "Activities · port 4006"
-        HotelService["HotelService<br/><i>@a2a · default executor</i>"]
-        ActivityService["ActivityService<br/><i>@a2a · default executor</i>"]
-    end
-
-    subgraph "xflights · port 4005"
-        FlightData["sap.capire.flights.data<br/><i>@mcp</i>"]
-    end
-
-    TravelAgent -->|A2A| HotelService
-    TravelAgent -->|A2A| ActivityService
-    TravelAgent -->|MCP| FlightData
-```
+![Architecture](cap-agents-demo.drawio.svg)
 
 ## Services
 
-| Service         | Port | Protocol | Description                                                                                                               |
-| --------------- | ---- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `travel-agent/` | 4004 | `@a2a`   | Orchestrator with custom executor. Connects to downstream A2A agents and MCP server via LangGraph.                        |
-| `activities/`   | 4006 | `@a2a`   | Hotel and activity services with default executor. Exposes `HotelService` and `ActivityService` as autonomous A2A agents. |
-| `xflights/`     | 4005 | `@mcp`   | Flight master data service. Exposes airlines, airports, flights, and booking actions as MCP tools.                        |
+| Service             | Port | Protocol | Description                                                                                                         |
+| ------------------- | ---- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `travel-agent/`     | 4004 | `@a2a`   | Orchestrator with custom executor and LLM. Connects to downstream A2A agents and MCP server via LangGraph.          |
+| `leisure-services/` | 4006 | `@a2a`   | Hotel and activity services. Exposes `HotelService` and `ActivityService` as autonomous A2A agents with LLM access. |
+| `xflights/`         | 4005 | `@mcp`   | Flight master data service. Exposes airlines, airports, flights, and booking actions as MCP tools.                  |
 
 ## Request Flow
 
@@ -116,7 +94,7 @@ Start all three services in separate terminals:
 cds watch tests/travel-sample/xflights
 
 # Terminal 2 — Hotel + Activity agents (A2A)
-cds watch tests/travel-sample/activities
+cds watch tests/travel-sample/leisure-services
 
 # Terminal 3 — Travel agent orchestrator (A2A)
 cds watch tests/travel-sample/travel-agent

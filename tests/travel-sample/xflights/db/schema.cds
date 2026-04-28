@@ -64,24 +64,24 @@ entity SupplementTypes : CodeList {
  * A flight booking for a passenger on a specific flight and date.
  */
 entity FlightBookings : cuid, managed {
-  @description: 'Reference to the booked flight connection'
+  /** Reference to the booked flight connection */
   flight          : Association to FlightConnections;
 
-  @description: 'Date of the flight (YYYY-MM-DD)'
+  /** Date of the flight (YYYY-MM-DD) */
   date            : Date;
 
-  @description: 'Passenger name'
+  /** Passenger name */
   passenger       : String(200);
 
-  @description: 'Number of seats booked'
+  /** Number of seats booked */
   seats           : Integer default 1;
 
-  @description: 'Booking status'
+  /** Booking status */
   status          : String enum { confirmed; cancelled } default 'confirmed';
 
-  @description: 'Total price for the booking'
+  /** Total price for the booking */
   totalPrice      : Decimal(9,4);
 
-  @description: 'Currency code'
+  /** Currency code */
   currency        : Currency;
 }

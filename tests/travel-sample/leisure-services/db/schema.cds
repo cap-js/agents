@@ -1,4 +1,4 @@
-namespace travel.activities;
+namespace travel.leisure;
 
 using { cuid, managed } from '@sap/cds/common';
 
@@ -6,49 +6,49 @@ using { cuid, managed } from '@sap/cds/common';
 
 /** Hotels available for booking */
 entity Hotels : cuid {
-  @description: 'Hotel name'
+  /** Hotel name */
   name            : String(200);
 
-  @description: 'City where the hotel is located'
+  /** City where the hotel is located */
   city            : String(100);
 
-  @description: 'Country where the hotel is located'
+  /** Country where the hotel is located */
   country         : String(100);
 
-  @description: 'Star rating (1-5)'
+  /** Star rating (1-5) */
   stars           : Integer;
 
-  @description: 'Price per night in USD'
+  /** Price per night in USD */
   pricePerNight   : Decimal(10,2);
 
-  @description: 'Number of rooms currently available'
+  /** Number of rooms currently available */
   availableRooms  : Integer;
 
-  @description: 'Comma-separated list of amenities'
+  /** Comma-separated list of amenities */
   amenities       : String(500);
 }
 
 /** Hotel booking records */
 entity HotelBookings : cuid, managed {
-  @description: 'Reference to the booked hotel'
+  /** Reference to the booked hotel */
   hotel           : Association to Hotels;
 
-  @description: 'Guest name'
+  /** Guest name */
   guest           : String(200);
 
-  @description: 'Check-in date'
+  /** Check-in date */
   checkIn         : Date;
 
-  @description: 'Check-out date'
+  /** Check-out date */
   checkOut        : Date;
 
-  @description: 'Number of rooms booked'
+  /** Number of rooms booked */
   rooms           : Integer default 1;
 
-  @description: 'Booking status'
+  /** Booking status */
   status          : String enum { confirmed; cancelled } default 'confirmed';
 
-  @description: 'Total price for the stay'
+  /** Total price for the stay */
   totalPrice      : Decimal(10,2);
 }
 
@@ -56,48 +56,48 @@ entity HotelBookings : cuid, managed {
 
 /** Local tours, attractions, and experiences */
 entity Activities : cuid {
-  @description: 'Activity name'
+  /** Activity name */
   name            : String(200);
 
-  @description: 'City where the activity takes place'
+  /** City where the activity takes place */
   city            : String(100);
 
-  @description: 'Country where the activity takes place'
+  /** Country where the activity takes place */
   country         : String(100);
 
-  @description: 'Category such as tour, food, adventure, culture, or nature'
+  /** Category such as tour, food, adventure, culture, or nature */
   category        : String(50);
 
-  @description: 'Detailed description of the activity'
+  /** Detailed description of the activity */
   description     : String(1000);
 
-  @description: 'Duration in hours'
+  /** Duration in hours */
   duration        : Decimal(4,1);
 
-  @description: 'Price per person in USD'
+  /** Price per person in USD */
   price           : Decimal(10,2);
 
-  @description: 'Average rating out of 5'
+  /** Average rating out of 5 */
   rating          : Decimal(2,1);
 }
 
 /** Activity booking records */
 entity Bookings : cuid, managed {
-  @description: 'Reference to the booked activity'
+  /** Reference to the booked activity */
   activity        : Association to Activities;
 
-  @description: 'Guest name'
+  /** Guest name */
   guest           : String(200);
 
-  @description: 'Date of the activity (YYYY-MM-DD)'
+  /** Date of the activity (YYYY-MM-DD) */
   date            : Date;
 
-  @description: 'Number of participants'
+  /** Number of participants */
   participants    : Integer default 1;
 
-  @description: 'Booking status'
+  /** Booking status */
   status          : String enum { confirmed; cancelled } default 'confirmed';
 
-  @description: 'Total price for the booking'
+  /** Total price for the booking */
   totalPrice      : Decimal(10,2);
 }

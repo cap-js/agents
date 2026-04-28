@@ -77,6 +77,6 @@
     "tests/bookshop/",
     "tests/travel-sample/travel-agent/",
     "tests/travel-sample/xflights/",
-    "tests/travel-sample/activities/"
+    "tests/travel-sample/leisure-services/"
   ]
 }

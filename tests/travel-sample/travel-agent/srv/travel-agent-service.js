@@ -301,7 +301,7 @@ class TravelAgentExecutor {
 
     if (tools.length === 0) {
       throw new Error(
-        "No downstream agents or MCP servers available. Make sure activities (4006) and xflights (4005) are running.",
+        "No downstream agents or MCP servers available. Make sure leisure-services (4006) and xflights (4005) are running.",
       )
     }
 

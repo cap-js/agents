@@ -38,18 +38,16 @@ service sap.capire.flights.data {
   excluding { createdAt, createdBy, modifiedBy };
 
   /** Book a flight for a passenger on a specific date */
-  @description: 'Book a flight for a passenger'
   action bookFlight(
-    @description: 'Flight connection ID (e.g. SW0001)' flight : String,
-    @description: 'Flight date (YYYY-MM-DD)' date : Date,
-    @description: 'Passenger name' passenger : String,
-    @description: 'Number of seats to book' seats : Integer
+    /** Flight connection ID (e.g. SW0001) */ flight    : String,
+    /** Flight date (YYYY-MM-DD) */           date      : Date,
+    /** Passenger name */                     passenger : String,
+    /** Number of seats to book */            seats     : Integer
   ) returns FlightBookings;
 
   /** Cancel a flight booking */
-  @description: 'Cancel a flight booking'
   action cancelFlight(
-    @description: 'Booking ID to cancel' bookingId : UUID
+    /** Booking ID to cancel */               bookingId : UUID
   ) returns FlightBookings;
 }
 
