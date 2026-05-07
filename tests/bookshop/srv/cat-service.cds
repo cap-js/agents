@@ -10,7 +10,6 @@ service CatalogService {
   /**
    * Book details with author information
    */
-  @description: 'Book details'
   @readonly
   entity Books       as
     projection on my.Books {
