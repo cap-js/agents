@@ -7,7 +7,8 @@ Markdown-based agent using `deepagents` with `@cap-js/a2a` as runtime. Defines a
 - **Search products** by name or category (via CDS `query` tool)
 - **Calculate bulk pricing** with tiered volume discounts (custom tool)
 - **Place orders** with stock validation (via CDS `orderProduct` action)
-- **Progressive disclosure** - reads `AGENTS.md` for identity, loads skills on demand
+- **HITL approval** — when `interruptOn` is configured, orders pause for user approval before execution
+- **Progressive disclosure** — reads `AGENTS.md` for identity, loads skills on demand
 
 ## Architecture
 

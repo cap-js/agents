@@ -89,6 +89,7 @@ async function createAgent(srv) {
     memory: ["./AGENTS.md"],
     skills: ["./skills/"],
     backend: new FilesystemBackend({ rootDir: __agentDir, virtualMode: true }),
+    interruptOn: { orderProduct: { allowedDecisions: ["approve", "reject"] } },
   })
 
   LOG.info("Deep agent created")

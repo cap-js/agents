@@ -1,7 +1,7 @@
 ---
 name: order-management
 description: >
-  Place and manage product orders. Requires approval for orders over $100.
+  Place and manage product orders.
 ---
 
 # Skill: Order Management
@@ -16,6 +16,5 @@ description: >
 
 1. Verify the product exists in catalog
 2. Check stock availability
-3. If order total > $100, request approval (HITL)
-4. Place the order via `orderProduct` action
-5. Confirm order details to user
+3. Place the order via `orderProduct` action
+4. Confirm order details to user

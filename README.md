@@ -35,7 +35,7 @@ service CatalogService {
 
 ### Markdown-Based Agents
 
-Create agents using an agent harness like `deepagents` and plug them into CAP via `this.a2a = { graph }`. Define agent identity in `AGENTS.md`, workflows in `skills/`, and let the plugin handle protocol, persistence, and agent card serving.
+Create agents using an agent harness like `deepagents` and plug them into CAP via `this.a2a = { graph }`. Define agent identity in `AGENTS.md`, workflows in `skills/`, and let the plugin handle protocol, persistence, agent card serving, and human-in-the-loop (HITL) approval flows.
 
 ```js
 const { createDeepAgent, FilesystemBackend } = require("deepagents")
@@ -130,11 +130,28 @@ const checkpointer = new CdsCheckpointSaver()
 
 Set in your service handler's `init()` to override the default executor:
 
-| Pattern        | What you provide          | Plugin provides                   |
-| -------------- | ------------------------- | --------------------------------- |
-| `{ graph }`    | Compiled LangGraph graph  | Protocol, persistence, agent card |
-| `{ executor }` | Full `AgentExecutor` impl | Protocol, persistence, agent card |
-| _(default)_    | Nothing                   | Everything (zero-code)            |
+| Pattern        | What you provide          | Plugin provides                         |
+| -------------- | ------------------------- | --------------------------------------- |
+| `{ graph }`    | Compiled LangGraph graph  | Protocol, persistence, agent card, HITL |
+| `{ executor }` | Full `AgentExecutor` impl | Protocol, persistence, agent card       |
+| _(default)_    | Nothing                   | Everything (zero-code)                  |
+
+### Human-in-the-Loop (HITL)
+
+For markdown-based agents using `deepagents`, the plugin automatically handles HITL approval flows. When a graph calls `interrupt()` (e.g. via `interruptOn` in `createDeepAgent`), the A2A task transitions to `input-required` and the user is prompted for approval. The user replies with "approve" or "reject" and the graph resumes.
+
+```js
+createDeepAgent({
+  ...
+  interruptOn: {
+    createOrder: { allowedDecisions: ["approve", "reject"] }
+  },
+})
+```
+
+No additional plugin configuration needed — interrupt detection, checkpoint persistence, and resume are handled automatically.
+
+Alternatively, HITL can be achieved without `interruptOn` by instructing the agent in its `AGENTS.md` or skills to ask the user for confirmation before proceeding — a pure prompt-based approach with no framework configuration required.
 
 ## Samples
 
