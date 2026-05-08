@@ -4,6 +4,7 @@
 */
 service TravelAgentService {
 
+  // Only here because agent card generation is not automated from agent/ md files yet
   /**
     * Plan a trip - coordinates hotels, flights, and activities
   */

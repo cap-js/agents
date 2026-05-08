@@ -5,136 +5,154 @@
 
 CDS protocol adapter for the [A2A (Agent-to-Agent)](https://a2a-protocol.org) protocol.
 
-Annotate a CDS service with `@a2a` and it becomes a discoverable AI agent that other agents (or humans) can interact with via the A2A protocol.
-
 ## Prerequisites
 
-### AI Core Access
+Access to an SAP AI Core instance:
 
-Access to an AI Core instance via one of the following options:
+- `AICORE_SERVICE_KEY` environment variable, or
+- Bound via `cds bind -2 <instance>`
 
-- `AICORE_SERVICE_KEY` set to your AI Core credentials in the environment variables
-- Application bound to an AI Core instance, e.g. via `cds bind -2 <srv-instance>` locally
-
-For more information, refer to the [SAP Cloud SDK for AI](https://sap.github.io/ai-sdk/docs/js/connecting-to-ai-core).
+See [SAP Cloud SDK for AI](https://sap.github.io/ai-sdk/docs/js/connecting-to-ai-core) for details.
 
 > [!NOTE]
-> In development profile, a mock executor is used that does not require AI Core access. See [Configuration](#configuration).
+> When agentifying existing services and in development profile, a mock executor is used (no AI Core needed).
 
-### Clone the repository and install the samples
+## Ways to Build Agents
 
-```bash
-git clone https://github.tools.sap/cap/a2a
-cd a2a
-npm i
-```
+### Agentify Existing CAP Services
 
-As the A2A plugin is reusing the tools from the MCP Adapter, make sure you are using the internal artifactory and install the dependencies:
-
-```bash
-npm set @cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/
-npm i
-```
-
-## Serving Agents
-
-Annotate a CDS service with `@a2a`:
+Add `@a2a` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the A2A protocol with zero code required. The agent has access to the tools generated from the service model.
 
 ```cds
 @a2a
 service CatalogService {
-  @readonly entity Books as projection on my.Books;
+  entity Books as projection on my.Books;
   action submitOrder(book: Books:ID, quantity: Integer) returns { stock: Integer };
 }
 ```
 
-Start the bookshop sample:
+→ See [Bookshop Sample](./tests/bookshop/)
+
+### Markdown-Based Agents
+
+Create agents using an agent harness like `deepagents` and plug them into CAP via `this.a2a = { graph }`. Define agent identity in `AGENTS.md`, workflows in `skills/`, and let the plugin handle protocol, persistence, and agent card serving.
+
+```js
+const { createDeepAgent, FilesystemBackend } = require("deepagents")
+const { createDeepAgentModel, generateTools } = require("@cap-js/a2a")
+
+module.exports = class MyAgent extends cds.ApplicationService {
+  async init() {
+    await super.init()
+    const { tools } = generateTools(this)
+    this.a2a = {
+      graph: createDeepAgent({
+        model: createDeepAgentModel(),
+        tools,
+        memory: ["./AGENTS.md"],
+        skills: ["./skills/"],
+        backend: new FilesystemBackend({ rootDir: __dirname + "/my-agent", virtualMode: true }),
+        // checkpointer auto-injected by plugin (CdsCheckpointSaver)
+      }),
+    }
+  }
+}
+```
+
+→ See [Deep Agent Sample](./tests/deep-agent-sample/)
+
+## Getting Started
+
+```bash
+git clone <repo-url>
+cd a2a && npm i
+```
+
+Run the bookshop (zero-code agent):
 
 ```bash
 cds w tests/bookshop --profile hybrid
 ```
 
-Send a request to the agent:
+Send a message:
 
 ```bash
 curl -s http://localhost:4004/a2a/catalog/ \
   -H 'Content-Type: application/json' \
-  -d '{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "message/send",
-  "params": {
-    "message": {
-      "messageId": "L1-001",
-      "role": "user",
-      "parts": [{ "kind": "text", "text": "Which books do you have in stock?" }]
-    }
-  }
-}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"message":{"messageId":"1","role":"user","parts":[{"kind":"text","text":"Which books do you have?"}]}}}'
 ```
 
 ## Configuration
 
-### LLM Model
-
-The LLM model is configurable via `cds.env.a2a.llm` or the `AICORE_MODEL` environment variable. Defaults to `anthropic--claude-4.5-sonnet`.
-
-```json
-{ "cds": { "a2a": { "llm": "anthropic--claude-4.5-sonnet" } } }
-```
+| Setting                   | Description                                     | Default                        |
+| ------------------------- | ----------------------------------------------- | ------------------------------ |
+| `cds.a2a.llm`             | LLM model name                                  | `anthropic--claude-4.5-sonnet` |
+| `cds.a2a.per_action_tool` | One tool per action (vs combined `call_action`) | `true`                         |
 
 ### Executor Profiles
 
-The plugin ships two executor implementations:
+Only available when agentifying existing services with `@a2a` annotation.
 
-- **`development`**: Mock executor. Returns sample data from the first entity. No LLM or AI Core needed.
-- **`hybrid`, `production`**: LangGraph executor with ReAct agent with LLM, tool calling, and checkpoint persistence. Requires AI Core.
+- **`development`** - Mock executor. No LLM needed.
+- **`hybrid` / `production`** - LangGraph ReAct agent with AI Core.
 
-## Behind the Scenes
+## API
 
-The plugin does the following in the background:
+### `createDeepAgentModel(options?)`
 
-- Creates a ReAct graph (Reason and Act) with tools auto-generated from the CDS model. These tools are shared with the [CAP MCP Adapter](https://github.tools.sap/cap/mcp-adapter):
-  - `describe`: describes the data model of the service
-  - `query`: retrieves data from exposed entities
-  - One tool per unbound action or function
-- Serves the A2A agent card at `GET /.well-known/agent-card.json`
-- Exposes the A2A JSON-RPC endpoint at `POST /` (handled by `@a2a-js/sdk`)
-- Persists A2A tasks and LangGraph checkpoints for multi-turn conversations
+Creates an LLM model compatible with `deepagents`. Handles array-content messages from deepagents' built-in tools that SAP AI Core would otherwise reject.
 
-## Custom Executors
+```js
+const { createDeepAgentModel } = require("@cap-js/a2a")
+const model = createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
+```
 
-For advanced use cases, you can override the default executor by setting `this.a2a = { executor }` in your service handler:
+### `generateTools(srv)`
+
+Generates LangChain tools from a CDS service model. Reuses tool definitions from `@cap-js/mcp`.
+
+```js
+const { generateTools } = require("@cap-js/a2a")
+const { tools } = generateTools(srv)
+// tools: [query, describe, ...perActionTools]
+```
+
+### `CdsCheckpointSaver`
+
+LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `this.a2a = { graph }`. Exported for custom executors or direct checkpoint access.
 
 ```js
 const { CdsCheckpointSaver } = require("@cap-js/a2a")
-
-module.exports = class MyService extends cds.ApplicationService {
-  async init() {
-    this.a2a = { executor: new MyCustomExecutor(this) }
-    await super.init()
-  }
-}
+const checkpointer = new CdsCheckpointSaver()
 ```
 
-See the [Travel Sample](./tests/travel-sample/) for a full example of a custom orchestrator that coordinates multiple A2A agents and MCP servers.
+### `this.a2a = { ... }`
+
+Set in your service handler's `init()` to override the default executor:
+
+| Pattern        | What you provide          | Plugin provides                   |
+| -------------- | ------------------------- | --------------------------------- |
+| `{ graph }`    | Compiled LangGraph graph  | Protocol, persistence, agent card |
+| `{ executor }` | Full `AgentExecutor` impl | Protocol, persistence, agent card |
+| _(default)_    | Nothing                   | Everything (zero-code)            |
 
 ## Samples
 
-- [Bookshop](./tests/bookshop/): Basic agent. Shows the zero-code setup: annotate with `@a2a` and go.
-- [Travel Sample](./tests/travel-sample/): Multi-agent sample. Custom executor coordinating hotels (A2A), local activities (A2A), and flights (MCP).
+- **[Bookshop](./tests/bookshop/)** - Agentifying an existing CAP service. `@a2a` annotation, zero agent code.
+- **[Deep Agent](./tests/deep-agent-sample/)** - Building a markdown-based agent. `deepagents` with custom tools, AGENTS.md, and progressive disclosure.
+- **[Travel](./tests/travel-sample/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) via A2A and a flight data service via MCP.
+
+## Tooling
+
+- [A2A Editor](https://github.com/open-resource-discovery/a2a-editor) - Chat UI for A2A agents
+- [sem-a2a-cli](https://github.tools.sap/SEM/sem-a2a-cli) - Protocol compliance testing
 
 ## Tests
 
 ```bash
-npm run test
+npm test
 ```
-
-## Tooling
-
-- [sem-a2a-cli](https://github.tools.sap/SEM/sem-a2a-cli) for testing A2A protocol compatibility
-- [A2A Editor](https://github.com/open-resource-discovery/a2a-editor) for a chat UI to communicate with agents
 
 ## License
 
-This package is provided under the terms of the [Apache License 2.0](./LICENSE).
+[Apache License 2.0](./LICENSE)

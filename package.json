@@ -7,10 +7,11 @@
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "test": "npx jest --silent",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
     "test:hybrid": "cds bind --exec -- node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "watch:sample": "cds w tests/bookshop",
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
+    "watch:deepagent-sample": "cds w tests/deep-agent-sample",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check .",
     "generate-sample-card": "cd tests/bookshop && cds c srv -s CatalogService -2 a2a > expected-agent-card.json",
@@ -28,7 +29,7 @@
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
-    "zod": "^4.0.0"
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@cap-js/cds-test": ">=0",
@@ -75,6 +76,7 @@
   },
   "workspaces": [
     "tests/bookshop/",
+    "tests/deep-agent-sample/",
     "tests/travel-sample/travel-agent/",
     "tests/travel-sample/xflights/",
     "tests/travel-sample/leisure-services/"
