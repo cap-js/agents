@@ -14,10 +14,6 @@ Multi-agent travel planner demonstrating A2A orchestration with MCP tool access.
 | `leisure-services/` | 4006 | `@a2a`   | Agentified CAP services. Exposes `HotelService` and `ActivityService` as autonomous A2A agents with LLM access. |
 | `xflights/`         | 4005 | `@mcp`   | Flight master data service. Exposes airlines, airports, flights, and booking actions as MCP tools.              |
 
-## Request Flow
-
-![Request Flow](cap-agents-demo.drawio.svg)
-
 ## Running the Sample
 
 Start all three services in separate terminals:
@@ -27,11 +23,13 @@ Start all three services in separate terminals:
 cds watch tests/travel-sample/xflights
 
 # Terminal 2 - Hotel + Activity agents (A2A)
-cds watch tests/travel-sample/leisure-services
+cds watch tests/travel-sample/leisure-services (--profile hybrid)
 
 # Terminal 3 - Travel agent orchestrator (A2A)
 cds watch tests/travel-sample/travel-agent
 ```
+
+The leisure-services can be started in hybrid mode if an AI Core binding is available or the `$AICORE_SERVICE_KEY` environment variable is set. If it is started in development mode, the agents will return a mock response instead of calling an LLM. The travel-agent is always using LLMs, as it has a custom agent implementation. Xflights does not need an LLM to start MCP servers, so the profile does not matter.
 
 Then send a message to the travel agent via the A2A protocol at `http://localhost:4004/a2a/travel-agent`.
 
