@@ -45,6 +45,13 @@
     "node": ">=20.0.0"
   },
   "cds": {
+    "a2a": {
+      "llm": "anthropic--claude-4.6-sonnet",
+      "params": {
+        "max_tokens": 4096,
+        "temperature": 0
+      }
+    },
     "requires": {
       "a2a": {
         "model": "@cap-js/a2a"

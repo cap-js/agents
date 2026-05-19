@@ -128,13 +128,14 @@ const checkpointer = new CdsCheckpointSaver()
 
 ### `this.a2a = { ... }`
 
-Set in your service handler's `init()` to override the default executor:
+Set in your service handler's `init()` to customize the default behavior:
 
-| Pattern        | What you provide          | Plugin provides                         |
-| -------------- | ------------------------- | --------------------------------------- |
-| `{ graph }`    | Compiled LangGraph graph  | Protocol, persistence, agent card, HITL |
-| `{ executor }` | Full `AgentExecutor` impl | Protocol, persistence, agent card       |
-| _(default)_    | Nothing                   | Everything (zero-code)                  |
+| Pattern        | What you provide                   | Plugin provides                         |
+| -------------- | ---------------------------------- | --------------------------------------- |
+| `{ graph }`    | Compiled LangGraph graph           | Protocol, persistence, agent card, HITL |
+| `{ executor }` | Full `AgentExecutor` impl          | Protocol, persistence, agent card       |
+| `{ model }`    | LangChain `BaseChatModel` instance | Everything else (zero-code)             |
+| _(default)_    | Nothing                            | Everything (zero-code)                  |
 
 ### Human-in-the-Loop (HITL)
 
