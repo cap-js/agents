@@ -2,6 +2,12 @@
 name: product-search
 description: >
   Search and browse the product catalog by name, category, or price range.
+metadata:
+  tags: [products, search, catalog]
+  examples:
+    - Show me all products
+    - Find widgets under $100
+    - Search for gadgets
 ---
 
 # Skill: Product Search

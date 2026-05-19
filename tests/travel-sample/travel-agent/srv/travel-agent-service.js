@@ -12,7 +12,7 @@
  * - CdsCheckpointSaver auto-injected by the plugin for multi-turn conversations
  */
 const cds = require("@sap/cds")
-const path = require("path")
+const { path } = cds.utils
 const { tool } = require("@langchain/core/tools")
 const { z } = require("zod")
 const { createDeepAgent, FilesystemBackend } = require("deepagents")

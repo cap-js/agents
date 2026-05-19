@@ -12,7 +12,7 @@
  * Run with: cds bind --exec -- cds watch tests/deep-agent-sample
  */
 const cds = require("@sap/cds")
-const path = require("path")
+const { path } = cds.utils
 const { createDeepAgent, FilesystemBackend } = require("deepagents")
 const { tool } = require("@langchain/core/tools")
 const { z } = require("zod")
@@ -100,7 +100,8 @@ module.exports = class ProductAgentService extends cds.ApplicationService {
   async init() {
     await super.init()
 
-    this.a2a = { graph: createAgent(this) }
+    // Passing the agent dir for automatic creation of the agent card from AGENTS.md and skills/
+    this.a2a = { graph: createAgent(this), agentDir: __agentDir }
 
     this.on("orderProduct", async (req) => {
       const { productName, quantity } = req.data

@@ -14,4 +14,3 @@ service ProductAgentService {
    */
   action orderProduct(productName: String, quantity: Integer) returns String;
 }
-

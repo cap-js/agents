@@ -1,7 +1,13 @@
 ---
 name: order-management
 description: >
-  Place and manage product orders.
+  Place and manage product orders via the orderProduct action.
+metadata:
+  tags: [orders, products, checkout]
+  examples:
+    - Order 5 Widget Pro
+    - Place an order for 100 Gadget X
+    - I want to buy some connectors
 ---
 
 # Skill: Order Management
