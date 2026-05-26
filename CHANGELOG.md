@@ -15,6 +15,8 @@
 - Mock Executor for testing purposes
 - Multi-turn conversations with checkpointing
 - Option to overwrite the ootb executor
+- OpenTelemetry spans for langChain workflows and nodes as well as LLM invocations and tool calls.
+- OpenTelemetry metrics for LLM token consumption, tool invocations, A2A requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions
 
 ### Changed
 

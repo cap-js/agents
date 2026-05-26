@@ -1,0 +1,31 @@
+{
+  "name": "telemetry-debug-test",
+  "version": "1.0.0",
+  "description": "Test project for debug tracing, failing graph, and trace_langchain=false",
+  "dependencies": {
+    "@cap-js/a2a": "file:../../.",
+    "@cap-js/telemetry": "^1",
+    "@sap/cds": "^9"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2"
+  },
+  "cds": {
+    "a2a": {
+      "trace_langchain": false
+    },
+    "log": {
+      "levels": {
+        "a2a": "debug"
+      }
+    },
+    "mcp": {
+      "toon_format": false
+    },
+    "requires": {
+      "telemetry": {
+        "kind": "telemetry-to-console"
+      }
+    }
+  }
+}

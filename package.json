@@ -38,8 +38,14 @@
     "jest": "^30.3.0"
   },
   "peerDependencies": {
+    "@cap-js/telemetry": ">=1",
     "@sap/cds": ">=8",
     "express": "^4 || ^5"
+  },
+  "peerDependenciesMeta": {
+    "@cap-js/telemetry": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20.0.0"
@@ -47,6 +53,7 @@
   "cds": {
     "a2a": {
       "llm": "anthropic--claude-4.6-sonnet",
+      "trace_langchain": true,
       "params": {
         "max_tokens": 4096,
         "temperature": 0
@@ -84,6 +91,7 @@
   "workspaces": [
     "tests/bookshop/",
     "tests/deep-agent-sample/",
+    "tests/telemetry-debug/",
     "tests/travel-sample/travel-agent/",
     "tests/travel-sample/xflights/",
     "tests/travel-sample/leisure-services/"

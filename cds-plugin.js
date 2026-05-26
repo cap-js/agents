@@ -3,6 +3,18 @@ const cds = require("@sap/cds")
 // Enable doc comments in CSN for agent card generation
 cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
 
+// Ensure A2A correlation fields are indexed by SAP Cloud Logging
+cds.env.log ??= {}
+const cls_fields = (cds.env.log.cls_custom_fields ??= [])
+if (!cls_fields.includes("a2a.task.id")) cls_fields.push("a2a.task.id")
+if (!cls_fields.includes("a2a.context.id")) cls_fields.push("a2a.context.id")
+
+// LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
+if (cds.env.a2a?.trace_langchain !== false) {
+  const { patchLangChain } = require("./lib/telemetry/tracing")
+  patchLangChain()
+}
+
 // Register compile targets (cds compile -2 a2a)
 require("./lib/api").registerCompileTargets()
 

@@ -96,6 +96,48 @@ Only available when agentifying existing services with `@a2a` annotation.
 - **`development`** - Mock executor. No LLM needed.
 - **`hybrid` / `production`** - LangGraph ReAct agent with AI Core.
 
+## Telemetry
+
+When [`@cap-js/telemetry`](https://github.com/cap-js/telemetry) is installed, the plugin automatically instruments LangChain and exposes OpenTelemetry metrics. No additional configuration required.
+
+```bash
+npm add @cap-js/telemetry
+```
+
+### LangChain Tracing
+
+The plugin provides its own OpenTelemetry instrumentation — no external tracing library needed. Spans are created for each execution stage with precise names:
+
+```
+POST /a2a/CatalogService/
+  └─ workflow CompiledStateGraph CatalogService
+       ├─ chat anthropic--claude-4.5-sonnet
+       ├─ execute_tool DynamicStructuredTool query
+       ├─ chat anthropic--claude-4.5-sonnet
+       └─ execute_tool DynamicStructuredTool submitOrder
+```
+
+**Privacy:** By default, spans contain only names, IDs, token counts, and outcomes — no message content. Set `DEBUG=a2a` (or `cds.log.levels.a2a: "debug"`) to include full input/output as `a2a.entity.input` and `a2a.entity.output` span attributes.
+
+### Metrics
+
+| Metric                      | Type           | Description                                | Attributes                                      |
+| --------------------------- | -------------- | ------------------------------------------ | ----------------------------------------------- |
+| `a2a.requests.total`        | Counter        | Total inbound A2A requests                 | `sap.tenantId`, `a2a.service`, `a2a.method`     |
+| `a2a.request.duration`      | Histogram (ms) | End-to-end A2A request duration            | `sap.tenantId`, `a2a.service`, `a2a.method`     |
+| `a2a.errors.total`          | Counter        | Requests resulting in error                | `sap.tenantId`, `a2a.service`, `a2a.error.code` |
+| `a2a.executions.concurrent` | UpDownCounter  | Currently active workflow executions       | `sap.tenantId`, `a2a.service`                   |
+| `a2a.workflows.completed`   | Counter        | Completed agent workflows                  | `sap.tenantId`, `a2a.service`                   |
+| `agent_actions`             | Counter        | Successful workflow completions per tenant | `sap.tenantId`                                  |
+| `a2a.llm.input_tokens`      | Counter        | LLM input tokens consumed                  | `sap.tenantId`, `model`, `node`                 |
+| `a2a.llm.output_tokens`     | Counter        | LLM output tokens generated                | `sap.tenantId`, `model`, `node`                 |
+| `a2a.llm.invocations`       | Counter        | LLM invocation count                       | `sap.tenantId`, `model`, `node`, `outcome`      |
+| `a2a.tool.invocations`      | Counter        | Tool invocation count                      | `sap.tenantId`, `tool`, `outcome`               |
+
+Error codes: `-32603` (JSON-RPC internal error), `execution_failed` (graph error), `timeout` (graph timeout).
+
+All metrics include `sap.tenantId` from `cds.context.tenant` for multi-tenant aggregation.
+
 ## API
 
 ### `createDeepAgentModel(options?)`

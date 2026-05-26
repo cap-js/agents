@@ -6,6 +6,8 @@
     "@cap-js/a2a": "file:../../.",
     "@cap-js/hana": "^2",
     "@cap-js/mcp": "^0.0.11",
+    "@cap-js/telemetry": "^1",
+    "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
     "@sap/cds": "^9.8.5",
     "@sap/xssec": "^4",
     "@toon-format/toon": "^2.1.0",
@@ -23,6 +25,14 @@
       "toon_format": false
     },
     "requires": {
+      "telemetry": {
+        "kind": "telemetry-to-console"
+      },
+      "[hybrid]": {
+        "telemetry": {
+          "kind": "telemetry-to-jaeger"
+        }
+      },
       "[production]": {
         "auth": "xsuaa"
       }
