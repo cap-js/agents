@@ -179,6 +179,20 @@ Set in your service handler's `init()` to customize the default behavior:
 | `{ model }`    | LangChain `BaseChatModel` instance | Everything else (zero-code)             |
 | _(default)_    | Nothing                            | Everything (zero-code)                  |
 
+#### Custom Model
+
+`this.a2a.model` offers an extension point to overwrite the model that is used by the Plugin. By default, an instance of `OrchestrationClient` for AI Core Access is used. You can pass everything in there that implements LangGraph's `BaseChatModel`. An example with the usage of the local [https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/](https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/) looks like this:
+
+```js
+this.a2a = {
+  model: new ChatAnthropic({
+    model: "claude-sonnet-4-5",
+    anthropicApiKey: "<api-key>",
+    anthropicApiUrl: "http://localhost:6655/anthropic",
+  }),
+}
+```
+
 ### Human-in-the-Loop (HITL)
 
 For markdown-based agents using `deepagents`, the plugin automatically handles HITL approval flows. When a graph calls `interrupt()` (e.g. via `interruptOn` in `createDeepAgent`), the A2A task transitions to `input-required` and the user is prompted for approval. The user replies with "approve" or "reject" and the graph resumes.

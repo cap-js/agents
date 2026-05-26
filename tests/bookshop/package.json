@@ -7,6 +7,7 @@
     "@cap-js/hana": "^2",
     "@cap-js/mcp": "^0.0.11",
     "@cap-js/telemetry": "^1",
+    "@langchain/anthropic": "^1.4.0",
     "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
     "@sap/cds": "^9.8.5",
     "@sap/xssec": "^4",

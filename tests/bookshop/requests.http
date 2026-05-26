@@ -88,6 +88,7 @@ Content-Type: application/json
 }
 
 ### ─── HITL: Request Requiring Approval ────────────────────────────
+### WIP, please ignore all following
 
 # Trigger Human-in-the-Loop — task transitions to input-required
 POST http://localhost:4004/a2a/catalog/
@@ -110,7 +111,7 @@ Content-Type: application/json
 
 ### ─── HITL: Approve the Action ────────────────────────────────────
 
-# Resume the HITL task by approving (use the taskId from the input-required response)
+# Resume the HITL task by approving
 POST http://localhost:4004/a2a/catalog/
 Content-Type: application/json
 

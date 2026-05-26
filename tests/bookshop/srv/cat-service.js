@@ -1,4 +1,5 @@
 const cds = require("@sap/cds")
+const { ChatAnthropic } = require("@langchain/anthropic")
 
 module.exports = class CatalogService extends cds.ApplicationService {
   init() {
@@ -33,6 +34,15 @@ module.exports = class CatalogService extends cds.ApplicationService {
       if (!book) return req.error(404, `Book #${id} doesn't exist`)
       return book.stock
     })
+
+    // Use the Hyperspace AI Proxy
+    // this.a2a = {
+    //   model: new ChatAnthropic({
+    //     model: "claude-sonnet-4-5",
+    //     anthropicApiKey: "<api-key>",
+    //     anthropicApiUrl: "http://localhost:6655/anthropic",
+    //   }),
+    // }
 
     return super.init()
   }
