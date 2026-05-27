@@ -84,10 +84,12 @@ curl -s http://localhost:4004/a2a/catalog/ \
 
 ## Configuration
 
-| Setting                   | Description                                     | Default                        |
-| ------------------------- | ----------------------------------------------- | ------------------------------ |
-| `cds.a2a.llm`             | LLM model name                                  | `anthropic--claude-4.5-sonnet` |
-| `cds.a2a.per_action_tool` | One tool per action (vs combined `call_action`) | `true`                         |
+| Setting                       | Description                                     | Default                        |
+| ----------------------------- | ----------------------------------------------- | ------------------------------ |
+| `cds.a2a.llm`                 | LLM model name                                  | `anthropic--claude-4.5-sonnet` |
+| `cds.a2a.per_action_tool`     | One tool per action (vs combined `call_action`) | `true`                         |
+| `cds.a2a.trace_langchain`     | Monkey-patch LangChain for tracing              | `true`                         |
+| `cds.a2a.activeUsersInterval` | Schedule for `active_users` metric computation  | `"24h"` (`0` to disable)       |
 
 ### Executor Profiles
 
@@ -95,6 +97,135 @@ Only available when agentifying existing services with `@a2a` annotation.
 
 - **`development`** - Mock executor. No LLM needed.
 - **`hybrid` / `production`** - LangGraph ReAct agent with AI Core.
+
+## Quota Enforcement
+
+The plugin enforces configurable rate limits and resource quotas at two levels:
+
+1. **Pre-request** — checked before graph execution starts. Returns HTTP `429` with `Retry-After` header.
+2. **Per-node** — checked after each LLM iteration inside the graph. Fails the task with `state: "failed"`.
+
+<details>
+<summary>Configuration</summary>
+
+All limits are configured via `cds.env.a2a.pool` (defaults provided by the plugin):
+
+```json
+{
+  "cds": {
+    "a2a": {
+      "pool": {
+        "maxConcurrentTasks": 5,
+        "maxConcurrentTasksPerUser": 2,
+        "maxTasksPerHour": 100,
+        "maxTasksPerHourPerUser": 20,
+        "maxLLMTokensPerDay": 500000,
+        "maxToolCallsPerHour": 1000,
+        "maxToolCallsPerTask": 50,
+        "maxLLMInvocationsPerTask": 15,
+        "maxLLMTokensPerTask": 20000,
+        "maxLLMCallTimeoutMs": 30000,
+        "maxExecutionTimeMsPerTask": 300000
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Pre-Request Limits (HTTP 429)</summary>
+
+| Limit                       | Retry-After        | Scope  |
+| --------------------------- | ------------------ | ------ |
+| `maxConcurrentTasks`        | 30s                | Tenant |
+| `maxConcurrentTasksPerUser` | 30s                | User   |
+| `maxTasksPerHour`           | Next hour boundary | Tenant |
+| `maxTasksPerHourPerUser`    | Next hour boundary | User   |
+| `maxToolCallsPerHour`       | Next hour boundary | Tenant |
+| `maxLLMTokensPerDay`        | Midnight UTC       | Tenant |
+
+When exceeded, the response is:
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 1847
+Content-Type: application/json
+
+{"jsonrpc":"2.0","error":{"code":-32029,"message":"The maximum of 100 tasks per hour..."}}
+```
+
+</details>
+
+<details>
+<summary>Per-Task Limits (Task Failed)</summary>
+
+| Limit                       | Checked at          | Effect                       |
+| --------------------------- | ------------------- | ---------------------------- |
+| `maxLLMInvocationsPerTask`  | After each LLM call | Graph throws → task `failed` |
+| `maxLLMTokensPerTask`       | After each LLM call | Same                         |
+| `maxToolCallsPerTask`       | After each LLM call | Same                         |
+| `maxLLMCallTimeoutMs`       | Per LLM HTTP call   | Request aborted → error      |
+| `maxExecutionTimeMsPerTask` | Timeout wrapper     | Graph throws → task `failed` |
+
+</details>
+
+<details>
+<summary>LLM Circuit Breaker</summary>
+
+Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](https://sap.github.io/cloud-sdk/docs/js/guides/resilience#circuit-breaker)) and a per-call timeout (`maxLLMCallTimeoutMs`, default 30s). This prevents cascading failures when the LLM backend is degraded.
+
+| Parameter        | Value                               | Description                                   |
+| ---------------- | ----------------------------------- | --------------------------------------------- |
+| Timeout          | `maxLLMCallTimeoutMs` (30s default) | Individual HTTP call timeout                  |
+| Error threshold  | 50%                                 | Opens breaker if ≥50% of calls fail in window |
+| Volume threshold | 10                                  | Minimum calls in window before evaluating     |
+| Reset timeout    | 30s                                 | Time before half-open test request            |
+
+**Behavior:**
+
+- 4xx responses (including 429 rate limits) do **not** trip the circuit breaker — only 5xx and network errors.
+- When the breaker opens, all subsequent LLM calls fail immediately until the reset timeout elapses.
+- After reset, one test request passes through (half-open). If successful, the breaker closes.
+- The circuit breaker is always active — no opt-out configuration.
+
+</details>
+
+<details>
+<summary>Using Per-Node Quota in Custom Graphs</summary>
+
+For custom graphs (`this.a2a = { graph }`), import `shouldContinue` to get quota enforcement in your loop:
+
+```js
+const { StateGraph, END } = require("@langchain/langgraph")
+const {
+  nodes: { shouldContinue },
+} = require("@cap-js/a2a")
+
+const graph = new StateGraph(MyState)
+  .addNode("agent", agentNode)
+  .addNode("tools", toolNode)
+  .addEdge("__start__", "agent")
+  .addConditionalEdges("agent", shouldContinue, { tools: "tools", end: END })
+  .addEdge("tools", "agent")
+```
+
+The state must include `_iterations`, `_totalTokens`, and `_totalToolCalls` fields (updated by your agent node):
+
+```js
+const MyState = Annotation.Root({
+  messages: Annotation({ reducer: messagesStateReducer }),
+  toolCalls: Annotation({ reducer: (_, v) => v, default: () => [] }),
+  _iterations: Annotation({ reducer: (_, v) => v, default: () => 0 }),
+  _totalTokens: Annotation({ reducer: (_, v) => v, default: () => 0 }),
+  _totalToolCalls: Annotation({ reducer: (_, v) => v, default: () => 0 }),
+})
+```
+
+When quota is exceeded, `shouldContinue` throws — the `GraphExecutor` catches it and publishes the task as `failed`.
+
+</details>
 
 ## Telemetry
 
@@ -104,7 +235,8 @@ When [`@cap-js/telemetry`](https://github.com/cap-js/telemetry) is installed, th
 npm add @cap-js/telemetry
 ```
 
-### LangChain Tracing
+<details>
+<summary>LangChain Tracing</summary>
 
 The plugin provides its own OpenTelemetry instrumentation — no external tracing library needed. Spans are created for each execution stage with precise names:
 
@@ -119,24 +251,39 @@ POST /a2a/CatalogService/
 
 **Privacy:** By default, spans contain only names, IDs, token counts, and outcomes — no message content. Set `DEBUG=a2a` (or `cds.log.levels.a2a: "debug"`) to include full input/output as `a2a.entity.input` and `a2a.entity.output` span attributes.
 
-### Metrics
+</details>
 
-| Metric                      | Type           | Description                                | Attributes                                      |
-| --------------------------- | -------------- | ------------------------------------------ | ----------------------------------------------- |
-| `a2a.requests.total`        | Counter        | Total inbound A2A requests                 | `sap.tenantId`, `a2a.service`, `a2a.method`     |
-| `a2a.request.duration`      | Histogram (ms) | End-to-end A2A request duration            | `sap.tenantId`, `a2a.service`, `a2a.method`     |
-| `a2a.errors.total`          | Counter        | Requests resulting in error                | `sap.tenantId`, `a2a.service`, `a2a.error.code` |
-| `a2a.executions.concurrent` | UpDownCounter  | Currently active workflow executions       | `sap.tenantId`, `a2a.service`                   |
-| `a2a.workflows.completed`   | Counter        | Completed agent workflows                  | `sap.tenantId`, `a2a.service`                   |
-| `agent_actions`             | Counter        | Successful workflow completions per tenant | `sap.tenantId`                                  |
-| `a2a.llm.input_tokens`      | Counter        | LLM input tokens consumed                  | `sap.tenantId`, `model`, `node`                 |
-| `a2a.llm.output_tokens`     | Counter        | LLM output tokens generated                | `sap.tenantId`, `model`, `node`                 |
-| `a2a.llm.invocations`       | Counter        | LLM invocation count                       | `sap.tenantId`, `model`, `node`, `outcome`      |
-| `a2a.tool.invocations`      | Counter        | Tool invocation count                      | `sap.tenantId`, `tool`, `outcome`               |
+<details>
+<summary>Metrics</summary>
+
+| Metric                      | Type             | Description                                   | Attributes                                      |
+| --------------------------- | ---------------- | --------------------------------------------- | ----------------------------------------------- |
+| `a2a.requests.total`        | Counter          | Total inbound A2A requests                    | `sap.tenantId`, `a2a.service`, `a2a.method`     |
+| `a2a.request.duration`      | Histogram (ms)   | End-to-end A2A request duration               | `sap.tenantId`, `a2a.service`, `a2a.method`     |
+| `a2a.errors.total`          | Counter          | Requests resulting in error                   | `sap.tenantId`, `a2a.service`, `a2a.error.code` |
+| `a2a.executions.concurrent` | UpDownCounter    | Currently active workflow executions          | `sap.tenantId`, `a2a.service`                   |
+| `a2a.workflows.completed`   | Counter          | Completed agent workflows                     | `sap.tenantId`, `a2a.service`                   |
+| `agent_actions`             | Counter          | Successful workflow completions per tenant    | `sap.tenantId`                                  |
+| `a2a.llm.input_tokens`      | Counter          | LLM input tokens consumed                     | `sap.tenantId`, `model`, `node`                 |
+| `a2a.llm.output_tokens`     | Counter          | LLM output tokens generated                   | `sap.tenantId`, `model`, `node`                 |
+| `a2a.llm.invocations`       | Counter          | LLM invocation count                          | `sap.tenantId`, `model`, `node`, `outcome`      |
+| `a2a.tool.invocations`      | Counter          | Tool invocation count                         | `sap.tenantId`, `tool`, `outcome`               |
+| `active_users`              | Observable Gauge | Active users per service (24h rolling window) | `sap.tenantId`, `a2a.service`                   |
 
 Error codes: `-32603` (JSON-RPC internal error), `execution_failed` (graph error), `timeout` (graph timeout).
 
 All metrics include `sap.tenantId` from `cds.context.tenant` for multi-tenant aggregation.
+
+The `active_users` gauge is computed periodically (default every 24h). To trigger manually:
+
+```js
+const executor = await cds.connect.to("a2a-executor")
+await executor.emit("computeActiveUsers")
+```
+
+Set `cds.a2a.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
+
+</details>
 
 ## API
 

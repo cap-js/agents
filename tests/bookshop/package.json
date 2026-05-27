@@ -4,6 +4,7 @@
   "description": "Sample CAP bookshop for @cap-js/a2a tests",
   "dependencies": {
     "@cap-js/a2a": "file:../../.",
+    "@cap-js/audit-logging": ">=1",
     "@cap-js/hana": "^2",
     "@cap-js/mcp": "^0.0.11",
     "@cap-js/telemetry": "^1",
@@ -22,10 +23,16 @@
     "@sap/cds-dk": "^9"
   },
   "cds": {
+    "a2a": {
+      "activeUsersInterval": "1s"
+    },
     "mcp": {
       "toon_format": false
     },
     "requires": {
+      "audit-log": {
+        "outbox": false
+      },
       "telemetry": {
         "kind": "telemetry-to-console"
       },

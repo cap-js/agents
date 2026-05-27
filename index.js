@@ -1,3 +1,7 @@
+const quotaEnforcerAtNode = require("./lib/executor/langgraph/nodes/quotaEnforcerAtNode")
+const quotaEnforcerAtStart = require("./lib/executor/langgraph/nodes/quotaEnforcerAtStart")
+const shouldContinue = require("./lib/executor/langgraph/nodes/shouldContinue")
+
 /**
  * - CdsCheckpointSaver: LangGraph checkpointer backed by CDS entities (multi-turn, HITL)
  * - CdsTaskStore: A2A task persistence backed by CDS entities
@@ -10,4 +14,9 @@ module.exports = {
   CdsTaskStore: require("./lib/persistence/task-store").CdsTaskStore,
   createDeepAgentModel: require("./lib/model").createDeepAgentModel,
   generateTools: require("./lib/tools").generateTools,
+  nodes: {
+    quotaEnforcerAtStart,
+    quotaEnforcerAtNode,
+    shouldContinue,
+  },
 }

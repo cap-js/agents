@@ -5,11 +5,11 @@ const {
   teardown,
   resetCapture,
   flushMetrics,
-  getSpanExporter,
   getSpansAfterRequest,
   findSpan,
   findSpans,
   createSendMessage,
+  getSpanExporter,
 } = require("./telemetry-utils")
 
 // Must be called BEFORE cds.test()

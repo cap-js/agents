@@ -1,0 +1,14 @@
+{
+  "name": "a2a-mtx-sidecar",
+  "version": "0.0.1",
+  "private": true,
+  "cds": {
+    "profile": "mtx-sidecar"
+  },
+  "dependencies": {
+    "@cap-js/a2a": "file:../../../../../.",
+    "@sap/cds": ">=8",
+    "@sap/cds-mtxs": ">=2",
+    "@cap-js/sqlite": "^2"
+  }
+}

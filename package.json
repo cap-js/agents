@@ -7,8 +7,9 @@
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent --testPathIgnorePatterns=tests/mtx",
     "test:hybrid": "cds bind --exec -- node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:mtx": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/mtx/",
     "watch:sample": "cds w tests/bookshop",
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
     "watch:deepagent-sample": "cds w tests/deep-agent-sample",
@@ -29,11 +30,13 @@
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
+    "@sap-cloud-sdk/resilience": "^4.7.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@cap-js/cds-test": ">=0",
     "@cap-js/sqlite": "^2",
+    "@sap/cds-mtxs": ">=2",
     "@toon-format/toon": ">=0",
     "jest": "^30.3.0"
   },
@@ -54,9 +57,23 @@
     "a2a": {
       "llm": "anthropic--claude-4.6-sonnet",
       "trace_langchain": true,
+      "activeUsersInterval": "24h",
       "params": {
         "max_tokens": 4096,
         "temperature": 0
+      },
+      "pool": {
+        "maxConcurrentTasks": 5,
+        "maxConcurrentTasksPerUser": 2,
+        "maxTasksPerHour": 100,
+        "maxTasksPerHourPerUser": 20,
+        "maxLLMTokensPerDay": 500000,
+        "maxToolCallsPerHour": 1000,
+        "maxToolCallsPerTask": 50,
+        "maxLLMInvocationsPerTask": 15,
+        "maxLLMTokensPerTask": 20000,
+        "maxLLMCallTimeoutMs": 30000,
+        "maxExecutionTimeMsPerTask": 300000
       }
     },
     "requires": {
@@ -91,6 +108,7 @@
   "workspaces": [
     "tests/bookshop/",
     "tests/deep-agent-sample/",
+    "tests/mtx/app/mtx/sidecar/",
     "tests/telemetry-debug/",
     "tests/travel-sample/travel-agent/",
     "tests/travel-sample/xflights/",

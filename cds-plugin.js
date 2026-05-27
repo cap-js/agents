@@ -41,3 +41,9 @@ if (isDev) {
     })
   })
 }
+
+// Schedule active_users metric computation
+cds.on("served", () => {
+  const { setupActiveUsersMetric } = require("./lib/telemetry/active-users")
+  setupActiveUsersMetric()
+})
