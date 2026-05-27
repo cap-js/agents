@@ -14,9 +14,7 @@
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
     "watch:deepagent-sample": "cds w tests/deep-agent-sample",
     "prettier": "npx -y prettier@3 --write .",
-    "prettier:check": "npx -y prettier@3 --check .",
-    "generate-sample-card": "cd tests/bookshop && cds c srv -s CatalogService -2 a2a > expected-agent-card.json",
-    "pretest": "(command -v cds >/dev/null || npm i -g @sap/cds-dk) && npm run generate-sample-card"
+    "prettier:check": "npx -y prettier@3 --check ."
   },
   "files": [
     "index.js",
@@ -41,6 +39,7 @@
     "jest": "^30.3.0"
   },
   "peerDependencies": {
+    "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
     "@sap/cds": ">=8",
     "express": "^4 || ^5"

@@ -21,6 +21,17 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
       const submitSkill = card.skills.find((s) => s.id === "submitOrder")
       expect(submitSkill).toBeDefined()
     })
+
+    test("agent card matches snapshot", async () => {
+      const res = await axios.get("/a2a/catalog/.well-known/agent-card.json")
+      const card = res.data
+      // Remove dynamic url field before snapshot comparison
+      delete card.url
+      if (card.supportedInterfaces) {
+        for (const iface of card.supportedInterfaces) delete iface.url
+      }
+      expect(card).toMatchSnapshot()
+    })
   })
 
   // ── agentCardPath mode (explicit file path override) ──────────────────

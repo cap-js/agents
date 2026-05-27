@@ -18,6 +18,7 @@
 - OpenTelemetry spans for langChain workflows and nodes as well as LLM invocations and tool calls.
 - OpenTelemetry metrics for LLM token consumption, tool invocations, A2A requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions & active_users
 - Quota enforcement via `cds.a2a.pool` to restrict the amount of tokens consumed, tasks run, Tool calls and LLM calls being made.
+- Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
 - Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.a2a.pool.maxLLMCallTimeoutMs` (default 30s).
 
 ### Changed
