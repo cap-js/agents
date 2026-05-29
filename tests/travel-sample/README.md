@@ -23,7 +23,7 @@ Start all three services in separate terminals:
 cds watch tests/travel-sample/xflights
 
 # Terminal 2 - Hotel + Activity agents (A2A)
-cds watch tests/travel-sample/leisure-services (--profile hybrid)
+cds watch tests/travel-sample/leisure-services --profile hybrid
 
 # Terminal 3 - Travel agent orchestrator (A2A)
 cds watch tests/travel-sample/travel-agent

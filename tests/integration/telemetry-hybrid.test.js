@@ -1,7 +1,8 @@
 /**
- * Hybrid telemetry tests — require AI Core binding.
- * Run with: npm run test:hybrid
- * Skipped when AI Core is not available (normal `npm test`).
+ * Hybrid telemetry tests — require the `hybrid` CDS profile.
+ * Run with: npm run test:hybrid (which sets CDS_ENV=hybrid via `cds bind --exec`).
+ * Skipped under regular `npm test` (development profile, mock executor).
+ * In hybrid, these tests will fail loudly if the AI Core binding is missing.
  */
 const cds = require("@sap/cds")
 const {
@@ -14,19 +15,13 @@ const {
   createSendMessage,
 } = require("./telemetry-utils")
 
-// Detect if AI Core binding is available
-const hasAiCore = !!(
-  process.env.AICORE_SERVICE_KEY ||
-  process.env.VCAP_SERVICES?.includes("aicore") ||
-  cds.env.requires?.["ai-core"]?.credentials
-)
-
-const describeHybrid = hasAiCore ? describe : describe.skip
-
 setup()
 
 const { POST, axios } = cds.test(__dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
+
+const isHybrid = cds.env.profiles?.includes("hybrid")
+const describeHybrid = isHybrid ? describe : describe.skip
 
 describeHybrid("@cap-js/a2a - Hybrid telemetry (AI Core)", () => {
   axios.defaults.validateStatus = () => true

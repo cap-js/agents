@@ -30,15 +30,30 @@
       "toon_format": false
     },
     "requires": {
-      "audit-log": {
-        "outbox": false
-      },
+      "audit-log": false,
       "telemetry": {
-        "kind": "telemetry-to-console"
+        "tracing": false,
+        "metrics": false
       },
-      "[hybrid]": {
+      "[test]": {
+        "audit-log": {
+          "outbox": false,
+          "kind": "audit-log-to-console"
+        },
         "telemetry": {
-          "kind": "telemetry-to-jaeger"
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
         }
       },
       "[production]": {

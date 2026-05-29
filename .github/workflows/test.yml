@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     runs-on: [self-hosted, solinas]
-    timeout-minutes: 5
+    timeout-minutes: 10
     name: SQLite Tests with Node.js ${{ matrix.node-version }}
     strategy:
       fail-fast: false
@@ -33,7 +33,6 @@ jobs:
       - run: npm run test
 
   test-hybrid:
-    if: contains(github.event.pull_request.labels.*.name, 'e2e') || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, solinas-medium]
     container:
       image: public.int.repositories.cloud.sap/ubuntu:24.04

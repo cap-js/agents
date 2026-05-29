@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "npx eslint .",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent --testPathIgnorePatterns=tests/mtx",
-    "test:hybrid": "cds bind --exec -- node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:hybrid": "cds bind --exec -- node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
     "test:mtx": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/mtx/",
     "watch:sample": "cds w tests/bookshop",
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
@@ -47,6 +47,9 @@
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
       "optional": true
+    },
+    "@cap-js/audit-logging": {
+      "optional": true
     }
   },
   "engines": {
@@ -66,11 +69,11 @@
         "maxConcurrentTasksPerUser": 2,
         "maxTasksPerHour": 100,
         "maxTasksPerHourPerUser": 20,
-        "maxLLMTokensPerDay": 500000,
+        "maxLLMTokensPerDay": 5000000,
         "maxToolCallsPerHour": 1000,
         "maxToolCallsPerTask": 50,
         "maxLLMInvocationsPerTask": 15,
-        "maxLLMTokensPerTask": 20000,
+        "maxLLMTokensPerTask": 200000,
         "maxLLMCallTimeoutMs": 30000,
         "maxExecutionTimeMsPerTask": 300000
       }
@@ -95,6 +98,19 @@
       "[hybrid]": {
         "a2a-executor": {
           "kind": "a2a-executor-langgraph"
+        },
+        "joule-cap-proxy": {
+          "binding": {
+            "type": "cf",
+            "apiEndpoint": "https://api.cf.eu12.hana.ondemand.com",
+            "org": "cdsruntime",
+            "space": "playground-sirsimon",
+            "instance": "joule-cap-proxy",
+            "key": "joule-cap-proxy-key"
+          },
+          "vcap": {
+            "name": "joule-cap-proxy"
+          }
         }
       },
       "[production]": {
