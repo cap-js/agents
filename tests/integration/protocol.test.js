@@ -3,6 +3,13 @@ const { POST, axios } = cds.test(__dirname + "/../bookshop")
 const { jsonrpc, sendMessage, streamMessage, parseSSEFrames, setupErrorDetection } =
   require("./helpers")({ POST, axios })
 
+const isHybrid = cds.env.profiles?.includes("hybrid")
+const isMock = !isHybrid
+// SSE streaming tests use the mock executor only: the streaming plumbing is
+// executor-independent, and running real LLM calls per test would leave
+// unread SSE streams open, exhausting the concurrent-task quota in hybrid.
+const describeMock = isMock ? describe : describe.skip
+
 describe("@cap-js/a2a - JSON-RPC Protocol", () => {
   setupErrorDetection()
 
@@ -46,7 +53,7 @@ describe("@cap-js/a2a - JSON-RPC Protocol", () => {
   })
 })
 
-describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
+describeMock("@cap-js/a2a - SSE Streaming (message/stream)", () => {
   setupErrorDetection()
 
   test("returns text/event-stream content-type", async () => {
@@ -54,18 +61,18 @@ describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
     expect(res.headers["content-type"]).toMatch(/text\/event-stream/)
   })
 
-  test("response body is a ReadableStream, not {}", async () => {
+  test("response body is SSE text, not {}", async () => {
     const res = await streamMessage("catalog", "Show me books")
-    // naxios returns res.body (ReadableStream) for text/event-stream responses.
     // Before the fix, transport.handle() returned an AsyncGenerator that
     // res.json() serialised as {} — res.data would have been an empty object.
-    expect(res.data).not.toEqual({})
-    expect(typeof res.data?.getReader).toBe("function") // is a ReadableStream
+    // Now res.data is the raw SSE body as a string containing data: frames.
+    expect(typeof res.data).toBe("string")
+    expect(res.data).toContain("data: ")
   })
 
   test("streams valid JSON-RPC envelopes as SSE frames", async () => {
     const res = await streamMessage("catalog", "Show me books")
-    const frames = await parseSSEFrames(res.data)
+    const frames = parseSSEFrames(res.data)
 
     expect(frames.length).toBeGreaterThan(0)
     for (const frame of frames) {
@@ -77,7 +84,7 @@ describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
 
   test("first frame has task submitted state", async () => {
     const res = await streamMessage("catalog", "Show me books")
-    const frames = await parseSSEFrames(res.data)
+    const frames = parseSSEFrames(res.data)
 
     const taskFrame = frames.find((f) => f.result?.kind === "task")
     expect(taskFrame).toBeDefined()
@@ -87,7 +94,7 @@ describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
 
   test("includes a working status frame before completion", async () => {
     const res = await streamMessage("catalog", "Show me books")
-    const frames = await parseSSEFrames(res.data)
+    const frames = parseSSEFrames(res.data)
 
     const workingFrame = frames.find(
       (f) => f.result?.kind === "status-update" && f.result?.status?.state === "working",
@@ -97,7 +104,7 @@ describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
 
   test("final frame has completed state", async () => {
     const res = await streamMessage("catalog", "Show me books")
-    const frames = await parseSSEFrames(res.data)
+    const frames = parseSSEFrames(res.data)
 
     const last = frames[frames.length - 1]
     expect(last.result?.kind).toBe("status-update")
@@ -107,7 +114,7 @@ describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
 
   test("task submitted via stream is retrievable with tasks/get", async () => {
     const res = await streamMessage("catalog", "Show me books")
-    const frames = await parseSSEFrames(res.data)
+    const frames = parseSSEFrames(res.data)
 
     const taskFrame = frames.find((f) => f.result?.kind === "task")
     const taskId = taskFrame?.result?.id

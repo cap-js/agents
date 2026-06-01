@@ -1,7 +1,11 @@
 const cds = require("@sap/cds")
+const { POST, axios } = cds.test(__dirname + "/../deep-agent-sample")
+const isHybrid = cds.env.profiles?.includes("hybrid")
 
-// deepagents has ESM-only transitive deps (p-retry) that can't be require()'d in Jest.
-// Skip these tests until we switch to a vitest runner or configure ESM transforms.
+// deepagents has ESM-only transitive deps (p-retry) that fail to load in Jest on
+// Node 22 but succeed on Node 24. However, these tests require a real LLM (AI Core)
+// via createDeepAgentModel() — they must only run in hybrid mode regardless of
+// whether deepagents itself is loadable.
 let canLoad = true
 try {
   require("deepagents")
@@ -9,10 +13,9 @@ try {
   canLoad = false
 }
 
-const describeGraph = canLoad ? describe : describe.skip
+const describeGraph = canLoad && isHybrid ? describe : describe.skip
 
 describeGraph("@cap-js/a2a - Custom Graph (deepagents)", () => {
-  const { POST, axios } = cds.test(__dirname + "/../deep-agent-sample")
   const { sendMessage, jsonrpc, setupErrorDetection } = require("./helpers")({ POST, axios })
 
   setupErrorDetection()

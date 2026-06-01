@@ -26,43 +26,40 @@ module.exports = ({ POST, axios }) => {
   }
 
   function streamMessage(service, text) {
-    return POST(`/a2a/${service}/`, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "message/stream",
-      params: {
-        message: {
-          kind: "message",
-          messageId: cds.utils.uuid(),
-          role: "user",
-          parts: [{ kind: "text", text }],
+    // responseType: 'text' makes naxios call res.text(), which waits for the
+    // server to close the connection (res.end()) and returns the complete SSE
+    // body as a plain string. This is portable across Node versions and avoids
+    // leaving unread ReadableStreams open (which would count against the
+    // concurrent-task quota in hybrid mode).
+    return POST(
+      `/a2a/${service}/`,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "message/stream",
+        params: {
+          message: {
+            kind: "message",
+            messageId: cds.utils.uuid(),
+            role: "user",
+            parts: [{ kind: "text", text }],
+          },
         },
       },
-    })
+      { responseType: "text" },
+    )
   }
 
   /**
-   * Drain a text/event-stream ReadableStream into an array of parsed JSON-RPC envelopes.
-   * Each SSE frame has the wire format: "data: <JSON>\n\n"
+   * Parse a text/event-stream response body string into an array of parsed
+   * JSON-RPC envelopes. Each SSE frame has the wire format: "data: <JSON>\n\n"
    */
-  async function parseSSEFrames(stream) {
-    const reader = stream.getReader()
-    const decoder = new TextDecoder()
-    const frames = []
-    let buf = ""
-    while (true) {
-      // eslint-disable-next-line no-await-in-loop
-      const { done, value } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      const parts = buf.split("\n\n")
-      buf = parts.pop() // keep any incomplete trailing chunk
-      for (const part of parts) {
-        const line = part.trim()
-        if (line.startsWith("data: ")) frames.push(JSON.parse(line.slice(6)))
-      }
-    }
-    return frames
+  function parseSSEFrames(body) {
+    return body
+      .split("\n\n")
+      .map((part) => part.trim())
+      .filter((part) => part.startsWith("data: "))
+      .map((part) => JSON.parse(part.slice(6)))
   }
 
   /**
