@@ -250,7 +250,7 @@ In development, audit events are logged to the console. In production, they are 
 | `AgentTaskCompleted` | Task succeeds                 | `taskId`, `contextId`, `service`, `duration`, `tokens`, `toolCalls`, `output`, `task`             |
 | `AgentTaskFailed`    | Task fails                    | `taskId`, `contextId`, `service`, `error`, `errorCode`, `task`                                    |
 | `AgentTaskCanceled`  | Task canceled                 | `taskId`, `service`                                                                               |
-| `SecurityEvent`      | Quota breach                  | `action`, `service`, `user`, `reason`, `forwardedIp` + `ip` (top-level)                           |
+| `QuotaExceeded`      | Quota breach                  | `action`, `service`, `user`, `reason`, `forwardedIp` + `ip` (top-level)                           |
 
 All events include the original event name in the `data` field for filtering and forensic reconstruction. Common fields (`uuid`, `tenant`, `user`, `time`) are auto-filled by `@cap-js/audit-logging`. Every event also carries a `correlationId` (`cds.context.id`) for cross-referencing with auto-emitted DPP events.
 

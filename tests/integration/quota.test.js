@@ -233,6 +233,92 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       const result = await shouldContinue(state, config)
       expect(result).toBe("end")
     })
+
+    it("should emit QuotaExceeded audit log when quota breached", async () => {
+      const utils = require("../../lib/utils")
+      const auditSpy = jest.spyOn(utils, "audit")
+
+      cds.env.a2a.pool.maxLLMInvocationsPerTask = 3
+      const state = { _iterations: 3, _totalTokens: 100, _totalToolCalls: 2 }
+      const config = { configurable: { _taskId: "task-abc-123", _service: "TestService" } }
+      const result = await quotaEnforcerAtNode(state, config)
+
+      expect(result).toBe("end")
+      expect(auditSpy).toHaveBeenCalledWith("QuotaExceeded", {
+        data: {
+          service: "TestService",
+          taskId: "task-abc-123",
+          user: cds.context?.user?.id,
+          reason: expect.stringContaining("Max iterations reached"),
+        },
+      })
+
+      auditSpy.mockRestore()
+    })
+
+    it("should not emit audit log when within quota", async () => {
+      const utils = require("../../lib/utils")
+      const auditSpy = jest.spyOn(utils, "audit")
+
+      cds.env.a2a.pool.maxLLMInvocationsPerTask = 15
+      cds.env.a2a.pool.maxLLMTokensPerTask = 20000
+      cds.env.a2a.pool.maxToolCallsPerTask = 50
+      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 2 }
+      const config = { configurable: { _taskId: "test", _service: "TestService" } }
+      const result = await quotaEnforcerAtNode(state, config)
+
+      expect(result).toBe("next")
+      expect(auditSpy).not.toHaveBeenCalled()
+
+      auditSpy.mockRestore()
+    })
+
+    it("should emit audit log with token quota reason", async () => {
+      const utils = require("../../lib/utils")
+      const auditSpy = jest.spyOn(utils, "audit")
+
+      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100
+      cds.env.a2a.pool.maxLLMTokensPerTask = 500
+      const state = { _iterations: 1, _totalTokens: 500, _totalToolCalls: 0 }
+      const config = { configurable: { _taskId: "task-xyz", _service: "TokenService" } }
+      const result = await quotaEnforcerAtNode(state, config)
+
+      expect(result).toBe("end")
+      expect(auditSpy).toHaveBeenCalledWith("QuotaExceeded", {
+        data: {
+          service: "TokenService",
+          taskId: "task-xyz",
+          user: cds.context?.user?.id,
+          reason: expect.stringContaining("Max tokens per task reached"),
+        },
+      })
+
+      auditSpy.mockRestore()
+    })
+
+    it("should emit audit log with tool calls quota reason", async () => {
+      const utils = require("../../lib/utils")
+      const auditSpy = jest.spyOn(utils, "audit")
+
+      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100
+      cds.env.a2a.pool.maxLLMTokensPerTask = 20000
+      cds.env.a2a.pool.maxToolCallsPerTask = 5
+      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 5 }
+      const config = { configurable: { _taskId: "task-tools", _service: "ToolService" } }
+      const result = await quotaEnforcerAtNode(state, config)
+
+      expect(result).toBe("end")
+      expect(auditSpy).toHaveBeenCalledWith("QuotaExceeded", {
+        data: {
+          service: "ToolService",
+          taskId: "task-tools",
+          user: cds.context?.user?.id,
+          reason: expect.stringContaining("Max tool calls per task reached"),
+        },
+      })
+
+      auditSpy.mockRestore()
+    })
   })
 
   describe("toolNode _totalToolCalls tracking", () => {
