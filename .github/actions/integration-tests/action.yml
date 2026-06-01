@@ -20,13 +20,13 @@ runs:
   using: "composite"
   steps:
     - name: Setup CF CLI and authenticate
-      uses: cap/.github/.github/actions/cf-setup@main
+      uses: cap/.github/.github/actions/cf-setup@931efef2f74232949efd47ea5fa3d36876d140c2 # main
       with:
         org: ${{ inputs.CF_ORG }}
         space: ${{ inputs.CF_SPACE }}
 
     - name: Use Node.js ${{ inputs.NODE_VERSION }}
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
       with:
         node-version: ${{ inputs.NODE_VERSION }}
 
