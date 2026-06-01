@@ -66,8 +66,8 @@
         "temperature": 0
       },
       "pool": {
-        "maxConcurrentTasks": 5,
-        "maxConcurrentTasksPerUser": 2,
+        "maxConcurrentTasks": 10,
+        "maxConcurrentTasksPerUser": 4,
         "maxTasksPerHour": 100,
         "maxTasksPerHourPerUser": 20,
         "maxLLMTokensPerDay": 5000000,
