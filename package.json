@@ -99,19 +99,6 @@
       "[hybrid]": {
         "a2a-executor": {
           "kind": "a2a-executor-langgraph"
-        },
-        "joule-cap-proxy": {
-          "binding": {
-            "type": "cf",
-            "apiEndpoint": "https://api.cf.eu12.hana.ondemand.com",
-            "org": "cdsruntime",
-            "space": "playground-sirsimon",
-            "instance": "joule-cap-proxy",
-            "key": "joule-cap-proxy-key"
-          },
-          "vcap": {
-            "name": "joule-cap-proxy"
-          }
         }
       },
       "[production]": {
