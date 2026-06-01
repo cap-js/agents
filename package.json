@@ -59,6 +59,7 @@
     "a2a": {
       "llm": "anthropic--claude-4.6-sonnet",
       "trace_langchain": true,
+      "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
       "params": {
         "max_tokens": 4096,

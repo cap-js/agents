@@ -1,42 +1,67 @@
-using { managed } from '@sap/cds/common';
+using {managed} from '@sap/cds/common';
+
 namespace cap.a2a;
 
 /**
  * Stores A2A task objects for retrieval via tasks/get.
  */
 entity Tasks : managed {
-  key taskId    : String; // A2A task ID (server-generated UUID)
-      contextId : String; // Groups related tasks into conversations
-      state     : String; // Current task state (submitted, working, completed, failed, etc.)
-      data      : LargeString; // Full serialized A2A Task JSON
+      /**
+       * A2A task ID (server-generated UUID)
+       */
+  key taskId         : String;
+      /**
+       * Groups related tasks into conversations
+       */
+      contextId      : String;
+      /**
+       * Current task state (submitted, working, completed, failed, etc.)
+       */
+      state          : String;
+      /**
+       * Full serialized A2A Task JSON
+       */
+      data           : LargeString; 
       /**
        * Fully qualified CDS service name
        */
-      agent_service: String;
+      agentService   : String;
       /**
        * Combined LLM Input and Output tokens used for this task
        */
-      usage_llm_tokens: Integer64 default 0;
+      usageLlmTokens : Integer64 default 0;
       /**
        * Amount of tool calls made by this task
        */
-      usage_tool_calls: Integer default 0;
+      usageToolCalls : Integer default 0;
 }
 
-entity Checkpoints {
+entity Checkpoints : managed {
   key thread_id            : String;
   key checkpoint_ns        : String default '';
   key checkpoint_id        : String;
       parent_checkpoint_id : String;
+      parent               : Association to one Checkpoints
+                               on parent.checkpoint_id = parent_checkpoint_id;
       checkpoint           : LargeString;
       metadata             : LargeString;
+      writes               : Composition of many CheckpointWrites
+                               on  writes.thread_id     = thread_id
+                               and writes.checkpoint_ns = checkpoint_ns
+                               and writes.checkpoint_id = checkpoint_id;
 }
 
 entity CheckpointWrites {
   key thread_id     : String;
   key checkpoint_ns : String default '';
   key checkpoint_id : String;
+      checkpoint    : Association to one Checkpoints
+                        on  checkpoint.checkpoint_id = checkpoint_id
+                        and checkpoint.checkpoint_ns = checkpoint_ns
+                        and checkpoint.thread_id     = thread_id;
   key task_id       : String;
+      task          : Association to one Tasks
+                        on task.taskId = task_id;
   key idx           : Integer;
       channel       : String;
       value         : LargeString;

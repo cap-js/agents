@@ -119,11 +119,11 @@ All limits are configured via `cds.env.a2a.pool` (defaults provided by the plugi
         "maxConcurrentTasksPerUser": 2,
         "maxTasksPerHour": 100,
         "maxTasksPerHourPerUser": 20,
-        "maxLLMTokensPerDay": 500000,
+        "maxLLMTokensPerDay": 5000000,
         "maxToolCallsPerHour": 1000,
         "maxToolCallsPerTask": 50,
         "maxLLMInvocationsPerTask": 15,
-        "maxLLMTokensPerTask": 20000,
+        "maxLLMTokensPerTask": 200000,
         "maxLLMCallTimeoutMs": 30000,
         "maxExecutionTimeMsPerTask": 300000
       }
@@ -377,6 +377,15 @@ LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using
 ```js
 const { CdsCheckpointSaver } = require("@cap-js/a2a")
 const checkpointer = new CdsCheckpointSaver()
+```
+
+By default, only special checkpoint writes (interrupts, errors, scheduled tasks, resume signals) are persisted. Regular node output writes are skipped to reduce database load — the full graph state is already captured in the checkpoint blob itself. This assumes a **sequential graph** (no fan-out/fan-in parallel branches).
+
+If your application uses a custom graph with parallel branches, enable full write persistence to avoid re-execution of completed branches on resume:
+
+```jsonc
+// package.json or .cdsrc.json
+"cds": { "a2a": { "persistAllCheckpointWrites": true } }
 ```
 
 ### `this.a2a = { ... }`

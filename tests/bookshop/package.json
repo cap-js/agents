@@ -24,7 +24,10 @@
   },
   "cds": {
     "a2a": {
-      "activeUsersInterval": "1s"
+      "activeUsersInterval": "1s",
+      "[hybrid]": {
+        "activeUsersInterval": "24h"
+      }
     },
     "mcp": {
       "toon_format": false

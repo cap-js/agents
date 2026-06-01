@@ -275,7 +275,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
   })
 
   describe("usage tracking on task record", () => {
-    it("should write agent_service to task record after completion", async () => {
+    it("should write agentService to task record after completion", async () => {
       const res = await sendMessage("graph-book", "Track usage")
       expect(res.status).toBe(200)
       expect(res.data.result.status.state).toBe("completed")
@@ -286,10 +286,10 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.a2a.Tasks").where({ taskId })
       expect(row).toBeDefined()
-      expect(row.agent_service).toBe("GraphBookService")
+      expect(row.agentService).toBe("GraphBookService")
     })
 
-    it("should write usage_tool_calls to task record when graph tracks it", async () => {
+    it("should write usageToolCalls to task record when graph tracks it", async () => {
       cds.env.a2a.pool.maxLLMInvocationsPerTask = 3
       const res = await sendMessage("looping", "Track tools")
       expect(res.data.result.status.state).toBe("failed")
@@ -299,7 +299,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.a2a.Tasks").where({ taskId })
       expect(row).toBeDefined()
-      expect(row.usage_tool_calls).toBeGreaterThanOrEqual(1)
+      expect(row.usageToolCalls).toBeGreaterThanOrEqual(1)
     })
 
     it("should write usage fields even when task fails", async () => {
@@ -312,9 +312,9 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.a2a.Tasks").where({ taskId })
       expect(row).toBeDefined()
-      expect(row.agent_service).toBe("LoopingService")
-      expect(row.usage_llm_tokens).toBeGreaterThanOrEqual(100)
-      expect(row.usage_tool_calls).toBeGreaterThanOrEqual(1)
+      expect(row.agentService).toBe("LoopingService")
+      expect(row.usageLlmTokens).toBeGreaterThanOrEqual(100)
+      expect(row.usageToolCalls).toBeGreaterThanOrEqual(1)
     })
   })
 
