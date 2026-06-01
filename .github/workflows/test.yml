@@ -19,6 +19,8 @@ jobs:
         cds-version: [latest]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
@@ -48,6 +50,8 @@ jobs:
     steps:
       - run: apt-get update -y && apt-get install make -y
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: cap/.github/.github/actions/git-setup@main
         with:
           com-github-token: ${{ secrets.COM_GITHUB_TOKEN }}
