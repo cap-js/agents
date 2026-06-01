@@ -4,7 +4,7 @@ exports[`@cap-js/a2a - Agent Card Generation Agentify mode (CDS model) agent car
 {
   "capabilities": {
     "pushNotifications": false,
-    "streaming": false,
+    "streaming": true,
   },
   "defaultInputModes": [
     "text/plain",

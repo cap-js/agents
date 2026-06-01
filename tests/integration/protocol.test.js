@@ -1,6 +1,7 @@
 const cds = require("@sap/cds")
 const { POST, axios } = cds.test(__dirname + "/../bookshop")
-const { jsonrpc, sendMessage, setupErrorDetection } = require("./helpers")({ POST, axios })
+const { jsonrpc, sendMessage, streamMessage, parseSSEFrames, setupErrorDetection } =
+  require("./helpers")({ POST, axios })
 
 describe("@cap-js/a2a - JSON-RPC Protocol", () => {
   setupErrorDetection()
@@ -42,5 +43,79 @@ describe("@cap-js/a2a - JSON-RPC Protocol", () => {
   test("tasks/get - returns error for non-existent task ID", async () => {
     const res = await jsonrpc("catalog", "tasks/get", { id: "non-existent-id" })
     expect(res.data.error).toBeDefined()
+  })
+})
+
+describe("@cap-js/a2a - SSE Streaming (message/stream)", () => {
+  setupErrorDetection()
+
+  test("returns text/event-stream content-type", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    expect(res.headers["content-type"]).toMatch(/text\/event-stream/)
+  })
+
+  test("response body is a ReadableStream, not {}", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    // naxios returns res.body (ReadableStream) for text/event-stream responses.
+    // Before the fix, transport.handle() returned an AsyncGenerator that
+    // res.json() serialised as {} — res.data would have been an empty object.
+    expect(res.data).not.toEqual({})
+    expect(typeof res.data?.getReader).toBe("function") // is a ReadableStream
+  })
+
+  test("streams valid JSON-RPC envelopes as SSE frames", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    const frames = await parseSSEFrames(res.data)
+
+    expect(frames.length).toBeGreaterThan(0)
+    for (const frame of frames) {
+      expect(frame.jsonrpc).toBe("2.0")
+      expect(frame.id).toBe(1)
+      expect(frame.result).toBeDefined()
+    }
+  })
+
+  test("first frame has task submitted state", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    const frames = await parseSSEFrames(res.data)
+
+    const taskFrame = frames.find((f) => f.result?.kind === "task")
+    expect(taskFrame).toBeDefined()
+    expect(taskFrame.result.status.state).toBe("submitted")
+    expect(taskFrame.result.id).toBeDefined()
+  })
+
+  test("includes a working status frame before completion", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    const frames = await parseSSEFrames(res.data)
+
+    const workingFrame = frames.find(
+      (f) => f.result?.kind === "status-update" && f.result?.status?.state === "working",
+    )
+    expect(workingFrame).toBeDefined()
+  })
+
+  test("final frame has completed state", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    const frames = await parseSSEFrames(res.data)
+
+    const last = frames[frames.length - 1]
+    expect(last.result?.kind).toBe("status-update")
+    expect(last.result?.status?.state).toBe("completed")
+    expect(last.result?.status?.message?.parts[0]?.text).toBeDefined()
+  })
+
+  test("task submitted via stream is retrievable with tasks/get", async () => {
+    const res = await streamMessage("catalog", "Show me books")
+    const frames = await parseSSEFrames(res.data)
+
+    const taskFrame = frames.find((f) => f.result?.kind === "task")
+    const taskId = taskFrame?.result?.id
+    expect(taskId).toBeDefined()
+
+    const getRes = await jsonrpc("catalog", "tasks/get", { id: taskId })
+    expect(getRes.data.result).toBeDefined()
+    expect(getRes.data.result.id).toBe(taskId)
+    expect(getRes.data.result.status.state).toBe("completed")
   })
 })
