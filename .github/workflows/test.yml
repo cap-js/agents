@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: cap/.github/.github/actions/git-setup@931efef2f74232949efd47ea5fa3d36876d140c2 # main
+      - uses: cap/.github/.github/actions/git-setup@20d670f8fe531e96ac02e73d09249106b36339ac # main
         with:
           com-github-token: ${{ secrets.COM_GITHUB_TOKEN }}
       - name: Run hybrid integration tests
