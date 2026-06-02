@@ -1,5 +1,5 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
+import assert from "node:assert/strict"
 
 let canLoadDeepAgent = true
 try {

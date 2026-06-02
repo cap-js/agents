@@ -1,10 +1,16 @@
 import { CdsCheckpointSaver } from "./lib/persistence/checkpoint-saver.js"
 import { CdsTaskStore } from "./lib/persistence/task-store.js"
-import { createModel, flattenMessages, buildContentFilter } from "./lib/llm.js"
+import {
+  createModel,
+  createDeepAgentModel,
+  flattenMessages,
+  buildContentFilter,
+} from "./lib/llm.js"
 import { generateTools } from "./lib/tools.js"
 import quotaEnforcerAtNode from "./lib/executor/langgraph/nodes/quotaEnforcerAtNode.js"
 import quotaEnforcerAtStart from "./lib/executor/langgraph/nodes/quotaEnforcerAtStart.js"
 import shouldContinue from "./lib/executor/langgraph/nodes/shouldContinue.js"
+import { contentFilterRecoveryMiddleware } from "./lib/middlewares/content-filter-recovery.js"
 
 /**
  * - CdsCheckpointSaver: LangGraph checkpointer backed by CDS entities (multi-turn, HITL)
@@ -16,6 +22,8 @@ import shouldContinue from "./lib/executor/langgraph/nodes/shouldContinue.js"
 export {
   CdsCheckpointSaver,
   CdsTaskStore,
+  contentFilterRecoveryMiddleware,
+  createDeepAgentModel,
   createModel,
   flattenMessages,
   buildContentFilter,

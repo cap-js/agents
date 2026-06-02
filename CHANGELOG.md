@@ -20,6 +20,7 @@
 - Quota enforcement via `cds.a2a.pool` to restrict the amount of tokens consumed, tasks run, Tool calls and LLM calls being made.
 - Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
 - Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.a2a.pool.maxLLMCallTimeoutMs` (default 30s).
+- Content filtering with Azure Content Safety prompt injection shield via `cds.a2a.contentFilter` (default: `true`). Supports per-service override via `this.a2a = { contentFilter }` (async function, object, or `false` to disable).
 - A2A Tasks and Checkpoints can only be accessed by the user who created it
 
 ### Changed

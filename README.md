@@ -47,7 +47,7 @@ export default class MyAgent extends cds.ApplicationService {
     const { tools } = generateTools(this)
     this.a2a = {
       graph: createDeepAgent({
-        model: await createModel({ deepAgent: true }),
+        model: await createDeepAgentModel(),
         tools,
         memory: ["./AGENTS.md"],
         skills: ["./skills/"],
@@ -87,12 +87,13 @@ curl -s http://localhost:4004/a2a/catalog/ \
 
 ## Configuration
 
-| Setting                       | Description                                     | Default                        |
-| ----------------------------- | ----------------------------------------------- | ------------------------------ |
-| `cds.a2a.llm`                 | LLM model name                                  | `anthropic--claude-4.5-sonnet` |
-| `cds.a2a.per_action_tool`     | One tool per action (vs combined `call_action`) | `true`                         |
-| `cds.a2a.trace_langchain`     | Monkey-patch LangChain for tracing              | `true`                         |
-| `cds.a2a.activeUsersInterval` | Schedule for `active_users` metric computation  | `"24h"` (`0` to disable)       |
+| Setting                       | Description                                                              | Default                        |
+| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
+| `cds.a2a.llm`                 | LLM model name                                                           | `anthropic--claude-4.5-sonnet` |
+| `cds.a2a.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                         |
+| `cds.a2a.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                         |
+| `cds.a2a.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                         |
+| `cds.a2a.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable)       |
 
 ### Executor Profiles
 
@@ -352,20 +353,135 @@ Set `cds.a2a.activeUsersInterval: 0` to disable automatic scheduling (manual tri
 
 </details>
 
+## Content Filter
+
+By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https://sap.github.io/ai-sdk/docs/js/orchestration/chat-completion#azure-content-filter) with a prompt injection shield (`cds.a2a.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
+
+<details>
+<summary>Configuration options</summary>
+
+**Disable globally:**
+
+```json
+{ "cds": { "a2a": { "contentFilter": false } } }
+```
+
+**Custom filter object globally:**
+
+```json
+{
+  "cds": {
+    "a2a": {
+      "contentFilter": {
+        "input": {
+          "filters": [
+            { "type": "azure_content_safety", "config": { "hate": 0, "prompt_shield": true } }
+          ]
+        },
+        "output": { "filters": [] }
+      }
+    }
+  }
+}
+```
+
+**Per-service override** via `this.a2a.contentFilter`:
+
+```js
+// Disable for one service
+this.a2a = { contentFilter: false }
+
+// Custom filter object
+this.a2a = {
+  contentFilter: {
+    input: { filters: [myCustomFilter] },
+    output: { filters: [] },
+  },
+}
+
+// Async factory function (full control)
+this.a2a = {
+  contentFilter: async () => {
+    const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
+    const filter = buildAzureContentSafetyFilter("input", { prompt_shield: true })
+    return { input: { filters: [filter] }, output: { filters: [] } }
+  },
+}
+```
+
+Resolution order: `srv.a2a.contentFilter` → `cds.env.a2a.contentFilter` → default (Azure Content Safety).
+
+</details>
+
+### Limitations: prompt_shield + Deepagents
+
+The default `prompt_shield` filter (Azure Content Safety) has a request payload
+size limit. Deepagents accumulate large contexts — system prompt, skill files,
+multiple tool results — that can exceed it. The fix for now is to disable filtering for deepagent-based services:
+
+```js
+this.a2a = {
+  graph: createDeepAgent({
+    /* ... */
+  }),
+  contentFilter: false,
+}
+```
+
+If you want to keep the content filter enabled and have your deepagent
+gracefully recover from filter errors instead of failing the task, see
+[`contentFilterRecoveryMiddleware()`](#contentfilterrecoverymiddleware) in the
+API section.
+
 ## API
+
+### `createDeepAgentModel(options?)`
+
+Creates an LLM model for use with `deepagents`' `createDeepAgent()`. Handles
+SAP AI Core's array-content compatibility issue: deepagents' built-in tools
+(`read_file`, `ls`, `grep`, …) return content as `[{ type: "text", text: "..." }]`
+arrays, but AI Core requires plain strings. This factory enables message
+flattening automatically and uses defaults appropriate for deepagents
+(`max_tokens: 4096`, `temperature: 0`, no tool binding).
+
+```js
+const { createDeepAgentModel } = require("@cap-js/a2a")
+
+const model = await createDeepAgentModel()
+const model = await createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
+```
 
 ### `createModel(options?)`
 
-Creates an LLM model (OrchestrationClient). Set `deepAgent: true` for deepagent mode which enables message flattening and uses appropriate defaults. Without `deepAgent`, behaves as the managed agent model factory (binds tools, checks `srv.a2a.model` overrides).
+Creates an LLM model (OrchestrationClient) for **managed agents** (default
+langgraph executor or custom graphs). Binds tools and checks `srv.a2a.model`
+overrides. For deepagents, use `createDeepAgentModel()` instead.
 
 ```js
 import { createModel } from "@cap-js/a2a"
 
-// Deep agent mode (flatten array-content, default params)
-const model = await createModel({ deepAgent: true, params: { max_tokens: 4096, temperature: 0.2 } })
-
 // Managed agent mode (binds tools, uses srv for content filter/model override)
 const model = await createModel({ srv, tools })
+```
+
+### `contentFilterRecoveryMiddleware()`
+
+LangChain agent middleware for use with `createDeepAgent({ middleware: [...] })`
+that gracefully recovers from SAP AI Core content filter errors instead of
+crashing the task. Add it to your deepagent's middleware chain to keep
+`prompt_shield` enabled while still handling filter rejections politely:
+
+```js
+import { createDeepAgent } from "deepagents"
+import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/a2a"
+
+const agent = createDeepAgent({
+  model: await createDeepAgentModel(),
+  tools: [
+    /* ... */
+  ],
+  middleware: [await contentFilterRecoveryMiddleware()],
+})
 ```
 
 ### `generateTools(srv)`
@@ -373,7 +489,7 @@ const model = await createModel({ srv, tools })
 Generates LangChain tools from a CDS service model. Reuses tool definitions from `@cap-js/mcp`.
 
 ```js
-const { generateTools } = require("@cap-js/a2a")
+import { generateTools } from "@cap-js/a2a"
 const { tools } = generateTools(srv)
 // tools: [query, describe, ...perActionTools]
 ```
@@ -383,7 +499,7 @@ const { tools } = generateTools(srv)
 LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `this.a2a = { graph }`. Exported for custom executors or direct checkpoint access.
 
 ```js
-const { CdsCheckpointSaver } = require("@cap-js/a2a")
+import { CdsCheckpointSaver } from "@cap-js/a2a"
 const checkpointer = new CdsCheckpointSaver()
 ```
 
@@ -400,12 +516,13 @@ If your application uses a custom graph with parallel branches, enable full writ
 
 Set in your service handler's `init()` to customize the default behavior:
 
-| Pattern        | What you provide                   | Plugin provides                         |
-| -------------- | ---------------------------------- | --------------------------------------- |
-| `{ graph }`    | Compiled LangGraph graph           | Protocol, persistence, agent card, HITL |
-| `{ executor }` | Full `AgentExecutor` impl          | Protocol, persistence, agent card       |
-| `{ model }`    | LangChain `BaseChatModel` instance | Everything else (zero-code)             |
-| _(default)_    | Nothing                            | Everything (zero-code)                  |
+| Pattern             | What you provide                    | Plugin provides                          |
+| ------------------- | ----------------------------------- | ---------------------------------------- |
+| `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL  |
+| `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card        |
+| `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)              |
+| `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.a2a.contentFilter` |
+| _(default)_         | Nothing                             | Everything (zero-code)                   |
 
 #### Custom Model
 

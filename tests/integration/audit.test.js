@@ -108,12 +108,11 @@ describe("@cap-js/a2a - Audit Logging", () => {
 
       cds.env.a2a.pool.maxTasksPerHourPerUser = originalMax
 
-      const events = _auditLogs.filter(byEvent("SecurityEvent"))
+      const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       assert.strictEqual(events.length, 1)
 
       const data = events[0].data.data
-      assert.strictEqual(data.event, "SecurityEvent")
-      assert.strictEqual(data.action, "QuotaExceeded")
+      assert.strictEqual(data.event, "QuotaExceeded")
       assert.strictEqual(data.service, "GraphBookService")
       assert.match(data.reason, /tasks per hour per user/)
       assert.notStrictEqual(events[0].data.ip, undefined)
@@ -128,9 +127,9 @@ describe("@cap-js/a2a - Audit Logging", () => {
 
       cds.env.a2a.pool.maxConcurrentTasks = originalMax
 
-      const events = _auditLogs.filter(byEvent("SecurityEvent"))
+      const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       assert.strictEqual(events.length, 1)
-      assert.strictEqual(events[0].data.data.action, "QuotaExceeded")
+      assert.strictEqual(events[0].data.data.event, "QuotaExceeded")
       assert.match(events[0].data.data.reason, /concurrent tasks/)
     })
   })

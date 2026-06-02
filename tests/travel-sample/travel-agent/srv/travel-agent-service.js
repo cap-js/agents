@@ -1,4 +1,5 @@
 /* eslint-disable no-await-in-loop */
+const { ChatAnthropic } = require("@langchain/anthropic")
 /**
  * Travel Agent — Deep agent orchestrator for @cap-js/a2a.
  *
@@ -16,7 +17,7 @@ const { path } = cds.utils
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createModel } from "@cap-js/a2a"
+import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/a2a"
 
 const LOG = cds.log("travel-agent")
 const __agentDir = path.join(import.meta.dirname, "travel-agent")
@@ -165,9 +166,15 @@ async function discoverTools() {
 
 async function createTravelAgent() {
   const tools = await discoverTools()
-  const model = await createModel({ deepAgent: true })
+  const model = await createDeepAgentModel()
 
   LOG.info("Creating travel deep agent", { tools: tools.length, agentDir: __agentDir })
+
+  // const model = new ChatAnthropic({
+  //   model: "claude-sonnet-4-5",
+  //   anthropicApiKey: "<api-key>",
+  //   anthropicApiUrl: "http://localhost:6655/anthropic",
+  // })
 
   const agent = createDeepAgent({
     model,
@@ -175,6 +182,7 @@ async function createTravelAgent() {
     memory: ["./AGENTS.md"],
     skills: ["./skills/"],
     backend: new FilesystemBackend({ rootDir: __agentDir, virtualMode: true }),
+    // middleware: [await contentFilterRecoveryMiddleware()], // See below for more information
   })
 
   LOG.info("Travel deep agent created")
@@ -183,7 +191,15 @@ async function createTravelAgent() {
 
 export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
-    this.a2a = { graph: createTravelAgent() }
+    this.a2a = {
+      graph: createTravelAgent(),
+      // Deepagents accumulate large contexts (system prompt + skills + tool
+      // results) that exceed Azure Content Safety prompt_shield's payload size
+      // limit (surfaces as HTTP 503 + `AI-External-Failure: true`). When enabled,
+      // make sure to use the `contentFilterRecoveryMiddleware` to not
+      // block the agent with an error
+      contentFilter: false,
+    }
 
     this.on("plan", async () => {
       return "Please use the A2A protocol to interact with the travel agent."

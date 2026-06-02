@@ -16,14 +16,10 @@ const { path } = cds.utils
 import { createDeepAgent, FilesystemBackend } from "deepagents"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { createModel, generateTools } from "@cap-js/a2a"
+import { createDeepAgentModel, createModel, generateTools } from "@cap-js/a2a"
 
 const LOG = cds.log("product-agent")
 const __agentDir = path.join(import.meta.dirname, "product-agent")
-
-// createModel({ deepAgent: true }) handles the AI Core array-content compatibility
-// issue automatically
-const model = await createModel({ deepAgent: true, params: { max_tokens: 4096, temperature: 0.2 } })
 
 const calculateBulkPricing = tool(
   async ({ productName, quantity }) => {
@@ -79,6 +75,14 @@ async function createAgent(srv) {
   // Generate CDS-derived tools (query, describe, orderProduct)
   // skipAuth: true because we generate tools at startup (no request context yet) -> Revisit
   const { tools: cdsTools } = generateTools(srv, { skipAuth: true })
+
+  // createDeepAgentModel() handles the AI Core array-content compatibility
+  // issue: deepagents' built-in tools (read_file, ls, grep, …) return content
+  // as [{type:"text",text:"..."}] arrays which AI Core rejects without flattening.
+  const model = await createDeepAgentModel({
+    params: { max_tokens: 4096, temperature: 0.2 },
+  })
+
   LOG.info("CDS tools generated", { tools: cdsTools.map((t) => t.name) })
 
   LOG.info("Creating deep agent", { agentDir: __agentDir })
