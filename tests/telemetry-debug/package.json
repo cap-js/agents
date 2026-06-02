@@ -1,6 +1,7 @@
 {
   "name": "telemetry-debug-test",
   "version": "1.0.0",
+  "type": "module",
   "description": "Test project for debug tracing, failing graph, and trace_langchain=false",
   "dependencies": {
     "@cap-js/a2a": "file:../../.",

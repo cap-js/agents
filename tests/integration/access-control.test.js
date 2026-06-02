@@ -1,5 +1,6 @@
-const cds = require("@sap/cds")
-const { POST, axios } = cds.test(__dirname + "/../bookshop")
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
+const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 
 axios.defaults.validateStatus = () => true
 
@@ -30,73 +31,71 @@ function sendMessageAs(service, text, auth, { contextId, taskId } = {}) {
 
 describe("@cap-js/a2a - Access Control", () => {
   describe("Tasks", () => {
-    test("bob cannot access alice's task via tasks/get", async () => {
+    it("bob cannot access alice's task via tasks/get", async () => {
       // Alice creates a task
       const aliceRes = await sendMessageAs("catalog", "What books?", ALICE)
-      expect(aliceRes.data.result.status.state).toBe("completed")
+      assert.strictEqual(aliceRes.data.result.status.state, "completed")
       const aliceTaskId = aliceRes.data.result.id
 
       // Alice can retrieve her own task
       const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, ALICE)
-      expect(aliceGet.data.result).toBeDefined()
-      expect(aliceGet.data.result.id).toBe(aliceTaskId)
+      assert.notStrictEqual(aliceGet.data.result, undefined)
+      assert.strictEqual(aliceGet.data.result.id, aliceTaskId)
 
       // Bob cannot retrieve Alice's task
       const bobGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, BOB)
-      expect(bobGet.data.error).toBeDefined()
+      assert.notStrictEqual(bobGet.data.error, undefined)
     })
 
-    test("alice cannot access bob's task via tasks/get", async () => {
+    it("alice cannot access bob's task via tasks/get", async () => {
       // Bob creates a task
       const bobRes = await sendMessageAs("catalog", "What books?", BOB)
-      expect(bobRes.data.result.status.state).toBe("completed")
+      assert.strictEqual(bobRes.data.result.status.state, "completed")
       const bobTaskId = bobRes.data.result.id
 
       // Bob can retrieve his own task
       const bobGet = await jsonrpcAs("catalog", "tasks/get", { id: bobTaskId }, BOB)
-      expect(bobGet.data.result).toBeDefined()
-      expect(bobGet.data.result.id).toBe(bobTaskId)
+      assert.notStrictEqual(bobGet.data.result, undefined)
+      assert.strictEqual(bobGet.data.result.id, bobTaskId)
 
       // Alice cannot retrieve Bob's task
       const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: bobTaskId }, ALICE)
-      expect(aliceGet.data.error).toBeDefined()
+      assert.notStrictEqual(aliceGet.data.error, undefined)
     })
   })
 
-  const isHybrid = cds.env.profiles?.includes("hybrid")
-  const describeMock = isHybrid ? describe.skip : describe
-  describeMock("Checkpoints", () => {
-    test("bob cannot resume alice's conversation", async () => {
+  describe("Checkpoints", () => {
+    it("bob cannot resume alice's conversation", async () => {
       const contextId = `ac-test-${Date.now()}`
 
       // Alice starts a conversation that triggers HITL
       const aliceRes = await sendMessageAs("catalog", "I need hitl approval", ALICE, { contextId })
-      expect(aliceRes.data.result.status.state).toBe("input-required")
+      assert.strictEqual(aliceRes.data.result.status.state, "input-required")
       const taskId = aliceRes.data.result.id
 
       // Bob tries to resume Alice's HITL task — should fail (checkpoint not found for bob)
       const bobResume = await sendMessageAs("catalog", "yes", BOB, { taskId })
       // Bob either gets an error or a new task (not Alice's resumed task)
       if (bobResume.data.error) {
-        expect(bobResume.data.error).toBeDefined()
+        assert.notStrictEqual(bobResume.data.error, undefined)
       } else {
         // If SDK creates a new task instead, it won't be Alice's task
-        expect(bobResume.data.result.id).not.toBe(taskId)
+        assert.notStrictEqual(bobResume.data.result.id, taskId)
       }
     })
 
-    test("alice can resume her own conversation", async () => {
+    it("alice can resume her own conversation", async () => {
       const contextId = `ac-test-own-${Date.now()}`
 
       // Alice starts a HITL conversation
       const aliceRes = await sendMessageAs("catalog", "hitl please", ALICE, { contextId })
-      expect(aliceRes.data.result.status.state).toBe("input-required")
+      assert.strictEqual(aliceRes.data.result.status.state, "input-required")
       const taskId = aliceRes.data.result.id
 
       // Alice resumes her own task
       const aliceResume = await sendMessageAs("catalog", "yes", ALICE, { taskId })
-      expect(aliceResume.data.result.id).toBe(taskId)
-      expect(aliceResume.data.result.status.state).toBe("completed")
+      assert.strictEqual(aliceResume.data.result.id, taskId)
+      assert.strictEqual(aliceResume.data.result.status.state, "completed")
     })
   })
 })

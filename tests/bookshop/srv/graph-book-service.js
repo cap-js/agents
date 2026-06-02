@@ -1,14 +1,14 @@
-const cds = require("@sap/cds")
-const { StateGraph, Annotation, messagesStateReducer } = require("@langchain/langgraph")
-const { AIMessage } = require("@langchain/core/messages")
-const { generateTools } = require("@cap-js/a2a")
-const metrics = require("@cap-js/a2a/lib/telemetry/metrics")
+import cds from "@sap/cds"
+import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
+import { AIMessage } from "@langchain/core/messages"
+import { generateTools } from "@cap-js/a2a"
+import * as metrics from "@cap-js/a2a/lib/telemetry/metrics.js"
 
 /**
  * Deterministic graph-based agent for telemetry e2e testing.
  * Uses @cap-js/mcp tools (via generateTools) + mock LLM metrics.
  */
-module.exports = class GraphBookService extends cds.ApplicationService {
+export default class GraphBookService extends cds.ApplicationService {
   init() {
     this.a2a = { graph: this._buildGraph() }
     return super.init()

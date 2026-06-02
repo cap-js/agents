@@ -1,6 +1,7 @@
 {
   "name": "bookshop",
   "version": "1.0.0",
+  "type": "module",
   "description": "Sample CAP bookshop for @cap-js/a2a tests",
   "dependencies": {
     "@cap-js/a2a": "file:../../.",

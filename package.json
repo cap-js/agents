@@ -4,12 +4,21 @@
   "description": "CDS protocol adapter for the A2A (Agent-to-Agent) protocol",
   "license": "Apache-2.0",
   "homepage": "https://cap.cloud.sap/",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./cds-plugin": "./cds-plugin.js",
+    "./index.cds": "./index.cds",
+    "./lib/executor/mock": "./lib/executor/mock.js",
+    "./lib/executor/langgraph": "./lib/executor/langgraph/index.js",
+    "./lib/*": "./lib/*"
+  },
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent --testPathIgnorePatterns=tests/mtx",
-    "test:hybrid": "cds bind --exec -- node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
-    "test:mtx": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/mtx/",
+    "test": "CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
+    "test:hybrid": "cds bind --exec -- CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
+    "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/mtx/*.test.js",
     "watch:sample": "cds w tests/bookshop",
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
     "watch:deepagent-sample": "cds w tests/deep-agent-sample",
@@ -35,8 +44,7 @@
     "@cap-js/cds-test": ">=0",
     "@cap-js/sqlite": "^2",
     "@sap/cds-mtxs": ">=2",
-    "@toon-format/toon": ">=0",
-    "jest": "^30.3.0"
+    "@toon-format/toon": ">=0"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",

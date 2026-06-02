@@ -1,20 +1,22 @@
 process.env.CDS_ENV = "with-mtx"
 
-const cds = require("@sap/cds")
-const { cleanDbFiles, startSidecar, stopSidecar, subscribeTenant, APP_DIR } = require("./setup")
-
-jest.setTimeout(60000)
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
+import { cleanDbFiles, startSidecar, stopSidecar, subscribeTenant, APP_DIR } from "./setup.js"
 
 let sidecar
 
-beforeAll(async () => {
-  cleanDbFiles()
-  sidecar = await startSidecar()
-  const status = await subscribeTenant("t1", sidecar.port)
-  expect(status).toBe(200)
-})
+before(
+  async () => {
+    cleanDbFiles()
+    sidecar = await startSidecar()
+    const status = await subscribeTenant("t1", sidecar.port)
+    assert.strictEqual(status, 200)
+  },
+  { timeout: 60000 },
+)
 
-afterAll(async () => {
+after(async () => {
   await stopSidecar(sidecar?.proc)
 })
 
@@ -47,22 +49,22 @@ describe("@cap-js/a2a - Multi-tenancy (active_users)", () => {
       },
       { auth: CAROL },
     )
-    expect(res.data.result?.status?.state).toBe("completed")
+    assert.strictEqual(res.data.result?.status?.state, "completed")
 
     // Wait for scheduled computeActiveUsers to fire (interval: 1s)
     await new Promise((r) => setTimeout(r, 2000))
 
     // Check gauge reports tenant "t1" (not "anonymous")
-    const { observeActiveUsers } = require("../../lib/telemetry/active-users")
+    const { observeActiveUsers } = await import("../../lib/telemetry/active-users.js")
     const observed = []
     observeActiveUsers({ observe: (value, attrs) => observed.push({ value, attrs }) })
 
     const t1Entry = observed.find((o) => o.attrs["sap.tenantId"] === "t1")
-    expect(t1Entry).toBeDefined()
-    expect(t1Entry.value).toBe(1)
+    assert.notStrictEqual(t1Entry, undefined)
+    assert.strictEqual(t1Entry.value, 1)
 
     // No "anonymous" — proves tenant resolved from iteration, not cds.context
     const anonEntry = observed.find((o) => o.attrs["sap.tenantId"] === "anonymous")
-    expect(anonEntry).toBeUndefined()
+    assert.strictEqual(anonEntry, undefined)
   })
 })

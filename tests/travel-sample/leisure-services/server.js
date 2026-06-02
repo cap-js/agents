@@ -1,4 +1,4 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 
 cds.on("bootstrap", (app) => {
   app.use((req, res, next) => {
@@ -11,4 +11,4 @@ cds.on("bootstrap", (app) => {
   })
 })
 
-module.exports = cds.server
+export default cds.server

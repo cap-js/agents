@@ -1,7 +1,7 @@
-const cds = require("@sap/cds")
-const { StateGraph, Annotation, messagesStateReducer, END } = require("@langchain/langgraph")
-const { AIMessage } = require("@langchain/core/messages")
-const { generateTools } = require("@cap-js/a2a")
+import cds from "@sap/cds"
+import { StateGraph, Annotation, messagesStateReducer, END } from "@langchain/langgraph"
+import { AIMessage } from "@langchain/core/messages"
+import { generateTools } from "@cap-js/a2a"
 
 /**
  * Looping graph that iterates multiple times.
@@ -9,7 +9,7 @@ const { generateTools } = require("@cap-js/a2a")
  * The graph simulates an agent that always wants to call tools,
  * triggering shouldContinue → quotaEnforcerAtNode on each iteration.
  */
-module.exports = class LoopingService extends cds.ApplicationService {
+export default class LoopingService extends cds.ApplicationService {
   init() {
     this.a2a = { graph: this._buildGraph() }
     return super.init()
@@ -18,7 +18,8 @@ module.exports = class LoopingService extends cds.ApplicationService {
   async _buildGraph() {
     const srv = this
     const { tools } = generateTools(srv, { skipAuth: true })
-    const shouldContinue = require("@cap-js/a2a/lib/executor/langgraph/nodes/shouldContinue")
+    const { default: shouldContinue } =
+      await import("@cap-js/a2a/lib/executor/langgraph/nodes/shouldContinue.js")
 
     const GraphState = Annotation.Root({
       messages: Annotation({ reducer: messagesStateReducer }),

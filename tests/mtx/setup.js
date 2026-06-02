@@ -1,6 +1,9 @@
-const { spawn } = require("child_process")
-const path = require("path")
-const fs = require("fs")
+import { spawn } from "child_process"
+import path from "path"
+import fs from "fs"
+import { fileURLToPath } from "url"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const APP_DIR = path.join(__dirname, "app")
 const SIDECAR_DIR = path.join(APP_DIR, "mtx", "sidecar")
@@ -97,4 +100,4 @@ async function subscribeTenant(tenant, port) {
   return res.status
 }
 
-module.exports = { cleanDbFiles, startSidecar, stopSidecar, subscribeTenant, APP_DIR, SIDECAR_DIR }
+export { cleanDbFiles, startSidecar, stopSidecar, subscribeTenant, APP_DIR, SIDECAR_DIR }

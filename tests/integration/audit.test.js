@@ -1,7 +1,10 @@
-const cds = require("@sap/cds")
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(__dirname + "/../bookshop")
-const { sendMessage, jsonrpc } = require("./helpers")({ POST, axios })
+const test = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, GET, axios } = test
+import createHelpers from "./helpers.js"
+const { sendMessage, jsonrpc } = createHelpers({ POST, axios })
 
 const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
 
@@ -11,7 +14,7 @@ const byEvent = (name) => (l) => l.event === "SecurityEvent" && l.data?.data?.ev
 describe("@cap-js/a2a - Audit Logging", () => {
   let _auditLogs
 
-  beforeAll(async () => {
+  before(async () => {
     const audit = await cds.connect.to("audit-log")
     _auditLogs = []
     audit.after("*", (_, req) => {
@@ -28,21 +31,21 @@ describe("@cap-js/a2a - Audit Logging", () => {
     await wait()
 
     const nonSecurity = _auditLogs.filter((l) => l.event !== "SecurityEvent")
-    expect(nonSecurity.length).toBe(0)
+    assert.strictEqual(nonSecurity.length, 0)
   })
 
   it("should include correlationId in all events for DPP cross-referencing", async () => {
     await sendMessage("graph-book", "Show me books")
     await wait()
 
-    expect(_auditLogs.length).toBeGreaterThan(0)
+    assert.ok(_auditLogs.length > 0, `expected auditLogs.length > 0`)
     for (const log of _auditLogs) {
-      expect(log.data.data.correlationId).toBeDefined()
-      expect(typeof log.data.data.correlationId).toBe("string")
+      assert.notStrictEqual(log.data.data.correlationId, undefined)
+      assert.strictEqual(typeof log.data.data.correlationId, "string")
     }
     // All events from same request share same correlationId
     const ids = new Set(_auditLogs.map((l) => l.data.data.correlationId))
-    expect(ids.size).toBe(1)
+    assert.strictEqual(ids.size, 1)
   })
 
   describe("AgentTaskStarted", () => {
@@ -51,17 +54,18 @@ describe("@cap-js/a2a - Audit Logging", () => {
       await wait()
 
       const events = _auditLogs.filter(byEvent("AgentTaskStarted"))
-      expect(events.length).toBe(1)
-      expect(events[0].data.data).toMatchObject({
-        event: "AgentTaskStarted",
-        taskId: expect.any(String),
-        contextId: expect.any(String),
-        service: "GraphBookService",
-      })
+      assert.strictEqual(events.length, 1)
+
+      const data = events[0].data.data
+      assert.strictEqual(data.event, "AgentTaskStarted")
+      assert.strictEqual(typeof data.taskId, "string")
+      assert.strictEqual(typeof data.contextId, "string")
+      assert.strictEqual(data.service, "GraphBookService")
+
       // Should include the full user message for forensic reconstruction
-      expect(events[0].data.data.userMessage).toBeDefined()
-      expect(events[0].data.data.userMessage.parts).toBeDefined()
-      expect(events[0].data.data.userMessage.role).toBe("user")
+      assert.notStrictEqual(data.userMessage, undefined)
+      assert.notStrictEqual(data.userMessage.parts, undefined)
+      assert.strictEqual(data.userMessage.role, "user")
     })
   })
 
@@ -71,15 +75,15 @@ describe("@cap-js/a2a - Audit Logging", () => {
       await wait()
 
       const events = _auditLogs.filter(byEvent("AgentTaskCompleted"))
-      expect(events.length).toBe(1)
-      expect(events[0].data.data).toMatchObject({
-        event: "AgentTaskCompleted",
-        taskId: expect.any(String),
-        contextId: expect.any(String),
-        service: "GraphBookService",
-        duration: expect.any(String),
-      })
-      expect(events[0].data.data.output).toBeDefined()
+      assert.strictEqual(events.length, 1)
+
+      const data = events[0].data.data
+      assert.strictEqual(data.event, "AgentTaskCompleted")
+      assert.strictEqual(typeof data.taskId, "string")
+      assert.strictEqual(typeof data.contextId, "string")
+      assert.strictEqual(data.service, "GraphBookService")
+      assert.strictEqual(typeof data.duration, "string")
+      assert.notStrictEqual(data.output, undefined)
     })
 
     it("should include duration and output", async () => {
@@ -87,10 +91,10 @@ describe("@cap-js/a2a - Audit Logging", () => {
       await wait()
 
       const event = _auditLogs.find(byEvent("AgentTaskCompleted"))
-      expect(event).toBeDefined()
-      expect(event.data.data.duration).toBeDefined()
-      expect(event.data.data.output).toBeDefined()
-      expect(event.data.data.taskId).toBeDefined()
+      assert.notStrictEqual(event, undefined)
+      assert.notStrictEqual(event.data.data.duration, undefined)
+      assert.notStrictEqual(event.data.data.output, undefined)
+      assert.notStrictEqual(event.data.data.taskId, undefined)
     })
   })
 
@@ -105,14 +109,14 @@ describe("@cap-js/a2a - Audit Logging", () => {
       cds.env.a2a.pool.maxTasksPerHourPerUser = originalMax
 
       const events = _auditLogs.filter(byEvent("SecurityEvent"))
-      expect(events.length).toBe(1)
-      expect(events[0].data.data).toMatchObject({
-        event: "SecurityEvent",
-        action: "QuotaExceeded",
-        service: "GraphBookService",
-        reason: expect.stringMatching(/tasks per hour per user/),
-      })
-      expect(events[0].data.ip).toBeDefined()
+      assert.strictEqual(events.length, 1)
+
+      const data = events[0].data.data
+      assert.strictEqual(data.event, "SecurityEvent")
+      assert.strictEqual(data.action, "QuotaExceeded")
+      assert.strictEqual(data.service, "GraphBookService")
+      assert.match(data.reason, /tasks per hour per user/)
+      assert.notStrictEqual(events[0].data.ip, undefined)
     })
 
     it("should emit on quota breach (maxConcurrentTasks)", async () => {
@@ -125,9 +129,9 @@ describe("@cap-js/a2a - Audit Logging", () => {
       cds.env.a2a.pool.maxConcurrentTasks = originalMax
 
       const events = _auditLogs.filter(byEvent("SecurityEvent"))
-      expect(events.length).toBe(1)
-      expect(events[0].data.data.action).toBe("QuotaExceeded")
-      expect(events[0].data.data.reason).toMatch(/concurrent tasks/)
+      assert.strictEqual(events.length, 1)
+      assert.strictEqual(events[0].data.data.action, "QuotaExceeded")
+      assert.match(events[0].data.data.reason, /concurrent tasks/)
     })
   })
 
@@ -137,17 +141,16 @@ describe("@cap-js/a2a - Audit Logging", () => {
       await wait()
 
       const events = _auditLogs.filter(byEvent("ToolInvocation"))
-      expect(events.length).toBeGreaterThan(0)
+      assert.ok(events.length > 0, `expected ToolInvocation events`)
 
       const toolEvent = events[0]
-      expect(toolEvent.data.data).toMatchObject({
-        event: "ToolInvocation",
-        tool: expect.any(String),
-        outcome: "success",
-        duration: expect.any(Number),
-      })
-      expect(toolEvent.data.data.args).toBeDefined()
-      expect(toolEvent.data.data.result).toBeDefined()
+      const data = toolEvent.data.data
+      assert.strictEqual(data.event, "ToolInvocation")
+      assert.strictEqual(typeof data.tool, "string")
+      assert.strictEqual(data.outcome, "success")
+      assert.strictEqual(typeof data.duration, "number")
+      assert.notStrictEqual(data.args, undefined)
+      assert.notStrictEqual(data.result, undefined)
     })
 
     it("should include task correlation", async () => {
@@ -157,12 +160,12 @@ describe("@cap-js/a2a - Audit Logging", () => {
       const toolEvents = _auditLogs.filter(byEvent("ToolInvocation"))
       const taskEvents = _auditLogs.filter(byEvent("AgentTaskStarted"))
 
-      expect(toolEvents.length).toBeGreaterThan(0)
-      expect(taskEvents.length).toBe(1)
+      assert.ok(toolEvents.length > 0, `expected ToolInvocation events`)
+      assert.strictEqual(taskEvents.length, 1)
 
       const taskId = taskEvents[0].data.data.taskId
       for (const te of toolEvents) {
-        expect(te.data.data.taskId).toBe(taskId)
+        assert.strictEqual(te.data.data.taskId, taskId)
       }
     })
 
@@ -173,7 +176,7 @@ describe("@cap-js/a2a - Audit Logging", () => {
       const events = _auditLogs.filter(byEvent("ToolInvocation"))
       for (const e of events) {
         if (e.data.data.result) {
-          expect(e.data.data.result.length).toBeLessThanOrEqual(2000)
+          assert.ok(e.data.data.result.length <= 2000, `expected result.length <= 2000`)
         }
       }
     })
@@ -188,14 +191,14 @@ describe("@cap-js/a2a - Audit Logging", () => {
 
       const startIdx = eventNames.indexOf("AgentTaskStarted")
       const completeIdx = eventNames.indexOf("AgentTaskCompleted")
-      expect(startIdx).toBeGreaterThanOrEqual(0)
-      expect(completeIdx).toBeGreaterThan(startIdx)
+      assert.ok(startIdx >= 0, `expected AgentTaskStarted index >= 0`)
+      assert.ok(completeIdx > startIdx, `expected AgentTaskCompleted after AgentTaskStarted`)
 
       // ToolInvocation should be between start and complete
       const toolIdx = eventNames.indexOf("ToolInvocation")
       if (toolIdx >= 0) {
-        expect(toolIdx).toBeGreaterThan(startIdx)
-        expect(toolIdx).toBeLessThan(completeIdx)
+        assert.ok(toolIdx > startIdx, `expected ToolInvocation after AgentTaskStarted`)
+        assert.ok(toolIdx < completeIdx, `expected ToolInvocation before AgentTaskCompleted`)
       }
     })
 
@@ -204,9 +207,9 @@ describe("@cap-js/a2a - Audit Logging", () => {
       await wait()
 
       const eventTypes = new Set(_auditLogs.map((l) => l.data?.data?.event))
-      expect(eventTypes.has("AgentTaskStarted")).toBe(true)
-      expect(eventTypes.has("ToolInvocation")).toBe(true)
-      expect(eventTypes.has("AgentTaskCompleted")).toBe(true)
+      assert.strictEqual(eventTypes.has("AgentTaskStarted"), true)
+      assert.strictEqual(eventTypes.has("ToolInvocation"), true)
+      assert.strictEqual(eventTypes.has("AgentTaskCompleted"), true)
     })
   })
 
@@ -214,7 +217,7 @@ describe("@cap-js/a2a - Audit Logging", () => {
     it("should emit when task is canceled", async () => {
       const res = await sendMessage("graph-book", "Show me books")
       const taskId = res.data.result?.id
-      expect(taskId).toBeDefined()
+      assert.notStrictEqual(taskId, undefined)
 
       _auditLogs.length = 0
 
@@ -224,11 +227,10 @@ describe("@cap-js/a2a - Audit Logging", () => {
       const events = _auditLogs.filter(byEvent("AgentTaskCanceled"))
       // Cancel of already-completed task may not fire (SDK may reject)
       if (events.length > 0) {
-        expect(events[0].data.data).toMatchObject({
-          event: "AgentTaskCanceled",
-          taskId,
-          service: "GraphBookService",
-        })
+        const data = events[0].data.data
+        assert.strictEqual(data.event, "AgentTaskCanceled")
+        assert.strictEqual(data.taskId, taskId)
+        assert.strictEqual(data.service, "GraphBookService")
       }
     })
   })

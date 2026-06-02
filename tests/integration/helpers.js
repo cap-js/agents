@@ -1,6 +1,6 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 
-module.exports = ({ POST, axios }) => {
+export default ({ POST, axios }) => {
   axios.defaults.validateStatus = () => true
 
   function jsonrpc(service, method, params = {}) {
@@ -64,14 +64,18 @@ module.exports = ({ POST, axios }) => {
 
   /**
    * Detects silent tool/executor failures in console.error output.
-   * Catch tool execution failures, etc. that the LLM might cover up with
-   * a polite "technical issue" response while still returning "completed".
+   * Returns { before, after } hooks to call manually in each test.
+   *
+   * Usage:
+   *   const errorDetection = setupErrorDetection()
+   *   // before each test: errorDetection.before()
+   *   // after each test:  errorDetection.after()
    */
   function setupErrorDetection() {
     const errors = []
     let originalError
 
-    beforeEach(() => {
+    function before() {
       errors.length = 0
       originalError = console.error
       console.error = (...args) => {
@@ -79,15 +83,17 @@ module.exports = ({ POST, axios }) => {
         errors.push(msg)
         originalError.apply(console, args)
       }
-    })
+    }
 
-    afterEach(() => {
+    function after() {
       console.error = originalError
       const relevantErrors = errors.filter((e) => /\[a2a\]|\[mcp\]/.test(e))
       if (relevantErrors.length > 0) {
         throw new Error(`Errors detected during test:\n${relevantErrors.join("\n")}`)
       }
-    })
+    }
+
+    return { before, after }
   }
 
   return { jsonrpc, sendMessage, streamMessage, parseSSEFrames, setupErrorDetection }

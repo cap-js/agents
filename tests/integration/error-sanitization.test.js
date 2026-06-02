@@ -1,7 +1,9 @@
-const cds = require("@sap/cds")
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(__dirname + "/../bookshop")
-const { sendMessage } = require("./helpers")({ POST, axios })
+const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+import createHelpers from "./helpers.js"
+const { sendMessage } = createHelpers({ POST, axios })
 
 const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
 
@@ -25,9 +27,9 @@ describe("@cap-js/a2a - Production error sanitization", () => {
       const res = await POST("/a2a/graph-book/", { invalid: true })
 
       if (res.status === 500) {
-        expect(res.data.error.message).toBe("Internal Server Error")
-        expect(res.data.error.message).not.toContain("Internal error:")
-        expect(res.data.error.code).toBe(-32603)
+        assert.strictEqual(res.data.error.message, "Internal Server Error")
+        assert.ok(!res.data.error.message.includes("Internal error:"))
+        assert.strictEqual(res.data.error.code, -32603)
       }
     })
 
@@ -37,8 +39,8 @@ describe("@cap-js/a2a - Production error sanitization", () => {
       const res = await POST("/a2a/graph-book/", { invalid: true })
 
       if (res.status === 500) {
-        expect(res.data.error.message).toMatch(/^Internal error:/)
-        expect(res.data.error.code).toBe(-32603)
+        assert.match(res.data.error.message, /^Internal error:/)
+        assert.strictEqual(res.data.error.code, -32603)
       }
     })
   })
@@ -57,8 +59,8 @@ describe("@cap-js/a2a - Production error sanitization", () => {
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
-        expect(msg).toBe("Internal Server Error")
-        expect(msg).not.toContain("Agent error:")
+        assert.strictEqual(msg, "Internal Server Error")
+        assert.ok(!msg.includes("Agent error:"))
       }
     })
 
@@ -75,7 +77,7 @@ describe("@cap-js/a2a - Production error sanitization", () => {
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
-        expect(msg).toMatch(/^Agent error:/)
+        assert.match(msg, /^Agent error:/)
       }
     })
   })

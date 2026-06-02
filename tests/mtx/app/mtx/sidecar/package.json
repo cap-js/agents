@@ -1,6 +1,7 @@
 {
   "name": "a2a-mtx-sidecar",
   "version": "0.0.1",
+  "type": "module",
   "private": true,
   "cds": {
     "profile": "mtx-sidecar"

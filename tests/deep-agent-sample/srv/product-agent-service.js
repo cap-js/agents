@@ -3,7 +3,7 @@
  *
  * Demonstrates the full pattern for building agents with:
  * - createDeepAgent() from deepagents library
- * - createDeepAgentModel() from @cap-js/a2a (handles AI Core compatibility)
+ * - createModel({ deepAgent: true }) from @cap-js/a2a (handles AI Core compatibility)
  * - CDS-derived tools (query, describe, orderProduct) from the plugin
  * - Custom business logic tool (calculate_bulk_pricing)
  * - CdsCheckpointSaver auto-injected by the plugin for multi-turn conversations
@@ -11,19 +11,19 @@
  *
  * Run with: cds bind --exec -- cds watch tests/deep-agent-sample
  */
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 const { path } = cds.utils
-const { createDeepAgent, FilesystemBackend } = require("deepagents")
-const { tool } = require("@langchain/core/tools")
-const { z } = require("zod")
-const { createDeepAgentModel, generateTools } = require("@cap-js/a2a")
+import { createDeepAgent, FilesystemBackend } from "deepagents"
+import { tool } from "@langchain/core/tools"
+import { z } from "zod"
+import { createModel, generateTools } from "@cap-js/a2a"
 
 const LOG = cds.log("product-agent")
-const __agentDir = path.join(__dirname, "product-agent")
+const __agentDir = path.join(import.meta.dirname, "product-agent")
 
-// createDeepAgentModel() handles the AI Core array-content compatibility
+// createModel({ deepAgent: true }) handles the AI Core array-content compatibility
 // issue automatically
-const model = createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
+const model = await createModel({ deepAgent: true, params: { max_tokens: 4096, temperature: 0.2 } })
 
 const calculateBulkPricing = tool(
   async ({ productName, quantity }) => {
@@ -96,7 +96,7 @@ async function createAgent(srv) {
   return agent
 }
 
-module.exports = class ProductAgentService extends cds.ApplicationService {
+export default class ProductAgentService extends cds.ApplicationService {
   async init() {
     await super.init()
 

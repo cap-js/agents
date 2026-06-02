@@ -1,96 +1,104 @@
-const cds = require("@sap/cds")
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
 
 let canLoadDeepAgent = true
 try {
-  require("deepagents")
+  await import("deepagents")
 } catch {
   canLoadDeepAgent = false
 }
 
-const { GET } = cds.test(__dirname + "/../deep-agent-sample")
+const { GET } = cds.test(import.meta.dirname + "/../deep-agent-sample")
 
 // ── Deep agent modes (skills/ scan + AGENT_CARD.md convention) ──────────
 // These tests require deep-agent-sample which has deepagents ESM deps.
-// Skip if deepagents can't be loaded in Jest.
+// Skip if deepagents can't be loaded.
 
-const describeDeepAgent = canLoadDeepAgent ? describe : describe.skip
-
-describeDeepAgent("@cap-js/a2a - Agent Card (deep agent modes)", () => {
+describe("@cap-js/a2a - Agent Card (deep agent modes)", { skip: !canLoadDeepAgent }, () => {
   // ── skills/ directory scan ──────────────────────────────────────────
 
   describe("skills/ directory scan", () => {
-    test("agent card generated from AGENTS.md frontmatter", async () => {
+    it("agent card generated from AGENTS.md frontmatter", async () => {
       const res = await GET("/a2a/product-agent/.well-known/agent-card.json")
 
       const card = res.data
-      expect(card.name).toBe("product-agent")
-      expect(card.description).toContain("Product catalog agent for searching products")
-      expect(card.version).toBe("1.0.0")
+      assert.strictEqual(card.name, "product-agent")
+      assert.ok(card.description.includes("Product catalog agent for searching products"))
+      assert.strictEqual(card.version, "1.0.0")
     })
 
-    test("public skills included, private skills excluded", async () => {
+    it("public skills included, private skills excluded", async () => {
       const res = await GET("/a2a/product-agent/.well-known/agent-card.json")
       const card = res.data
 
       const searchSkill = card.skills.find((s) => s.id === "product-search")
-      expect(searchSkill).toBeDefined()
-      expect(searchSkill.name).toBe("Product Search")
-      expect(searchSkill.tags).toContain("products")
-      expect(searchSkill.examples).toContain("Show me all products")
+      assert.notStrictEqual(searchSkill, undefined)
+      assert.strictEqual(searchSkill.name, "Product Search")
+      assert.ok(searchSkill.tags.includes("products"))
+      assert.ok(searchSkill.examples.includes("Show me all products"))
 
       const orderSkill = card.skills.find((s) => s.id === "order-management")
-      expect(orderSkill).toBeDefined()
+      assert.notStrictEqual(orderSkill, undefined)
 
       // response-format has metadata.private: true
       const privateSkill = card.skills.find((s) => s.id === "response-format")
-      expect(privateSkill).toBeUndefined()
+      assert.strictEqual(privateSkill, undefined)
     })
 
-    test("metadata.tags and metadata.examples in agent card", async () => {
+    it("metadata.tags and metadata.examples in agent card", async () => {
       const res = await GET("/a2a/product-agent/.well-known/agent-card.json")
       const card = res.data
 
       const orderSkill = card.skills.find((s) => s.id === "order-management")
-      expect(orderSkill.tags).toEqual(["orders", "products", "checkout"])
-      expect(orderSkill.examples).toContain("Order 5 Widget Pro")
-      expect(orderSkill.examples).toContain("Place an order for 100 Gadget X")
+      assert.deepStrictEqual(orderSkill.tags, ["orders", "products", "checkout"])
+      assert.ok(orderSkill.examples.includes("Order 5 Widget Pro"))
+      assert.ok(orderSkill.examples.includes("Place an order for 100 Gadget X"))
     })
   })
 
   // ── AGENT_CARD.md convention (within agentDir) ────────────────────────
 
   describe("AGENT_CARD.md convention (within agentDir)", () => {
-    test("agent card generated from AGENT_CARD.md in agentDir", async () => {
+    it("agent card generated from AGENT_CARD.md in agentDir", async () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
 
       const card = res.data
-      expect(card.name).toBe("custom-book-agent")
-      expect(card.description).toContain("book recommendation")
-      expect(card.version).toBe("2.0.0")
+      assert.strictEqual(card.name, "custom-book-agent")
+      assert.ok(card.description.includes("book recommendation"))
+      assert.strictEqual(card.version, "2.0.0")
     })
 
-    test("skills come from AGENT_CARD.md frontmatter", async () => {
+    it("skills come from AGENT_CARD.md frontmatter", async () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
       const card = res.data
 
-      expect(card.skills).toHaveLength(2)
+      assert.strictEqual(card.skills.length, 2)
 
       const recSkill = card.skills.find((s) => s.id === "book-recommendations")
-      expect(recSkill).toBeDefined()
-      expect(recSkill.tags).toContain("books")
-      expect(recSkill.examples).toContain("Recommend a mystery novel")
+      assert.notStrictEqual(recSkill, undefined)
+      assert.ok(recSkill.tags.includes("books"))
+      assert.ok(recSkill.examples.includes("Recommend a mystery novel"))
     })
 
-    test("skills/ directory is ignored when AGENT_CARD.md exists", async () => {
+    it("skills/ directory is ignored when AGENT_CARD.md exists", async () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
       const card = res.data
 
       // Only skills from AGENT_CARD.md
-      expect(card.skills.map((s) => s.id).sort()).toEqual(["book-recommendations", "reading-list"])
+      assert.deepStrictEqual(card.skills.map((s) => s.id).sort(), [
+        "book-recommendations",
+        "reading-list",
+      ])
 
       // skills/ directory contents (book-formatting, library-helpers) are NOT in the card
-      expect(card.skills.find((s) => s.id === "book-formatting")).toBeUndefined()
-      expect(card.skills.find((s) => s.id === "library-helpers")).toBeUndefined()
+      assert.strictEqual(
+        card.skills.find((s) => s.id === "book-formatting"),
+        undefined,
+      )
+      assert.strictEqual(
+        card.skills.find((s) => s.id === "library-helpers"),
+        undefined,
+      )
     })
   })
 })

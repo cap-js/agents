@@ -2,20 +2,20 @@
  * Shared test utilities for telemetry integration tests.
  *
  * Usage:
- *   const { captured, setup, flushMetrics, getSpansAfterRequest, findSpan, findSpans } = require("./telemetry-utils")
+ *   import { captured, setup, flushMetrics, getSpansAfterRequest, findSpan, findSpans } from "./telemetry-utils.js"
  *   setup() // call BEFORE cds.test() to patch console.info early
  */
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 
 /** Captured console.info output */
-const captured = []
+export const captured = []
 const _originalInfo = console.info
 
 /**
  * Patch console.info to capture telemetry output.
  * MUST be called BEFORE cds.test() so cds.log('telemetry') picks up the patched version.
  */
-function setup() {
+export function setup() {
   console.info = function (...args) {
     const msg = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")
     captured.push(msg)
@@ -24,12 +24,12 @@ function setup() {
 }
 
 /** Restore console.info — call in afterAll() */
-function teardown() {
+export function teardown() {
   console.info = _originalInfo
 }
 
 /** Reset captured output — call in beforeEach() */
-function resetCapture() {
+export function resetCapture() {
   captured.length = 0
 }
 
@@ -37,20 +37,23 @@ function resetCapture() {
  * Flush metrics and return captured console output.
  * Uses forceFlush() as the sole synchronisation — no arbitrary timeouts.
  */
-async function flushMetrics() {
-  const { metrics } = require("@opentelemetry/api")
+export async function flushMetrics() {
+  const { metrics } = await import("@opentelemetry/api")
   const meterProvider = metrics.getMeterProvider()
-  expect(typeof meterProvider.forceFlush).toBe("function")
+  if (typeof meterProvider.forceFlush !== "function") {
+    throw new Error("meterProvider.forceFlush is not a function")
+  }
   await meterProvider.forceFlush()
   return captured.join("")
 }
 
 /** In-memory span exporter — lazily initialized, shared per process */
 let memExporter
-function getSpanExporter() {
+export async function getSpanExporter() {
   if (memExporter) return memExporter
-  const { trace } = require("@opentelemetry/api")
-  const { SimpleSpanProcessor, InMemorySpanExporter } = require("@opentelemetry/sdk-trace-base")
+  const { trace } = await import("@opentelemetry/api")
+  const { SimpleSpanProcessor, InMemorySpanExporter } =
+    await import("@opentelemetry/sdk-trace-base")
   memExporter = new InMemorySpanExporter()
   const provider = trace.getTracerProvider()
   const delegate = provider.getDelegate?.() || provider
@@ -65,25 +68,26 @@ function getSpanExporter() {
  * @param {Function} fn - async function that makes the request
  * @returns {Promise<Array>} finished spans
  */
-async function getSpansAfterRequest(fn) {
-  getSpanExporter().reset()
+export async function getSpansAfterRequest(fn) {
+  const exporter = await getSpanExporter()
+  exporter.reset()
   await fn()
-  const { trace } = require("@opentelemetry/api")
+  const { trace } = await import("@opentelemetry/api")
   const provider = trace.getTracerProvider()
   const delegate = provider.getDelegate?.() || provider
   if (delegate.forceFlush) await delegate.forceFlush()
-  return getSpanExporter().getFinishedSpans()
+  return exporter.getFinishedSpans()
 }
 
 /** Find first span matching a name pattern */
-function findSpan(spans, namePattern) {
+export function findSpan(spans, namePattern) {
   return spans.find((s) =>
     typeof namePattern === "string" ? s.name.includes(namePattern) : namePattern.test(s.name),
   )
 }
 
 /** Find all spans matching a name pattern */
-function findSpans(spans, namePattern) {
+export function findSpans(spans, namePattern) {
   return spans.filter((s) =>
     typeof namePattern === "string" ? s.name.includes(namePattern) : namePattern.test(s.name),
   )
@@ -94,7 +98,7 @@ function findSpans(spans, namePattern) {
  * @param {Function} POST - from cds.test()
  * @returns {Function} sendMessage(service, text)
  */
-function createSendMessage(POST) {
+export function createSendMessage(POST) {
   return function sendMessage(service, text) {
     return POST(`/a2a/${service}/`, {
       jsonrpc: "2.0",
@@ -110,17 +114,4 @@ function createSendMessage(POST) {
       },
     })
   }
-}
-
-module.exports = {
-  captured,
-  setup,
-  teardown,
-  resetCapture,
-  flushMetrics,
-  getSpanExporter,
-  getSpansAfterRequest,
-  findSpan,
-  findSpans,
-  createSendMessage,
 }

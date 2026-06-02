@@ -1,5 +1,5 @@
-const fs = require("fs")
-const path = require("path")
+import fs from "fs"
+import path from "path"
 
 const mode = process.argv[2]
 if (!mode || !["apply", "revert"].includes(mode)) {
@@ -7,7 +7,7 @@ if (!mode || !["apply", "revert"].includes(mode)) {
   process.exit(1)
 }
 
-const bookshopDir = __dirname
+const bookshopDir = import.meta.dirname
 const rootPkg = path.resolve(bookshopDir, "../../package.json")
 const cdsFile = path.resolve(bookshopDir, "srv/a2a-dev-service.cds")
 

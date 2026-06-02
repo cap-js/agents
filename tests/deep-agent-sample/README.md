@@ -14,7 +14,7 @@ Markdown-based agent using `deepagents` with `@cap-js/a2a` as runtime. Defines a
 
 ```
 createDeepAgent()
-├── model: createDeepAgentModel() - Claude via AI Core
+├── model: createModel({ deepAgent: true }) - Claude via AI Core
 ├── tools: CAP-based Tools (query, describe, orderProduct) (CDS) + Custom Tools (calculate_bulk_pricing)
 ├── memory: AGENTS.md - agent identity and behavior rules
 ├── skills: product-search/, order-management/ - loaded on demand

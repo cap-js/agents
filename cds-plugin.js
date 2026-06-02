@@ -1,4 +1,4 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 
 const LOG = cds.log("a2a")
 
@@ -24,19 +24,23 @@ if (!cls_fields.includes("a2a.context.id")) cls_fields.push("a2a.context.id")
 // LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
 // Skipped when @cap-js/telemetry is not configured — patches would be wasted no-ops.
 if (hasTelemetry && cds.env.a2a?.trace_langchain !== false) {
-  const { patchLangChain } = require("./lib/telemetry/tracing")
+  const { patchLangChain } = await import("./lib/telemetry/tracing.js")
   patchLangChain()
 }
 
 // Register compile targets (cds compile -2 a2a)
-require("./lib/api").registerCompileTargets()
+const { registerCompileTargets } = await import("./lib/api.js")
+registerCompileTargets()
 
 // Register A2A as a CDS protocol adapter
+// CDS protocols.serve uses require() which can't load ESM directly.
+// We eagerly import and set impl as the loaded function.
 const protocols = (cds.env.protocols ??= {})
 if (!protocols.a2a) {
+  const { default: a2aAdapter } = await import("./lib/index.js")
   protocols.a2a = {
     path: "/a2a",
-    impl: require.resolve("./lib"),
+    impl: a2aAdapter,
   }
 }
 
@@ -57,8 +61,8 @@ if (isDev) {
 
 // Schedule active_users metric computation (only when telemetry plugin is present)
 if (hasTelemetry) {
-  cds.on("served", () => {
-    const { setupActiveUsersMetric } = require("./lib/telemetry/active-users")
+  cds.on("served", async () => {
+    const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
   })
 }

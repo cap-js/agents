@@ -1,18 +1,19 @@
-const cds = require("@sap/cds")
-const { setup, teardown, resetCapture, createSendMessage } = require("./telemetry-utils")
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
+import { setup, teardown, resetCapture, createSendMessage } from "./telemetry-utils.js"
 
 setup()
 
-const { POST, axios } = cds.test(__dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/a2a - LLM Circuit Breaker & Timeout", () => {
   axios.defaults.validateStatus = () => true
-  afterAll(teardown)
+  after(teardown)
   beforeEach(resetCapture)
 
   it("should have maxLLMCallTimeoutMs configured in pool", () => {
-    expect(cds.env.a2a.pool.maxLLMCallTimeoutMs).toBe(30000)
+    assert.strictEqual(cds.env.a2a.pool.maxLLMCallTimeoutMs, 30000)
   })
 
   // REVISIT: Not circuit breaker not working atm
@@ -24,7 +25,7 @@ describe("@cap-js/a2a - LLM Circuit Breaker & Timeout", () => {
   describeHybrid("hybrid: real LLM with resilience", () => {
     it("should complete request successfully (breaker closed)", async () => {
       const res = await sendMessage("catalog", "What books do you have?")
-      expect(res.data.result?.status?.state).toBe("completed")
+      assert.strictEqual(res.data.result?.status?.state, "completed")
     })
 
     it("should fail task when timeout is impossibly short", async () => {
@@ -35,24 +36,25 @@ describe("@cap-js/a2a - LLM Circuit Breaker & Timeout", () => {
 
       cds.env.a2a.pool.maxLLMCallTimeoutMs = original
 
-      expect(res.data.result?.status?.state).toBe("failed")
+      assert.strictEqual(res.data.result?.status?.state, "failed")
     })
 
     it("should inject resilience middleware into OrchestrationClient calls", async () => {
-      const resilience = require("@sap-cloud-sdk/resilience")
-      const cbSpy = jest.spyOn(resilience, "circuitBreaker")
-      const toSpy = jest.spyOn(resilience, "timeout")
+      const resilience = await import("@sap-cloud-sdk/resilience")
+      const cbSpy = mock.method(resilience, "circuitBreaker")
+      const toSpy = mock.method(resilience, "timeout")
 
       // Send A2A request to a service that uses the default langgraph executor
       // (no custom graph/model). The default path goes through lib/llm.js which
       // wraps OrchestrationClient and injects circuitBreaker() + timeout() middleware.
       await sendMessage("catalog", "test resilience middleware")
 
-      expect(cbSpy).toHaveBeenCalled()
-      expect(toSpy).toHaveBeenCalledWith(cds.env.a2a.pool.maxLLMCallTimeoutMs)
+      assert.ok(cbSpy.mock.calls.length > 0, "circuitBreaker should have been called")
+      assert.ok(toSpy.mock.calls.length > 0, "timeout should have been called")
+      assert.strictEqual(toSpy.mock.calls[0].arguments[0], cds.env.a2a.pool.maxLLMCallTimeoutMs)
 
-      cbSpy.mockRestore()
-      toSpy.mockRestore()
+      cbSpy.mock.restore()
+      toSpy.mock.restore()
     })
   })
 })

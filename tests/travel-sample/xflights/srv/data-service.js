@@ -1,4 +1,4 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 class DataService extends cds.ApplicationService {
   init() {
     const { Flights, FlightBookings } = cds.entities("sap.capire.flights")
@@ -80,4 +80,4 @@ class DataService extends cds.ApplicationService {
     return super.init()
   }
 }
-module.exports = DataService
+export default DataService

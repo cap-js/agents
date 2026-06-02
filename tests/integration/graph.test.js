@@ -1,62 +1,68 @@
-const cds = require("@sap/cds")
-const { POST, axios } = cds.test(__dirname + "/../deep-agent-sample")
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
+const { POST, axios } = cds.test(import.meta.dirname + "/../deep-agent-sample")
 const isHybrid = cds.env.profiles?.includes("hybrid")
 
-// deepagents has ESM-only transitive deps (p-retry) that fail to load in Jest on
-// Node 22 but succeed on Node 24. However, these tests require a real LLM (AI Core)
-// via createDeepAgentModel() — they must only run in hybrid mode regardless of
+// deepagents has ESM-only transitive deps (p-retry) that fail to load in some
+// Node versions but succeed on others. However, these tests require a real LLM (AI Core)
+// via createModel({ deepAgent: true }) — they must only run in hybrid mode regardless of
 // whether deepagents itself is loadable.
 let canLoad = true
 try {
-  require("deepagents")
+  await import("deepagents")
 } catch {
   canLoad = false
 }
 
-const describeGraph = canLoad && isHybrid ? describe : describe.skip
+const shouldSkip = !(canLoad && isHybrid)
 
-describeGraph("@cap-js/a2a - Custom Graph (deepagents)", () => {
-  const { sendMessage, jsonrpc, setupErrorDetection } = require("./helpers")({ POST, axios })
-
-  setupErrorDetection()
-
-  test("custom graph receives message and responds", async () => {
-    const res = await sendMessage("product-agent", "Show me products")
-    expect(res.data.result.status.state).toBe("completed")
+describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: shouldSkip }, () => {
+  let sendMessage, jsonrpc, setupErrorDetection
+  before(async () => {
+    const createHelpers = (await import("./helpers.js")).default
+    const helpers = createHelpers({ POST, axios })
+    sendMessage = helpers.sendMessage
+    jsonrpc = helpers.jsonrpc
+    setupErrorDetection = helpers.setupErrorDetection
   })
 
-  test("response includes text content", async () => {
+  it("custom graph receives message and responds", async () => {
+    const res = await sendMessage("product-agent", "Show me products")
+    assert.strictEqual(res.data.result.status.state, "completed")
+  })
+
+  it("response includes text content", async () => {
     const res = await sendMessage("product-agent", "Hello world")
     const text = res.data.result.status.message.parts[0].text
-    expect(text).toBeDefined()
-    expect(text.length).toBeGreaterThan(0)
+    assert.notStrictEqual(text, undefined)
+    assert.ok(text.length > 0, `expected text.length > 0`)
   })
 
-  test("returns valid A2A task structure", async () => {
+  it("returns valid A2A task structure", async () => {
     const res = await sendMessage("product-agent", "anything")
     const task = res.data.result
-    expect(task.id).toBeDefined()
-    expect(task.contextId).toBeDefined()
-    expect(task.status.state).toBe("completed")
-    expect(task.status.message.role).toBe("agent")
-    expect(task.status.message.parts).toHaveLength(1)
-    expect(task.status.message.parts[0].kind).toBe("text")
+    assert.notStrictEqual(task.id, undefined)
+    assert.notStrictEqual(task.contextId, undefined)
+    assert.strictEqual(task.status.state, "completed")
+    assert.strictEqual(task.status.message.role, "agent")
+    assert.strictEqual(task.status.message.parts.length, 1)
+    assert.strictEqual(task.status.message.parts[0].kind, "text")
   })
 
-  test("agent card is served", async () => {
+  it("agent card is served", async () => {
     const res = await axios.get("/a2a/product-agent/.well-known/agent-card.json")
-    expect(res.status).toBe(200)
-    expect(res.data.name).toBeDefined()
-    expect(res.data.url).toContain("/a2a/product-agent")
+    assert.strictEqual(res.status, 200)
+    assert.notStrictEqual(res.data.name, undefined)
+    assert.ok(res.data.url.includes("/a2a/product-agent"))
   })
 
-  test("tasks/get retrieves completed task", async () => {
+  it("tasks/get retrieves completed task", async () => {
     const sendRes = await sendMessage("product-agent", "test retrieval")
     const taskId = sendRes.data.result.id
-    expect(taskId).toBeDefined()
+    assert.notStrictEqual(taskId, undefined)
 
     const getRes = await jsonrpc("product-agent", "tasks/get", { id: taskId })
-    expect(getRes.data.result.status.state).toBe("completed")
-    expect(getRes.data.result.id).toBe(taskId)
+    assert.strictEqual(getRes.data.result.status.state, "completed")
+    assert.strictEqual(getRes.data.result.id, taskId)
   })
 })

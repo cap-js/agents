@@ -1,10 +1,10 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 const { path } = cds.utils
 
-module.exports = class CustomAgentCardService extends cds.ApplicationService {
+export default class CustomAgentCardService extends cds.ApplicationService {
   async init() {
     // Passing the agent dir for automatic discovery of AGENT_CARD.md in the dir
-    this.a2a = { agentDir: path.join(__dirname, "custom-agent-card") }
+    this.a2a = { agentDir: path.join(import.meta.dirname, "custom-agent-card") }
     await super.init()
   }
 }

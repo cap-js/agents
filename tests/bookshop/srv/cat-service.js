@@ -1,7 +1,7 @@
-const cds = require("@sap/cds")
-const { ChatAnthropic } = require("@langchain/anthropic")
+import cds from "@sap/cds"
+import { ChatAnthropic } from "@langchain/anthropic"
 
-module.exports = class CatalogService extends cds.ApplicationService {
+export default class CatalogService extends cds.ApplicationService {
   init() {
     const { Books } = cds.entities("sap.capire.bookshop")
     const { ListOfBooks } = this.entities

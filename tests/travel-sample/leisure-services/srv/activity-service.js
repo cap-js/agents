@@ -1,6 +1,6 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 
-module.exports = class ActivityService extends cds.ApplicationService {
+export default class ActivityService extends cds.ApplicationService {
   async init() {
     const { Activities, Bookings } = this.entities
 

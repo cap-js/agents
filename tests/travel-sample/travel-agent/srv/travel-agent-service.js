@@ -8,18 +8,18 @@
  * Demonstrates:
  * - Downstream A2A agent delegation (natural language tools)
  * - MCP server tool access (structured parameters)
- * - createDeepAgentModel() for AI Core compatibility
+ * - createModel({ deepAgent: true }) for AI Core compatibility
  * - CdsCheckpointSaver auto-injected by the plugin for multi-turn conversations
  */
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 const { path } = cds.utils
-const { tool } = require("@langchain/core/tools")
-const { z } = require("zod")
-const { createDeepAgent, FilesystemBackend } = require("deepagents")
-const { createDeepAgentModel } = require("@cap-js/a2a")
+import { tool } from "@langchain/core/tools"
+import { z } from "zod"
+import { createDeepAgent, FilesystemBackend } from "deepagents"
+import { createModel } from "@cap-js/a2a"
 
 const LOG = cds.log("travel-agent")
-const __agentDir = path.join(__dirname, "travel-agent")
+const __agentDir = path.join(import.meta.dirname, "travel-agent")
 
 const A2A_AGENTS = ["http://localhost:4006/a2a/hotel", "http://localhost:4006/a2a/activity"]
 
@@ -102,8 +102,8 @@ function createA2ATool(client, agentCard) {
  * Connect to downstream A2A agents and MCP servers, returning tools for the deep agent.
  */
 async function discoverTools() {
-  const { ClientFactory } = require("@a2a-js/sdk/client")
-  const { MultiServerMCPClient } = require("@langchain/mcp-adapters")
+  const { ClientFactory } = await import("@a2a-js/sdk/client")
+  const { MultiServerMCPClient } = await import("@langchain/mcp-adapters")
   const factory = new ClientFactory()
 
   const tools = []
@@ -165,7 +165,7 @@ async function discoverTools() {
 
 async function createTravelAgent() {
   const tools = await discoverTools()
-  const model = createDeepAgentModel()
+  const model = await createModel({ deepAgent: true })
 
   LOG.info("Creating travel deep agent", { tools: tools.length, agentDir: __agentDir })
 
@@ -181,7 +181,7 @@ async function createTravelAgent() {
   return agent
 }
 
-module.exports = class TravelAgentServiceHandler extends cds.ApplicationService {
+export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
     this.a2a = { graph: createTravelAgent() }
 

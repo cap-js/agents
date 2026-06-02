@@ -1,6 +1,6 @@
-const cds = require("@sap/cds")
+import cds from "@sap/cds"
 
-module.exports = class AdminService extends cds.ApplicationService {
+export default class AdminService extends cds.ApplicationService {
   init() {
     return super.init()
   }

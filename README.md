@@ -38,20 +38,23 @@ service CatalogService {
 Create agents using an agent harness like `deepagents` and plug them into CAP via `this.a2a = { graph }`. Define agent identity in `AGENTS.md`, workflows in `skills/`, and let the plugin handle protocol, persistence, agent card serving, and human-in-the-loop (HITL) approval flows.
 
 ```js
-const { createDeepAgent, FilesystemBackend } = require("deepagents")
-const { createDeepAgentModel, generateTools } = require("@cap-js/a2a")
+import { createDeepAgent, FilesystemBackend } from "deepagents"
+import { createModel, generateTools } from "@cap-js/a2a"
 
-module.exports = class MyAgent extends cds.ApplicationService {
+export default class MyAgent extends cds.ApplicationService {
   async init() {
     await super.init()
     const { tools } = generateTools(this)
     this.a2a = {
       graph: createDeepAgent({
-        model: createDeepAgentModel(),
+        model: await createModel({ deepAgent: true }),
         tools,
         memory: ["./AGENTS.md"],
         skills: ["./skills/"],
-        backend: new FilesystemBackend({ rootDir: __dirname + "/my-agent", virtualMode: true }),
+        backend: new FilesystemBackend({
+          rootDir: import.meta.dirname + "/my-agent",
+          virtualMode: true,
+        }),
         // checkpointer auto-injected by plugin (CdsCheckpointSaver)
       }),
     }
@@ -351,13 +354,18 @@ Set `cds.a2a.activeUsersInterval: 0` to disable automatic scheduling (manual tri
 
 ## API
 
-### `createDeepAgentModel(options?)`
+### `createModel(options?)`
 
-Creates an LLM model compatible with `deepagents`. Handles array-content messages from deepagents' built-in tools that SAP AI Core would otherwise reject.
+Creates an LLM model (OrchestrationClient). Set `deepAgent: true` for deepagent mode which enables message flattening and uses appropriate defaults. Without `deepAgent`, behaves as the managed agent model factory (binds tools, checks `srv.a2a.model` overrides).
 
 ```js
-const { createDeepAgentModel } = require("@cap-js/a2a")
-const model = createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
+import { createModel } from "@cap-js/a2a"
+
+// Deep agent mode (flatten array-content, default params)
+const model = await createModel({ deepAgent: true, params: { max_tokens: 4096, temperature: 0.2 } })
+
+// Managed agent mode (binds tools, uses srv for content filter/model override)
+const model = await createModel({ srv, tools })
 ```
 
 ### `generateTools(srv)`

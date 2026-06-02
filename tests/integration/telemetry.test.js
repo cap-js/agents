@@ -1,5 +1,6 @@
-const cds = require("@sap/cds")
-const {
+import assert from "node:assert/strict"
+import cds from "@sap/cds"
+import {
   captured,
   setup,
   teardown,
@@ -10,27 +11,31 @@ const {
   findSpans,
   createSendMessage,
   getSpanExporter,
-} = require("./telemetry-utils")
+} from "./telemetry-utils.js"
+
+// Disable cds.test() console silencing so we can capture telemetry output
+process.env.CDS_TEST_SILENT = "false"
 
 // Must be called BEFORE cds.test()
 setup()
 
-const { POST, axios } = cds.test(__dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/a2a - OpenTelemetry integration", () => {
   axios.defaults.validateStatus = () => true
-  afterAll(teardown)
+  after(teardown)
   beforeEach(resetCapture)
 
   // ─── E2E ────────────────────────────────────────────────────────────
 
   it("should complete A2A request via graph with MCP tools", async () => {
     const res = await sendMessage("graph-book", "Show me books")
-    expect(res.status).toBe(200)
-    expect(res.data.result).toBeDefined()
-    expect(res.data.result.status.state).toBe("completed")
-    expect(res.data.result.status.message.parts[0].text).toMatch(
+    assert.strictEqual(res.status, 200)
+    assert.notStrictEqual(res.data.result, undefined)
+    assert.strictEqual(res.data.result.status.state, "completed")
+    assert.match(
+      res.data.result.status.message.parts[0].text,
       /Wuthering Heights|Jane Eyre|Catweazle/,
     )
   })
@@ -40,35 +45,41 @@ describe("@cap-js/a2a - OpenTelemetry integration", () => {
   it("should create workflow span with correct name and attributes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "workflow span test"))
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
-    expect(span).toBeDefined()
-    expect(span.attributes["a2a.span.kind"]).toBe("workflow")
-    expect(span.attributes["gen_ai.agent.name"]).toBe("GraphBookService")
-    expect(span.attributes["a2a.task.id"]).toBeDefined()
-    expect(span.attributes["a2a.context.id"]).toBeDefined()
-    expect(span.attributes["a2a.outcome"]).toBe("completed")
+    assert.notStrictEqual(span, undefined)
+    assert.strictEqual(span.attributes["a2a.span.kind"], "workflow")
+    assert.strictEqual(span.attributes["gen_ai.agent.name"], "GraphBookService")
+    assert.notStrictEqual(span.attributes["a2a.task.id"], undefined)
+    assert.notStrictEqual(span.attributes["a2a.context.id"], undefined)
+    assert.strictEqual(span.attributes["a2a.outcome"], "completed")
   })
 
   it("should create tool span with correct name and attributes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "tool span test"))
     const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
-    expect(span).toBeDefined()
-    expect(span.attributes["a2a.span.kind"]).toBe("tool")
-    expect(span.attributes["a2a.tool.name"]).toBe("query")
-    expect(span.attributes["a2a.tool.outcome"]).toBe("success")
+    assert.notStrictEqual(span, undefined)
+    assert.strictEqual(span.attributes["a2a.span.kind"], "tool")
+    assert.strictEqual(span.attributes["a2a.tool.name"], "query")
+    assert.strictEqual(span.attributes["a2a.tool.outcome"], "success")
   })
 
   it("should create RunnableSequence spans for graph nodes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "sequence test"))
     const seqSpans = findSpans(spans, "workflow RunnableSequence")
-    expect(seqSpans.length).toBeGreaterThan(0)
+    assert.ok(seqSpans.length > 0, `expected ${seqSpans.length} > 0`)
     const nodeNames = seqSpans.map((s) => s.name)
-    expect(nodeNames.some((n) => n.includes("llm"))).toBe(true)
-    expect(nodeNames.some((n) => n.includes("tools"))).toBe(true)
+    assert.strictEqual(
+      nodeNames.some((n) => n.includes("llm")),
+      true,
+    )
+    assert.strictEqual(
+      nodeNames.some((n) => n.includes("tools")),
+      true,
+    )
   })
 
   it("should record tool_calls requested by LLM on chat span", async () => {
-    const { BaseChatModel } = require("@langchain/core/language_models/chat_models")
-    const { AIMessage, HumanMessage } = require("@langchain/core/messages")
+    const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
+    const { AIMessage, HumanMessage } = await import("@langchain/core/messages")
 
     // Create a mock model that returns tool_calls
     class MockModelWithTools extends BaseChatModel {
@@ -88,32 +99,32 @@ describe("@cap-js/a2a - OpenTelemetry integration", () => {
     }
 
     const model = new MockModelWithTools({})
-    const exporter = getSpanExporter()
+    const exporter = await getSpanExporter()
     exporter.reset()
 
     // Invoke triggers the monkey-patched BaseChatModel.invoke
     await model.invoke([new HumanMessage("test")])
 
-    const { trace } = require("@opentelemetry/api")
+    const { trace } = await import("@opentelemetry/api")
     const provider = trace.getTracerProvider()
     const delegate = provider.getDelegate?.() || provider
     if (delegate.forceFlush) await delegate.forceFlush()
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, "chat MockModelWithTools")
-    expect(chatSpan).toBeDefined()
-    expect(chatSpan.attributes["gen_ai.response.tool_calls"]).toBeDefined()
+    assert.notStrictEqual(chatSpan, undefined)
+    assert.notStrictEqual(chatSpan.attributes["gen_ai.response.tool_calls"], undefined)
     const toolCalls = JSON.parse(chatSpan.attributes["gen_ai.response.tool_calls"])
-    expect(toolCalls).toHaveLength(2)
-    expect(toolCalls[0].name).toBe("query")
-    expect(toolCalls[1].name).toBe("getStock")
+    assert.strictEqual(toolCalls.length, 2)
+    assert.strictEqual(toolCalls[0].name, "query")
+    assert.strictEqual(toolCalls[1].name, "getStock")
   })
 
   it("should NOT include input/output content at default log level", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "privacy test"))
     for (const span of spans) {
-      expect(span.attributes["a2a.entity.input"]).toBeUndefined()
-      expect(span.attributes["a2a.entity.output"]).toBeUndefined()
+      assert.strictEqual(span.attributes["a2a.entity.input"], undefined)
+      assert.strictEqual(span.attributes["a2a.entity.output"], undefined)
     }
   })
 
@@ -122,35 +133,35 @@ describe("@cap-js/a2a - OpenTelemetry integration", () => {
     const wfSpan = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
     const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")
 
-    expect(wfSpan).toBeDefined()
-    expect(toolSpan).toBeDefined()
+    assert.notStrictEqual(wfSpan, undefined)
+    assert.notStrictEqual(toolSpan, undefined)
 
-    expect(toolSpan.spanContext().traceId).toBe(wfSpan.spanContext().traceId)
+    assert.strictEqual(toolSpan.spanContext().traceId, wfSpan.spanContext().traceId)
     const toolParent = spans.find((s) => s.spanContext().spanId === toolSpan.parentSpanId)
     const isDirectChild = toolSpan.parentSpanId === wfSpan.spanContext().spanId
     const isGrandchild = toolParent?.parentSpanId === wfSpan.spanContext().spanId
-    expect(isDirectChild || isGrandchild).toBe(true)
+    assert.strictEqual(isDirectChild || isGrandchild, true)
   })
 
   // ─── Monkey-patching ────────────────────────────────────────────────
 
-  it("should have LangChain patches applied (feature flag default on)", () => {
-    expect(cds.env.a2a.trace_langchain).not.toBe(false)
-    const { BaseChatModel } = require("@langchain/core/language_models/chat_models")
+  it("should have LangChain patches applied (feature flag default on)", async () => {
+    assert.notStrictEqual(cds.env.a2a.trace_langchain, false)
+    const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
     const PATCHED = Symbol.for("@cap-js/a2a:patched")
-    expect(BaseChatModel.prototype[PATCHED]).toBe(true)
+    assert.strictEqual(BaseChatModel.prototype[PATCHED], true)
   })
 
-  it("should patch StructuredTool.invoke", () => {
-    const { StructuredTool } = require("@langchain/core/tools")
+  it("should patch StructuredTool.invoke", async () => {
+    const { StructuredTool } = await import("@langchain/core/tools")
     const PATCHED = Symbol.for("@cap-js/a2a:patched")
-    expect(StructuredTool.prototype[PATCHED]).toBe(true)
+    assert.strictEqual(StructuredTool.prototype[PATCHED], true)
   })
 
-  it("should patch RunnableLambda.invoke", () => {
-    const { RunnableLambda } = require("@langchain/core/runnables")
+  it("should patch RunnableLambda.invoke", async () => {
+    const { RunnableLambda } = await import("@langchain/core/runnables")
     const PATCHED = Symbol.for("@cap-js/a2a:patched")
-    expect(RunnableLambda.prototype[PATCHED]).toBe(true)
+    assert.strictEqual(RunnableLambda.prototype[PATCHED], true)
   })
 
   // ─── Metrics ────────────────────────────────────────────────────────
@@ -158,37 +169,37 @@ describe("@cap-js/a2a - OpenTelemetry integration", () => {
   it("should record golden signal metrics", async () => {
     await sendMessage("graph-book", "Metrics test")
     const output = await flushMetrics()
-    expect(output).toMatch(/a2a\.requests\.total/)
-    expect(output).toMatch(/a2a\.request\.duration/)
-    expect(output).toMatch(/a2a\.workflows\.completed/)
-    expect(output).toMatch(/agent_actions/)
-    expect(output).toMatch(/a2a\.tool\.invocations/)
-    expect(output).toMatch(/sap\.tenantId/)
+    assert.match(output, /a2a\.requests\.total/)
+    assert.match(output, /a2a\.request\.duration/)
+    assert.match(output, /a2a\.workflows\.completed/)
+    assert.match(output, /agent_actions/)
+    assert.match(output, /a2a\.tool\.invocations/)
+    assert.match(output, /sap\.tenantId/)
   })
 
   it("should record LLM metrics (tokens, invocations)", async () => {
     await sendMessage("graph-book", "LLM test")
     const output = await flushMetrics()
-    expect(output).toMatch(/a2a\.llm\.input_tokens/)
-    expect(output).toMatch(/a2a\.llm\.output_tokens/)
-    expect(output).toMatch(/a2a\.llm\.invocations/)
-    expect(output).toMatch(/mock-model-for-testing/)
+    assert.match(output, /a2a\.llm\.input_tokens/)
+    assert.match(output, /a2a\.llm\.output_tokens/)
+    assert.match(output, /a2a\.llm\.invocations/)
+    assert.match(output, /mock-model-for-testing/)
   })
 
   // ─── Correlation ────────────────────────────────────────────────────
 
   it("should register cls_custom_fields for A2A correlation", () => {
     const cls_fields = cds.env.log.cls_custom_fields
-    expect(cls_fields).toBeDefined()
-    expect(cls_fields).toContain("a2a.task.id")
-    expect(cls_fields).toContain("a2a.context.id")
+    assert.notStrictEqual(cls_fields, undefined)
+    assert.ok(cls_fields.includes("a2a.task.id"))
+    assert.ok(cls_fields.includes("a2a.context.id"))
   })
 
   it("should set A2A correlation IDs on responses", async () => {
     const res = await sendMessage("graph-book", "Correlation test")
-    expect(res.status).toBe(200)
-    expect(res.data.result.id).toBeDefined()
-    expect(res.data.result.id.length).toBeGreaterThan(0)
-    expect(res.data.result.contextId).toBeDefined()
+    assert.strictEqual(res.status, 200)
+    assert.notStrictEqual(res.data.result.id, undefined)
+    assert.ok(res.data.result.id.length > 0, `expected ${res.data.result.id.length} > 0`)
+    assert.notStrictEqual(res.data.result.contextId, undefined)
   })
 })
