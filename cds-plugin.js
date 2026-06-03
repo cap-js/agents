@@ -2,6 +2,9 @@ import cds from "@sap/cds"
 
 const LOG = cds.log("a2a")
 
+import cds_compile_to_a2a from "./lib/compile.js"
+cds.compile.to.a2a = cds_compile_to_a2a
+
 // Detect optional peer plugins (@cap-js/telemetry, @cap-js/audit-logging)
 const hasTelemetry = !!cds.env.requires?.telemetry
 const hasAuditLog = !!cds.env.requires?.["audit-log"]
@@ -19,30 +22,27 @@ cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
 cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("a2a.task.id")) cls_fields.push("a2a.task.id")
-if (!cls_fields.includes("a2a.context.id")) cls_fields.push("a2a.context.id")
+if (!cls_fields.includes("a2a.context.id"))
+  cls_fields.push("a2a.context.id")
 
-// LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
-// Skipped when @cap-js/telemetry is not configured — patches would be wasted no-ops.
-if (hasTelemetry && cds.env.a2a?.trace_langchain !== false) {
-  const { patchLangChain } = await import("./lib/telemetry/tracing.js")
-  patchLangChain()
-}
-
-// Register compile targets (cds compile -2 a2a)
-const { registerCompileTargets } = await import("./lib/api.js")
-registerCompileTargets()
-
-// Register A2A as a CDS protocol adapter
-// CDS protocols.serve uses require() which can't load ESM directly.
-// We eagerly import and set impl as the loaded function.
-const protocols = (cds.env.protocols ??= {})
-if (!protocols.a2a) {
-  const { default: a2aAdapter } = await import("./lib/index.js")
-  protocols.a2a = {
-    path: "/a2a",
-    impl: a2aAdapter,
+  // Async initialization — wrapped to avoid top-level await (CJS compat with @sap/cds require())
+;(async () => {
+  // LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
+  if (hasTelemetry && cds.env.a2a?.trace_langchain !== false) {
+    const { patchLangChain } = await import("./lib/telemetry/tracing.js")
+    patchLangChain()
   }
-}
+
+  // Register A2A as a CDS protocol adapter
+  const protocols = (cds.env.protocols ??= {})
+  if (!protocols.a2a) {
+    const { default: a2aAdapter } = await import("./lib/index.js")
+    protocols.a2a = {
+      path: "/a2a",
+      impl: a2aAdapter,
+    }
+  }
+})()
 
 // CORS support for browser-based A2A clients (development and hybrid profiles)
 const isDev = cds.env.profiles?.includes("development") || cds.env.profiles?.includes("hybrid")

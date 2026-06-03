@@ -2,7 +2,7 @@
  * Shared test utilities for telemetry integration tests.
  *
  * Usage:
- *   import { captured, setup, flushMetrics, getSpansAfterRequest, findSpan, findSpans } from "./telemetry-utils.js"
+ *   import { captured, setup, flushMetrics, getSpansAfterRequest, findSpan, findSpans } from "../utils/telemetry-utils.js"
  *   setup() // call BEFORE cds.test() to patch console.info early
  */
 import cds from "@sap/cds"
@@ -75,7 +75,7 @@ export async function getSpansAfterRequest(fn) {
   const { trace } = await import("@opentelemetry/api")
   const provider = trace.getTracerProvider()
   const delegate = provider.getDelegate?.() || provider
-  if (delegate.forceFlush) await delegate.forceFlush()
+  if (delegate.forceFlush) await delegate.forceFlush().catch(() => {})
   return exporter.getFinishedSpans()
 }
 

@@ -14,16 +14,15 @@ import {
   findSpan,
   findSpans,
   createSendMessage,
-} from "./telemetry-utils.js"
+} from "../utils/telemetry-utils.js"
 
+process.env.CDS_TEST_SILENT = "false"
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
 
-const isHybrid = cds.env.profiles?.includes("hybrid")
-
-describe("@cap-js/a2a - Hybrid telemetry (AI Core)", { skip: !isHybrid }, () => {
+describe("@cap-js/a2a - Hybrid telemetry (AI Core)", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
 

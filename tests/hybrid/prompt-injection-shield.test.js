@@ -10,18 +10,15 @@
  * Skipped when AI Core is not available (normal `npm test`).
  */
 import cds from "@sap/cds"
-import { createSendMessage } from "./telemetry-utils.js"
-import createHelpers from "./helpers.js"
+import { createSendMessage } from "../utils/telemetry-utils.js"
+import createHelpers from "../utils/helpers.js"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
-
-const isHybrid = cds.env.profiles?.includes("hybrid")
-const describeHybrid = isHybrid ? describe : describe.skip
 
 const sendMessage = createSendMessage(POST)
 const { sendMessage: sendMessageWithContext } = createHelpers({ POST, axios })
 
-describeHybrid("@cap-js/a2a - Prompt Injection Shield (AI Core)", () => {
+describe("@cap-js/a2a - Prompt Injection Shield (AI Core)", () => {
   axios.defaults.validateStatus = () => true
 
   beforeAll(async () => {

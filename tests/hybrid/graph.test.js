@@ -1,12 +1,10 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
+import createHelpers from "../utils/helpers.js"
 const { POST, axios } = cds.test(import.meta.dirname + "/../deep-agent-sample")
-const isHybrid = cds.env.profiles?.includes("hybrid")
 
 // deepagents has ESM-only transitive deps (p-retry) that fail to load in some
-// Node versions but succeed on others. However, these tests require a real LLM (AI Core)
-// via createModel({ deepAgent: true }) — they must only run in hybrid mode regardless of
-// whether deepagents itself is loadable.
+// Node versions but succeed on others.
 let canLoad = true
 try {
   await import("deepagents")
@@ -14,12 +12,9 @@ try {
   canLoad = false
 }
 
-const shouldSkip = !(canLoad && isHybrid)
-
-describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: shouldSkip }, () => {
+describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: !canLoad }, () => {
   let sendMessage, jsonrpc, setupErrorDetection
   before(async () => {
-    const createHelpers = (await import("./helpers.js")).default
     const helpers = createHelpers({ POST, axios })
     sendMessage = helpers.sendMessage
     jsonrpc = helpers.jsonrpc

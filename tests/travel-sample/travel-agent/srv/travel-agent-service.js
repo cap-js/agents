@@ -1,5 +1,5 @@
 /* eslint-disable no-await-in-loop */
-const { ChatAnthropic } = require("@langchain/anthropic")
+// import { ChatAnthropic } from "@langchain/anthropic"
 /**
  * Travel Agent — Deep agent orchestrator for @cap-js/a2a.
  *
@@ -9,7 +9,7 @@ const { ChatAnthropic } = require("@langchain/anthropic")
  * Demonstrates:
  * - Downstream A2A agent delegation (natural language tools)
  * - MCP server tool access (structured parameters)
- * - createModel({ deepAgent: true }) for AI Core compatibility
+ * - createDeepAgentModel() for AI Core compatibility
  * - CdsCheckpointSaver auto-injected by the plugin for multi-turn conversations
  */
 import cds from "@sap/cds"
@@ -193,6 +193,10 @@ export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
     this.a2a = {
       graph: createTravelAgent(),
+      // Build the agent card from AGENTS.md frontmatter + skills/ directory scan
+      // (instead of falling back to the agentify mode which would just expose
+      // the `plan` action). This showcases the convention-based agent card.
+      agentDir: __agentDir,
       // Deepagents accumulate large contexts (system prompt + skills + tool
       // results) that exceed Azure Content Safety prompt_shield's payload size
       // limit (surfaces as HTTP 503 + `AI-External-Failure: true`). When enabled,
@@ -200,10 +204,6 @@ export default class TravelAgentServiceHandler extends cds.ApplicationService {
       // block the agent with an error
       contentFilter: false,
     }
-
-    this.on("plan", async () => {
-      return "Please use the A2A protocol to interact with the travel agent."
-    })
 
     await super.init()
   }

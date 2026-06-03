@@ -3,6 +3,12 @@ name: trip-planning
 description: >
   Plan a complete trip by coordinating flights, hotels, and activities.
   Searches all domains in parallel and presents options to the user.
+metadata:
+  tags: [travel, planning, trips, flights, hotels, activities]
+  examples:
+    - Plan a weekend trip to Paris
+    - I want to visit Tokyo for 5 days
+    - Book me a getaway to Barcelona next month
 ---
 
 # Skill: Trip Planning

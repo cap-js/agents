@@ -17,7 +17,7 @@
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
-    "test:hybrid": "cds bind --exec -- CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
+    "test:hybrid": "CDS_ENV=test,hybrid cds bind --exec -- node --test --test-force-exit --test-timeout=900000 tests/integration/*.test.js tests/hybrid/*.test.js",
     "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/mtx/*.test.js",
     "watch:sample": "cds w tests/bookshop",
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",

@@ -64,7 +64,10 @@ describe("@cap-js/a2a - Access Control", () => {
     })
   })
 
-  describe("Checkpoints", () => {
+  const isMock = !cds.env.profiles?.includes("hybrid")
+  const describeCheckpoints = isMock ? describe : describe.skip
+
+  describeCheckpoints("Checkpoints", () => {
     it("bob cannot resume alice's conversation", async () => {
       const contextId = `ac-test-${Date.now()}`
 

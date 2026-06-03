@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
-import { setup, teardown, resetCapture, createSendMessage } from "./telemetry-utils.js"
+import { setup, teardown, resetCapture, createSendMessage } from "../utils/telemetry-utils.js"
 
 setup()
 

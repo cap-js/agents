@@ -11,7 +11,7 @@ import {
   findSpans,
   createSendMessage,
   getSpanExporter,
-} from "./telemetry-utils.js"
+} from "../utils/telemetry-utils.js"
 
 // Disable cds.test() console silencing so we can capture telemetry output
 process.env.CDS_TEST_SILENT = "false"
@@ -22,7 +22,11 @@ setup()
 const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/a2a - OpenTelemetry integration", () => {
+// Span/metrics tests require [test] profile telemetry config (ConsoleSpanExporter).
+// In hybrid mode, telemetry uses different exporters that our in-memory capture can't intercept.
+const isHybrid = cds.env.profiles?.includes("hybrid")
+
+describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)

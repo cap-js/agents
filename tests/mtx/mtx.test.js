@@ -2,7 +2,13 @@ process.env.CDS_ENV = "with-mtx"
 
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
-import { cleanDbFiles, startSidecar, stopSidecar, subscribeTenant, APP_DIR } from "./setup.js"
+import {
+  cleanDbFiles,
+  startSidecar,
+  stopSidecar,
+  subscribeTenant,
+  APP_DIR,
+} from "../utils/mtx-setup.js"
 
 let sidecar
 

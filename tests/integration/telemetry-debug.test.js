@@ -9,7 +9,7 @@ import {
   getSpansAfterRequest,
   findSpan,
   createSendMessage,
-} from "./telemetry-utils.js"
+} from "../utils/telemetry-utils.js"
 
 process.env.CDS_TEST_SILENT = "false"
 setup()

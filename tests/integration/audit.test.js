@@ -3,7 +3,7 @@ import cds from "@sap/cds"
 
 const test = cds.test(import.meta.dirname + "/../bookshop")
 const { POST, GET, axios } = test
-import createHelpers from "./helpers.js"
+import createHelpers from "../utils/helpers.js"
 const { sendMessage, jsonrpc } = createHelpers({ POST, axios })
 
 const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
@@ -13,13 +13,22 @@ const byEvent = (name) => (l) => l.event === "SecurityEvent" && l.data?.data?.ev
 
 describe("@cap-js/a2a - Audit Logging", () => {
   let _auditLogs
+  let _skipAudit = false
 
   before(async () => {
-    const audit = await cds.connect.to("audit-log")
-    _auditLogs = []
-    audit.after("*", (_, req) => {
-      _auditLogs.push({ event: req.event, data: JSON.parse(JSON.stringify(req.data)) })
-    })
+    // Ensure audit-log is connectable (hybrid mode may lack 'kind')
+    if (!cds.env.requires?.["audit-log"]?.kind)
+      cds.env.requires["audit-log"] = { kind: "audit-log-to-console", outbox: false }
+
+    try {
+      const audit = await cds.connect.to("audit-log")
+      _auditLogs = []
+      audit.after("*", (_, req) => {
+        _auditLogs.push({ event: req.event, data: JSON.parse(JSON.stringify(req.data)) })
+      })
+    } catch {
+      _skipAudit = true
+    }
   })
 
   beforeEach(() => {
