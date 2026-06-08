@@ -161,6 +161,22 @@ describe("@cap-js/a2a - Audit Logging", () => {
       assert.notStrictEqual(data.result, undefined)
     })
 
+    it("should emit for custom (non-CDS) tools in the same graph", async () => {
+      await sendMessage("graph-book", "Show me books")
+      await wait()
+
+      const events = _auditLogs.filter(byEvent("ToolInvocation"))
+      const customToolEvent = events.find((e) => e.data.data.tool === "getBookCount")
+      assert.notStrictEqual(customToolEvent, undefined, "expected ToolInvocation for getBookCount")
+
+      const data = customToolEvent.data.data
+      assert.strictEqual(data.tool, "getBookCount")
+      assert.strictEqual(data.outcome, "success")
+      assert.strictEqual(typeof data.duration, "number")
+      assert.notStrictEqual(data.result, undefined)
+      assert.notStrictEqual(data.taskId, undefined)
+    })
+
     it("should include task correlation", async () => {
       await sendMessage("graph-book", "Show me books")
       await wait()

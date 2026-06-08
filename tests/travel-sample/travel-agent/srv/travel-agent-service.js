@@ -17,7 +17,7 @@ const { path } = cds.utils
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/a2a"
+import { createDeepAgentModel, contentFilterRecoveryMiddleware, instrumentTool } from "@cap-js/a2a"
 
 const LOG = cds.log("travel-agent")
 const __agentDir = path.join(import.meta.dirname, "travel-agent")
@@ -135,10 +135,13 @@ async function discoverTools() {
       const mcpClient = new MultiServerMCPClient({ mcpServers: { [serverName]: serverConfig } })
       const mcpTools = await mcpClient.getTools()
       for (const mcpTool of mcpTools) {
-        const originalInvoke = mcpTool.invoke.bind(mcpTool)
+        // Instrument for tracing, audit, and metrics
+        instrumentTool(mcpTool)
+        // Additionally wrap to catch errors (deepagents workaround — errors become LLM-readable strings)
+        const tracedInvoke = mcpTool.invoke.bind(mcpTool)
         mcpTool.invoke = async (args, config) => {
           try {
-            return await originalInvoke(args, config)
+            return await tracedInvoke(args, config)
           } catch (err) {
             LOG.debug("MCP tool error caught (deepagents workaround)", {
               tool: mcpTool.name,

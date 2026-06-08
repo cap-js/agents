@@ -1,12 +1,33 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { AIMessage } from "@langchain/core/messages"
+import { tool } from "@langchain/core/tools"
+import { z } from "zod"
 import { generateTools } from "@cap-js/a2a"
 import * as metrics from "@cap-js/a2a/lib/telemetry/metrics.js"
 
 /**
+ * Custom tool (not CDS-generated) to verify prototype-level tracing covers it.
+ */
+const getBookCount = tool(
+  async ({ genre_ID }) => {
+    const { Books } = cds.entities("sap.capire.bookshop")
+    const where = genre_ID ? { genre_ID } : {}
+    const result = await SELECT.from(Books).where(where)
+    return JSON.stringify({ count: result.length, genre_ID: genre_ID || "all" })
+  },
+  {
+    name: "getBookCount",
+    description: "Returns the number of books, optionally filtered by genre ID.",
+    schema: z.object({
+      genre_ID: z.number().optional().describe("Genre ID to filter by"),
+    }),
+  },
+)
+
+/**
  * Deterministic graph-based agent for telemetry e2e testing.
- * Uses @cap-js/mcp tools (via generateTools) + mock LLM metrics.
+ * Uses @cap-js/mcp tools (via generateTools) + mock LLM metrics + custom tool.
  */
 export default class GraphBookService extends cds.ApplicationService {
   init() {
@@ -41,8 +62,8 @@ export default class GraphBookService extends cds.ApplicationService {
       }
     }
 
-    // Tool node: invoke the MCP-generated query tool
-    async function toolNode(state) {
+    // Tool node: invoke both the CDS query tool and the custom getBookCount tool
+    async function toolNode(state, config) {
       const queryTool = tools.find((t) => t.name === "query")
       if (!queryTool) {
         return {
@@ -50,8 +71,10 @@ export default class GraphBookService extends cds.ApplicationService {
           output: "No query tool available.",
         }
       }
-      const result = await queryTool.invoke({ entity: "Books", limit: 3 })
-      return { messages: [new AIMessage(result)], output: result }
+      const result = await queryTool.invoke({ entity: "Books", limit: 3 }, config)
+      const countResult = await getBookCount.invoke({ genre_ID: 11 }, config)
+      const output = `${result}\n\nBook count: ${countResult}`
+      return { messages: [new AIMessage(output)], output }
     }
 
     const graph = new StateGraph(GraphState)

@@ -66,6 +66,15 @@ describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
     assert.strictEqual(span.attributes["a2a.tool.outcome"], "success")
   })
 
+  it("should create tool span for custom (non-CDS) tools via prototype patch", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "custom tool test"))
+    const span = findSpan(spans, "execute_tool DynamicStructuredTool getBookCount")
+    assert.notStrictEqual(span, undefined)
+    assert.strictEqual(span.attributes["a2a.span.kind"], "tool")
+    assert.strictEqual(span.attributes["a2a.tool.name"], "getBookCount")
+    assert.strictEqual(span.attributes["a2a.tool.outcome"], "success")
+  })
+
   it("should create RunnableSequence spans for graph nodes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "sequence test"))
     const seqSpans = findSpans(spans, "workflow RunnableSequence")

@@ -263,11 +263,11 @@ All events include the original event name in the `data` field for filtering and
 <details>
 <summary>Coverage</summary>
 
-| Scenario                                    | Audit coverage                                                                                                                               |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Built-in ReAct (`@a2a` annotation)          | Full — all events fire automatically                                                                                                         |
-| Custom graph (`this.a2a = { graph }`)       | Full for task lifecycle + tools using `StructuredTool`. LLM decisions covered if `model.invoke` receives `config` with `_taskId`/`_service`. |
-| Custom executor (`this.a2a = { executor }`) | None — custom executors manage their own lifecycle                                                                                           |
+| Scenario                                    | Audit coverage                                                                                                                                                               |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Built-in ReAct (`@a2a` annotation)          | Full — all events fire automatically                                                                                                                                         |
+| Custom graph (`this.a2a = { graph }`)       | Full — task lifecycle, CDS tools, custom tools, and deepagents built-in tools are all covered automatically. LLM decisions covered if `config` carries `_taskId`/`_service`. |
+| Custom executor (`this.a2a = { executor }`) | None — custom executors manage their own lifecycle                                                                                                                           |
 
 </details>
 
@@ -493,6 +493,35 @@ import { generateTools } from "@cap-js/a2a"
 const { tools } = generateTools(srv)
 // tools: [query, describe, ...perActionTools]
 ```
+
+### `instrumentTool(tool)` / `instrumentTools(tools)`
+
+Wraps a tool's `.invoke()` with OpenTelemetry tracing, audit logging, and the `a2a.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
+
+For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed.
+
+```js
+import { instrumentTool, instrumentTools } from "@cap-js/a2a"
+
+// Single tool (mutates and returns the tool)
+instrumentTool(myMcpTool)
+
+// Multiple tools
+instrumentTools(mcpTools)
+
+// Typical pattern: instrument first, then wrap with error handling
+instrumentTool(mcpTool)
+const tracedInvoke = mcpTool.invoke.bind(mcpTool)
+mcpTool.invoke = async (args, config) => {
+  try {
+    return await tracedInvoke(args, config)
+  } catch (err) {
+    return `Error: ${err.message}`
+  }
+}
+```
+
+Re-throws errors after recording them (unlike CDS tools which swallow errors for LLM retry).
 
 ### `CdsCheckpointSaver`
 

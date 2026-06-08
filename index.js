@@ -6,7 +6,7 @@ import {
   flattenMessages,
   buildContentFilter,
 } from "./lib/llm.js"
-import { generateTools } from "./lib/tools.js"
+import { generateTools, instrumentTool, instrumentTools } from "./lib/tools.js"
 import quotaEnforcerAtNode from "./lib/executor/langgraph/nodes/quotaEnforcerAtNode.js"
 import quotaEnforcerAtStart from "./lib/executor/langgraph/nodes/quotaEnforcerAtStart.js"
 import shouldContinue from "./lib/executor/langgraph/nodes/shouldContinue.js"
@@ -18,6 +18,7 @@ import { contentFilterRecoveryMiddleware } from "./lib/middlewares/content-filte
  * - createModel: LLM model factory — use { deepAgent: true } for deepagents to handle
  *   array-content messages from deepagents' built-in tools that SAP AI Core would otherwise reject
  * - generateTools: Creates LangChain tools from a CDS service model (query, describe, per-action)
+ * - instrumentTool / instrumentTools: Wrap custom tools with tracing, audit, and metrics
  */
 export {
   CdsCheckpointSaver,
@@ -28,6 +29,8 @@ export {
   flattenMessages,
   buildContentFilter,
   generateTools,
+  instrumentTool,
+  instrumentTools,
 }
 
 export const nodes = {
