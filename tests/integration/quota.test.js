@@ -423,8 +423,8 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       const config = { configurable: { _taskId: "test", _service: "TestService" } }
       const result = await toolNode(state, config)
 
-      // 5 + 3 = 8 (not 5 + 1 = 6 which was the old bug)
-      assert.strictEqual(result._totalToolCalls, 8)
+      // Result is aggregated via state so that the next node has 8 as the totalToolCalls
+      assert.strictEqual(result._totalToolCalls, 3)
       assert.strictEqual(result.messages.length, 3)
     })
 

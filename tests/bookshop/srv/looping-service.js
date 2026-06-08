@@ -43,7 +43,7 @@ export default class LoopingService extends cds.ApplicationService {
         toolCalls: [{ name: "query", args: { entity: "Books" }, id: `call-${iteration}` }],
         _iterations: iteration,
         _totalTokens: state._totalTokens + 100,
-        _totalToolCalls: state._totalToolCalls + 1,
+        _totalToolCalls: 1,
       }
     }
 
