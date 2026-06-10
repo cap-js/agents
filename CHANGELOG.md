@@ -22,6 +22,7 @@
 - Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.a2a.pool.maxLLMCallTimeoutMs` (default 30s).
 - Content filtering with Azure Content Safety prompt injection shield via `cds.a2a.contentFilter` (default: `true`). Supports per-service override via `this.a2a = { contentFilter }` (async function, object, or `false` to disable).
 - A2A Tasks and Checkpoints can only be accessed by the user who created it
+- `configMapper` option on `GraphExecutor` (`this.a2a = { graph, configMapper }`) to inject request-scoped data into `config.configurable` before `graph.invoke()`. Enables use cases such as supplying A2A-uploaded file capabilities to deepagents' `CapabilityBackend` via LangGraph's `getConfig()` AsyncLocalStorage. The mapper is `await`ed, so async implementations work correctly. Reserved keys (`thread_id`, `_taskId`, `_service`) always take precedence over mapper output. Non-object return values fail the task with a clear error.
 
 ### Changed
 
