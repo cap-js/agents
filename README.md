@@ -500,7 +500,7 @@ const { tools } = generateTools(srv)
 
 Wraps a tool's `.invoke()` with OpenTelemetry tracing, audit logging, and the `a2a.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
 
-For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed.
+For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed. The plugin also calls `instrumentTool` on every tool resolved via `srv.a2a.tools`, so you only need it when you build tools outside that resolution path.
 
 ```js
 import { instrumentTool, instrumentTools } from "@cap-js/a2a"
@@ -552,6 +552,7 @@ Set in your service handler's `init()` to customize the default behavior:
 | `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL  |
 | `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card        |
 | `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)              |
+| `{ tools }`         | Array or factory of LangChain tools | Everything else (zero-code)              |
 | `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.a2a.contentFilter` |
 | _(default)_         | Nothing                             | Everything (zero-code)                   |
 
@@ -568,6 +569,32 @@ this.a2a = {
   }),
 }
 ```
+
+#### Custom Tools
+
+`this.a2a.tools` replaces or extends the auto-generated CDS tools (`query`, `describe`, per-action). User tools are auto-instrumented (telemetry, audit, metrics).
+
+```js
+import { generateTools } from "@cap-js/a2a"
+
+this.a2a = { tools: [weatherTool] }                               // replace
+this.a2a = { tools: [...generateTools(this).tools, weatherTool] } // extend
+this.a2a = { tools: ({ srv, generateTools }) => [...] }           // factory
+```
+
+<details>
+<summary>
+Notes
+</summary>
+
+- Plugin throws at startup if a tool item is missing `name`/`invoke` or if two
+  tools share the same name.
+- When you supply tools, the plugin does **not** apply `checkAuthorization`
+  filtering — your tools are your responsibility. Call `generateTools(srv)`
+  (which auth-filters by default) inside your factory to opt back in.
+- Empty array (`tools: []`) is allowed: the model runs without function
+calling.
+</details>
 
 ### Human-in-the-Loop (HITL)
 
