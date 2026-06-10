@@ -67,7 +67,7 @@ export default class MyAgent extends cds.ApplicationService {
 ## Getting Started
 
 ```bash
-git clone <repo-url>
+git clone https://github.tools.sap/cap/a2a
 cd a2a && npm i
 ```
 

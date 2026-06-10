@@ -21,9 +21,6 @@
     "sonar_fix": {
       "enable": true,
       "excluded_rules": []
-    },
-    "pipeline_fix": {
-      "enable": true
     }
   },
   "excluded_paths": []
