@@ -1,8 +1,10 @@
 import cds from "@sap/cds"
 
 const LOG = cds.log("a2a")
-
+import a2aAdapter from "./lib/index.js"
+import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
+
 cds.compile.to.a2a = cds_compile_to_a2a
 
 // Detect optional peer plugins (@cap-js/telemetry, @cap-js/audit-logging)
@@ -22,27 +24,20 @@ cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
 cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("a2a.task.id")) cls_fields.push("a2a.task.id")
-if (!cls_fields.includes("a2a.context.id"))
-  cls_fields.push("a2a.context.id")
+if (!cls_fields.includes("a2a.context.id")) cls_fields.push("a2a.context.id")
+// LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
+if (hasTelemetry && cds.env.a2a?.trace_langchain !== false) {
+  patchLangChain()
+}
 
-  // Async initialization — wrapped to avoid top-level await (CJS compat with @sap/cds require())
-;(async () => {
-  // LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
-  if (hasTelemetry && cds.env.a2a?.trace_langchain !== false) {
-    const { patchLangChain } = await import("./lib/telemetry/tracing.js")
-    patchLangChain()
+// Register A2A as a CDS protocol adapter
+const protocols = (cds.env.protocols ??= {})
+if (!protocols.a2a) {
+  protocols.a2a = {
+    path: "/a2a",
+    impl: a2aAdapter,
   }
-
-  // Register A2A as a CDS protocol adapter
-  const protocols = (cds.env.protocols ??= {})
-  if (!protocols.a2a) {
-    const { default: a2aAdapter } = await import("./lib/index.js")
-    protocols.a2a = {
-      path: "/a2a",
-      impl: a2aAdapter,
-    }
-  }
-})()
+}
 
 // CORS support for browser-based A2A clients (development and hybrid profiles)
 const isDev = cds.env.profiles?.includes("development") || cds.env.profiles?.includes("hybrid")

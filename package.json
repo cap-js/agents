@@ -86,7 +86,8 @@
         "maxLLMInvocationsPerTask": 15,
         "maxLLMTokensPerTask": 200000,
         "maxLLMCallTimeoutMs": 30000,
-        "maxExecutionTimeMsPerTask": 300000
+        "maxExecutionTimeMsPerTask": 300000,
+        "maxIncomingMessageLength": 5000
       }
     },
     "requires": {

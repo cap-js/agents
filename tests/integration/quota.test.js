@@ -107,6 +107,25 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
   })
 
+  describe("maxIncomingMessageLength", () => {
+    it("should reject messages exceeding maxIncomingMessageLength with 400", async () => {
+      cds.env.a2a.pool.maxIncomingMessageLength = 10
+
+      const res = await sendMessage("graph-book", "This message is longer than ten characters")
+      assert.strictEqual(res.status, 400)
+      assert.strictEqual(res.data.error.code, -32029)
+      assert.match(res.data.error.message, /must not exceed/)
+    })
+
+    it("should allow messages within maxIncomingMessageLength", async () => {
+      cds.env.a2a.pool.maxIncomingMessageLength = 5000
+
+      const res = await sendMessage("graph-book", "Short message")
+      assert.strictEqual(res.status, 200)
+      assert.strictEqual(res.data.result?.status?.state, "completed")
+    })
+  })
+
   describe("quotaEnforcerAtNode (e2e)", () => {
     it("should fail task when maxLLMInvocationsPerTask exceeded during graph execution", async () => {
       cds.env.a2a.pool.maxLLMInvocationsPerTask = 2

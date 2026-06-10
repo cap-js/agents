@@ -129,7 +129,8 @@ All limits are configured via `cds.env.a2a.pool` (defaults provided by the plugi
         "maxLLMInvocationsPerTask": 15,
         "maxLLMTokensPerTask": 200000,
         "maxLLMCallTimeoutMs": 30000,
-        "maxExecutionTimeMsPerTask": 300000
+        "maxExecutionTimeMsPerTask": 300000,
+        "maxIncomingMessageLength": 5000
       }
     }
   }
@@ -141,14 +142,15 @@ All limits are configured via `cds.env.a2a.pool` (defaults provided by the plugi
 <details>
 <summary>Pre-Request Limits (HTTP 429)</summary>
 
-| Limit                       | Retry-After        | Scope  |
-| --------------------------- | ------------------ | ------ |
-| `maxConcurrentTasks`        | 30s                | Tenant |
-| `maxConcurrentTasksPerUser` | 30s                | User   |
-| `maxTasksPerHour`           | Next hour boundary | Tenant |
-| `maxTasksPerHourPerUser`    | Next hour boundary | User   |
-| `maxToolCallsPerHour`       | Next hour boundary | Tenant |
-| `maxLLMTokensPerDay`        | Midnight UTC       | Tenant |
+| Limit                       | Retry-After        | Scope   |
+| --------------------------- | ------------------ | ------- |
+| `maxConcurrentTasks`        | 30s                | Tenant  |
+| `maxConcurrentTasksPerUser` | 30s                | User    |
+| `maxTasksPerHour`           | Next hour boundary | Tenant  |
+| `maxTasksPerHourPerUser`    | Next hour boundary | User    |
+| `maxToolCallsPerHour`       | Next hour boundary | Tenant  |
+| `maxLLMTokensPerDay`        | Midnight UTC       | Tenant  |
+| `maxIncomingMessageLength`  | — (HTTP 400)       | Request |
 
 When exceeded, the response is:
 
