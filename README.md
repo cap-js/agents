@@ -514,23 +514,21 @@ const { tools } = generateTools(srv)
 // tools: [query, describe, ...perActionTools]
 ```
 
-### `instrumentTool(tool)` / `instrumentTools(tools)`
+### `instrumentTools(tools)`
 
-Wraps a tool's `.invoke()` with OpenTelemetry tracing, audit logging, and the `a2a.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
+Wraps tools' `.invoke()` with OpenTelemetry tracing, audit logging, and the `a2a.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
 
 For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed. The plugin also calls `instrumentTool` on every tool resolved via `srv.a2a.tools`, so you only need it when you build tools outside that resolution path.
 
 ```js
-import { instrumentTool, instrumentTools } from "@cap-js/a2a"
+import { instrumentTools } from "@cap-js/a2a"
 
-// Single tool (mutates and returns the tool)
-instrumentTool(myMcpTool)
-
-// Multiple tools
+// Pass a list (one or many — mutates and returns the tools)
 instrumentTools(mcpTools)
+instrumentTools([myMcpTool])
 
 // Typical pattern: instrument first, then wrap with error handling
-instrumentTool(mcpTool)
+instrumentTools([mcpTool])
 const tracedInvoke = mcpTool.invoke.bind(mcpTool)
 mcpTool.invoke = async (args, config) => {
   try {

@@ -60,7 +60,7 @@
           }
         }
       },
-      "[hybrid]": {
+      "[change_to_hybrid_if_needed]": {
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"

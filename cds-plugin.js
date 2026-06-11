@@ -12,10 +12,14 @@ const hasTelemetry = !!cds.env.requires?.telemetry
 const hasAuditLog = !!cds.env.requires?.["audit-log"]
 const hasMetrics = !!cds.env.requires?.telemetry?.["metrics"]
 const hasTracing = !!cds.env.requires?.telemetry?.["tracing"]
-if (!hasTelemetry) LOG.warn("@cap-js/telemetry not configured - metrics and tracing disabled")
-if (!hasAuditLog) LOG.warn("@cap-js/audit-logging not configured - audit events disabled")
-if (!hasMetrics) LOG.warn("@cap-js/telemetry has no metrics configured - metrics disabled")
-if (!hasTracing) LOG.warn("@cap-js/telemetry has no tracing configured - tracing disabled")
+if (!hasTelemetry && cds.env.profiles?.includes("production"))
+  LOG.warn("@cap-js/telemetry not configured - metrics and tracing disabled")
+if (!hasAuditLog && cds.env.profiles?.includes("production"))
+  LOG.warn("@cap-js/audit-logging not configured - audit events disabled")
+if (hasTelemetry && !hasMetrics && cds.env.profiles?.includes("production"))
+  LOG.warn("@cap-js/telemetry has no metrics configured - metrics disabled")
+if (hasTelemetry && !hasTracing && cds.env.profiles?.includes("production"))
+  LOG.warn("@cap-js/telemetry has no tracing configured - tracing disabled")
 
 // Enable doc comments in CSN for agent card generation
 cds.env.cdsc = { ...cds.env.cdsc, docComment: true }

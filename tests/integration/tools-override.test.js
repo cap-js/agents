@@ -3,7 +3,7 @@ import { describe, it, mock } from "node:test"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 
-import { resolveTools, instrumentTool } from "../../lib/tools.js"
+import { resolveTools, instrumentTools } from "../../lib/tools.js"
 
 // Symbol marking a tool as instrumented by @cap-js/a2a
 const INSTRUMENTED = Symbol.for("@cap-js/a2a:instrumented")
@@ -110,11 +110,11 @@ describe("resolveTools — srv.a2a.tools override", () => {
     assert.ok(Array.isArray(result.tools))
   })
 
-  it("instrumentTool: idempotent (re-instrumenting is a no-op)", () => {
+  it("instrumentTools: idempotent (re-instrumenting is a no-op)", () => {
     const t = makeTool()
-    instrumentTool(t)
+    instrumentTools([t])
     const wrapped = t.invoke
-    instrumentTool(t) // second call
+    instrumentTools([t]) // second call
     assert.strictEqual(t.invoke, wrapped) // not re-wrapped
   })
 
@@ -129,7 +129,7 @@ describe("resolveTools — srv.a2a.tools override", () => {
         schema: z.object({}),
       },
     )
-    instrumentTool(failing)
+    instrumentTools([failing])
 
     await assert.rejects(failing.invoke({}), /boom/)
   })

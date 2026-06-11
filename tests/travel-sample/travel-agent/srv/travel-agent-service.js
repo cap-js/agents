@@ -17,7 +17,7 @@ const { path } = cds.utils
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, contentFilterRecoveryMiddleware, instrumentTool } from "@cap-js/a2a"
+import { createDeepAgentModel, contentFilterRecoveryMiddleware, instrumentTools } from "@cap-js/a2a"
 
 const LOG = cds.log("travel-agent")
 const __agentDir = path.join(import.meta.dirname, "travel-agent")
@@ -134,9 +134,9 @@ async function discoverTools() {
       LOG.info("Connecting to MCP server", { server: serverName, url: serverConfig.url })
       const mcpClient = new MultiServerMCPClient({ mcpServers: { [serverName]: serverConfig } })
       const mcpTools = await mcpClient.getTools()
+      // Instrument for tracing, audit, and metrics
+      instrumentTools(mcpTools)
       for (const mcpTool of mcpTools) {
-        // Instrument for tracing, audit, and metrics
-        instrumentTool(mcpTool)
         // Additionally wrap to catch errors (deepagents workaround — errors become LLM-readable strings)
         const tracedInvoke = mcpTool.invoke.bind(mcpTool)
         mcpTool.invoke = async (args, config) => {
@@ -167,9 +167,9 @@ async function discoverTools() {
   return tools
 }
 
-async function createTravelAgent() {
+async function createTravelAgent(srv) {
   const tools = await discoverTools()
-  const model = await createDeepAgentModel()
+  const model = await createDeepAgentModel({ srv })
 
   LOG.info("Creating travel deep agent", { tools: tools.length, agentDir: __agentDir })
 
@@ -195,7 +195,7 @@ async function createTravelAgent() {
 export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
     this.a2a = {
-      graph: createTravelAgent(),
+      graph: createTravelAgent(this),
       // Build the agent card from AGENTS.md frontmatter + skills/ directory scan
       // (instead of falling back to the agentify mode which would just expose
       // the `plan` action). This showcases the convention-based agent card.

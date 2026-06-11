@@ -80,6 +80,7 @@ async function createAgent(srv) {
   // issue: deepagents' built-in tools (read_file, ls, grep, …) return content
   // as [{type:"text",text:"..."}] arrays which AI Core rejects without flattening.
   const model = await createDeepAgentModel({
+    srv,
     params: { max_tokens: 4096, temperature: 0.2 },
   })
 
