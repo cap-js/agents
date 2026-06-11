@@ -22,6 +22,12 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
       assert.notStrictEqual(submitSkill, undefined)
     })
 
+    it("capabilities.streaming reflects cds.env.a2a.streaming config", async () => {
+      const res = await GET("/a2a/catalog/.well-known/agent-card.json")
+      const card = res.data
+      assert.strictEqual(card.capabilities.streaming, true)
+    })
+
     it("agent card matches snapshot", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data

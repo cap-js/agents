@@ -67,6 +67,7 @@
   "cds": {
     "a2a": {
       "llm": "anthropic--claude-4.6-sonnet",
+      "streaming": true,
       "trace_langchain": true,
       "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
