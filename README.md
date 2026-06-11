@@ -33,6 +33,24 @@ service CatalogService {
 
 → See [Bookshop Sample](./tests/bookshop/)
 
+<details>
+<summary>Customize Agent Card URL</summary>
+
+If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
+
+```cds
+@a2a
+@Core.Links : [
+  {
+      rel : 'via',
+      href : 'https://example.com/agent/catalog',
+  },
+]
+service CatalogService { }
+```
+
+</details>
+
 ### Markdown-Based Agents
 
 Create agents using an agent harness like `deepagents` and plug them into CAP via `this.a2a = { graph }`. Define agent identity in `AGENTS.md`, workflows in `skills/`, and let the plugin handle protocol, persistence, agent card serving, and human-in-the-loop (HITL) approval flows.

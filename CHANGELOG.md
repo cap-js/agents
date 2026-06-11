@@ -10,6 +10,7 @@
 
 - Initial project setup as a CDS protocol adapter
 - Agent Card compilation during runtime and design time
+  - Customize the agent card URL with `@Core.Links` annotated to the service
 - A2A Protocol adapter that converts A2A requests into LangGraph execution
 - Langgraph Executor with AI Core integration to agentify CAP services
 - Mock Executor for testing purposes

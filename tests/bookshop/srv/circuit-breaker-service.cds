@@ -6,6 +6,12 @@ using {sap.capire.bookshop as my} from '../db/schema';
  * pointed at a mock AI Core server.
  */
 @a2a
+@Core.Links : [
+  {
+      rel : 'via',
+      href : 'https://example.com/agent/circuit-breaker',
+  },
+]
 @description: 'Circuit breaker test agent'
 service CircuitBreakerService {
   @readonly

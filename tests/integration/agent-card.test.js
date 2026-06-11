@@ -73,4 +73,50 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
       assert.strictEqual(querySkill, undefined)
     })
   })
+
+  // ── Proxy URL from @Core.Links rel=via ──────────────────────────────────
+
+  describe("Proxy URL from @Core.Links rel=via", () => {
+    it("agent card URL uses @Core.Links via href as proxy URL", async () => {
+      const res = await GET("/a2a/circuit-breaker/.well-known/agent-card.json")
+      const card = res.data
+
+      assert.strictEqual(card.url, "https://example.com/agent/circuit-breaker")
+      assert.strictEqual(
+        card.supportedInterfaces[0].url,
+        "https://example.com/agent/circuit-breaker",
+      )
+    })
+
+    it("agent card without @Core.Links via still uses request-derived URL", async () => {
+      const res = await GET("/a2a/catalog/.well-known/agent-card.json")
+      const card = res.data
+
+      assert.ok(card.url.includes("/a2a/catalog"), "URL should be request-derived")
+      assert.ok(!card.url.includes("example.com"), "URL should NOT be proxy URL")
+    })
+
+    it("compile to a2a uses @Core.Links via href as URL", () => {
+      const card = cds.compile.to.a2a(cds.model, {
+        service: "CircuitBreakerService",
+        as: "object",
+      })
+
+      assert.strictEqual(card.url, "https://example.com/agent/circuit-breaker")
+      assert.strictEqual(
+        card.supportedInterfaces[0].url,
+        "https://example.com/agent/circuit-breaker",
+      )
+    })
+
+    it("compile to a2a without @Core.Links via uses default HOST URL", () => {
+      const card = cds.compile.to.a2a(cds.model, {
+        service: "CatalogService",
+        as: "object",
+      })
+
+      assert.ok(card.url.includes("HOST"), "URL should contain HOST placeholder")
+      assert.ok(card.url.includes("/a2a/catalog"), "URL should contain service path")
+    })
+  })
 })
