@@ -258,7 +258,10 @@ describe("@cap-js/a2a - Travel Sample E2E", { skip: !canLoadDeepagents }, () => 
     { timeout: 5 * 60 * 1000 },
     async () => {
       const { sendMessage } = helpers
-      const res = await sendMessage("travel-agent", "Plan a weekend trip to Paris")
+      const res = await sendMessage(
+        "travel-agent",
+        "Plan a weekend trip to Paris with Hotels, Flights and activities",
+      )
 
       assert.strictEqual(
         res.data.result?.status?.state,

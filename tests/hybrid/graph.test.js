@@ -60,4 +60,84 @@ describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: !canLoad }, () => {
     assert.strictEqual(getRes.data.result.status.state, "completed")
     assert.strictEqual(getRes.data.result.id, taskId)
   })
+
+  // ── tasks/cancel ────────────────────────────────────────────────────────
+
+  it("tasks/cancel cancels task in input-required state", async () => {
+    // interruptOn: { orderProduct } should trigger HITL interrupt
+    const res = await sendMessage("product-agent", "Order 5 Widget Pro")
+    const state = res.data.result?.status?.state
+
+    // LLM non-determinism: may not always call orderProduct tool
+    if (state !== "input-required") return
+
+    const taskId = res.data.result.id
+    const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: taskId })
+    assert.strictEqual(cancelRes.data.result.status.state, "canceled")
+  })
+
+  it("tasks/cancel returns error for completed task", async () => {
+    const res = await sendMessage("product-agent", "Hello")
+    const taskId = res.data.result.id
+    assert.strictEqual(res.data.result.status.state, "completed")
+
+    const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: taskId })
+    assert.strictEqual(cancelRes.data.error.code, -32002)
+    assert.ok(cancelRes.data.error.message.includes(taskId))
+  })
+
+  it("tasks/cancel returns error for non-existent task", async () => {
+    const cancelRes = await jsonrpc("product-agent", "tasks/cancel", {
+      id: "does-not-exist-task-id",
+    })
+    assert.strictEqual(cancelRes.data.error.code, -32001)
+  })
+
+  it("tasks/cancel can cancel actively running task", async () => {
+    // Fire stream request without awaiting — LLM calls take seconds
+    const streamPromise = POST(
+      "/a2a/product-agent/",
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "message/stream",
+        params: {
+          message: {
+            kind: "message",
+            messageId: cds.utils.uuid(),
+            role: "user",
+            parts: [
+              {
+                kind: "text",
+                text: "Give me a detailed analysis of all products including bulk pricing calculations for 100 units of each product",
+              },
+            ],
+          },
+        },
+      },
+      { responseType: "text" },
+    )
+
+    // Give server time to create task and start execution
+    await new Promise((r) => setTimeout(r, 1000))
+
+    // Query task store for most recent non-completed task
+    const [task] = await SELECT.from("cap.a2a.Tasks").orderBy("createdAt desc").limit(1)
+
+    if (!task?.taskId || task.state === "completed" || task.state === "failed") {
+      // Task already finished — can't test active cancel, skip gracefully
+      await streamPromise.catch(() => {})
+      return
+    }
+
+    const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: task.taskId })
+    // Accept: canceled (won race) or taskNotCancelable (lost race — completed before cancel)
+    assert.ok(
+      cancelRes.data.result?.status?.state === "canceled" || cancelRes.data.error?.code === -32002,
+      "expected canceled state or taskNotCancelable error",
+    )
+
+    // Let stream finish to avoid dangling connections
+    await streamPromise.catch(() => {})
+  })
 })
