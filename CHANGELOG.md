@@ -30,4 +30,7 @@
 
 ### Fixed
 
+- Replace `res.set()` with `res.setHeader()` in CORS middleware for compatibility with native Node.js HTTP response objects
+- Replace `res.status(204).end()` with `res.writeHead(204)` / `res.end()` to avoid Express-specific API usage
+
 ### Removed

@@ -48,11 +48,14 @@ const isDev = cds.env.profiles?.includes("development") || cds.env.profiles?.inc
 if (isDev) {
   cds.on("bootstrap", (app) => {
     app.use("/a2a", (req, res, next) => {
-      res.set("Access-Control-Allow-Origin", req.headers.origin || "*")
-      res.set("Access-Control-Allow-Methods", "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS")
-      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
-      res.set("Access-Control-Allow-Credentials", "true")
-      if (req.method === "OPTIONS") return res.status(204).end()
+      res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*")
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS")
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
+      res.setHeader("Access-Control-Allow-Credentials", "true")
+      if (req.method === "OPTIONS") {
+        res.writeHead(204)
+        return res.end()
+      }
       next()
     })
   })
