@@ -57,30 +57,45 @@ Create agents using an agent harness like `deepagents` and plug them into CAP vi
 
 ```js
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createModel, generateTools } from "@cap-js/a2a"
+import { createDeepAgentModel, generateTools } from "@cap-js/a2a"
+
+// Extract the async construction so it returns a Promise.
+// See "Lazy graph construction" below for why.
+async function createMyAgent(srv) {
+  const { tools } = generateTools(srv)
+  const model = await createDeepAgentModel({ srv })
+  return createDeepAgent({
+    model,
+    tools,
+    memory: ["./AGENTS.md"],
+    skills: ["./skills/"],
+    backend: new FilesystemBackend({
+      rootDir: import.meta.dirname + "/my-agent",
+      virtualMode: true,
+    }),
+    // checkpointer auto-injected by plugin (CdsCheckpointSaver)
+  })
+}
 
 export default class MyAgent extends cds.ApplicationService {
   async init() {
-    await super.init()
-    const { tools } = generateTools(this)
     this.a2a = {
-      graph: createDeepAgent({
-        model: await createDeepAgentModel(),
-        tools,
-        memory: ["./AGENTS.md"],
-        skills: ["./skills/"],
-        backend: new FilesystemBackend({
-          rootDir: import.meta.dirname + "/my-agent",
-          virtualMode: true,
-        }),
-        // checkpointer auto-injected by plugin (CdsCheckpointSaver)
-      }),
+      graph: createMyAgent(this), // unawaited Promise — see "Lazy graph construction"
     }
+    await super.init()
   }
 }
 ```
 
 → See [Deep Agent Sample](./tests/deep-agent-sample/)
+
+#### Lazy graph construction
+
+`srv.a2a.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.a2a.contentFilter` or `srv.a2a.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.a2a = { graph: createMyAgent(this), … }` _without_ `await`.
+
+Why this matters: the right-hand side of `this.a2a = { … }` is fully evaluated **before** the assignment to `this.a2a` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.a2a` is still `undefined`, so per-service overrides like `srv.a2a.contentFilter` and `srv.a2a.model` are silently ignored and fall back to the global `cds.env.a2a.*` defaults. With the unawaited-Promise form, `this.a2a` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.a2a.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
+
+Compiled-graph form (`this.a2a = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
 
 ## Getting Started
 
@@ -437,14 +452,27 @@ Resolution order: `srv.a2a.contentFilter` → `cds.env.a2a.contentFilter` → de
 
 The default `prompt_shield` filter (Azure Content Safety) has a request payload
 size limit. Deepagents accumulate large contexts — system prompt, skill files,
-multiple tool results — that can exceed it. The fix for now is to disable filtering for deepagent-based services:
+multiple tool results — that can exceed it. The fix for now is to disable filtering for deepagent-based services.
+
+`contentFilter: false` only takes effect on per-service models if `srv.a2a` is assigned **before** the model is constructed; the unawaited-Promise pattern shown in [Lazy graph construction](#lazy-graph-construction) guarantees that ordering:
 
 ```js
-this.a2a = {
-  graph: createDeepAgent({
+async function createMyAgent(srv) {
+  const model = await createDeepAgentModel({ srv })
+  return createDeepAgent({
+    model,
     /* ... */
-  }),
-  contentFilter: false,
+  })
+}
+
+export default class MyAgent extends cds.ApplicationService {
+  async init() {
+    this.a2a = {
+      contentFilter: false, // visible by the time createDeepAgentModel reads srv.a2a
+      graph: createMyAgent(this), // unawaited Promise
+    }
+    await super.init()
+  }
 }
 ```
 
