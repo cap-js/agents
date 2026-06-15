@@ -260,7 +260,7 @@ describe("@cap-js/a2a - Travel Sample E2E", { skip: !canLoadDeepagents }, () => 
       const { sendMessage } = helpers
       const res = await sendMessage(
         "travel-agent",
-        "Plan a weekend trip to Paris with Hotels, Flights and activities",
+        "Plan a weekend trip to Paris with Hotels, Flights and activities. Make sure to use the provided tools to search for Hotels, Flights, and Activities",
       )
 
       assert.strictEqual(
