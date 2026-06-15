@@ -5,7 +5,7 @@
   "description": "CAP sample for master data service",
   "private": true,
   "dependencies": {
-    "@cap-js/mcp": "^0.0.11",
+    "@cap-js/mcp": "^1",
     "@cap-js/sqlite": "*"
   },
   "license": "Apache-2.0",

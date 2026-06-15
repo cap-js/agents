@@ -7,7 +7,7 @@
     "@cap-js/a2a": "file:../../.",
     "@cap-js/audit-logging": ">=1",
     "@cap-js/hana": "^2",
-    "@cap-js/mcp": "^0.0.11",
+    "@cap-js/mcp": "^1",
     "@cap-js/telemetry": "^1",
     "@langchain/anthropic": "^1.4.0",
     "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
