@@ -27,6 +27,7 @@
 - `configMapper` option on `GraphExecutor` (`this.a2a = { graph, configMapper }`) to inject request-scoped data into `config.configurable` before `graph.invoke()`. Enables use cases such as supplying A2A-uploaded file capabilities to deepagents' `CapabilityBackend` via LangGraph's `getConfig()` AsyncLocalStorage. The mapper is `await`ed, so async implementations work correctly. Reserved keys (`thread_id`, `_taskId`, `_service`) always take precedence over mapper output. Non-object return values fail the task with a clear error.
 - Custom tools override via `this.a2a = { tools }`
 - Markdown-based agents auto-built by convention: a `@a2a` service with a sibling directory matching the slugified service name (containing `AGENTS.md`) becomes a deep agent — no `.js` handler required. Tools, model, content-filter recovery middleware, and checkpoint persistence are wired automatically.
+  - Tools marked with `@UI.IsActionCritical` are automatically considered for human-in-the-loop
 - `@a2a.directory` and `@a2a.card` annotations to override the convention with explicit paths to the agent directory and the agent card markdown file.
 
 ### Changed

@@ -59,6 +59,9 @@ Define an agent's identity, behaviour, and skills entirely in markdown — no Ja
 @a2a
 service ProductAgent {
   @readonly entity Products as projection on my.Products;
+
+  @UI.IsActionCritical // > Action is considered for Human-in-the-loop
+  action doSomething();
 }
 ```
 

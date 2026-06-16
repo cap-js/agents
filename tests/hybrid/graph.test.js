@@ -69,7 +69,7 @@ describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: !canLoad }, () => {
     const state = res.data.result?.status?.state
 
     // LLM non-determinism: may not always call orderProduct tool
-    if (state !== "input-required") return
+    assert.strictEqual(state, "input-required")
 
     const taskId = res.data.result.id
     const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: taskId })

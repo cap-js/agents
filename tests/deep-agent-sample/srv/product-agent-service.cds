@@ -12,5 +12,6 @@ service ProductAgentService {
    *
    * Example: Order 5 Widget Pro
    */
+  @UI.IsActionCritical
   action orderProduct(productName: String, quantity: Integer) returns String;
 }
