@@ -1,7 +1,7 @@
 /* eslint-disable no-await-in-loop */
 // import { ChatAnthropic } from "@langchain/anthropic"
 /**
- * Travel Agent — Deep agent orchestrator for @cap-js/a2a.
+ * Travel Agent — Deep agent orchestrator for @cap-js/agent.
  *
  * Coordinates downstream A2A agents (hotel, activity) and MCP servers (flights)
  * using createDeepAgent() with progressive disclosure via AGENTS.md.
@@ -17,7 +17,11 @@ const { path } = cds.utils
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, contentFilterRecoveryMiddleware, instrumentTools } from "@cap-js/a2a"
+import {
+  createDeepAgentModel,
+  contentFilterRecoveryMiddleware,
+  instrumentTools,
+} from "@cap-js/agent"
 
 const LOG = cds.log("travel-agent")
 const __agentDir = path.join(import.meta.dirname, "travel-agent")
@@ -194,7 +198,7 @@ async function createTravelAgent(srv) {
 
 export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
-    this.a2a = {
+    this.agent = {
       graph: createTravelAgent(this),
       // Deepagents accumulate large contexts (system prompt + skills + tool
       // results) that exceed Azure Content Safety prompt_shield's payload size

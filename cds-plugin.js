@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 
-const LOG = cds.log("a2a")
-import a2aAdapter from "./lib/index.js"
+const LOG = cds.log("agent")
+import agentAdapter from "./lib/index.js"
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
 
@@ -27,19 +27,19 @@ cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
 // Ensure A2A correlation fields are indexed by SAP Cloud Logging
 cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
-if (!cls_fields.includes("a2a.task.id")) cls_fields.push("a2a.task.id")
-if (!cls_fields.includes("a2a.context.id")) cls_fields.push("a2a.context.id")
-// LangChain monkey-patching for tracing (opt-out via cds.env.a2a.trace_langchain = false)
-if (hasTelemetry && cds.env.a2a?.trace_langchain !== false) {
+if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
+if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
+// LangChain monkey-patching for tracing (opt-out via cds.env.agent.trace_langchain = false)
+if (hasTelemetry && cds.env.agent?.trace_langchain !== false) {
   patchLangChain()
 }
 
 // Register A2A as a CDS protocol adapter
 const protocols = (cds.env.protocols ??= {})
-if (!protocols.a2a) {
-  protocols.a2a = {
+if (!protocols.agent) {
+  protocols.agent = {
     path: "/a2a",
-    impl: a2aAdapter,
+    impl: agentAdapter,
   }
 }
 
@@ -68,7 +68,7 @@ cds.on("served", async () => {
     setupActiveUsersMetric()
   }
 
-  if (cds.env.a2a?.mlflow) {
+  if (cds.env.agent?.mlflow) {
     const { setupMlflowExporter } = await import("./lib/telemetry/mlflow.js")
     setupMlflowExporter()
   }

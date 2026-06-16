@@ -1,7 +1,7 @@
 _schema-version: 3.3.0
 ID: bookshop
 version: 1.0.0
-description: "Sample CAP bookshop for @cap-js&#x2F;a2a tests"
+description: "Sample CAP bookshop for @cap-js&#x2F;agent tests"
 parameters:
   enable-parallel-deployments: true
 build-parameters:
@@ -10,10 +10,10 @@ build-parameters:
       commands:
         - node deploy-patches.js apply
         - npm pack ../../
-        - npm i cap-js-a2a-0.1.0.tgz
+        - npm i cap-js-agent-0.1.0.tgz
         - npm ci
         - npx cds build --production
-        - cp cap-js-a2a-0.1.0.tgz ./gen/srv
+        - cp cap-js-agent-0.1.0.tgz ./gen/srv
   after-all:
     - builder: custom
       commands:

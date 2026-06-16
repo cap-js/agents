@@ -28,16 +28,16 @@ try {
   canLoad = false
 }
 
-describe("@cap-js/a2a - LLM Circuit Breaker", { skip: !canLoad }, () => {
+describe("@cap-js/agent - LLM Circuit Breaker", { skip: !canLoad }, () => {
   axios.defaults.validateStatus = () => true
 
   let originalQuota
   before(() => {
-    originalQuota = cds.env.a2a.pool.maxTasksPerHourPerUser
-    cds.env.a2a.pool.maxTasksPerHourPerUser = 200
+    originalQuota = cds.env.agent.pool.maxTasksPerHourPerUser
+    cds.env.agent.pool.maxTasksPerHourPerUser = 200
   })
   after(() => {
-    cds.env.a2a.pool.maxTasksPerHourPerUser = originalQuota
+    cds.env.agent.pool.maxTasksPerHourPerUser = originalQuota
     mock.stop()
   })
   beforeEach(() => {
@@ -49,7 +49,7 @@ describe("@cap-js/a2a - LLM Circuit Breaker", { skip: !canLoad }, () => {
   })
 
   it("should have maxLLMCallTimeoutMs configured", () => {
-    assert.strictEqual(cds.env.a2a.pool.maxLLMCallTimeoutMs, 120000)
+    assert.strictEqual(cds.env.agent.pool.maxLLMCallTimeoutMs, 120000)
   })
 
   it("should complete task when AI Core returns 200", async () => {

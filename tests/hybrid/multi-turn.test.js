@@ -8,7 +8,7 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage, setupErrorDetection } = createHelpers({ POST, axios })
 
-describe("@cap-js/a2a - Multi-turn (hybrid executor)", () => {
+describe("@cap-js/agent - Multi-turn (hybrid executor)", () => {
   setupErrorDetection()
 
   it("agent remembers context across turns", async () => {

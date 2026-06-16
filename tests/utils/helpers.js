@@ -87,7 +87,7 @@ export default ({ POST, axios }) => {
 
     function after() {
       console.error = originalError
-      const relevantErrors = errors.filter((e) => /\[a2a\]|\[mcp\]/.test(e))
+      const relevantErrors = errors.filter((e) => /\[agent\]|\[mcp\]/.test(e))
       if (relevantErrors.length > 0) {
         throw new Error(`Errors detected during test:\n${relevantErrors.join("\n")}`)
       }

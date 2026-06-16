@@ -32,7 +32,7 @@ axios.defaults.validateStatus = () => true
 // carol → t1 in default cds mock auth with multitenancy: true
 const CAROL = { username: "carol", password: "" }
 
-describe("@cap-js/a2a - Multi-tenancy (active_users)", () => {
+describe("@cap-js/agent - Multi-tenancy (active_users)", () => {
   // TODO: This test requires proper CDS MTX sidecar ↔ app binding via ~/.cds-services.json.
   // The sidecar registers on startup, but cds.test() may boot the app before the binding is visible.
   // Works with manual `cds watch` but Jest orchestration needs further investigation.

@@ -1,6 +1,6 @@
 # Bookshop Sample
 
-Zero-code A2A agent. Annotate with `@a2a` - the plugin generates tools, agent card, and ReAct loop automatically.
+Zero-code agent. Annotate with `@agent` - the plugin generates tools, agent card, and ReAct loop automatically.
 
 ## What the Agent Can Do
 

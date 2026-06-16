@@ -1,9 +1,9 @@
 > [!WARNING]
 > This plugin is in an early experimental state and not recommended for production use.
 
-# @cap-js/a2a
+# @cap-js/agent
 
-CDS protocol adapter for the [A2A (Agent-to-Agent)](https://a2a-protocol.org) protocol.
+CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
 ## Prerequisites
 
@@ -17,8 +17,8 @@ See [SAP Cloud SDK for AI](https://sap.github.io/ai-sdk/docs/js/connecting-to-ai
 ## Getting Started
 
 ```bash
-git clone https://github.tools.sap/cap/a2a
-cd a2a && npm i
+git clone https://github.tools.sap/cap/agent
+cd agent && npm i
 ```
 
 Run the bookshop (zero-code agent):
@@ -39,10 +39,10 @@ curl -s http://localhost:4004/a2a/catalog/ \
 
 ### Agentify Existing CAP Services
 
-Add `@a2a` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the A2A protocol with zero code required. The agent has access to the tools generated from the service model.
+Add `@agent` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the service as a remote agent with zero code required. The agent has access to the tools generated from the service model.
 
 ```cds
-@a2a
+@agent
 service CatalogService {
   entity Books as projection on my.Books;
   action submitOrder(book: Books:ID, quantity: Integer) returns { stock: Integer };
@@ -53,10 +53,10 @@ service CatalogService {
 
 ### Markdown-Based Agents
 
-Define an agent's identity, behaviour, and skills entirely in markdown — no JavaScript handler required. Annotate the CDS service with `@a2a` and create a sibling directory matching the slugified service name. The plugin auto-builds the agent at startup.
+Define an agent's identity, behaviour, and skills entirely in markdown — no JavaScript handler required. Annotate the CDS service with `@agent` and create a sibling directory matching the slugified service name. The plugin auto-builds the agent at startup.
 
 ```cds
-@a2a
+@agent
 service ProductAgent {
   @readonly entity Products as projection on my.Products;
 
@@ -92,20 +92,20 @@ You help users find and explore products in the catalog. Use ...
 
 → See [Deep Agent Sample](./tests/deep-agent-sample/)
 
-#### Custom locations: `@a2a.directory` and `@a2a.card`
+#### Custom locations: `@agent.directory` and `@agent.card`
 
 Two annotations override the convention when your layout doesn't match. Both
 paths are resolved relative to the `.cds` file.
 
-| Annotation       | Purpose                                                      |
-| ---------------- | ------------------------------------------------------------ |
-| `@a2a.directory` | Path to the agent directory (overrides the slug convention). |
-| `@a2a.card`      | Path to a hand-crafted agent card markdown file.             |
+| Annotation         | Purpose                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| `@agent.directory` | Path to the agent directory (overrides the slug convention). |
+| `@agent.card`      | Path to a hand-crafted agent card markdown file.             |
 
 ```cds
-@a2a
-@a2a.directory: 'agents/product'
-@a2a.card     : 'cards/product-card.md'
+@agent
+@agent.directory: 'agents/product'
+@agent.card     : 'cards/product-card.md'
 service ProductAgent {
   @readonly entity Products as projection on my.Products;
 }
@@ -121,14 +121,14 @@ service ProductAgent {
 
 ## Configuration
 
-| Setting                       | Description                                                              | Default                        |
-| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
-| `cds.a2a.llm`                 | LLM model name                                                           | `anthropic--claude-4.5-sonnet` |
-| `cds.a2a.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                         |
-| `cds.a2a.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                        |
-| `cds.a2a.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                         |
-| `cds.a2a.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                         |
-| `cds.a2a.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable)       |
+| Setting                         | Description                                                              | Default                        |
+| ------------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
+| `cds.agent.llm`                 | LLM model name                                                           | `anthropic--claude-4.5-sonnet` |
+| `cds.agent.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                         |
+| `cds.agent.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                        |
+| `cds.agent.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                         |
+| `cds.agent.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                         |
+| `cds.agent.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable)       |
 
 <details>
 <summary>Customize Agent Card URL</summary>
@@ -136,7 +136,7 @@ service ProductAgent {
 If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
 
 ```cds
-@a2a
+@agent
 @Core.Links : [
   {
       rel : 'via',
@@ -150,7 +150,7 @@ service CatalogService { }
 
 ### Executor Profiles
 
-Only available when agentifying existing services with `@a2a` annotation.
+Only available when agentifying existing services with `@agent` annotation.
 
 - **`development`** - Mock executor. No LLM needed.
 - **`hybrid` / `production`** - LangGraph ReAct agent with AI Core.
@@ -165,12 +165,12 @@ The plugin enforces configurable rate limits and resource quotas at two levels:
 <details>
 <summary>Configuration</summary>
 
-All limits are configured via `cds.env.a2a.pool` (defaults provided by the plugin):
+All limits are configured via `cds.env.agent.pool` (defaults provided by the plugin):
 
 ```json
 {
   "cds": {
-    "a2a": {
+    "agent": {
       "pool": {
         "maxConcurrentTasks": 5,
         "maxConcurrentTasksPerUser": 2,
@@ -254,13 +254,13 @@ Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](
 <details>
 <summary>Using Per-Node Quota in Custom Graphs</summary>
 
-For custom graphs (`this.a2a = { graph }`), import `shouldContinue` to get quota enforcement in your loop:
+For custom graphs (`this.agent = { graph }`), import `shouldContinue` to get quota enforcement in your loop:
 
 ```js
 const { StateGraph, END } = require("@langchain/langgraph")
 const {
   nodes: { shouldContinue },
-} = require("@cap-js/a2a")
+} = require("@cap-js/agent")
 
 const graph = new StateGraph(MyState)
   .addNode("agent", agentNode)
@@ -318,18 +318,18 @@ All events include the original event name in the `data` field for filtering and
 <details>
 <summary>Coverage</summary>
 
-| Scenario                                    | Audit coverage                                                                                                                                                               |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Built-in ReAct (`@a2a` annotation)          | Full — all events fire automatically                                                                                                                                         |
-| Custom graph (`this.a2a = { graph }`)       | Full — task lifecycle, CDS tools, custom tools, and deepagents built-in tools are all covered automatically. LLM decisions covered if `config` carries `_taskId`/`_service`. |
-| Custom executor (`this.a2a = { executor }`) | None — custom executors manage their own lifecycle                                                                                                                           |
+| Scenario                                      | Audit coverage                                                                                                                                                               |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Built-in ReAct (`@agent` annotation)          | Full — all events fire automatically                                                                                                                                         |
+| Custom graph (`this.agent = { graph }`)       | Full — task lifecycle, CDS tools, custom tools, and deepagents built-in tools are all covered automatically. LLM decisions covered if `config` carries `_taskId`/`_service`. |
+| Custom executor (`this.agent = { executor }`) | None — custom executors manage their own lifecycle                                                                                                                           |
 
 </details>
 
 <details>
 <summary>Correlation</summary>
 
-Events are correlated via `taskId`. For custom graphs, set `configurable._taskId` and `configurable._service` in your LangGraph config for full correlation. The plugin also sets `cds.context["a2a.task.id"]` and `cds.context["a2a.service"]` as fallback.
+Events are correlated via `taskId`. For custom graphs, set `configurable._taskId` and `configurable._service` in your LangGraph config for full correlation. The plugin also sets `cds.context["agent.task.id"]` and `cds.context["agent.service"]` as fallback.
 
 Every audit event includes a `correlationId` (`cds.context.id`) which is shared with auto-emitted DPP events. When a tool reads an entity annotated with `@PersonalData`, the `SensitiveDataRead` event emitted by `@cap-js/audit-logging` runs in the same CDS request context. Join on `correlationId` to trace which agent task and tool invocation triggered a personal data access.
 
@@ -372,7 +372,7 @@ POST /a2a/CatalogService/
        └─ execute_tool DynamicStructuredTool submitOrder
 ```
 
-**Privacy:** By default, spans contain only names, IDs, token counts, and outcomes — no message content. Set `DEBUG=a2a` (or `cds.log.levels.a2a: "debug"`) to include full input/output as `a2a.entity.input` and `a2a.entity.output` span attributes.
+**Privacy:** By default, spans contain only names, IDs, token counts, and outcomes — no message content. Set `DEBUG=agent` (or `cds.log.levels.agent: "debug"`) to include full input/output as `agent.entity.input` and `agent.entity.output` span attributes.
 
 </details>
 
@@ -401,19 +401,19 @@ The bookshop's `telemetry` profile is preconfigured with OTLP export to `localho
 <details>
 <summary>Metrics</summary>
 
-| Metric                      | Type             | Description                                   | Attributes                                      |
-| --------------------------- | ---------------- | --------------------------------------------- | ----------------------------------------------- |
-| `a2a.requests.total`        | Counter          | Total inbound A2A requests                    | `sap.tenantId`, `a2a.service`, `a2a.method`     |
-| `a2a.request.duration`      | Histogram (ms)   | End-to-end A2A request duration               | `sap.tenantId`, `a2a.service`, `a2a.method`     |
-| `a2a.errors.total`          | Counter          | Requests resulting in error                   | `sap.tenantId`, `a2a.service`, `a2a.error.code` |
-| `a2a.executions.concurrent` | UpDownCounter    | Currently active workflow executions          | `sap.tenantId`, `a2a.service`                   |
-| `a2a.workflows.completed`   | Counter          | Completed agent workflows                     | `sap.tenantId`, `a2a.service`                   |
-| `agent_actions`             | Counter          | Successful workflow completions per tenant    | `sap.tenantId`                                  |
-| `a2a.llm.input_tokens`      | Counter          | LLM input tokens consumed                     | `sap.tenantId`, `model`, `node`                 |
-| `a2a.llm.output_tokens`     | Counter          | LLM output tokens generated                   | `sap.tenantId`, `model`, `node`                 |
-| `a2a.llm.invocations`       | Counter          | LLM invocation count                          | `sap.tenantId`, `model`, `node`, `outcome`      |
-| `a2a.tool.invocations`      | Counter          | Tool invocation count                         | `sap.tenantId`, `tool`, `outcome`               |
-| `active_users`              | Observable Gauge | Active users per service (24h rolling window) | `sap.tenantId`, `a2a.service`                   |
+| Metric                        | Type             | Description                                   | Attributes                                          |
+| ----------------------------- | ---------------- | --------------------------------------------- | --------------------------------------------------- |
+| `agent.requests.total`        | Counter          | Total inbound agent requests                  | `sap.tenantId`, `agent.service`, `agent.method`     |
+| `agent.request.duration`      | Histogram (ms)   | End-to-end agent request duration             | `sap.tenantId`, `agent.service`, `agent.method`     |
+| `agent.errors.total`          | Counter          | Requests resulting in error                   | `sap.tenantId`, `agent.service`, `agent.error.code` |
+| `agent.executions.concurrent` | UpDownCounter    | Currently active workflow executions          | `sap.tenantId`, `agent.service`                     |
+| `agent.workflows.completed`   | Counter          | Completed agent workflows                     | `sap.tenantId`, `agent.service`                     |
+| `agent_actions`               | Counter          | Successful workflow completions per tenant    | `sap.tenantId`                                      |
+| `agent.llm.input_tokens`      | Counter          | LLM input tokens consumed                     | `sap.tenantId`, `model`, `node`                     |
+| `agent.llm.output_tokens`     | Counter          | LLM output tokens generated                   | `sap.tenantId`, `model`, `node`                     |
+| `agent.llm.invocations`       | Counter          | LLM invocation count                          | `sap.tenantId`, `model`, `node`, `outcome`          |
+| `agent.tool.invocations`      | Counter          | Tool invocation count                         | `sap.tenantId`, `tool`, `outcome`                   |
+| `active_users`                | Observable Gauge | Active users per service (24h rolling window) | `sap.tenantId`, `agent.service`                     |
 
 Error codes: `-32603` (JSON-RPC internal error), `execution_failed` (graph error), `timeout` (graph timeout).
 
@@ -422,11 +422,11 @@ All metrics include `sap.tenantId` from `cds.context.tenant` for multi-tenant ag
 The `active_users` gauge is computed periodically (default every 24h). To trigger manually:
 
 ```js
-const executor = await cds.connect.to("a2a-executor")
+const executor = await cds.connect.to("agent-executor")
 await executor.emit("computeActiveUsers")
 ```
 
-Set `cds.a2a.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
+Set `cds.agent.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
 
 </details>
 
@@ -440,13 +440,13 @@ The MLflow exporter is added as a **second span processor** alongside any existi
 **Enable:**
 
 ```json
-{ "cds": { "a2a": { "mlflow": true } } }
+{ "cds": { "agent": { "mlflow": true } } }
 ```
 
 **Set the experiment ID** via `@Core.SchemaVersion` annotation on your service (feature-toggleable):
 
 ```cds
-@a2a
+@agent
 @Core.SchemaVersion: '123456789'
 service CatalogService { ... }
 ```
@@ -461,7 +461,7 @@ The `@Core.SchemaVersion` annotation takes precedence over credentials. Since it
 
 The plugin reads credentials from `cds.env.requires["databricks-mlflow"].credentials` and adds a `BatchSpanProcessor` with an OTLP exporter pointed at the Databricks endpoint.
 
-**Span attributes added** (only when `cds.a2a.mlflow` is truthy):
+**Span attributes added** (only when `cds.agent.mlflow` is truthy):
 
 | Attribute                | Source                                                                                                |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
@@ -493,7 +493,7 @@ Traces appear at http://localhost:5678/#/experiments/0.
 
 ## Content Filter
 
-By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https://sap.github.io/ai-sdk/docs/js/orchestration/chat-completion#azure-content-filter) with a prompt injection shield (`cds.a2a.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
+By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https://sap.github.io/ai-sdk/docs/js/orchestration/chat-completion#azure-content-filter) with a prompt injection shield (`cds.agent.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
 
 <details>
 <summary>Configuration options</summary>
@@ -501,7 +501,7 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 **Disable globally:**
 
 ```json
-{ "cds": { "a2a": { "contentFilter": false } } }
+{ "cds": { "agent": { "contentFilter": false } } }
 ```
 
 **Custom filter object globally:**
@@ -509,7 +509,7 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 ```json
 {
   "cds": {
-    "a2a": {
+    "agent": {
       "contentFilter": {
         "input": {
           "filters": [
@@ -523,14 +523,14 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 }
 ```
 
-**Per-service override** via `this.a2a.contentFilter`:
+**Per-service override** via `this.agent.contentFilter`:
 
 ```js
 // Disable for one service
-this.a2a = { contentFilter: false }
+this.agent = { contentFilter: false }
 
 // Custom filter object
-this.a2a = {
+this.agent = {
   contentFilter: {
     input: { filters: [myCustomFilter] },
     output: { filters: [] },
@@ -538,7 +538,7 @@ this.a2a = {
 }
 
 // Async factory function (full control)
-this.a2a = {
+this.agent = {
   contentFilter: async () => {
     const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
     const filter = buildAzureContentSafetyFilter("input", { prompt_shield: true })
@@ -547,7 +547,7 @@ this.a2a = {
 }
 ```
 
-Resolution order: `srv.a2a.contentFilter` → `cds.env.a2a.contentFilter` → default (Azure Content Safety).
+Resolution order: `srv.agent.contentFilter` → `cds.env.agent.contentFilter` → default (Azure Content Safety).
 
 </details>
 
@@ -558,7 +558,7 @@ size limit. Markdown-based agents accumulate large contexts — system prompt,
 skill files, multiple tool results — that can exceed it. The fix for now is to
 disable filtering for the affected services.
 
-`contentFilter: false` only takes effect on per-service models if `srv.a2a` is
+`contentFilter: false` only takes effect on per-service models if `srv.agent` is
 assigned **before** the model is constructed; the unawaited-Promise pattern
 guarantees that ordering:
 
@@ -573,8 +573,8 @@ async function createMyAgent(srv) {
 
 export default class MyAgent extends cds.ApplicationService {
   async init() {
-    this.a2a = {
-      contentFilter: false, // visible by the time createDeepAgentModel reads srv.a2a
+    this.agent = {
+      contentFilter: false, // visible by the time createDeepAgentModel reads srv.agent
       graph: createMyAgent(this), // unawaited Promise
     }
     await super.init()
@@ -590,12 +590,12 @@ API section.
 ## Manual graph wiring
 
 For full control, plug a compiled LangGraph graph in directly via
-`this.a2a = { graph }`. Useful when you need a multi-agent graph, custom
+`this.agent = { graph }`. Useful when you need a multi-agent graph, custom
 checkpointer behaviour, or non-`deepagents` tooling.
 
 ```js
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, generateTools } from "@cap-js/a2a"
+import { createDeepAgentModel, generateTools } from "@cap-js/agent"
 
 // Extract the async construction so it returns a Promise.
 // See "Lazy graph construction" below for why.
@@ -617,7 +617,7 @@ async function createMyAgent(srv) {
 
 export default class MyAgent extends cds.ApplicationService {
   async init() {
-    this.a2a = {
+    this.agent = {
       graph: createMyAgent(this), // unawaited Promise — see "Lazy graph construction"
     }
     await super.init()
@@ -627,11 +627,11 @@ export default class MyAgent extends cds.ApplicationService {
 
 ### Lazy graph construction
 
-`srv.a2a.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.a2a.contentFilter` or `srv.a2a.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.a2a = { graph: createMyAgent(this), … }` _without_ `await`.
+`srv.agent.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.agent.contentFilter` or `srv.agent.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.agent = { graph: createMyAgent(this), … }` _without_ `await`.
 
-Why this matters: the right-hand side of `this.a2a = { … }` is fully evaluated **before** the assignment to `this.a2a` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.a2a` is still `undefined`, so per-service overrides like `srv.a2a.contentFilter` and `srv.a2a.model` are silently ignored and fall back to the global `cds.env.a2a.*` defaults. With the unawaited-Promise form, `this.a2a` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.a2a.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
+Why this matters: the right-hand side of `this.agent = { … }` is fully evaluated **before** the assignment to `this.agent` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.agent` is still `undefined`, so per-service overrides like `srv.agent.contentFilter` and `srv.agent.model` are silently ignored and fall back to the global `cds.env.agent.*` defaults. With the unawaited-Promise form, `this.agent` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.agent.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
 
-Compiled-graph form (`this.a2a = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
+Compiled-graph form (`this.agent = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
 
 ## API
 
@@ -645,7 +645,7 @@ flattening automatically and uses defaults appropriate for deepagents
 (`max_tokens: 4096`, `temperature: 0`, no tool binding).
 
 ```js
-const { createDeepAgentModel } = require("@cap-js/a2a")
+const { createDeepAgentModel } = require("@cap-js/agent")
 
 const model = await createDeepAgentModel()
 const model = await createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
@@ -654,11 +654,11 @@ const model = await createDeepAgentModel({ params: { max_tokens: 4096, temperatu
 ### `createModel(options?)`
 
 Creates an LLM model (OrchestrationClient) for **managed agents** (default
-langgraph executor or custom graphs). Binds tools and checks `srv.a2a.model`
+langgraph executor or custom graphs). Binds tools and checks `srv.agent.model`
 overrides. For deepagents, use `createDeepAgentModel()` instead.
 
 ```js
-import { createModel } from "@cap-js/a2a"
+import { createModel } from "@cap-js/agent"
 
 // Managed agent mode (binds tools, uses srv for content filter/model override)
 const model = await createModel({ srv, tools })
@@ -673,7 +673,7 @@ crashing the task. Add it to your deepagent's middleware chain to keep
 
 ```js
 import { createDeepAgent } from "deepagents"
-import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/a2a"
+import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/agent"
 
 const agent = createDeepAgent({
   model: await createDeepAgentModel(),
@@ -689,19 +689,19 @@ const agent = createDeepAgent({
 Generates LangChain tools from a CDS service model. Reuses tool definitions from `@cap-js/mcp`.
 
 ```js
-import { generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/agent"
 const { tools } = generateTools(srv)
 // tools: [query, describe, ...perActionTools]
 ```
 
 ### `instrumentTools(tools)`
 
-Wraps tools' `.invoke()` with OpenTelemetry tracing, audit logging, and the `a2a.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
+Wraps tools' `.invoke()` with OpenTelemetry tracing, audit logging, and the `agent.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
 
-For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed. The plugin also calls `instrumentTool` on every tool resolved via `srv.a2a.tools`, so you only need it when you build tools outside that resolution path.
+For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed. The plugin also calls `instrumentTool` on every tool resolved via `srv.agent.tools`, so you only need it when you build tools outside that resolution path.
 
 ```js
-import { instrumentTools } from "@cap-js/a2a"
+import { instrumentTools } from "@cap-js/agent"
 
 // Pass a list (one or many — mutates and returns the tools)
 instrumentTools(mcpTools)
@@ -723,10 +723,10 @@ Re-throws errors after recording them (unlike CDS tools which swallow errors for
 
 ### `CdsCheckpointSaver`
 
-LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `this.a2a = { graph }`. Exported for custom executors or direct checkpoint access.
+LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `this.agent = { graph }`. Exported for custom executors or direct checkpoint access.
 
 ```js
-import { CdsCheckpointSaver } from "@cap-js/a2a"
+import { CdsCheckpointSaver } from "@cap-js/agent"
 const checkpointer = new CdsCheckpointSaver()
 ```
 
@@ -736,28 +736,28 @@ If your application uses a custom graph with parallel branches, enable full writ
 
 ```jsonc
 // package.json or .cdsrc.json
-"cds": { "a2a": { "persistAllCheckpointWrites": true } }
+"cds": { "agent": { "persistAllCheckpointWrites": true } }
 ```
 
-### `this.a2a = { ... }`
+### `this.agent = { ... }`
 
 Set in your service handler's `init()` to customize the default behavior:
 
-| Pattern             | What you provide                    | Plugin provides                          |
-| ------------------- | ----------------------------------- | ---------------------------------------- |
-| `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL  |
-| `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card        |
-| `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)              |
-| `{ tools }`         | Array or factory of LangChain tools | Everything else (zero-code)              |
-| `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.a2a.contentFilter` |
-| _(default)_         | Nothing                             | Everything (zero-code)                   |
+| Pattern             | What you provide                    | Plugin provides                            |
+| ------------------- | ----------------------------------- | ------------------------------------------ |
+| `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL    |
+| `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card          |
+| `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)                |
+| `{ tools }`         | Array or factory of LangChain tools | Everything else (zero-code)                |
+| `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.agent.contentFilter` |
+| _(default)_         | Nothing                             | Everything (zero-code)                     |
 
 #### Custom Model
 
-`this.a2a.model` offers an extension point to overwrite the model that is used by the Plugin. By default, an instance of `OrchestrationClient` for AI Core Access is used. You can pass everything in there that implements LangGraph's `BaseChatModel`. An example with the usage of the local [https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/](https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/) looks like this:
+`this.agent.model` offers an extension point to overwrite the model that is used by the Plugin. By default, an instance of `OrchestrationClient` for AI Core Access is used. You can pass everything in there that implements LangGraph's `BaseChatModel`. An example with the usage of the local [https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/](https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/) looks like this:
 
 ```js
-this.a2a = {
+this.agent = {
   model: new ChatAnthropic({
     model: "claude-sonnet-4-5",
     anthropicApiKey: "<api-key>",
@@ -768,14 +768,14 @@ this.a2a = {
 
 #### Custom Tools
 
-`this.a2a.tools` replaces or extends the auto-generated CDS tools (`query`, `describe`, per-action). User tools are auto-instrumented (telemetry, audit, metrics).
+`this.agent.tools` replaces or extends the auto-generated CDS tools (`query`, `describe`, per-action). User tools are auto-instrumented (telemetry, audit, metrics).
 
 ```js
-import { generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/agent"
 
-this.a2a = { tools: [weatherTool] }                               // replace
-this.a2a = { tools: [...generateTools(this).tools, weatherTool] } // extend
-this.a2a = { tools: ({ srv, generateTools }) => [...] }           // factory
+this.agent = { tools: [weatherTool] }                               // replace
+this.agent = { tools: [...generateTools(this).tools, weatherTool] } // extend
+this.agent = { tools: ({ srv, generateTools }) => [...] }           // factory
 ```
 
 <details>
@@ -794,7 +794,7 @@ calling.
 
 ### Human-in-the-Loop (HITL)
 
-For markdown-based agents using `deepagents`, the plugin automatically handles HITL approval flows. When a graph calls `interrupt()` (e.g. via `interruptOn` in `createDeepAgent`), the A2A task transitions to `input-required` and the user is prompted for approval. The user replies with "approve" or "reject" and the graph resumes.
+For markdown-based agents using `deepagents`, the plugin automatically handles HITL approval flows. When a graph calls `interrupt()` (e.g. via `interruptOn` in `createDeepAgent`), the agent task transitions to `input-required` and the user is prompted for approval. The user replies with "approve" or "reject" and the graph resumes.
 
 ```js
 createDeepAgent({
@@ -811,15 +811,15 @@ Alternatively, HITL can be achieved without `interruptOn` by instructing the age
 
 ## Samples
 
-- **[Bookshop](./tests/bookshop/)** - Agentifying an existing CAP service. `@a2a` annotation, zero agent code.
+- **[Bookshop](./tests/bookshop/)** - Agentifying an existing CAP service. `@agent` annotation, zero agent code.
 - **[Deep Agent](./tests/deep-agent-sample/)** - Markdown-based agent — convention-driven, with custom tools and skills.
-- **[Travel](./tests/travel-sample/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) via A2A and a flight data service via MCP.
+- **[Travel](./tests/travel-sample/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) and a flight data service via MCP.
 
 ## Tooling
 
-- [A2A Editor](https://github.com/open-resource-discovery/a2a-editor) - Chat UI for A2A agents
-- [A2A Protocol Docs](https://a2a-protocol.org) - Official protocol specification and guides
-- [sem-a2a-cli](https://github.tools.sap/SEM/sem-a2a-cli) - Protocol compliance testing
+- [A2A Editor](https://github.com/open-resource-discovery/a2a-editor) - Chat UI for agents
+- [Protocol Docs](https://a2a-protocol.org) - Official protocol specification and guides
+- [sem-agent-cli](https://github.tools.sap/SEM/sem-agent-cli) - Protocol compliance testing
 
 ## Tests
 

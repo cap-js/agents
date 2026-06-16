@@ -1,6 +1,6 @@
 using { travel.leisure as db } from '../db/schema';
 
-@a2a
+@agent
 @odata
 /** Local activities and experiences service — find tours, food experiences, adventures, and cultural activities in popular destinations */
 service ActivityService {

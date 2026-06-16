@@ -12,7 +12,7 @@ try {
   canLoad = false
 }
 
-describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: !canLoad }, () => {
+describe("@cap-js/agent - Custom Graph (deepagents)", { skip: !canLoad }, () => {
   let sendMessage, jsonrpc, setupErrorDetection
   before(async () => {
     const helpers = createHelpers({ POST, axios })
@@ -122,7 +122,7 @@ describe("@cap-js/a2a - Custom Graph (deepagents)", { skip: !canLoad }, () => {
     await new Promise((r) => setTimeout(r, 1000))
 
     // Query task store for most recent non-completed task
-    const [task] = await SELECT.from("cap.a2a.Tasks").orderBy("createdAt desc").limit(1)
+    const [task] = await SELECT.from("cap.agent.Tasks").orderBy("createdAt desc").limit(1)
 
     if (!task?.taskId || task.state === "completed" || task.state === "failed") {
       // Task already finished — can't test active cancel, skip gracefully

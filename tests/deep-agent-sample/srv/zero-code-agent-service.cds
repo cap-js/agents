@@ -10,7 +10,7 @@ using { sample.products } from '../db/schema';
  *     CDS-derived tools (query, describe), filesystem-backed skills/memory,
  *     and content-filter recovery middleware.
  */
-@a2a
+@agent
 service ZeroCodeAgentService {
   @readonly entity Products as projection on products.Products;
 }

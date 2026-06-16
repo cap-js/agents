@@ -1,15 +1,15 @@
 {
-  "name": "a2a-mtx-app",
+  "name": "agent-mtx-app",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@cap-js/a2a": "file:../../../.",
+    "@cap-js/agent": "file:../../../.",
     "@cap-js/sqlite": "^2",
     "@sap/cds": ">=8",
     "@sap/cds-mtxs": ">=2"
   },
   "cds": {
-    "a2a": {
+    "agent": {
       "activeUsersInterval": "1s"
     },
     "requires": {

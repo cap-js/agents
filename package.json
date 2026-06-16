@@ -1,7 +1,7 @@
 {
-  "name": "@cap-js/a2a",
+  "name": "@cap-js/agent",
   "version": "0.1.0",
-  "description": "CDS protocol adapter for the A2A (Agent-to-Agent) protocol",
+  "description": "CDS plugin for building agents",
   "license": "Apache-2.0",
   "homepage": "https://cap.cloud.sap/",
   "type": "module",
@@ -20,7 +20,7 @@
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- node --test --test-force-exit --test-timeout=900000 tests/integration/*.test.js tests/hybrid/*.test.js",
     "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/mtx/*.test.js",
     "watch:sample": "cds w tests/bookshop",
-    "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
+    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/bookshop",
     "watch:deepagent-sample": "cds w tests/deep-agent-sample",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
@@ -65,7 +65,7 @@
     "node": ">=20.0.0"
   },
   "cds": {
-    "a2a": {
+    "agent": {
       "llm": "anthropic--claude-4.6-sonnet",
       "streaming": true,
       "trace_langchain": true,
@@ -93,8 +93,8 @@
       }
     },
     "requires": {
-      "a2a": {
-        "model": "@cap-js/a2a"
+      "agent": {
+        "model": "@cap-js/agent"
       },
       "databricks-mlflow": {
         "vcap": {
@@ -103,26 +103,26 @@
         }
       },
       "kinds": {
-        "a2a-executor-mock": {
-          "impl": "@cap-js/a2a/lib/executor/mock"
+        "agent-executor-mock": {
+          "impl": "@cap-js/agent/lib/executor/mock"
         },
-        "a2a-executor-langgraph": {
-          "impl": "@cap-js/a2a/lib/executor/langgraph"
+        "agent-executor-langgraph": {
+          "impl": "@cap-js/agent/lib/executor/langgraph"
         }
       },
       "[development]": {
-        "a2a-executor": {
-          "kind": "a2a-executor-mock"
+        "agent-executor": {
+          "kind": "agent-executor-mock"
         }
       },
       "[hybrid]": {
-        "a2a-executor": {
-          "kind": "a2a-executor-langgraph"
+        "agent-executor": {
+          "kind": "agent-executor-langgraph"
         }
       },
       "[production]": {
-        "a2a-executor": {
-          "kind": "a2a-executor-langgraph"
+        "agent-executor": {
+          "kind": "agent-executor-langgraph"
         }
       }
     }

@@ -3,8 +3,8 @@ import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgra
 import { AIMessage } from "@langchain/core/messages"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { generateTools } from "@cap-js/a2a"
-import * as metrics from "@cap-js/a2a/lib/telemetry/metrics.js"
+import { generateTools } from "@cap-js/agent"
+import * as metrics from "@cap-js/agent/lib/telemetry/metrics.js"
 
 /**
  * Custom tool (not CDS-generated) to verify prototype-level tracing covers it.
@@ -31,7 +31,7 @@ const getBookCount = tool(
  */
 export default class GraphBookService extends cds.ApplicationService {
   init() {
-    this.a2a = { graph: this._buildGraph() }
+    this.agent = { graph: this._buildGraph() }
     return super.init()
   }
 

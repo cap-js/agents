@@ -5,8 +5,8 @@ import { z } from "zod"
 
 import { resolveTools, instrumentTools } from "../../lib/tools.js"
 
-// Symbol marking a tool as instrumented by @cap-js/a2a
-const INSTRUMENTED = Symbol.for("@cap-js/a2a:instrumented")
+// Symbol marking a tool as instrumented by @cap-js/agent
+const INSTRUMENTED = Symbol.for("@cap-js/agent:instrumented")
 
 function makeTool(name = "weather") {
   return tool(async ({ city }) => `Sunny in ${city}`, {
@@ -16,10 +16,10 @@ function makeTool(name = "weather") {
   })
 }
 
-describe("resolveTools — srv.a2a.tools override", () => {
+describe("resolveTools — srv.agent.tools override", () => {
   it("array form: full replace with single custom tool", async () => {
     const myTool = makeTool()
-    const srv = { name: "TestService", a2a: { tools: [myTool] } }
+    const srv = { name: "TestService", agent: { tools: [myTool] } }
 
     const { tools, toolMap } = await resolveTools(srv)
 
@@ -30,7 +30,7 @@ describe("resolveTools — srv.a2a.tools override", () => {
   })
 
   it("array form: empty array allowed (LLM-only mode)", async () => {
-    const srv = { name: "TestService", a2a: { tools: [] } }
+    const srv = { name: "TestService", agent: { tools: [] } }
     const { tools, toolMap } = await resolveTools(srv)
     assert.deepStrictEqual(tools, [])
     assert.deepStrictEqual(toolMap, {})
@@ -43,7 +43,7 @@ describe("resolveTools — srv.a2a.tools override", () => {
       assert.strictEqual(typeof generateTools, "function")
       return [myTool]
     })
-    const srv = { name: "TestService", a2a: { tools: factory } }
+    const srv = { name: "TestService", agent: { tools: factory } }
 
     const { tools } = await resolveTools(srv)
 
@@ -56,41 +56,41 @@ describe("resolveTools — srv.a2a.tools override", () => {
     const myTool = makeTool()
     const srv = {
       name: "TestService",
-      a2a: { tools: async () => [myTool] },
+      agent: { tools: async () => [myTool] },
     }
     const { tools } = await resolveTools(srv)
     assert.deepStrictEqual(tools, [myTool])
   })
 
   it("function form: throws when factory returns non-array", async () => {
-    const srv = { name: "TestService", a2a: { tools: () => "not-an-array" } }
+    const srv = { name: "TestService", agent: { tools: () => "not-an-array" } }
     await assert.rejects(resolveTools(srv), /factory must return an array/)
   })
 
   it("validation: invalid type throws clear error", async () => {
-    const srv = { name: "TestService", a2a: { tools: 42 } }
+    const srv = { name: "TestService", agent: { tools: 42 } }
     await assert.rejects(
       resolveTools(srv),
-      /srv\.a2a\.tools must be an array of LangChain tools or a factory function/,
+      /srv\.agent\.tools must be an array of LangChain tools or a factory function/,
     )
   })
 
   it("validation: tool item missing invoke throws", async () => {
     const broken = { name: "broken" }
-    const srv = { name: "TestService", a2a: { tools: [broken] } }
+    const srv = { name: "TestService", agent: { tools: [broken] } }
     await assert.rejects(resolveTools(srv), /invalid item|Invalid tool/)
   })
 
   it("validation: tool item missing name throws", async () => {
     const broken = { invoke: async () => "x" }
-    const srv = { name: "TestService", a2a: { tools: [broken] } }
+    const srv = { name: "TestService", agent: { tools: [broken] } }
     await assert.rejects(resolveTools(srv), /invalid item|Invalid tool/)
   })
 
   it("validation: duplicate tool names throw at startup", async () => {
     const a = makeTool("dup")
     const b = makeTool("dup")
-    const srv = { name: "TestService", a2a: { tools: [a, b] } }
+    const srv = { name: "TestService", agent: { tools: [a, b] } }
     await assert.rejects(resolveTools(srv), /duplicate tool name "dup" for service "TestService"/)
   })
 
@@ -101,7 +101,7 @@ describe("resolveTools — srv.a2a.tools override", () => {
       name: "TestService",
       entities: {},
       operations: {},
-      a2a: undefined, // no override
+      agent: undefined, // no override
     }
 
     const result = await resolveTools(srv)

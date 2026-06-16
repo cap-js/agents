@@ -1,6 +1,6 @@
 using {managed} from '@sap/cds/common';
 
-namespace cap.a2a;
+namespace cap.agent;
 
 /**
  * Stores A2A task objects for retrieval via tasks/get.

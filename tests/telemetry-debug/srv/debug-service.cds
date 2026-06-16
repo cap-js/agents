@@ -3,7 +3,7 @@ using { test.debug as my } from '../db/schema';
 /**
  * Debug tracing test service — has both a working graph and a failing graph
  */
-@a2a
+@agent
 @description: 'Debug tracing test'
 service DebugService {
   @readonly

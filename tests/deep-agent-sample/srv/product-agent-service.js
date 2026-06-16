@@ -1,8 +1,8 @@
 /**
- * Product Agent — Zero-code-with-tool-override example for @cap-js/a2a.
+ * Product Agent — Zero-code-with-tool-override example for @cap-js/agent.
  *
  * Demonstrates the *minimal handler* pattern for deep agents:
- *  - The CDS service is annotated with `@a2a` only.
+ *  - The CDS service is annotated with `@agent` only.
  *    The slug `product-agent` matches the sibling directory
  *    `./product-agent/`, so the plugin auto-resolves the agent dir, builds a
  *    `deepagent` from `AGENTS.md`+`skills/`
@@ -16,14 +16,14 @@
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/agent"
 
 export default class ProductAgentService extends cds.ApplicationService {
   async init() {
     // Tool override: extend auto-generated CDS tools (query, describe,
     // orderProduct) with a custom business-logic tool. The plugin's
-    // auto-deepagent picks `srv.a2a.tools` up via `resolveTools(srv)`.
-    this.a2a = {
+    // auto-deepagent picks `srv.agent.tools` up via `resolveTools(srv)`.
+    this.agent = {
       tools: ({ srv }) => [...generateTools(srv).tools, calculateBulkPricing],
     }
 

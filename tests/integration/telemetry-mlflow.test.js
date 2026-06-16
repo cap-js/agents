@@ -20,11 +20,11 @@ const sendMessage = createSendMessage(POST)
 // Enable mlflow after cds.test() bootstrap — cds.test() re-resolves cds.env from
 // package.json + .cdsrc.json, so mutations before it are overwritten.
 before(() => {
-  cds.env.a2a ??= {}
-  cds.env.a2a.mlflow = true
+  cds.env.agent ??= {}
+  cds.env.agent.mlflow = true
 })
 
-describe("@cap-js/a2a - MLflow Databricks span attributes", () => {
+describe("@cap-js/agent - MLflow Databricks span attributes", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -34,18 +34,18 @@ describe("@cap-js/a2a - MLflow Databricks span attributes", () => {
   describe("mlflowAttrs()", () => {
     it("should return empty object when mlflow disabled", async () => {
       const { mlflowAttrs, mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
-      const saved = cds.env.a2a.mlflow
-      cds.env.a2a.mlflow = false
+      const saved = cds.env.agent.mlflow
+      cds.env.agent.mlflow = false
       assert.deepStrictEqual(mlflowAttrs("LLM"), {})
       assert.deepStrictEqual(mlflowTraceAttrs(), {})
-      cds.env.a2a.mlflow = saved
+      cds.env.agent.mlflow = saved
     })
 
     it("should return mlflow attributes when enabled", async () => {
       const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
-      // Set a2a.service context so resolveExperimentId finds @Core.SchemaVersion
+      // Set agent.service context so resolveExperimentId finds @Core.SchemaVersion
       const origCtx = cds.context
-      cds.context = { ...cds.context, "a2a.service": "CatalogService" }
+      cds.context = { ...cds.context, "agent.service": "CatalogService" }
       try {
         const attrs = mlflowAttrs("TOOL", { inputs: { foo: "bar" } })
         assert.strictEqual(attrs["mlflow.spanType"], "TOOL")
@@ -82,7 +82,7 @@ describe("@cap-js/a2a - MLflow Databricks span attributes", () => {
       const mockSrv = { definition: { "@Core.SchemaVersion": "not-a-number" } }
       cds.services = { ...cds.services, BadService: mockSrv }
       const origCtx = cds.context
-      cds.context = { ...cds.context, "a2a.service": "BadService" }
+      cds.context = { ...cds.context, "agent.service": "BadService" }
       try {
         assert.throws(() => mlflowAttrs("LLM"), /must be a numeric string.*Got: "not-a-number"/)
       } finally {

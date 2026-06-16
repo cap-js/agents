@@ -36,7 +36,7 @@ export default class CatalogService extends cds.ApplicationService {
     })
 
     // Use the Hyperspace AI Proxy
-    // this.a2a = {
+    // this.agent = {
     //   model: new ChatAnthropic({
     //     model: "claude-sonnet-4-5",
     //     anthropicApiKey: "<api-key>",

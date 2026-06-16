@@ -8,7 +8,7 @@ import { createSendMessage } from "../utils/telemetry-utils.js"
 const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/a2a - Content Filter (hybrid: AI Core)", () => {
+describe("@cap-js/agent - Content Filter (hybrid: AI Core)", () => {
   axios.defaults.validateStatus = () => true
 
   beforeAll(async () => {
@@ -19,18 +19,18 @@ describe("@cap-js/a2a - Content Filter (hybrid: AI Core)", () => {
    * Clear executor cache so next request re-creates model with current config.
    */
   async function resetExecutorCache() {
-    const executorSrv = await cds.connect.to("a2a-executor")
+    const executorSrv = await cds.connect.to("agent-executor")
     executorSrv._executors?.clear()
     executorSrv._initPromises?.clear()
   }
 
   afterEach(async () => {
-    cds.env.a2a.contentFilter = true
+    cds.env.agent.contentFilter = true
     await resetExecutorCache()
   })
 
   it("should let injection through when filter is disabled", async () => {
-    cds.env.a2a.contentFilter = false
+    cds.env.agent.contentFilter = false
     await resetExecutorCache()
 
     const res = await sendMessage(
@@ -45,7 +45,7 @@ describe("@cap-js/a2a - Content Filter (hybrid: AI Core)", () => {
   }, 120000)
 
   it("should block same injection when filter is re-enabled", async () => {
-    expect(cds.env.a2a.contentFilter).toBe(true)
+    expect(cds.env.agent.contentFilter).toBe(true)
 
     const res = await sendMessage(
       "catalog",

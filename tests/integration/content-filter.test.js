@@ -19,31 +19,31 @@ const sendMessage = createSendMessage(POST)
 
 // ─── Unit Tests: buildContentFilter resolution ────────────────────────────
 
-describe("@cap-js/a2a - Content Filter Configuration", () => {
+describe("@cap-js/agent - Content Filter Configuration", () => {
   axios.defaults.validateStatus = () => true
   afterAll(teardown)
   beforeEach(resetCapture)
 
-  describe("cds.env.a2a.contentFilter (global config)", () => {
+  describe("cds.env.agent.contentFilter (global config)", () => {
     let originalValue
 
     beforeEach(() => {
-      originalValue = cds.env.a2a.contentFilter
+      originalValue = cds.env.agent.contentFilter
     })
 
     afterEach(() => {
-      cds.env.a2a.contentFilter = originalValue
+      cds.env.agent.contentFilter = originalValue
     })
 
     it("should return undefined when set to false (disables filtering)", async () => {
-      cds.env.a2a.contentFilter = false
+      cds.env.agent.contentFilter = false
       const result = await buildContentFilter()
 
       expect(result).toBeUndefined()
     })
 
     it("should return undefined when set to 0", async () => {
-      cds.env.a2a.contentFilter = 0
+      cds.env.agent.contentFilter = 0
       const result = await buildContentFilter()
 
       expect(result).toBeUndefined()
@@ -54,14 +54,14 @@ describe("@cap-js/a2a - Content Filter Configuration", () => {
         input: { filters: [{ type: "custom", config: { level: 1 } }] },
         output: { filters: [] },
       }
-      cds.env.a2a.contentFilter = custom
+      cds.env.agent.contentFilter = custom
       const result = await buildContentFilter()
 
       expect(result).toBe(custom)
     })
 
     it("should return Azure defaults when set to true", async () => {
-      cds.env.a2a.contentFilter = true
+      cds.env.agent.contentFilter = true
       const result = await buildContentFilter()
 
       expect(result.input.filters).toHaveLength(1)
@@ -71,31 +71,31 @@ describe("@cap-js/a2a - Content Filter Configuration", () => {
     })
   })
 
-  describe("srv.a2a.contentFilter (per-service override)", () => {
+  describe("srv.agent.contentFilter (per-service override)", () => {
     let originalValue
 
     beforeEach(() => {
-      originalValue = cds.env.a2a.contentFilter
-      cds.env.a2a.contentFilter = true // global enabled
+      originalValue = cds.env.agent.contentFilter
+      cds.env.agent.contentFilter = true // global enabled
     })
 
     afterEach(() => {
-      cds.env.a2a.contentFilter = originalValue
+      cds.env.agent.contentFilter = originalValue
     })
 
-    it("should disable when srv.a2a.contentFilter = false (overrides global true)", async () => {
-      const srv = { a2a: { contentFilter: false } }
+    it("should disable when srv.agent.contentFilter = false (overrides global true)", async () => {
+      const srv = { agent: { contentFilter: false } }
       const result = await buildContentFilter(srv)
 
       expect(result).toBeUndefined()
     })
 
-    it("should passthrough object from srv.a2a.contentFilter", async () => {
+    it("should passthrough object from srv.agent.contentFilter", async () => {
       const custom = {
         input: { filters: [{ type: "my_filter", config: {} }] },
         output: { filters: [{ type: "my_output_filter", config: {} }] },
       }
-      const srv = { a2a: { contentFilter: custom } }
+      const srv = { agent: { contentFilter: custom } }
       const result = await buildContentFilter(srv)
 
       expect(result).toBe(custom)
@@ -106,14 +106,14 @@ describe("@cap-js/a2a - Content Filter Configuration", () => {
         input: { filters: [{ type: "dynamic_filter" }] },
         output: { filters: [] },
       }
-      const srv = { a2a: { contentFilter: async () => custom } }
+      const srv = { agent: { contentFilter: async () => custom } }
       const result = await buildContentFilter(srv)
 
       expect(result).toBe(custom)
     })
 
-    it("should fall back to global config when srv.a2a.contentFilter is undefined", async () => {
-      const srv = { a2a: {} }
+    it("should fall back to global config when srv.agent.contentFilter is undefined", async () => {
+      const srv = { agent: {} }
       const result = await buildContentFilter(srv)
 
       // Global is true → Azure defaults
@@ -121,7 +121,7 @@ describe("@cap-js/a2a - Content Filter Configuration", () => {
       expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
     })
 
-    it("should fall back to global config when srv.a2a is undefined", async () => {
+    it("should fall back to global config when srv.agent is undefined", async () => {
       const srv = {}
       const result = await buildContentFilter(srv)
 

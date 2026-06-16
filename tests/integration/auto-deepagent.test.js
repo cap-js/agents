@@ -18,7 +18,7 @@ const { sendMessage } = createHelpers({ POST, axios })
 const MOCK_EXECUTOR_TEXT = /Here is a sample from|No data found\.|Could not query data/
 
 describe(
-  "@cap-js/a2a - Auto-built deep agents (zero-code convention)",
+  "@cap-js/agent - Auto-built deep agents (zero-code convention)",
   { skip: !canLoadDeepAgent },
   () => {
     // ── Slug-only convention (no .js handler at all) ──────────────────────
@@ -45,13 +45,13 @@ describe(
       })
     })
 
-    // ── @a2a.directory annotation override ────────────────────────────────
+    // ── @agent.directory annotation override ────────────────────────────────
 
-    describe("@a2a.directory annotation (override-card-service)", () => {
-      it("agent card resolved from annotation-pointed dir + @a2a.card file", async () => {
+    describe("@agent.directory annotation (override-card-service)", () => {
+      it("agent card resolved from annotation-pointed dir + @agent.card file", async () => {
         const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
         assert.strictEqual(res.status, 200)
-        // @a2a.card wins over the in-dir resolution chain.
+        // @agent.card wins over the in-dir resolution chain.
         assert.strictEqual(res.data.name, "card-override-explicit")
         assert.strictEqual(res.data.version, "2.0.0")
       })
@@ -62,7 +62,7 @@ describe(
         assert.doesNotMatch(
           text,
           MOCK_EXECUTOR_TEXT,
-          `mock executor response received — @a2a.directory wiring failed: ${text}`,
+          `mock executor response received — @agent.directory wiring failed: ${text}`,
         )
       })
     })

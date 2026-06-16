@@ -1,9 +1,9 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { circuitBreaker, timeout } from "@sap-cloud-sdk/resilience"
-import { generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/agent"
 
-const LOG = cds.log("a2a")
+const LOG = cds.log("agent")
 
 /**
  * Circuit breaker integration test service.
@@ -12,13 +12,13 @@ const LOG = cds.log("a2a")
  * with circuitBreaker() + timeout() middleware — same as the production
  * InstrumentedOrchestrationClient in lib/llm.js — pointed at a mock AI Core.
  *
- * Uses `this.a2a = { graph }` to bypass the mock executor and test the
+ * Uses `this.agent = { graph }` to bypass the mock executor and test the
  * real end-to-end path: A2A message → graph → agent node → model.invoke()
  *   → circuitBreaker middleware → HTTP to mock server
  */
 export default class CircuitBreakerService extends cds.ApplicationService {
   init() {
-    this.a2a = { graph: this._buildGraph() }
+    this.agent = { graph: this._buildGraph() }
     return super.init()
   }
 
@@ -36,7 +36,7 @@ export default class CircuitBreakerService extends cds.ApplicationService {
      */
     class CircuitBreakerTestModel extends OrchestrationClient {
       async _generate(messages, opts, runManager) {
-        const llmTimeout = cds.env.a2a?.pool?.maxLLMCallTimeoutMs || 120000
+        const llmTimeout = cds.env.agent?.pool?.maxLLMCallTimeoutMs || 120000
         opts = {
           ...opts,
           customRequestConfig: {

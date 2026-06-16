@@ -14,7 +14,7 @@ setup()
 const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/a2a - Quota enforcement", () => {
+describe("@cap-js/agent - Quota enforcement", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -22,12 +22,12 @@ describe("@cap-js/a2a - Quota enforcement", () => {
   let originalPool
 
   before(() => {
-    originalPool = { ...cds.env.a2a.pool }
+    originalPool = { ...cds.env.agent.pool }
   })
 
   afterEach(() => {
     // Restore pool config after each test
-    Object.assign(cds.env.a2a.pool, originalPool)
+    Object.assign(cds.env.agent.pool, originalPool)
   })
 
   describe("quotaEnforcerAtStart", () => {
@@ -39,7 +39,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 429 when maxTasksPerHourPerUser is exceeded", async () => {
-      cds.env.a2a.pool.maxTasksPerHourPerUser = 0
+      cds.env.agent.pool.maxTasksPerHourPerUser = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       assert.strictEqual(res.status, 429)
@@ -52,7 +52,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 429 when maxTasksPerHour is exceeded", async () => {
-      cds.env.a2a.pool.maxTasksPerHour = 0
+      cds.env.agent.pool.maxTasksPerHour = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       assert.strictEqual(res.status, 429)
@@ -61,7 +61,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 429 when maxConcurrentTasks is exceeded", async () => {
-      cds.env.a2a.pool.maxConcurrentTasks = 0
+      cds.env.agent.pool.maxConcurrentTasks = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       assert.strictEqual(res.status, 429)
@@ -71,7 +71,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 429 when maxToolCallsPerHour is exceeded", async () => {
-      cds.env.a2a.pool.maxToolCallsPerHour = 0
+      cds.env.agent.pool.maxToolCallsPerHour = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       assert.strictEqual(res.status, 429)
@@ -79,7 +79,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 429 when maxLLMTokensPerDay is exceeded", async () => {
-      cds.env.a2a.pool.maxLLMTokensPerDay = 0
+      cds.env.agent.pool.maxLLMTokensPerDay = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       assert.strictEqual(res.status, 429)
@@ -91,7 +91,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should include Retry-After header with specific values", async () => {
-      cds.env.a2a.pool.maxConcurrentTasksPerUser = 0
+      cds.env.agent.pool.maxConcurrentTasksPerUser = 0
 
       const res = await sendMessage("graph-book", "Check header")
       assert.strictEqual(res.status, 429)
@@ -100,7 +100,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should include JSON-RPC error code -32029", async () => {
-      cds.env.a2a.pool.maxTasksPerHour = 0
+      cds.env.agent.pool.maxTasksPerHour = 0
 
       const res = await sendMessage("graph-book", "Check error code")
       assert.strictEqual(res.data.error.code, -32029)
@@ -109,7 +109,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
 
   describe("maxIncomingMessageLength", () => {
     it("should reject messages exceeding maxIncomingMessageLength with 400", async () => {
-      cds.env.a2a.pool.maxIncomingMessageLength = 10
+      cds.env.agent.pool.maxIncomingMessageLength = 10
 
       const res = await sendMessage("graph-book", "This message is longer than ten characters")
       assert.strictEqual(res.status, 400)
@@ -118,7 +118,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should allow messages within maxIncomingMessageLength", async () => {
-      cds.env.a2a.pool.maxIncomingMessageLength = 5000
+      cds.env.agent.pool.maxIncomingMessageLength = 5000
 
       const res = await sendMessage("graph-book", "Short message")
       assert.strictEqual(res.status, 200)
@@ -128,7 +128,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
 
   describe("quotaEnforcerAtNode (e2e)", () => {
     it("should fail task when maxLLMInvocationsPerTask exceeded during graph execution", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 2
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 2
 
       const res = await sendMessage("looping", "trigger loop")
       assert.strictEqual(res.status, 200)
@@ -138,8 +138,8 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should fail task when maxToolCallsPerTask exceeded during graph execution", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
-      cds.env.a2a.pool.maxToolCallsPerTask = 1
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
+      cds.env.agent.pool.maxToolCallsPerTask = 1
 
       const res = await sendMessage("looping", "trigger tool limit")
       assert.strictEqual(res.status, 200)
@@ -149,9 +149,9 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should fail task when maxLLMTokensPerTask exceeded during graph execution", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100
-      cds.env.a2a.pool.maxToolCallsPerTask = 100
-      cds.env.a2a.pool.maxLLMTokensPerTask = 150 // agent adds 100 tokens per iteration → exceeds after 2nd
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agent.pool.maxToolCallsPerTask = 100
+      cds.env.agent.pool.maxLLMTokensPerTask = 150 // agent adds 100 tokens per iteration → exceeds after 2nd
 
       const res = await sendMessage("looping", "trigger token limit")
       assert.strictEqual(res.status, 200)
@@ -161,14 +161,14 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should complete normally when per-task limits are high", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100
-      cds.env.a2a.pool.maxToolCallsPerTask = 100
-      cds.env.a2a.pool.maxLLMTokensPerTask = 100000
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agent.pool.maxToolCallsPerTask = 100
+      cds.env.agent.pool.maxLLMTokensPerTask = 100000
 
       // LoopingService always loops — but shouldContinue won't stop it by quota.
       // It will loop until it hits the limit... actually it always produces toolCalls
       // so it will loop forever unless quota stops it. Set a reasonable iteration limit.
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 3
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 3
 
       const res = await sendMessage("looping", "limited loop")
       assert.strictEqual(res.status, 200)
@@ -198,7 +198,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 'end' when maxLLMInvocationsPerTask exceeded", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 5
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 5
       const state = { _iterations: 5, _totalTokens: 100, _totalToolCalls: 2 }
       const config = { configurable: { _taskId: "test", _service: "TestService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -206,7 +206,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 'end' when maxLLMTokensPerTask exceeded", async () => {
-      cds.env.a2a.pool.maxLLMTokensPerTask = 1000
+      cds.env.agent.pool.maxLLMTokensPerTask = 1000
       const state = { _iterations: 1, _totalTokens: 1000, _totalToolCalls: 2 }
       const config = { configurable: { _taskId: "test", _service: "TestService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -214,7 +214,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 'end' when maxToolCallsPerTask exceeded", async () => {
-      cds.env.a2a.pool.maxToolCallsPerTask = 10
+      cds.env.agent.pool.maxToolCallsPerTask = 10
       const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 10 }
       const config = { configurable: { _taskId: "test", _service: "TestService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -222,9 +222,9 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should return 'next' when limits not yet reached", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 15
-      cds.env.a2a.pool.maxLLMTokensPerTask = 20000
-      cds.env.a2a.pool.maxToolCallsPerTask = 50
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 15
+      cds.env.agent.pool.maxLLMTokensPerTask = 20000
+      cds.env.agent.pool.maxToolCallsPerTask = 50
       const state = { _iterations: 14, _totalTokens: 19999, _totalToolCalls: 49 }
       const config = { configurable: { _taskId: "test", _service: "TestService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -232,7 +232,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("shouldContinue throws QUOTA_EXCEEDED_AT_NODE when quota exceeded", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 1
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 1
       const state = {
         _iterations: 1,
         _totalTokens: 100,
@@ -256,7 +256,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("shouldContinue returns 'tools' when within quota and toolCalls present", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 15
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 15
       const state = {
         _iterations: 1,
         _totalTokens: 100,
@@ -295,7 +295,7 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       }
       audit.after("*", handler)
 
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 3
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 3
       const state = { _iterations: 3, _totalTokens: 100, _totalToolCalls: 2 }
       const config = { configurable: { _taskId: "task-abc-123", _service: "TestService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -330,9 +330,9 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       }
       audit.after("*", handler)
 
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 15
-      cds.env.a2a.pool.maxLLMTokensPerTask = 20000
-      cds.env.a2a.pool.maxToolCallsPerTask = 50
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 15
+      cds.env.agent.pool.maxLLMTokensPerTask = 20000
+      cds.env.agent.pool.maxToolCallsPerTask = 50
       const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 2 }
       const config = { configurable: { _taskId: "test", _service: "TestService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -364,8 +364,8 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       }
       audit.after("*", handler)
 
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100
-      cds.env.a2a.pool.maxLLMTokensPerTask = 500
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agent.pool.maxLLMTokensPerTask = 500
       const state = { _iterations: 1, _totalTokens: 500, _totalToolCalls: 0 }
       const config = { configurable: { _taskId: "task-xyz", _service: "TokenService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -400,9 +400,9 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       }
       audit.after("*", handler)
 
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 100
-      cds.env.a2a.pool.maxLLMTokensPerTask = 20000
-      cds.env.a2a.pool.maxToolCallsPerTask = 5
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agent.pool.maxLLMTokensPerTask = 20000
+      cds.env.agent.pool.maxToolCallsPerTask = 5
       const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 5 }
       const config = { configurable: { _taskId: "task-tools", _service: "ToolService" } }
       const result = await quotaEnforcerAtNode(state, config)
@@ -472,33 +472,33 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
-      const row = await SELECT.one.from("cap.a2a.Tasks").where({ taskId })
+      const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
       assert.notStrictEqual(row, undefined)
       assert.strictEqual(row.agentService, "GraphBookService")
     })
 
     it("should write usageToolCalls to task record when graph tracks it", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 3
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 3
       const res = await sendMessage("looping", "Track tools")
       assert.strictEqual(res.data.result.status.state, "failed")
 
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
-      const row = await SELECT.one.from("cap.a2a.Tasks").where({ taskId })
+      const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
       assert.notStrictEqual(row, undefined)
       assert.ok(row.usageToolCalls >= 1)
     })
 
     it("should write usage fields even when task fails", async () => {
-      cds.env.a2a.pool.maxLLMInvocationsPerTask = 2
+      cds.env.agent.pool.maxLLMInvocationsPerTask = 2
       const res = await sendMessage("looping", "Fail and track")
       assert.strictEqual(res.data.result.status.state, "failed")
 
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
-      const row = await SELECT.one.from("cap.a2a.Tasks").where({ taskId })
+      const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
       assert.notStrictEqual(row, undefined)
       assert.strictEqual(row.agentService, "LoopingService")
       assert.ok(row.usageLlmTokens >= 100)
@@ -526,12 +526,12 @@ describe("@cap-js/a2a - Quota enforcement", () => {
       assert.match(output, /GraphBookService/)
     })
 
-    it("should be triggerable via computeActiveUsers event on a2a-executor", async () => {
+    it("should be triggerable via computeActiveUsers event on agent-executor", async () => {
       await sendMessage("graph-book", "before event")
       captured.length = 0
 
       // Emit the event on the executor service
-      const executor = await cds.connect.to("a2a-executor")
+      const executor = await cds.connect.to("agent-executor")
       await executor.emit("computeActiveUsers")
 
       // Flush and verify gauge was updated
@@ -545,8 +545,8 @@ describe("@cap-js/a2a - Quota enforcement", () => {
     })
 
     it("should have activeUsersInterval configured", () => {
-      assert.notStrictEqual(cds.env.a2a.activeUsersInterval, undefined)
-      assert.notStrictEqual(cds.env.a2a.activeUsersInterval, 0)
+      assert.notStrictEqual(cds.env.agent.activeUsersInterval, undefined)
+      assert.notStrictEqual(cds.env.agent.activeUsersInterval, 0)
     })
 
     it("should count distinct users per service via scheduled cds.spawn", async () => {
@@ -585,8 +585,8 @@ describe("@cap-js/a2a - Quota enforcement", () => {
 
   describe("pool config", () => {
     it("should have all expected pool limits defined", () => {
-      const pool = cds.env.a2a.pool
-      assert.notStrictEqual(cds.env.a2a?.pool, undefined)
+      const pool = cds.env.agent.pool
+      assert.notStrictEqual(cds.env.agent?.pool, undefined)
       assert.ok(pool.maxConcurrentTasks > 0, `expected ${pool.maxConcurrentTasks} > 0`)
       assert.ok(
         pool.maxConcurrentTasksPerUser > 0,

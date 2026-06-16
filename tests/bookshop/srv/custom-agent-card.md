@@ -23,5 +23,5 @@ skills:
 
 # Custom Agent Card
 
-This card is loaded via the `@a2a.card` annotation — overriding the
+This card is loaded via the `@agent.card` annotation — overriding the
 auto-generated CDS-based card. Body content is ignored by the plugin.

@@ -3,7 +3,7 @@ using {sap.capire.bookshop as my} from '../db/schema';
 /**
  * Browse and order books
  */
-@a2a  @odata
+@agent  @odata
 @Core.SchemaVersion: '0'
 @description: 'Browse and order books from the catalog'
 service CatalogService {

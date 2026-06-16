@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  XMAKE_PROJECT_ID: ght-cap-a2a
+  XMAKE_PROJECT_ID: ght-cap-agent
   XMAKE_RELEASE_MODE: stage_and_promote
 
 jobs:

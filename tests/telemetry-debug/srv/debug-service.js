@@ -1,16 +1,16 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { AIMessage } from "@langchain/core/messages"
-import { generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/agent"
 
 /**
  * Service with two modes:
- * - "fail" in message → graph throws (tests a2a.errors.total + failed span)
+ * - "fail" in message → graph throws (tests agent.errors.total + failed span)
  * - anything else → normal query (tests debug content capture on tool spans)
  */
 export default class DebugService extends cds.ApplicationService {
   init() {
-    this.a2a = { graph: this._buildGraph() }
+    this.agent = { graph: this._buildGraph() }
     return super.init()
   }
 

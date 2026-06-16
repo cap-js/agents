@@ -3,8 +3,8 @@ import cds from "@sap/cds"
 cds.test(import.meta.dirname + "/../bookshop")
 import { CdsCheckpointSaver } from "../../lib/persistence/checkpoint-saver.js"
 
-const CHECKPOINTS = "cap.a2a.Checkpoints"
-const WRITES = "cap.a2a.CheckpointWrites"
+const CHECKPOINTS = "cap.agent.Checkpoints"
+const WRITES = "cap.agent.CheckpointWrites"
 
 function runAs(userId, fn) {
   return cds._with({ user: new cds.User({ id: userId }) }, fn)

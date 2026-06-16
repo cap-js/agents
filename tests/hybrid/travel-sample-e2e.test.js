@@ -182,7 +182,7 @@ async function collectToolCallsFromCheckpoints(threadId) {
   const saver = new (class extends BaseCheckpointSaver {})()
   const serde = saver.serde
 
-  const rows = await SELECT.from("cap.a2a.Checkpoints").where({ thread_id: threadId })
+  const rows = await SELECT.from("cap.agent.Checkpoints").where({ thread_id: threadId })
   const tools = new Set()
 
   for (const row of rows) {
@@ -207,7 +207,7 @@ async function collectToolCallsFromCheckpoints(threadId) {
   return tools
 }
 
-describe("@cap-js/a2a - Travel Sample E2E", { skip: !canLoadDeepagents }, () => {
+describe("@cap-js/agent - Travel Sample E2E", { skip: !canLoadDeepagents }, () => {
   let helpers
 
   before(async () => {

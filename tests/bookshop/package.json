@@ -2,9 +2,9 @@
   "name": "bookshop",
   "version": "1.0.0",
   "type": "module",
-  "description": "Sample CAP bookshop for @cap-js/a2a tests",
+  "description": "Sample CAP bookshop for @cap-js/agent tests",
   "dependencies": {
-    "@cap-js/a2a": "file:../../.",
+    "@cap-js/agent": "file:../../.",
     "@cap-js/audit-logging": ">=1",
     "@cap-js/hana": "^2",
     "@cap-js/mcp": "^1",
@@ -24,7 +24,7 @@
     "@sap/cds-dk": "^9"
   },
   "cds": {
-    "a2a": {
+    "agent": {
       "activeUsersInterval": "1s",
       "[tracing]": {
         "mlflow": true

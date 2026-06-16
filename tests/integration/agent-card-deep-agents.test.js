@@ -14,7 +14,7 @@ const { GET } = cds.test(import.meta.dirname + "/../deep-agent-sample")
 // These tests require deep-agent-sample which has deepagents ESM deps.
 // Skip if deepagents can't be loaded.
 
-describe("@cap-js/a2a - Agent Card (deep agent modes)", { skip: !canLoadDeepAgent }, () => {
+describe("@cap-js/agent - Agent Card (deep agent modes)", { skip: !canLoadDeepAgent }, () => {
   // ── skills/ directory scan ──────────────────────────────────────────
 
   describe("skills/ directory scan", () => {
@@ -56,10 +56,10 @@ describe("@cap-js/a2a - Agent Card (deep agent modes)", { skip: !canLoadDeepAgen
     })
   })
 
-  // ── @a2a.directory annotation (override slug-based agent dir) ─────────
+  // ── @agent.directory annotation (override slug-based agent dir) ─────────
 
-  it("@a2a.directory annotation: agent card built from the annotation-resolved agent dir", async () => {
-    // DirOverrideService has @a2a.directory but NO @a2a.card, so card
+  it("@agent.directory annotation: agent card built from the annotation-resolved agent dir", async () => {
+    // DirOverrideService has @agent.directory but NO @agent.card, so card
     // generation is forced through the dir resolution chain (AGENTS.md
     // frontmatter + skills/ scan).
     const res = await GET("/a2a/dir-override/.well-known/agent-card.json")
@@ -73,9 +73,9 @@ describe("@cap-js/a2a - Agent Card (deep agent modes)", { skip: !canLoadDeepAgen
     assert.ok(skill.tags.includes("products"))
   })
 
-  // ── @a2a.card annotation (explicit card markdown file) ────────────────
+  // ── @agent.card annotation (explicit card markdown file) ────────────────
 
-  it("@a2a.card annotation loads card from a markdown file outside the agent directory", async () => {
+  it("@agent.card annotation loads card from a markdown file outside the agent directory", async () => {
     const res = await GET("/a2a/override-card/.well-known/agent-card.json")
     const card = res.data
 
@@ -83,7 +83,7 @@ describe("@cap-js/a2a - Agent Card (deep agent modes)", { skip: !canLoadDeepAgen
     assert.strictEqual(card.name, "card-override-explicit")
     assert.strictEqual(card.version, "2.0.0")
     const skill = card.skills.find((s) => s.id === "catalog-browse")
-    assert.notStrictEqual(skill, undefined, "card should expose @a2a.card skill")
+    assert.notStrictEqual(skill, undefined, "card should expose @agent.card skill")
     assert.ok(skill.tags.includes("override"))
   })
 

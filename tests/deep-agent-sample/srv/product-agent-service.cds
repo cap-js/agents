@@ -3,7 +3,7 @@ using { sample.products } from '../db/schema';
 /**
  * Product catalog agent for searching products and managing orders.
  */
-@a2a
+@agent
 service ProductAgentService {
   @readonly entity Products as projection on products.Products;
 

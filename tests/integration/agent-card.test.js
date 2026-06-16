@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../bookshop")
 
-describe("@cap-js/a2a - Agent Card Generation", () => {
+describe("@cap-js/agent - Agent Card Generation", () => {
   // ── Agentify mode (CDS model) ────────────────────────────────────────
 
   describe("Agentify mode (CDS model)", () => {
@@ -22,7 +22,7 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
       assert.notStrictEqual(submitSkill, undefined)
     })
 
-    it("capabilities.streaming reflects cds.env.a2a.streaming config", async () => {
+    it("capabilities.streaming reflects cds.env.agent.streaming config", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
       assert.strictEqual(card.capabilities.streaming, true)
@@ -41,10 +41,10 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
     })
   })
 
-  // ── @a2a.card annotation (explicit file path override) ────────────────
+  // ── @agent.card annotation (explicit file path override) ────────────────
 
-  describe("@a2a.card annotation (explicit file override)", () => {
-    it("agent card loaded from @a2a.card markdown file", async () => {
+  describe("@agent.card annotation (explicit file override)", () => {
+    it("agent card loaded from @agent.card markdown file", async () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
 
       const card = res.data
@@ -102,7 +102,7 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
       assert.ok(!card.url.includes("example.com"), "URL should NOT be proxy URL")
     })
 
-    it("compile to a2a uses @Core.Links via href as URL", () => {
+    it("compile to agent uses @Core.Links via href as URL", () => {
       const card = cds.compile.to.a2a(cds.model, {
         service: "CircuitBreakerService",
         as: "object",
@@ -115,7 +115,7 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
       )
     })
 
-    it("compile to a2a without @Core.Links via uses default HOST URL", () => {
+    it("compile to agent without @Core.Links via uses default HOST URL", () => {
       const card = cds.compile.to.a2a(cds.model, {
         service: "CatalogService",
         as: "object",

@@ -4,11 +4,11 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage, setupErrorDetection } = createHelpers({ POST, axios })
 
-const isMock = cds.env.requires?.["a2a-executor"]?.kind === "a2a-executor-mock"
+const isMock = cds.env.requires?.["agent-executor"]?.kind === "agent-executor-mock"
 
 // HITL tests only work with mock executor (keyword-triggered)
 const describeHitl = isMock ? describe : describe.skip
-describeHitl("@cap-js/a2a - HITL (mock executor)", () => {
+describeHitl("@cap-js/agent - HITL (mock executor)", () => {
   setupErrorDetection()
 
   it("returns input-required when message contains 'hitl'", async () => {

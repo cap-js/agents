@@ -2,7 +2,7 @@
 name: card-override-explicit
 description: >
   Hand-crafted agent card for the Card Override sample. Lives outside the
-  agent directory and is referenced via the `@a2a.card` annotation.
+  agent directory and is referenced via the `@agent.card` annotation.
 version: "2.0.0"
 defaultInputModes: [text/plain]
 defaultOutputModes: [text/plain]
@@ -20,5 +20,5 @@ skills:
 # Card Override (Explicit)
 
 This card is defined explicitly in `card-override-agent/cards/card-override.md` and pointed at via
-the `@a2a.card` annotation. It overrides both the convention-based skill scan
+the `@agent.card` annotation. It overrides both the convention-based skill scan
 and any `AGENT_CARD.md` inside the agent directory.

@@ -2,24 +2,24 @@ import assert from "node:assert/strict"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../bookshop")
 
-describe("@cap-js/a2a plugin", () => {
-  it("should register a2a protocol adapter", () => {
-    assert.notStrictEqual(cds.env.protocols.a2a, undefined)
-    assert.strictEqual(cds.env.protocols.a2a.path, "/a2a")
+describe("@cap-js/agent plugin", () => {
+  it("should register agent protocol adapter", () => {
+    assert.notStrictEqual(cds.env.protocols.agent, undefined)
+    assert.strictEqual(cds.env.protocols.agent.path, "/a2a")
   })
 
-  it("should expose CatalogService with a2a endpoint", () => {
+  it("should expose CatalogService with agent endpoint", () => {
     const srv = cds.services.CatalogService
     assert.notStrictEqual(srv, undefined)
-    const a2aEndpoint = srv.endpoints?.find((ep) => ep.kind === "a2a")
-    assert.notStrictEqual(a2aEndpoint, undefined)
+    const agentEndpoint = srv.endpoints?.find((ep) => ep.kind === "agent")
+    assert.notStrictEqual(agentEndpoint, undefined)
   })
 
-  it("should NOT expose AdminService (no @a2a annotation)", () => {
+  it("should NOT expose AdminService (no @agent annotation)", () => {
     const srv = cds.services.AdminService
     assert.notStrictEqual(srv, undefined)
-    const a2aEndpoint = srv.endpoints?.find((ep) => ep.kind === "a2a")
-    assert.strictEqual(a2aEndpoint, undefined)
+    const agentEndpoint = srv.endpoints?.find((ep) => ep.kind === "agent")
+    assert.strictEqual(agentEndpoint, undefined)
   })
 
   it("should still serve OData normally", async () => {

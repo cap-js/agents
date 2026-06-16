@@ -3,7 +3,7 @@ using {sap.capire.bookshop as my} from '../db/schema';
 /**
  * Graph-based agent for telemetry e2e testing
  */
-@a2a
+@agent
 @description: 'Graph-based book agent with LLM metrics'
 @Core.SchemaVersion : '2'
 service GraphBookService {

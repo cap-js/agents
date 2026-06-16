@@ -1,10 +1,10 @@
 {
-  "name": "a2a-leisure-services",
+  "name": "agent-leisure-services",
   "version": "1.0.0",
   "type": "module",
   "private": true,
   "dependencies": {
-    "@cap-js/a2a": "file:../../..",
+    "@cap-js/agent": "file:../../..",
     "@cap-js/sqlite": "*"
   },
   "cds": {

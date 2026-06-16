@@ -11,7 +11,7 @@ const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
 /** Filter audit logs by original event name (stored in data.data.event) */
 const byEvent = (name) => (l) => l.event === "SecurityEvent" && l.data?.data?.event === name
 
-describe("@cap-js/a2a - Audit Logging", () => {
+describe("@cap-js/agent - Audit Logging", () => {
   let _auditLogs
   let _skipAudit = false
 
@@ -109,13 +109,13 @@ describe("@cap-js/a2a - Audit Logging", () => {
 
   describe("SecurityEvent (quota breach)", () => {
     it("should emit on quota breach (maxTasksPerHourPerUser)", async () => {
-      const originalMax = cds.env.a2a.pool.maxTasksPerHourPerUser
-      cds.env.a2a.pool.maxTasksPerHourPerUser = 0
+      const originalMax = cds.env.agent.pool.maxTasksPerHourPerUser
+      cds.env.agent.pool.maxTasksPerHourPerUser = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.a2a.pool.maxTasksPerHourPerUser = originalMax
+      cds.env.agent.pool.maxTasksPerHourPerUser = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       assert.strictEqual(events.length, 1)
@@ -128,13 +128,13 @@ describe("@cap-js/a2a - Audit Logging", () => {
     })
 
     it("should emit on quota breach (maxConcurrentTasks)", async () => {
-      const originalMax = cds.env.a2a.pool.maxConcurrentTasks
-      cds.env.a2a.pool.maxConcurrentTasks = 0
+      const originalMax = cds.env.agent.pool.maxConcurrentTasks
+      cds.env.agent.pool.maxConcurrentTasks = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.a2a.pool.maxConcurrentTasks = originalMax
+      cds.env.agent.pool.maxConcurrentTasks = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       assert.strictEqual(events.length, 1)

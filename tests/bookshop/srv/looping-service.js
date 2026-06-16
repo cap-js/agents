@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer, END } from "@langchain/langgraph"
 import { AIMessage } from "@langchain/core/messages"
-import { generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/agent"
 
 /**
  * Looping graph that iterates multiple times.
@@ -11,7 +11,7 @@ import { generateTools } from "@cap-js/a2a"
  */
 export default class LoopingService extends cds.ApplicationService {
   init() {
-    this.a2a = { graph: this._buildGraph() }
+    this.agent = { graph: this._buildGraph() }
     return super.init()
   }
 
@@ -19,7 +19,7 @@ export default class LoopingService extends cds.ApplicationService {
     const srv = this
     const { tools } = generateTools(srv, { skipAuth: true })
     const { default: shouldContinue } =
-      await import("@cap-js/a2a/lib/executor/langgraph/nodes/shouldContinue.js")
+      await import("@cap-js/agent/lib/executor/langgraph/nodes/shouldContinue.js")
 
     const GraphState = Annotation.Root({
       messages: Annotation({ reducer: messagesStateReducer }),

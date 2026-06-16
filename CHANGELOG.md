@@ -8,27 +8,27 @@
 
 ### Added
 
-- Initial project setup as a CDS protocol adapter
+- Initial project setup as a CDS plugin
 - Agent Card compilation during runtime and design time
   - Customize the agent card URL with `@Core.Links` annotated to the service
-- A2A Protocol adapter that converts A2A requests into LangGraph execution
+- Agent protocol adapter that converts incoming requests into LangGraph execution
 - Langgraph Executor with AI Core integration to agentify CAP services
 - Mock Executor for testing purposes
 - Multi-turn conversations with checkpointing
 - Option to overwrite the ootb executor
 - OpenTelemetry spans for langChain workflows and nodes as well as LLM invocations and tool calls.
-- OpenTelemetry metrics for LLM token consumption, tool invocations, A2A requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions & active_users
-- Quota enforcement via `cds.a2a.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made.
+- OpenTelemetry metrics for LLM token consumption, tool invocations, agent requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions & active_users
+- Quota enforcement via `cds.agent.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made.
 - Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
-- Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.a2a.pool.maxLLMCallTimeoutMs` (default 30s).
-- Content filtering with Azure Content Safety prompt injection shield via `cds.a2a.contentFilter` (default: `true`). Supports per-service override via `this.a2a = { contentFilter }` (async function, object, or `false` to disable).
-- Support export to MLFlow via `cds.a2a.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["databricks-mlflow"]`.
-- A2A Tasks and Checkpoints can only be accessed by the user who created it
-- `configMapper` option on `GraphExecutor` (`this.a2a = { graph, configMapper }`) to inject request-scoped data into `config.configurable` before `graph.invoke()`. Enables use cases such as supplying A2A-uploaded file capabilities to deepagents' `CapabilityBackend` via LangGraph's `getConfig()` AsyncLocalStorage. The mapper is `await`ed, so async implementations work correctly. Reserved keys (`thread_id`, `_taskId`, `_service`) always take precedence over mapper output. Non-object return values fail the task with a clear error.
-- Custom tools override via `this.a2a = { tools }`
-- Markdown-based agents auto-built by convention: a `@a2a` service with a sibling directory matching the slugified service name (containing `AGENTS.md`) becomes a deep agent — no `.js` handler required. Tools, model, content-filter recovery middleware, and checkpoint persistence are wired automatically.
+- Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agent.pool.maxLLMCallTimeoutMs` (default 30s).
+- Content filtering with Azure Content Safety prompt injection shield via `cds.agent.contentFilter` (default: `true`). Supports per-service override via `this.agent = { contentFilter }` (async function, object, or `false` to disable).
+- Support export to MLFlow via `cds.agent.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["databricks-mlflow"]`.
+- Agent Tasks and Checkpoints can only be accessed by the user who created it
+- `configMapper` option on `GraphExecutor` (`this.agent = { graph, configMapper }`) to inject request-scoped data into `config.configurable` before `graph.invoke()`. Enables use cases such as supplying uploaded file capabilities to deepagents' `CapabilityBackend` via LangGraph's `getConfig()` AsyncLocalStorage. The mapper is `await`ed, so async implementations work correctly. Reserved keys (`thread_id`, `_taskId`, `_service`) always take precedence over mapper output. Non-object return values fail the task with a clear error.
+- Custom tools override via `this.agent = { tools }`
+- Markdown-based agents auto-built by convention: a `@agent` service with a sibling directory matching the slugified service name (containing `AGENTS.md`) becomes a deep agent — no `.js` handler required. Tools, model, content-filter recovery middleware, and checkpoint persistence are wired automatically.
   - Tools marked with `@UI.IsActionCritical` are automatically considered for human-in-the-loop
-- `@a2a.directory` and `@a2a.card` annotations to override the convention with explicit paths to the agent directory and the agent card markdown file.
+  * `@agent.directory` and `@agent.card` annotations to override the convention with explicit paths to the agent directory and the agent card markdown file.
 
 ### Changed
 

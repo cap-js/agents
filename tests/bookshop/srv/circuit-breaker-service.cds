@@ -5,7 +5,7 @@ using {sap.capire.bookshop as my} from '../db/schema';
  * Uses real OrchestrationClient with circuitBreaker() + timeout() middleware
  * pointed at a mock AI Core server.
  */
-@a2a
+@agent
 @Core.Links : [
   {
       rel : 'via',

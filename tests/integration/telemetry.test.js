@@ -26,7 +26,7 @@ const sendMessage = createSendMessage(POST)
 // In hybrid mode, telemetry uses different exporters that our in-memory capture can't intercept.
 const isHybrid = cds.env.profiles?.includes("hybrid")
 
-describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
+describe("@cap-js/agent - OpenTelemetry integration", { skip: isHybrid }, () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -50,29 +50,29 @@ describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "workflow span test"))
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
     assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["a2a.span.kind"], "workflow")
+    assert.strictEqual(span.attributes["agent.span.kind"], "workflow")
     assert.strictEqual(span.attributes["gen_ai.agent.name"], "GraphBookService")
-    assert.notStrictEqual(span.attributes["a2a.task.id"], undefined)
-    assert.notStrictEqual(span.attributes["a2a.context.id"], undefined)
-    assert.strictEqual(span.attributes["a2a.outcome"], "completed")
+    assert.notStrictEqual(span.attributes["agent.task.id"], undefined)
+    assert.notStrictEqual(span.attributes["agent.context.id"], undefined)
+    assert.strictEqual(span.attributes["agent.outcome"], "completed")
   })
 
   it("should create tool span with correct name and attributes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "tool span test"))
     const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
     assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["a2a.span.kind"], "tool")
-    assert.strictEqual(span.attributes["a2a.tool.name"], "query")
-    assert.strictEqual(span.attributes["a2a.tool.outcome"], "success")
+    assert.strictEqual(span.attributes["agent.span.kind"], "tool")
+    assert.strictEqual(span.attributes["agent.tool.name"], "query")
+    assert.strictEqual(span.attributes["agent.tool.outcome"], "success")
   })
 
   it("should create tool span for custom (non-CDS) tools via prototype patch", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "custom tool test"))
     const span = findSpan(spans, "execute_tool DynamicStructuredTool getBookCount")
     assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["a2a.span.kind"], "tool")
-    assert.strictEqual(span.attributes["a2a.tool.name"], "getBookCount")
-    assert.strictEqual(span.attributes["a2a.tool.outcome"], "success")
+    assert.strictEqual(span.attributes["agent.span.kind"], "tool")
+    assert.strictEqual(span.attributes["agent.tool.name"], "getBookCount")
+    assert.strictEqual(span.attributes["agent.tool.outcome"], "success")
   })
 
   it("should create RunnableSequence spans for graph nodes", async () => {
@@ -136,8 +136,8 @@ describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
   it("should NOT include input/output content at default log level", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "privacy test"))
     for (const span of spans) {
-      assert.strictEqual(span.attributes["a2a.entity.input"], undefined)
-      assert.strictEqual(span.attributes["a2a.entity.output"], undefined)
+      assert.strictEqual(span.attributes["agent.entity.input"], undefined)
+      assert.strictEqual(span.attributes["agent.entity.output"], undefined)
     }
   })
 
@@ -159,21 +159,21 @@ describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
   // ─── Monkey-patching ────────────────────────────────────────────────
 
   it("should have LangChain patches applied (feature flag default on)", async () => {
-    assert.notStrictEqual(cds.env.a2a.trace_langchain, false)
+    assert.notStrictEqual(cds.env.agent.trace_langchain, false)
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
-    const PATCHED = Symbol.for("@cap-js/a2a:patched")
+    const PATCHED = Symbol.for("@cap-js/agent:patched")
     assert.strictEqual(BaseChatModel.prototype[PATCHED], true)
   })
 
   it("should patch StructuredTool.invoke", async () => {
     const { StructuredTool } = await import("@langchain/core/tools")
-    const PATCHED = Symbol.for("@cap-js/a2a:patched")
+    const PATCHED = Symbol.for("@cap-js/agent:patched")
     assert.strictEqual(StructuredTool.prototype[PATCHED], true)
   })
 
   it("should patch RunnableLambda.invoke", async () => {
     const { RunnableLambda } = await import("@langchain/core/runnables")
-    const PATCHED = Symbol.for("@cap-js/a2a:patched")
+    const PATCHED = Symbol.for("@cap-js/agent:patched")
     assert.strictEqual(RunnableLambda.prototype[PATCHED], true)
   })
 
@@ -182,20 +182,20 @@ describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
   it("should record golden signal metrics", async () => {
     await sendMessage("graph-book", "Metrics test")
     const output = await flushMetrics()
-    assert.match(output, /a2a\.requests\.total/)
-    assert.match(output, /a2a\.request\.duration/)
-    assert.match(output, /a2a\.workflows\.completed/)
+    assert.match(output, /agent\.requests\.total/)
+    assert.match(output, /agent\.request\.duration/)
+    assert.match(output, /agent\.workflows\.completed/)
     assert.match(output, /agent_actions/)
-    assert.match(output, /a2a\.tool\.invocations/)
+    assert.match(output, /agent\.tool\.invocations/)
     assert.match(output, /sap\.tenantId/)
   })
 
   it("should record LLM metrics (tokens, invocations)", async () => {
     await sendMessage("graph-book", "LLM test")
     const output = await flushMetrics()
-    assert.match(output, /a2a\.llm\.input_tokens/)
-    assert.match(output, /a2a\.llm\.output_tokens/)
-    assert.match(output, /a2a\.llm\.invocations/)
+    assert.match(output, /agent\.llm\.input_tokens/)
+    assert.match(output, /agent\.llm\.output_tokens/)
+    assert.match(output, /agent\.llm\.invocations/)
     assert.match(output, /mock-model-for-testing/)
   })
 
@@ -204,8 +204,8 @@ describe("@cap-js/a2a - OpenTelemetry integration", { skip: isHybrid }, () => {
   it("should register cls_custom_fields for A2A correlation", () => {
     const cls_fields = cds.env.log.cls_custom_fields
     assert.notStrictEqual(cls_fields, undefined)
-    assert.ok(cls_fields.includes("a2a.task.id"))
-    assert.ok(cls_fields.includes("a2a.context.id"))
+    assert.ok(cls_fields.includes("agent.task.id"))
+    assert.ok(cls_fields.includes("agent.context.id"))
   })
 
   it("should set A2A correlation IDs on responses", async () => {
