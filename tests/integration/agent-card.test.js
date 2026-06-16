@@ -41,10 +41,10 @@ describe("@cap-js/a2a - Agent Card Generation", () => {
     })
   })
 
-  // ── agentCardPath mode (explicit file path override) ──────────────────
+  // ── @a2a.card annotation (explicit file path override) ────────────────
 
-  describe("agentCardPath mode (explicit file override)", () => {
-    it("agent card loaded from agentCardPath markdown file", async () => {
+  describe("@a2a.card annotation (explicit file override)", () => {
+    it("agent card loaded from @a2a.card markdown file", async () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
 
       const card = res.data

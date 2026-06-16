@@ -86,7 +86,7 @@
         "maxToolCallsPerTask": 50,
         "maxLLMInvocationsPerTask": 15,
         "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeoutMs": 30000,
+        "maxLLMCallTimeoutMs": 120000,
         "maxExecutionTimeMsPerTask": 300000,
         "maxIncomingMessageLength": 5000
       }

@@ -1,25 +1,54 @@
 /**
- * Product Agent — Deep agent example for @cap-js/a2a.
+ * Product Agent — Zero-code-with-tool-override example for @cap-js/a2a.
  *
- * Demonstrates the full pattern for building agents with:
- * - createDeepAgent() from deepagents library
- * - createModel({ deepAgent: true }) from @cap-js/a2a (handles AI Core compatibility)
- * - CDS-derived tools (query, describe, orderProduct) from the plugin
- * - Custom business logic tool (calculate_bulk_pricing)
- * - CdsCheckpointSaver auto-injected by the plugin for multi-turn conversations
- * - this.a2a = { graph } to plug into the A2A protocol adapter
+ * Demonstrates the *minimal handler* pattern for deep agents:
+ *  - The CDS service is annotated with `@a2a` only.
+ *    The slug `product-agent` matches the sibling directory
+ *    `./product-agent/`, so the plugin auto-resolves the agent dir, builds a
+ *    `deepagent` from `AGENTS.md`+`skills/`
+ *  - This handler only customises tools (adds a business-logic tool to the
+ *    auto-generated CDS tools).
+ *  - No `createDeepAgent`, `FilesystemBackend`, `createDeepAgentModel`, or
+ *    `agentDir` boilerplate — all auto-derived by the plugin.
  *
- * Run with: cds bind --exec -- cds watch tests/deep-agent-sample
+ * Run with: cds watch tests/deep-agent-sample
  */
 import cds from "@sap/cds"
-const { path } = cds.utils
-import { createDeepAgent, FilesystemBackend } from "deepagents"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { createDeepAgentModel, createModel, generateTools } from "@cap-js/a2a"
+import { generateTools } from "@cap-js/a2a"
 
-const LOG = cds.log("product-agent")
-const __agentDir = path.join(import.meta.dirname, "product-agent")
+export default class ProductAgentService extends cds.ApplicationService {
+  async init() {
+    // Tool override: extend auto-generated CDS tools (query, describe,
+    // orderProduct) with a custom business-logic tool. The plugin's
+    // auto-deepagent picks `srv.a2a.tools` up via `resolveTools(srv)`.
+    this.a2a = {
+      tools: ({ srv }) => [...generateTools(srv).tools, calculateBulkPricing],
+    }
+
+    this.on("orderProduct", async (req) => {
+      const { productName, quantity } = req.data
+      const { Products } = this.entities
+
+      const [product] = await SELECT.from(Products)
+        .where({ name: { like: `%${productName}%` } })
+        .limit(1)
+
+      if (!product) return `Product "${productName}" not found in catalog.`
+      if (product.stock < quantity) {
+        return `Insufficient stock for ${product.name}. Requested: ${quantity}, Available: ${product.stock}.`
+      }
+
+      const total = (Number(product.price) * quantity).toFixed(2)
+      await UPDATE(Products, product.ID).set({ stock: product.stock - quantity })
+
+      return `Order confirmed: ${quantity}x ${product.name} at $${product.price}/unit. Total: $${total}. Remaining stock: ${product.stock - quantity}.`
+    })
+
+    await super.init()
+  }
+}
 
 const calculateBulkPricing = tool(
   async ({ productName, quantity }) => {
@@ -70,62 +99,3 @@ const calculateBulkPricing = tool(
     }),
   },
 )
-
-async function createAgent(srv) {
-  // Generate CDS-derived tools (query, describe, orderProduct)
-  // skipAuth: true because we generate tools at startup (no request context yet) -> Revisit
-  const { tools: cdsTools } = generateTools(srv, { skipAuth: true })
-
-  // createDeepAgentModel() handles the AI Core array-content compatibility
-  // issue: deepagents' built-in tools (read_file, ls, grep, …) return content
-  // as [{type:"text",text:"..."}] arrays which AI Core rejects without flattening.
-  const model = await createDeepAgentModel({
-    srv,
-    params: { max_tokens: 4096, temperature: 0.2 },
-  })
-
-  LOG.info("CDS tools generated", { tools: cdsTools.map((t) => t.name) })
-
-  LOG.info("Creating deep agent", { agentDir: __agentDir })
-
-  const agent = createDeepAgent({
-    model,
-    tools: [...cdsTools, calculateBulkPricing],
-    memory: ["./AGENTS.md"],
-    skills: ["./skills/"],
-    backend: new FilesystemBackend({ rootDir: __agentDir, virtualMode: true }),
-    interruptOn: { orderProduct: { allowedDecisions: ["approve", "reject"] } },
-  })
-
-  LOG.info("Deep agent created")
-  return agent
-}
-
-export default class ProductAgentService extends cds.ApplicationService {
-  async init() {
-    await super.init()
-
-    // Passing the agent dir for automatic creation of the agent card from AGENTS.md and skills/
-    this.a2a = { graph: createAgent(this), agentDir: __agentDir }
-
-    this.on("orderProduct", async (req) => {
-      const { productName, quantity } = req.data
-      const { Products } = this.entities
-
-      const [product] = await SELECT.from(Products)
-        .where({ name: { like: `%${productName}%` } })
-        .limit(1)
-
-      if (!product) return `Product "${productName}" not found in catalog.`
-      if (product.stock < quantity) {
-        return `Insufficient stock for ${product.name}. Requested: ${quantity}, Available: ${product.stock}.`
-      }
-
-      // Place order (decrement stock)
-      const total = (Number(product.price) * quantity).toFixed(2)
-      await UPDATE(Products, product.ID).set({ stock: product.stock - quantity })
-
-      return `Order confirmed: ${quantity}x ${product.name} at $${product.price}/unit. Total: $${total}. Remaining stock: ${product.stock - quantity}.`
-    })
-  }
-}

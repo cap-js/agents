@@ -56,49 +56,46 @@ describe("@cap-js/a2a - Agent Card (deep agent modes)", { skip: !canLoadDeepAgen
     })
   })
 
-  // ── AGENT_CARD.md convention (within agentDir) ────────────────────────
+  // ── @a2a.directory annotation (override slug-based agent dir) ─────────
 
-  describe("AGENT_CARD.md convention (within agentDir)", () => {
-    it("agent card generated from AGENT_CARD.md in agentDir", async () => {
-      const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
+  it("@a2a.directory annotation: agent card built from the annotation-resolved agent dir", async () => {
+    // DirOverrideService has @a2a.directory but NO @a2a.card, so card
+    // generation is forced through the dir resolution chain (AGENTS.md
+    // frontmatter + skills/ scan).
+    const res = await GET("/a2a/dir-override/.well-known/agent-card.json")
+    const card = res.data
+    // From `card-override-agent/AGENTS.md` frontmatter:
+    assert.strictEqual(card.name, "card-override-agent")
+    assert.ok(card.description.includes("Read-only product browsing"))
+    // From `card-override-agent/skills/product-overview/SKILL.md`:
+    const skill = card.skills.find((s) => s.id === "product-overview")
+    assert.notStrictEqual(skill, undefined, "skills/ scan should yield product-overview")
+    assert.ok(skill.tags.includes("products"))
+  })
 
-      const card = res.data
-      assert.strictEqual(card.name, "custom-book-agent")
-      assert.ok(card.description.includes("book recommendation"))
-      assert.strictEqual(card.version, "2.0.0")
-    })
+  // ── @a2a.card annotation (explicit card markdown file) ────────────────
 
-    it("skills come from AGENT_CARD.md frontmatter", async () => {
-      const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
-      const card = res.data
+  it("@a2a.card annotation loads card from a markdown file outside the agent directory", async () => {
+    const res = await GET("/a2a/override-card/.well-known/agent-card.json")
+    const card = res.data
 
-      assert.strictEqual(card.skills.length, 2)
+    // From `cards/card-override.md` frontmatter (NOT from the agent dir):
+    assert.strictEqual(card.name, "card-override-explicit")
+    assert.strictEqual(card.version, "2.0.0")
+    const skill = card.skills.find((s) => s.id === "catalog-browse")
+    assert.notStrictEqual(skill, undefined, "card should expose @a2a.card skill")
+    assert.ok(skill.tags.includes("override"))
+  })
 
-      const recSkill = card.skills.find((s) => s.id === "book-recommendations")
-      assert.notStrictEqual(recSkill, undefined)
-      assert.ok(recSkill.tags.includes("books"))
-      assert.ok(recSkill.examples.includes("Recommend a mystery novel"))
-    })
+  // ── Slug-only convention (zero-code service) ──────────────────────────
+  it("Slug-only convention: agent card auto-built from <slug>/AGENTS.md + skills/", async () => {
+    const res = await GET("/a2a/zero-code-agent/.well-known/agent-card.json")
+    const card = res.data
+    assert.strictEqual(card.name, "zero-code-agent")
+    assert.ok(card.description.includes("product catalog"))
 
-    it("skills/ directory is ignored when AGENT_CARD.md exists", async () => {
-      const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
-      const card = res.data
-
-      // Only skills from AGENT_CARD.md
-      assert.deepStrictEqual(card.skills.map((s) => s.id).sort(), [
-        "book-recommendations",
-        "reading-list",
-      ])
-
-      // skills/ directory contents (book-formatting, library-helpers) are NOT in the card
-      assert.strictEqual(
-        card.skills.find((s) => s.id === "book-formatting"),
-        undefined,
-      )
-      assert.strictEqual(
-        card.skills.find((s) => s.id === "library-helpers"),
-        undefined,
-      )
-    })
+    const listing = card.skills.find((s) => s.id === "product-listing")
+    assert.notStrictEqual(listing, undefined, "skills/ scan should yield product-listing skill")
+    assert.ok(listing.tags.includes("read-only"))
   })
 })

@@ -14,89 +14,6 @@ Access to an SAP AI Core instance:
 
 See [SAP Cloud SDK for AI](https://sap.github.io/ai-sdk/docs/js/connecting-to-ai-core) for details.
 
-> [!NOTE]
-> When agentifying existing services and in development profile, a mock executor is used (no AI Core needed).
-
-## Ways to Build Agents
-
-### Agentify Existing CAP Services
-
-Add `@a2a` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the A2A protocol with zero code required. The agent has access to the tools generated from the service model.
-
-```cds
-@a2a
-service CatalogService {
-  entity Books as projection on my.Books;
-  action submitOrder(book: Books:ID, quantity: Integer) returns { stock: Integer };
-}
-```
-
-→ See [Bookshop Sample](./tests/bookshop/)
-
-<details>
-<summary>Customize Agent Card URL</summary>
-
-If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
-
-```cds
-@a2a
-@Core.Links : [
-  {
-      rel : 'via',
-      href : 'https://example.com/agent/catalog',
-  },
-]
-service CatalogService { }
-```
-
-</details>
-
-### Markdown-Based Agents
-
-Create agents using an agent harness like `deepagents` and plug them into CAP via `this.a2a = { graph }`. Define agent identity in `AGENTS.md`, workflows in `skills/`, and let the plugin handle protocol, persistence, agent card serving, and human-in-the-loop (HITL) approval flows.
-
-```js
-import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, generateTools } from "@cap-js/a2a"
-
-// Extract the async construction so it returns a Promise.
-// See "Lazy graph construction" below for why.
-async function createMyAgent(srv) {
-  const { tools } = generateTools(srv)
-  const model = await createDeepAgentModel({ srv })
-  return createDeepAgent({
-    model,
-    tools,
-    memory: ["./AGENTS.md"],
-    skills: ["./skills/"],
-    backend: new FilesystemBackend({
-      rootDir: import.meta.dirname + "/my-agent",
-      virtualMode: true,
-    }),
-    // checkpointer auto-injected by plugin (CdsCheckpointSaver)
-  })
-}
-
-export default class MyAgent extends cds.ApplicationService {
-  async init() {
-    this.a2a = {
-      graph: createMyAgent(this), // unawaited Promise — see "Lazy graph construction"
-    }
-    await super.init()
-  }
-}
-```
-
-→ See [Deep Agent Sample](./tests/deep-agent-sample/)
-
-#### Lazy graph construction
-
-`srv.a2a.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.a2a.contentFilter` or `srv.a2a.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.a2a = { graph: createMyAgent(this), … }` _without_ `await`.
-
-Why this matters: the right-hand side of `this.a2a = { … }` is fully evaluated **before** the assignment to `this.a2a` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.a2a` is still `undefined`, so per-service overrides like `srv.a2a.contentFilter` and `srv.a2a.model` are silently ignored and fall back to the global `cds.env.a2a.*` defaults. With the unawaited-Promise form, `this.a2a` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.a2a.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
-
-Compiled-graph form (`this.a2a = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
-
 ## Getting Started
 
 ```bash
@@ -118,6 +35,87 @@ curl -s http://localhost:4004/a2a/catalog/ \
   -d '{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"message":{"messageId":"1","role":"user","parts":[{"kind":"text","text":"Which books do you have?"}]}}}'
 ```
 
+## Ways to Build Agents
+
+### Agentify Existing CAP Services
+
+Add `@a2a` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the A2A protocol with zero code required. The agent has access to the tools generated from the service model.
+
+```cds
+@a2a
+service CatalogService {
+  entity Books as projection on my.Books;
+  action submitOrder(book: Books:ID, quantity: Integer) returns { stock: Integer };
+}
+```
+
+→ See [Bookshop Sample](./tests/bookshop/)
+
+### Markdown-Based Agents
+
+Define an agent's identity, behaviour, and skills entirely in markdown — no JavaScript handler required. Annotate the CDS service with `@a2a` and create a sibling directory matching the slugified service name. The plugin auto-builds the agent at startup.
+
+```cds
+@a2a
+service ProductAgent {
+  @readonly entity Products as projection on my.Products;
+}
+```
+
+```
+srv/
+├─ product-agent-service.cds
+└─ product-agent/                ← matches the slugified service name
+   ├─ AGENTS.md                  ← agent identity + behaviour
+   └─ skills/
+      └─ catalog-browse/
+         └─ SKILL.md             ← workflow + examples
+```
+
+`AGENTS.md` defines who the agent is. The frontmatter populates the agent card;
+the body is the agent's system prompt:
+
+```md
+---
+name: product-agent
+version: "1.0.0"
+description: Read-only product catalog assistant.
+---
+
+# Product Agent
+
+You help users find and explore products in the catalog. Use ...
+```
+
+→ See [Deep Agent Sample](./tests/deep-agent-sample/)
+
+#### Custom locations: `@a2a.directory` and `@a2a.card`
+
+Two annotations override the convention when your layout doesn't match. Both
+paths are resolved relative to the `.cds` file.
+
+| Annotation       | Purpose                                                      |
+| ---------------- | ------------------------------------------------------------ |
+| `@a2a.directory` | Path to the agent directory (overrides the slug convention). |
+| `@a2a.card`      | Path to a hand-crafted agent card markdown file.             |
+
+```cds
+@a2a
+@a2a.directory: 'agents/product'
+@a2a.card     : 'cards/product-card.md'
+service ProductAgent {
+  @readonly entity Products as projection on my.Products;
+}
+```
+
+---
+
+> [!WARNING]
+> Everything below is advanced / not part of the first official release.
+> Their public surface may change.
+
+---
+
 ## Configuration
 
 | Setting                       | Description                                                              | Default                        |
@@ -127,6 +125,24 @@ curl -s http://localhost:4004/a2a/catalog/ \
 | `cds.a2a.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                         |
 | `cds.a2a.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                         |
 | `cds.a2a.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable)       |
+
+<details>
+<summary>Customize Agent Card URL</summary>
+
+If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
+
+```cds
+@a2a
+@Core.Links : [
+  {
+      rel : 'via',
+      href : 'https://example.com/agent/catalog',
+  },
+]
+service CatalogService { }
+```
+
+</details>
 
 ### Executor Profiles
 
@@ -161,7 +177,7 @@ All limits are configured via `cds.env.a2a.pool` (defaults provided by the plugi
         "maxToolCallsPerTask": 50,
         "maxLLMInvocationsPerTask": 15,
         "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeoutMs": 30000,
+        "maxLLMCallTimeoutMs": 120000,
         "maxExecutionTimeMsPerTask": 300000,
         "maxIncomingMessageLength": 5000
       }
@@ -448,13 +464,16 @@ Resolution order: `srv.a2a.contentFilter` → `cds.env.a2a.contentFilter` → de
 
 </details>
 
-### Limitations: prompt_shield + Deepagents
+### Limitations: prompt_shield + large contexts
 
 The default `prompt_shield` filter (Azure Content Safety) has a request payload
-size limit. Deepagents accumulate large contexts — system prompt, skill files,
-multiple tool results — that can exceed it. The fix for now is to disable filtering for deepagent-based services.
+size limit. Markdown-based agents accumulate large contexts — system prompt,
+skill files, multiple tool results — that can exceed it. The fix for now is to
+disable filtering for the affected services.
 
-`contentFilter: false` only takes effect on per-service models if `srv.a2a` is assigned **before** the model is constructed; the unawaited-Promise pattern shown in [Lazy graph construction](#lazy-graph-construction) guarantees that ordering:
+`contentFilter: false` only takes effect on per-service models if `srv.a2a` is
+assigned **before** the model is constructed; the unawaited-Promise pattern
+guarantees that ordering:
 
 ```js
 async function createMyAgent(srv) {
@@ -476,10 +495,56 @@ export default class MyAgent extends cds.ApplicationService {
 }
 ```
 
-If you want to keep the content filter enabled and have your deepagent
-gracefully recover from filter errors instead of failing the task, see
+If you want to keep the content filter enabled and recover from filter errors
+gracefully instead of failing the task, see
 [`contentFilterRecoveryMiddleware()`](#contentfilterrecoverymiddleware) in the
 API section.
+
+## Manual graph wiring
+
+For full control, plug a compiled LangGraph graph in directly via
+`this.a2a = { graph }`. Useful when you need a multi-agent graph, custom
+checkpointer behaviour, or non-`deepagents` tooling.
+
+```js
+import { createDeepAgent, FilesystemBackend } from "deepagents"
+import { createDeepAgentModel, generateTools } from "@cap-js/a2a"
+
+// Extract the async construction so it returns a Promise.
+// See "Lazy graph construction" below for why.
+async function createMyAgent(srv) {
+  const { tools } = generateTools(srv)
+  const model = await createDeepAgentModel({ srv })
+  return createDeepAgent({
+    model,
+    tools,
+    memory: ["./AGENTS.md"],
+    skills: ["./skills/"],
+    backend: new FilesystemBackend({
+      rootDir: import.meta.dirname + "/my-agent",
+      virtualMode: true,
+    }),
+    // checkpointer auto-injected by plugin (CdsCheckpointSaver)
+  })
+}
+
+export default class MyAgent extends cds.ApplicationService {
+  async init() {
+    this.a2a = {
+      graph: createMyAgent(this), // unawaited Promise — see "Lazy graph construction"
+    }
+    await super.init()
+  }
+}
+```
+
+### Lazy graph construction
+
+`srv.a2a.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.a2a.contentFilter` or `srv.a2a.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.a2a = { graph: createMyAgent(this), … }` _without_ `await`.
+
+Why this matters: the right-hand side of `this.a2a = { … }` is fully evaluated **before** the assignment to `this.a2a` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.a2a` is still `undefined`, so per-service overrides like `srv.a2a.contentFilter` and `srv.a2a.model` are silently ignored and fall back to the global `cds.env.a2a.*` defaults. With the unawaited-Promise form, `this.a2a` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.a2a.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
+
+Compiled-graph form (`this.a2a = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
 
 ## API
 
@@ -660,7 +725,7 @@ Alternatively, HITL can be achieved without `interruptOn` by instructing the age
 ## Samples
 
 - **[Bookshop](./tests/bookshop/)** - Agentifying an existing CAP service. `@a2a` annotation, zero agent code.
-- **[Deep Agent](./tests/deep-agent-sample/)** - Building a markdown-based agent. `deepagents` with custom tools, AGENTS.md, and progressive disclosure.
+- **[Deep Agent](./tests/deep-agent-sample/)** - Markdown-based agent — convention-driven, with custom tools and skills.
 - **[Travel](./tests/travel-sample/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) via A2A and a flight data service via MCP.
 
 ## Tooling

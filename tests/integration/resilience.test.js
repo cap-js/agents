@@ -49,7 +49,7 @@ describe("@cap-js/a2a - LLM Circuit Breaker", { skip: !canLoad }, () => {
   })
 
   it("should have maxLLMCallTimeoutMs configured", () => {
-    assert.strictEqual(cds.env.a2a.pool.maxLLMCallTimeoutMs, 30000)
+    assert.strictEqual(cds.env.a2a.pool.maxLLMCallTimeoutMs, 120000)
   })
 
   it("should complete task when AI Core returns 200", async () => {

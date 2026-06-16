@@ -196,10 +196,6 @@ export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
     this.a2a = {
       graph: createTravelAgent(this),
-      // Build the agent card from AGENTS.md frontmatter + skills/ directory scan
-      // (instead of falling back to the agentify mode which would just expose
-      // the `plan` action). This showcases the convention-based agent card.
-      agentDir: __agentDir,
       // Deepagents accumulate large contexts (system prompt + skills + tool
       // results) that exceed Azure Content Safety prompt_shield's payload size
       // limit (surfaces as HTTP 503 + `AI-External-Failure: true`). When enabled,
