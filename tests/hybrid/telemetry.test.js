@@ -19,7 +19,7 @@ import {
 process.env.CDS_TEST_SILENT = "false"
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/agent - Hybrid telemetry (AI Core)", () => {

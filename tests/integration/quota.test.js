@@ -11,7 +11,7 @@ import {
 process.env.CDS_TEST_SILENT = "false"
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/agent - Quota enforcement", () => {
@@ -183,11 +183,9 @@ describe("@cap-js/agent - Quota enforcement", () => {
     let shouldContinue
 
     before(async () => {
-      quotaEnforcerAtNode = (
-        await import("../../lib/executor/langgraph/nodes/quotaEnforcerAtNode.js")
-      ).default
-      shouldContinue = (await import("../../lib/executor/langgraph/nodes/shouldContinue.js"))
+      quotaEnforcerAtNode = (await import("../../lib/agents/react/nodes/quotaEnforcerAtNode.js"))
         .default
+      shouldContinue = (await import("../../lib/agents/react/nodes/shouldContinue.js")).default
     })
 
     it("should return 'next' when within per-task limits", async () => {
@@ -423,7 +421,7 @@ describe("@cap-js/agent - Quota enforcement", () => {
     let createToolNode
 
     before(async () => {
-      createToolNode = (await import("../../lib/executor/langgraph/nodes/tool.js")).default
+      createToolNode = (await import("../../lib/agents/react/nodes/tool.js")).default
     })
 
     it("should increment _totalToolCalls by toolCalls.length, not by 1", async () => {

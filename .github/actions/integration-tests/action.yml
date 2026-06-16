@@ -44,7 +44,7 @@ runs:
       run: npm install
     - name: Install bookshop dependencies
       shell: bash
-      run: cd tests/bookshop && npm install
+      run: cd tests/samples/bookshop && npm install
 
     - name: CDS Versions being used
       shell: bash

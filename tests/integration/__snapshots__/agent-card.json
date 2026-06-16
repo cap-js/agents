@@ -1,0 +1,41 @@
+{
+  "name": "CatalogService",
+  "description": "Browse and order books from the catalog",
+  "version": "1.0.0",
+  "protocolVersion": "0.3.0",
+  "supportedInterfaces": [
+    {
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "0.3.0"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "skills": [
+    {
+      "id": "query",
+      "name": "Data Query",
+      "description": "Query data from the service. Available entities: \n Books: Book details with author information \n Currencies: Code list for currencies\n\nSee https://cap.cloud.sap/docs/cds/common#entity-currencies \n Genres: Hierarchically organized Code List for Genres \n ListOfBooks: Browse available books",
+      "examples": ["Show me all Books"],
+      "tags": ["query", "data", "read", "books", "currencies", "genres"]
+    },
+    {
+      "id": "submitOrder",
+      "name": "submitOrder",
+      "description": "Submit an order for a book",
+      "examples": ["Order 2 copies of Wuthering Heights"],
+      "tags": ["submitorder", "action", "hitl"]
+    },
+    {
+      "id": "getStock",
+      "name": "getStock",
+      "description": "Get stock level for a specific book",
+      "examples": ["Get stock level for Wuthering Heights"],
+      "tags": ["getstock", "function"]
+    }
+  ]
+}

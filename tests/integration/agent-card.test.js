@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
 import cds from "@sap/cds"
-const { GET } = cds.test(import.meta.dirname + "/../bookshop")
+const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
 describe("@cap-js/agent - Agent Card Generation", () => {
   // ── Agentify mode (CDS model) ────────────────────────────────────────
@@ -31,13 +33,15 @@ describe("@cap-js/agent - Agent Card Generation", () => {
     it("agent card matches snapshot", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
-      // Remove dynamic url field before snapshot comparison
+      // Strip dynamic placeholder URLs (compile uses "https://HOST/..." vs
+      // runtime's request-derived URL).
       delete card.url
       if (card.supportedInterfaces) {
         for (const iface of card.supportedInterfaces) delete iface.url
       }
-      // NOTE: toMatchSnapshot not available in node:test — skipping snapshot assertion
-      assert.ok(card, "card should exist")
+      const snapshotPath = path.join(import.meta.dirname, "__snapshots__", "agent-card.json")
+      const expected = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
+      assert.deepStrictEqual(card, expected)
     })
   })
 

@@ -8,7 +8,7 @@ try {
   canLoadDeepAgent = false
 }
 
-const { GET } = cds.test(import.meta.dirname + "/../deep-agent-sample")
+const { GET } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 
 // ── Deep agent modes (skills/ scan + AGENT_CARD.md convention) ──────────
 // These tests require deep-agent-sample which has deepagents ESM deps.

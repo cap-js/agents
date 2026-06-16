@@ -19,7 +19,7 @@ process.env.CDS_TEST_SILENT = "false"
 // Must be called BEFORE cds.test()
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
 // Span/metrics tests require [test] profile telemetry config (ConsoleSpanExporter).

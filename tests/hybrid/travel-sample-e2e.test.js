@@ -8,7 +8,7 @@ import path from "node:path"
 import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 
-const SAMPLE_DIR = path.resolve(import.meta.dirname, "../travel-sample")
+const SAMPLE_DIR = path.resolve(import.meta.dirname, "../samples/travel")
 const TRAVEL_AGENT_DIR = path.join(SAMPLE_DIR, "travel-agent")
 const XFLIGHTS_DIR = path.join(SAMPLE_DIR, "xflights")
 const LEISURE_DIR = path.join(SAMPLE_DIR, "leisure-services")

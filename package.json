@@ -9,19 +9,22 @@
     ".": "./index.js",
     "./cds-plugin": "./cds-plugin.js",
     "./index.cds": "./index.cds",
-    "./lib/executor/mock": "./lib/executor/mock.js",
-    "./lib/executor/langgraph": "./lib/executor/langgraph/index.js",
+    "./srv/mock": "./srv/mock.js",
+    "./srv/langgraph": "./srv/langgraph/index.js",
+    "./srv/*": "./srv/*",
     "./lib/*": "./lib/*"
   },
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
+    "generate-agent-card-snapshot": "cd tests/samples/bookshop && cds compile ./srv -s CatalogService -2 a2a | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const c=JSON.parse(d);delete c.url;if(c.supportedInterfaces)for(const i of c.supportedInterfaces)delete i.url;require('node:fs').writeFileSync('../../integration/__snapshots__/agent-card.json',JSON.stringify(c,null,2)+'\\n');})\"",
+    "pretest": "npm run generate-agent-card-snapshot",
     "test": "CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- node --test --test-force-exit --test-timeout=900000 tests/integration/*.test.js tests/hybrid/*.test.js",
-    "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/mtx/*.test.js",
-    "watch:sample": "cds w tests/bookshop",
-    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/bookshop",
-    "watch:deepagent-sample": "cds w tests/deep-agent-sample",
+    "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/integration/mtx.test.js",
+    "watch:sample": "cds w tests/samples/bookshop",
+    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
+    "watch:deep-agent": "cds w tests/samples/deep-agent",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
   },
@@ -29,6 +32,7 @@
     "index.js",
     "index.cds",
     "lib",
+    "srv",
     "cds-plugin.js"
   ],
   "dependencies": {
@@ -104,10 +108,10 @@
       },
       "kinds": {
         "agent-executor-mock": {
-          "impl": "@cap-js/agent/lib/executor/mock"
+          "impl": "@cap-js/agent/srv/mock"
         },
         "agent-executor-langgraph": {
-          "impl": "@cap-js/agent/lib/executor/langgraph"
+          "impl": "@cap-js/agent/srv/langgraph"
         }
       },
       "[development]": {
@@ -128,12 +132,12 @@
     }
   },
   "workspaces": [
-    "tests/bookshop/",
-    "tests/deep-agent-sample/",
-    "tests/mtx/app/mtx/sidecar/",
-    "tests/telemetry-debug/",
-    "tests/travel-sample/travel-agent/",
-    "tests/travel-sample/xflights/",
-    "tests/travel-sample/leisure-services/"
+    "tests/samples/bookshop/",
+    "tests/samples/deep-agent/",
+    "tests/samples/mtx/mtx/sidecar/",
+    "tests/samples/telemetry-debug/",
+    "tests/samples/travel/travel-agent/",
+    "tests/samples/travel/xflights/",
+    "tests/samples/travel/leisure-services/"
   ]
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 

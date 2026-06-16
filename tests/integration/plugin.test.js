@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
-const { GET } = cds.test(import.meta.dirname + "/../bookshop")
+const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
 describe("@cap-js/agent plugin", () => {
   it("should register agent protocol adapter", () => {

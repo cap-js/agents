@@ -5,7 +5,7 @@ import { fileURLToPath } from "url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const APP_DIR = path.join(__dirname, "app")
+const APP_DIR = path.join(__dirname, "..", "samples", "mtx")
 const SIDECAR_DIR = path.join(APP_DIR, "mtx", "sidecar")
 
 function cleanDbFiles() {
@@ -43,7 +43,9 @@ function startSidecar() {
     }, 30000)
 
     proc.stdout.on("data", (data) => {
-      output += data.toString()
+      const s = data.toString()
+      output += s
+      if (process.env.MTX_DEBUG) process.stderr.write("[sidecar] " + s)
       const match = output.match(/server listening on \{[^}]*url:\s*'http:\/\/localhost:(\d+)'/)
       if (match) {
         clearTimeout(timeout)
@@ -52,7 +54,9 @@ function startSidecar() {
     })
 
     proc.stderr.on("data", (data) => {
-      output += data.toString()
+      const s = data.toString()
+      output += s
+      if (process.env.MTX_DEBUG) process.stderr.write("[sidecar-err] " + s)
     })
 
     proc.on("exit", (code) => {

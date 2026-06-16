@@ -1,0 +1,99 @@
+{
+  "name": "bookshop",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sample CAP bookshop for @cap-js/agent tests",
+  "dependencies": {
+    "@cap-js/agent": "file:../../../.",
+    "@cap-js/audit-logging": ">=1",
+    "@cap-js/hana": "^2",
+    "@cap-js/mcp": "^1",
+    "@cap-js/telemetry": "^1",
+    "@langchain/anthropic": "^1.4.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
+    "@sap/cds": "^9.8.5",
+    "@sap/xssec": "^4",
+    "@toon-format/toon": "^2.1.0",
+    "zod": "^4.3.6"
+  },
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2",
+    "@sap/cds-dk": "^9"
+  },
+  "cds": {
+    "agent": {
+      "activeUsersInterval": "1s",
+      "[tracing]": {
+        "mlflow": true
+      },
+      "[hybrid]": {
+        "activeUsersInterval": "24h"
+      }
+    },
+    "mcp": {
+      "toon_format": false
+    },
+    "requires": {
+      "audit-log": false,
+      "telemetry": {
+        "tracing": false,
+        "metrics": false
+      },
+      "[test]": {
+        "audit-log": {
+          "outbox": false,
+          "kind": "audit-log-to-console"
+        },
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        }
+      },
+      "[tracing]": {
+        "audit-log": {
+          "outbox": false,
+          "kind": "audit-log-to-console"
+        },
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        },
+        "databricks-mlflow": {
+          "credentials": {
+            "DATABRICKS_HOST": "http://localhost:5678",
+            "DATABRICKS_TOKEN": "unused",
+            "MLFLOW_EXPERIMENT_ID": "0"
+          }
+        }
+      },
+      "[production]": {
+        "auth": "xsuaa"
+      }
+    }
+  }
+}

@@ -3,7 +3,7 @@ import { describe, it, mock } from "node:test"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 
-import { resolveTools, instrumentTools } from "../../lib/tools.js"
+import { resolveTools, instrumentTools } from "../../srv/tools.js"
 
 // Symbol marking a tool as instrumented by @cap-js/agent
 const INSTRUMENTED = Symbol.for("@cap-js/agent:instrumented")

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
-cds.test(import.meta.dirname + "/../bookshop")
-import { CdsCheckpointSaver } from "../../lib/persistence/checkpoint-saver.js"
+cds.test(import.meta.dirname + "/../samples/bookshop")
+import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
 
 const CHECKPOINTS = "cap.agent.Checkpoints"
 const WRITES = "cap.agent.CheckpointWrites"

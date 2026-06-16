@@ -13,7 +13,7 @@ import cds from "@sap/cds"
 import { createSendMessage } from "../utils/telemetry-utils.js"
 import createHelpers from "../utils/helpers.js"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
 const sendMessage = createSendMessage(POST)
 const { sendMessage: sendMessageWithContext } = createHelpers({ POST, axios })

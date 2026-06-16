@@ -8,7 +8,7 @@ try {
   canLoadDeepAgent = false
 }
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../deep-agent-sample")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 
@@ -71,7 +71,7 @@ describe(
 
     describe("Tool override path (product-agent)", () => {
       it("auto-built deepagent includes both auto-generated CDS tools and the user's custom tool", async () => {
-        const { resolveTools } = await import("../../lib/tools.js")
+        const { resolveTools } = await import("../../srv/tools.js")
         const srv = cds.services.ProductAgentService
         assert.ok(srv, "ProductAgentService should be loaded")
 

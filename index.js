@@ -1,16 +1,16 @@
-import { CdsCheckpointSaver } from "./lib/persistence/checkpoint-saver.js"
-import { CdsTaskStore } from "./lib/persistence/task-store.js"
+import { CdsCheckpointSaver } from "./lib/protocol/persistence/checkpoint-saver.js"
+import { CdsTaskStore } from "./lib/protocol/persistence/task-store.js"
 import {
   createModel,
   createDeepAgentModel,
   flattenMessages,
   buildContentFilter,
-} from "./lib/llm.js"
-import { generateTools, instrumentTools } from "./lib/tools.js"
-import quotaEnforcerAtNode from "./lib/executor/langgraph/nodes/quotaEnforcerAtNode.js"
-import quotaEnforcerAtStart from "./lib/executor/langgraph/nodes/quotaEnforcerAtStart.js"
-import shouldContinue from "./lib/executor/langgraph/nodes/shouldContinue.js"
-import { contentFilterRecoveryMiddleware } from "./lib/middlewares/content-filter-recovery.js"
+} from "./srv/llm.js"
+import { generateTools, instrumentTools } from "./srv/tools.js"
+import quotaEnforcerAtNode from "./lib/agents/react/nodes/quotaEnforcerAtNode.js"
+import quotaEnforcerAtStart from "./lib/agents/react/nodes/quotaEnforcerAtStart.js"
+import shouldContinue from "./lib/agents/react/nodes/shouldContinue.js"
+import { contentFilterRecoveryMiddleware } from "./lib/agents/markdown/middlewares/content-filter-recovery.js"
 
 /**
  * - CdsCheckpointSaver: LangGraph checkpointer backed by CDS entities (multi-turn, HITL)

@@ -8,7 +8,7 @@ const mock = createMockAICore()
 const mockPort = await mock.start()
 process.env.MOCK_AICORE_PORT = String(mockPort)
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 

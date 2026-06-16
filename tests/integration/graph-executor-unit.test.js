@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-const { GraphExecutor } = await import("../../lib/executor/graph.js")
+const { GraphExecutor } = await import("../../srv/graph.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
 

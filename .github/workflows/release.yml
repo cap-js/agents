@@ -32,7 +32,7 @@ jobs:
           echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ secrets.NPM_REGISTRY_TOKEN }}" >> .npmrc
       - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
       - run: npm i
-      - run: cd tests/bookshop && npm i
+      - run: cd tests/samples/bookshop && npm i
       - run: node --experimental-vm-modules node_modules/jest/bin/jest.js
 
   # Pre-release: upload test results and run BlackDuck scans

@@ -14,7 +14,7 @@ import {
 process.env.CDS_TEST_SILENT = "false"
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../telemetry-debug")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/telemetry-debug")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/agent - Debug tracing & error handling", () => {

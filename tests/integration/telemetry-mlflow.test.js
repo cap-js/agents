@@ -14,7 +14,7 @@ import {
 
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
 // Enable mlflow after cds.test() bootstrap — cds.test() re-resolves cds.env from

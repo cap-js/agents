@@ -24,7 +24,7 @@ cd agent && npm i
 Run the bookshop (zero-code agent):
 
 ```bash
-cds w tests/bookshop --profile hybrid
+cds w tests/samples/bookshop --profile hybrid
 ```
 
 Send a message:
@@ -49,7 +49,7 @@ service CatalogService {
 }
 ```
 
-→ See [Bookshop Sample](./tests/bookshop/)
+→ See [Bookshop Sample](./tests/samples/bookshop/)
 
 ### Markdown-Based Agents
 
@@ -90,7 +90,7 @@ description: Read-only product catalog assistant.
 You help users find and explore products in the catalog. Use ...
 ```
 
-→ See [Deep Agent Sample](./tests/deep-agent-sample/)
+→ See [Deep Agent Sample](./tests/samples/deep-agent/)
 
 #### Custom locations: `@agent.directory` and `@agent.card`
 
@@ -391,7 +391,7 @@ podman run -d --name lgtm \
 Start the app with OTLP export:
 
 ```bash
-cds w tests/bookshop --profile hybrid,telemetry
+cds w tests/samples/bookshop --profile hybrid,telemetry
 ```
 
 The bookshop's `telemetry` profile is preconfigured with OTLP export to `localhost:4318`. Open http://localhost:3000 to browse traces (Tempo) and metrics (Prometheus) in Grafana.
@@ -484,7 +484,7 @@ podman run -p 5678:5000 ghcr.io/mlflow/mlflow mlflow server --host 0.0.0.0
 The plugin ships with default credentials for `localhost:5678` in the bookshop's `telemetry` profile — no env variables needed. Just enable mlflow:
 
 ```bash
-cds w tests/bookshop --profile hybrid,telemetry
+cds w tests/samples/bookshop --profile hybrid,telemetry
 ```
 
 Traces appear at http://localhost:5678/#/experiments/0.
@@ -811,9 +811,9 @@ Alternatively, HITL can be achieved without `interruptOn` by instructing the age
 
 ## Samples
 
-- **[Bookshop](./tests/bookshop/)** - Agentifying an existing CAP service. `@agent` annotation, zero agent code.
-- **[Deep Agent](./tests/deep-agent-sample/)** - Markdown-based agent — convention-driven, with custom tools and skills.
-- **[Travel](./tests/travel-sample/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) and a flight data service via MCP.
+- **[Bookshop](./tests/samples/bookshop/)** - Agentifying an existing CAP service. `@agent` annotation, zero agent code.
+- **[Deep Agent](./tests/samples/deep-agent/)** - Markdown-based agent — convention-driven, with custom tools and skills.
+- **[Travel](./tests/samples/travel/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) and a flight data service via MCP.
 
 ## Tooling
 

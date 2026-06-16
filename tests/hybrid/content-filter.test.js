@@ -5,7 +5,7 @@
 import cds from "@sap/cds"
 import { createSendMessage } from "../utils/telemetry-utils.js"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/agent - Content Filter (hybrid: AI Core)", () => {
