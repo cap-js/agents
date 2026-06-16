@@ -61,10 +61,15 @@ if (isDev) {
   })
 }
 
-// Schedule active_users metric computation (only when telemetry plugin is present)
-if (hasTelemetry) {
-  cds.on("served", async () => {
+// Schedule active_users metric computation + MLflow exporter
+cds.on("served", async () => {
+  if (hasTelemetry) {
     const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
-  })
-}
+  }
+
+  if (cds.env.a2a?.mlflow) {
+    const { setupMlflowExporter } = await import("./lib/telemetry/mlflow.js")
+    setupMlflowExporter()
+  }
+})

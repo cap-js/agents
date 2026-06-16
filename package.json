@@ -17,7 +17,7 @@
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
-    "test:hybrid": "CDS_ENV=test,hybrid cds bind --exec -- node --test --test-force-exit --test-timeout=900000 tests/integration/*.test.js tests/hybrid/*.test.js",
+    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- node --test --test-force-exit --test-timeout=900000 tests/integration/*.test.js tests/hybrid/*.test.js",
     "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/mtx/*.test.js",
     "watch:sample": "cds w tests/bookshop",
     "watch:hybrid": "DEBUG=a2a cds bind --exec -- cds w tests/bookshop",
@@ -69,6 +69,7 @@
       "llm": "anthropic--claude-4.6-sonnet",
       "streaming": true,
       "trace_langchain": true,
+      "mlflow": false,
       "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
       "params": {
@@ -94,6 +95,12 @@
     "requires": {
       "a2a": {
         "model": "@cap-js/a2a"
+      },
+      "databricks-mlflow": {
+        "vcap": {
+          "label": "user-provided",
+          "name": "databricks-mlflow"
+        }
       },
       "kinds": {
         "a2a-executor-mock": {

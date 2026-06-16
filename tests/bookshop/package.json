@@ -26,6 +26,9 @@
   "cds": {
     "a2a": {
       "activeUsersInterval": "1s",
+      "[tracing]": {
+        "mlflow": true
+      },
       "[hybrid]": {
         "activeUsersInterval": "24h"
       }
@@ -60,7 +63,7 @@
           }
         }
       },
-      "[change_to_hybrid_if_needed]": {
+      "[tracing]": {
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"
@@ -78,6 +81,13 @@
               "module": "@cap-js/telemetry",
               "class": "ConsoleMetricExporter"
             }
+          }
+        },
+        "databricks-mlflow": {
+          "credentials": {
+            "DATABRICKS_HOST": "http://localhost:5678",
+            "DATABRICKS_TOKEN": "unused",
+            "MLFLOW_EXPERIMENT_ID": "0"
           }
         }
       },

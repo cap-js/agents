@@ -2,7 +2,7 @@
  * Shared test utilities for telemetry integration tests.
  *
  * Usage:
- *   import { captured, setup, flushMetrics, getSpansAfterRequest, findSpan, findSpans } from "../utils/telemetry-utils.js"
+ *   import { setup, teardown, resetCapture, getSpansAfterRequest, findSpan, findSpans, createSendMessage, getSpanExporter } from "../utils/telemetry-utils.js"
  *   setup() // call BEFORE cds.test() to patch console.info early
  */
 import cds from "@sap/cds"

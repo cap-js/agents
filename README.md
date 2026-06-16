@@ -122,6 +122,7 @@ service ProductAgent {
 | ----------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
 | `cds.a2a.llm`                 | LLM model name                                                           | `anthropic--claude-4.5-sonnet` |
 | `cds.a2a.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                         |
+| `cds.a2a.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                        |
 | `cds.a2a.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                         |
 | `cds.a2a.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                         |
 | `cds.a2a.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable)       |
@@ -373,6 +374,28 @@ POST /a2a/CatalogService/
 </details>
 
 <details>
+<summary>Grafana (local trace + metrics visualization)</summary>
+
+Run [Grafana OTel LGTM](https://github.com/grafana/docker-otel-lgtm) locally for traces, metrics, and logs in one stack:
+
+```bash
+podman run -d --name lgtm \
+  -p 3000:3000 \
+  -p 4318:4318 \
+  grafana/otel-lgtm
+```
+
+Start the app with OTLP export:
+
+```bash
+cds w tests/bookshop --profile hybrid,telemetry
+```
+
+The bookshop's `telemetry` profile is preconfigured with OTLP export to `localhost:4318`. Open http://localhost:3000 to browse traces (Tempo) and metrics (Prometheus) in Grafana.
+
+</details>
+
+<details>
 <summary>Metrics</summary>
 
 | Metric                      | Type             | Description                                   | Attributes                                      |
@@ -401,6 +424,67 @@ await executor.emit("computeActiveUsers")
 ```
 
 Set `cds.a2a.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
+
+</details>
+
+<details>
+<summary>MLflow Databricks</summary>
+
+Export traces to [MLflow on Databricks](https://docs.databricks.com/en/mlflow3/genai/tracing/) for GenAI observability. The plugin adds `mlflow.*` span attributes to existing OTel spans so the MLflow OTLP ingestion endpoint assembles them into proper MLflow traces — no additional SDK required.
+
+The MLflow exporter is added as a **second span processor** alongside any existing exporter (Dynatrace, Cloud Logging, Grafana, etc.). Existing telemetry pipelines are not affected.
+
+**Enable:**
+
+```json
+{ "cds": { "a2a": { "mlflow": true } } }
+```
+
+**Set the experiment ID** via `@Core.SchemaVersion` annotation on your service (feature-toggleable):
+
+```cds
+@a2a
+@Core.SchemaVersion: '123456789'
+service CatalogService { ... }
+```
+
+**Provide credentials** via a BTP user-provided service named `databricks-mlflow`:
+
+```bash
+cf cups databricks-mlflow -p '{"DATABRICKS_HOST":"https://adb-xxx.azuredatabricks.net","DATABRICKS_TOKEN":"dapi...","MLFLOW_EXPERIMENT_ID":"123456789"}'
+```
+
+The `@Core.SchemaVersion` annotation takes precedence over credentials. Since it's a CDS annotation, it can be overridden per feature toggle.
+
+The plugin reads credentials from `cds.env.requires["databricks-mlflow"].credentials` and adds a `BatchSpanProcessor` with an OTLP exporter pointed at the Databricks endpoint.
+
+**Span attributes added** (only when `cds.a2a.mlflow` is truthy):
+
+| Attribute                | Source                                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `mlflow.experimentId`    | `@Core.SchemaVersion` annotation or service credentials                                               |
+| `mlflow.traceRequestId`  | `cds.context.id`                                                                                      |
+| `mlflow.spanType`        | `AGENT` / `LLM` / `TOOL` / `CHAIN`                                                                    |
+| `mlflow.spanInputs`      | Tool args, user message (JSON)                                                                        |
+| `mlflow.spanOutputs`     | Agent response (JSON)                                                                                 |
+| `mlflow.chat.tokenUsage` | `{input_tokens, output_tokens, total_tokens, cache_read_input_tokens?, cache_creation_input_tokens?}` |
+| `mlflow.traceTag.*`      | Session, user, tenant (extracted as trace tags by MLflow server)                                      |
+
+**Local testing with self-hosted MLflow:**
+
+Start an [MLflow OSS](https://mlflow.org/docs/latest/getting-started/quickstart.html) server via container:
+
+```bash
+podman run -p 5678:5000 ghcr.io/mlflow/mlflow mlflow server --host 0.0.0.0
+```
+
+The plugin ships with default credentials for `localhost:5678` in the bookshop's `telemetry` profile — no env variables needed. Just enable mlflow:
+
+```bash
+cds w tests/bookshop --profile hybrid,telemetry
+```
+
+Traces appear at http://localhost:5678/#/experiments/0.
 
 </details>
 
@@ -731,6 +815,7 @@ Alternatively, HITL can be achieved without `interruptOn` by instructing the age
 ## Tooling
 
 - [A2A Editor](https://github.com/open-resource-discovery/a2a-editor) - Chat UI for A2A agents
+- [A2A Protocol Docs](https://a2a-protocol.org) - Official protocol specification and guides
 - [sem-a2a-cli](https://github.tools.sap/SEM/sem-a2a-cli) - Protocol compliance testing
 
 ## Tests

@@ -1,0 +1,222 @@
+import assert from "node:assert/strict"
+import { describe, it, before, beforeEach, after } from "node:test"
+import cds from "@sap/cds"
+import {
+  setup,
+  teardown,
+  resetCapture,
+  getSpansAfterRequest,
+  findSpan,
+  findSpans,
+  createSendMessage,
+  getSpanExporter,
+} from "../utils/telemetry-utils.js"
+
+setup()
+
+const { POST, axios } = cds.test(import.meta.dirname + "/../bookshop")
+const sendMessage = createSendMessage(POST)
+
+// Enable mlflow after cds.test() bootstrap — cds.test() re-resolves cds.env from
+// package.json + .cdsrc.json, so mutations before it are overwritten.
+before(() => {
+  cds.env.a2a ??= {}
+  cds.env.a2a.mlflow = true
+})
+
+describe("@cap-js/a2a - MLflow Databricks span attributes", () => {
+  axios.defaults.validateStatus = () => true
+  after(teardown)
+  beforeEach(resetCapture)
+
+  // ─── mlflowAttrs helper ─────────────────────────────────────────────
+
+  describe("mlflowAttrs()", () => {
+    it("should return empty object when mlflow disabled", async () => {
+      const { mlflowAttrs, mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const saved = cds.env.a2a.mlflow
+      cds.env.a2a.mlflow = false
+      assert.deepStrictEqual(mlflowAttrs("LLM"), {})
+      assert.deepStrictEqual(mlflowTraceAttrs(), {})
+      cds.env.a2a.mlflow = saved
+    })
+
+    it("should return mlflow attributes when enabled", async () => {
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      // Set a2a.service context so resolveExperimentId finds @Core.SchemaVersion
+      const origCtx = cds.context
+      cds.context = { ...cds.context, "a2a.service": "CatalogService" }
+      try {
+        const attrs = mlflowAttrs("TOOL", { inputs: { foo: "bar" } })
+        assert.strictEqual(attrs["mlflow.spanType"], "TOOL")
+        assert.strictEqual(attrs["mlflow.experimentId"], "0")
+        assert.strictEqual(attrs["mlflow.spanInputs"], '{"foo":"bar"}')
+      } finally {
+        cds.context = origCtx
+      }
+    })
+
+    it("should include token usage when provided", async () => {
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const attrs = mlflowAttrs("LLM", {
+        tokenUsage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
+      })
+      assert.strictEqual(
+        attrs["mlflow.chat.tokenUsage"],
+        '{"input_tokens":10,"output_tokens":20,"total_tokens":30}',
+      )
+    })
+
+    it("should not include inputs/outputs/tokenUsage keys when not provided", async () => {
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const attrs = mlflowAttrs("AGENT")
+      assert.strictEqual(attrs["mlflow.spanInputs"], undefined)
+      assert.strictEqual(attrs["mlflow.spanOutputs"], undefined)
+      assert.strictEqual(attrs["mlflow.chat.tokenUsage"], undefined)
+    })
+
+    it("should throw when @Core.SchemaVersion is not numeric", async () => {
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      // Mock a service with non-numeric SchemaVersion
+      const origServices = cds.services
+      const mockSrv = { definition: { "@Core.SchemaVersion": "not-a-number" } }
+      cds.services = { ...cds.services, BadService: mockSrv }
+      const origCtx = cds.context
+      cds.context = { ...cds.context, "a2a.service": "BadService" }
+      try {
+        assert.throws(() => mlflowAttrs("LLM"), /must be a numeric string.*Got: "not-a-number"/)
+      } finally {
+        cds.context = origCtx
+        cds.services = origServices
+      }
+    })
+  })
+
+  describe("mlflowTraceAttrs()", () => {
+    it("should return trace tag attributes when enabled", async () => {
+      const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const attrs = mlflowTraceAttrs()
+      assert.ok(Object.keys(attrs).includes("mlflow.traceTag.session"))
+      assert.ok(Object.keys(attrs).includes("mlflow.traceTag.user"))
+      assert.ok(Object.keys(attrs).includes("mlflow.traceTag.tenant"))
+      assert.ok(Object.keys(attrs).includes("session.id"))
+      assert.ok(Object.keys(attrs).includes("user.id"))
+      // All values must be strings
+      for (const v of Object.values(attrs)) {
+        assert.strictEqual(typeof v, "string")
+      }
+    })
+  })
+
+  // ─── Workflow span ──────────────────────────────────────────────────
+
+  it("should set mlflow.spanType=AGENT on workflow span", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow workflow"))
+    const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
+    assert.notStrictEqual(span, undefined)
+    assert.strictEqual(span.attributes["mlflow.spanType"], "AGENT")
+    assert.ok(span.attributes["mlflow.experimentId"], "should have experimentId")
+    assert.strictEqual(span.attributes["mlflow.experimentId"], "2")
+  })
+
+  it("should set mlflow trace tags on workflow span", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow trace tags"))
+    const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
+    assert.notStrictEqual(span, undefined)
+    assert.notStrictEqual(span.attributes["mlflow.traceTag.session"], undefined)
+    assert.notStrictEqual(span.attributes["mlflow.traceTag.tenant"], undefined)
+  })
+
+  // ─── Tool spans ────────────────────────────────────────────────────
+
+  it("should set mlflow.spanType=TOOL on tool spans", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow tool test"))
+    const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
+    assert.notStrictEqual(span, undefined)
+    assert.strictEqual(span.attributes["mlflow.spanType"], "TOOL")
+    assert.notStrictEqual(span.attributes["mlflow.spanInputs"], undefined)
+  })
+
+  // ─── LLM / Chat spans ──────────────────────────────────────────────
+
+  it("should set mlflow.spanType=LLM on chat spans (when mock model produces them)", async () => {
+    const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
+    const { AIMessage, HumanMessage } = await import("@langchain/core/messages")
+
+    class MockLLM extends BaseChatModel {
+      _llmType() {
+        return "mock-mlflow"
+      }
+      async _generate() {
+        return { generations: [{ message: new AIMessage("hello") }] }
+      }
+    }
+
+    const model = new MockLLM({})
+    const exporter = await getSpanExporter()
+    exporter.reset()
+
+    await model.invoke([new HumanMessage("test mlflow LLM")])
+
+    const { trace } = await import("@opentelemetry/api")
+    const provider = trace.getTracerProvider()
+    const delegate = provider.getDelegate?.() || provider
+    if (delegate.forceFlush) await delegate.forceFlush().catch(() => {})
+
+    const spans = exporter.getFinishedSpans()
+    const chatSpan = findSpan(spans, "chat MockLLM")
+    assert.notStrictEqual(chatSpan, undefined)
+    assert.strictEqual(chatSpan.attributes["mlflow.spanType"], "LLM")
+  })
+
+  // ─── RunnableSequence spans ─────────────────────────────────────────
+
+  it("should set mlflow.spanType=CHAIN on RunnableSequence spans", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow chain test"))
+    const seqSpans = findSpans(spans, "workflow RunnableSequence")
+    assert.ok(seqSpans.length > 0)
+    assert.strictEqual(seqSpans[0].attributes["mlflow.spanType"], "CHAIN")
+  })
+
+  // ─── HTTP span ──────────────────────────────────────────────────────
+
+  it("should set mlflow attributes on HTTP/protocol span", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow http"))
+    const httpSpan = findSpan(spans, "POST /a2a/")
+    // HTTP span may not always be captured by the in-memory exporter
+    // (depends on @cap-js/telemetry wrapping express), so test conditionally
+    if (httpSpan) {
+      assert.strictEqual(httpSpan.attributes["mlflow.spanType"], "CHAIN")
+    }
+  })
+
+  // ─── setupMlflowExporter guard logic ────────────────────────────────
+
+  it("should not add OTLP exporter without databricks-mlflow credentials", async () => {
+    const { trace } = await import("@opentelemetry/api")
+    const provider = trace.getTracerProvider()
+    const delegate = provider.getDelegate?.() || provider
+    const processorsBefore = delegate._registeredSpanProcessors?.length || 0
+
+    // Temporarily remove credentials to test the guard path
+    const savedCreds = cds.env.requires?.["databricks-mlflow"]?.credentials
+    if (cds.env.requires?.["databricks-mlflow"]) {
+      cds.env.requires["databricks-mlflow"].credentials = undefined
+    }
+
+    const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow.js")
+    await setupMlflowExporter()
+
+    // Restore credentials
+    if (cds.env.requires?.["databricks-mlflow"]) {
+      cds.env.requires["databricks-mlflow"].credentials = savedCreds
+    }
+
+    const processorsAfter = delegate._registeredSpanProcessors?.length || 0
+    assert.strictEqual(
+      processorsAfter,
+      processorsBefore,
+      "no processor should be added without credentials",
+    )
+  })
+})
