@@ -26,7 +26,7 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
 
   describe("trace_langchain disabled", () => {
     it("should NOT patch BaseChatModel when trace_langchain is false", async () => {
-      assert.strictEqual(cds.env.agent.trace_langchain, false)
+      assert.strictEqual(cds.env.agents.trace_langchain, false)
       const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
       assert.strictEqual(BaseChatModel.prototype[PATCHED], undefined)

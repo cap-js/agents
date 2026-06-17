@@ -134,7 +134,7 @@ class GraphExecutor {
   }
 
   async _invokeWithTimeout(graph, input, config) {
-    const timeout = cds.env.agent?.pool?.maxExecutionTimeMsPerTask || 300_000
+    const timeout = cds.env.agents?.pool?.maxExecutionTimeMsPerTask || 300_000
     let timeoutHandle
     return Promise.race([
       graph.invoke(input, config),

@@ -24,26 +24,26 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
   afterAll(teardown)
   beforeEach(resetCapture)
 
-  describe("cds.env.agent.contentFilter (global config)", () => {
+  describe("cds.env.agents.contentFilter (global config)", () => {
     let originalValue
 
     beforeEach(() => {
-      originalValue = cds.env.agent.contentFilter
+      originalValue = cds.env.agents.contentFilter
     })
 
     afterEach(() => {
-      cds.env.agent.contentFilter = originalValue
+      cds.env.agents.contentFilter = originalValue
     })
 
     it("should return undefined when set to false (disables filtering)", async () => {
-      cds.env.agent.contentFilter = false
+      cds.env.agents.contentFilter = false
       const result = await buildContentFilter()
 
       expect(result).toBeUndefined()
     })
 
     it("should return undefined when set to 0", async () => {
-      cds.env.agent.contentFilter = 0
+      cds.env.agents.contentFilter = 0
       const result = await buildContentFilter()
 
       expect(result).toBeUndefined()
@@ -54,14 +54,14 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
         input: { filters: [{ type: "custom", config: { level: 1 } }] },
         output: { filters: [] },
       }
-      cds.env.agent.contentFilter = custom
+      cds.env.agents.contentFilter = custom
       const result = await buildContentFilter()
 
       expect(result).toBe(custom)
     })
 
     it("should return Azure defaults when set to true", async () => {
-      cds.env.agent.contentFilter = true
+      cds.env.agents.contentFilter = true
       const result = await buildContentFilter()
 
       expect(result.input.filters).toHaveLength(1)
@@ -75,12 +75,12 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
     let originalValue
 
     beforeEach(() => {
-      originalValue = cds.env.agent.contentFilter
-      cds.env.agent.contentFilter = true // global enabled
+      originalValue = cds.env.agents.contentFilter
+      cds.env.agents.contentFilter = true // global enabled
     })
 
     afterEach(() => {
-      cds.env.agent.contentFilter = originalValue
+      cds.env.agents.contentFilter = originalValue
     })
 
     it("should disable when srv.agent.contentFilter = false (overrides global true)", async () => {

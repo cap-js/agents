@@ -49,13 +49,13 @@ describe("@cap-js/agents - Production error sanitization", () => {
     it("should hide error details in production", async () => {
       process.env.NODE_ENV = "production"
 
-      const originalMax = cds.env.agent.pool.maxLLMInvocationsPerTask
-      cds.env.agent.pool.maxLLMInvocationsPerTask = 1
+      const originalMax = cds.env.agents.pool.maxLLMInvocationsPerTask
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
 
       const res = await sendMessage("looping", "trigger")
       await wait()
 
-      cds.env.agent.pool.maxLLMInvocationsPerTask = originalMax
+      cds.env.agents.pool.maxLLMInvocationsPerTask = originalMax
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
@@ -67,13 +67,13 @@ describe("@cap-js/agents - Production error sanitization", () => {
     it("should show error details in development", async () => {
       process.env.NODE_ENV = "development"
 
-      const originalMax = cds.env.agent.pool.maxLLMInvocationsPerTask
-      cds.env.agent.pool.maxLLMInvocationsPerTask = 1
+      const originalMax = cds.env.agents.pool.maxLLMInvocationsPerTask
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
 
       const res = await sendMessage("looping", "trigger")
       await wait()
 
-      cds.env.agent.pool.maxLLMInvocationsPerTask = originalMax
+      cds.env.agents.pool.maxLLMInvocationsPerTask = originalMax
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text

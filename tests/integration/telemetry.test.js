@@ -159,7 +159,7 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
   // ─── Monkey-patching ────────────────────────────────────────────────
 
   it("should have LangChain patches applied (feature flag default on)", async () => {
-    assert.notStrictEqual(cds.env.agent.trace_langchain, false)
+    assert.notStrictEqual(cds.env.agents.trace_langchain, false)
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
     const PATCHED = Symbol.for("@cap-js/agents:patched")
     assert.strictEqual(BaseChatModel.prototype[PATCHED], true)

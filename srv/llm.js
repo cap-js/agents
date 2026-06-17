@@ -139,7 +139,7 @@ export function flattenMessages(messages) {
  *   1. srv.agent.contentFilter as async function → await fn()
  *   2. srv.agent.contentFilter === false → disabled for this service
  *   3. srv.agent.contentFilter as object → passthrough
- *   4. No srv override → fall back to cds.env.agent.contentFilter:
+ *   4. No srv override → fall back to cds.env.agents.contentFilter:
  *      - falsy → disabled
  *      - object → passthrough
  *      - truthy (default: true) → Azure Content Safety with prompt_shield
@@ -156,8 +156,8 @@ export async function buildContentFilter(srv) {
   }
 
   // Global config fallback
-  if (!cds.env.agent.contentFilter) return disabled
-  if (typeof cds.env.agent.contentFilter === "object") return cds.env.agent.contentFilter
+  if (!cds.env.agents.contentFilter) return disabled
+  if (typeof cds.env.agents.contentFilter === "object") return cds.env.agents.contentFilter
 
   // Default: Azure Content Safety with prompt injection shield
   const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
@@ -232,7 +232,7 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
         let result
         const t0 = Date.now()
         try {
-          const llmTimeout = cds.env.agent?.pool?.maxLLMCallTimeoutMs || 120000
+          const llmTimeout = cds.env.agents?.pool?.maxLLMCallTimeoutMs || 120000
           const middleware = [timeout(llmTimeout), circuitBreaker()]
           // For Claude: add response-capture middleware to extract raw usage with cache details
           if (claudeModel) {
@@ -403,7 +403,7 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
 }
 
 export function resolveModelName(srv) {
-  return srv?.definition?.["@agent.model"] || cds.env.agent?.llm || process.env.AICORE_MODEL
+  return srv?.definition?.["@agent.model"] || cds.env.agents?.llm || process.env.AICORE_MODEL
 }
 
 /**
@@ -422,7 +422,7 @@ export function resolveModelName(srv) {
  * @param {boolean} [options.deepAgent] - Deep agent mode: flatten=true, default params, no tool binding
  * @param {import("@sap/cds").Service} [options.srv] - CDS service (for custom model override + content filter)
  * @param {Array} [options.tools] - LangChain tools to bind (ignored when deepAgent=true)
- * @param {string} [options.name] - Model name (default: cds.env.agent.llm || AICORE_MODEL)
+ * @param {string} [options.name] - Model name (default: cds.env.agents.llm || AICORE_MODEL)
  * @param {object} [options.params] - Model params (deepAgent default: { max_tokens: 4096, temperature: 0 })
  * @param {boolean} [options.flatten] - Override flatten behavior (deepAgent default: true, managed default: false)
  * @returns {Promise<import("@sap-ai-sdk/langchain").OrchestrationClient>} A LangChain-compatible chat model
@@ -448,12 +448,12 @@ export async function createModel(options = {}) {
   const modelName = options.name ?? resolveModelName(srv)
   if (!modelName) {
     throw new Error(
-      "No LLM model configured. Set @agent.model on the service, cds.env.agent.llm, or AICORE_MODEL.",
+      "No LLM model configured. Set @agent.model on the service, cds.env.agents.llm, or AICORE_MODEL.",
     )
   }
 
   const params =
-    options.params || (deepAgent ? { max_tokens: 4096, temperature: 0 } : cds.env.agent?.params)
+    options.params || (deepAgent ? { max_tokens: 4096, temperature: 0 } : cds.env.agents?.params)
   const flatten = options.flatten ?? (deepAgent ? true : false)
 
   LOG.debug("Initializing LLM", { model: modelName, deepAgent: !!deepAgent })
@@ -493,7 +493,7 @@ export async function createModel(options = {}) {
  *   - No tool binding: deepagents manages its own tool execution.
  *
  * @param {object} [options]
- * @param {string} [options.name] - Model name (default: cds.env.agent.llm)
+ * @param {string} [options.name] - Model name (default: cds.env.agents.llm)
  * @param {object} [options.params] - Model params (default: { max_tokens: 4096, temperature: 0 })
  * @returns {Promise<import("@sap-ai-sdk/langchain").OrchestrationClient>}
  */

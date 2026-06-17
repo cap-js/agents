@@ -69,7 +69,7 @@
     "node": ">=20.0.0"
   },
   "cds": {
-    "agent": {
+    "agents": {
       "llm": "anthropic--claude-4.6-sonnet",
       "streaming": true,
       "trace_langchain": true,
@@ -97,7 +97,7 @@
       }
     },
     "requires": {
-      "agent": {
+      "agents": {
         "model": "@cap-js/agents"
       },
       "databricks-mlflow": {

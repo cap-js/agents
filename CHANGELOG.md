@@ -18,11 +18,11 @@
 - Option to overwrite the ootb executor
 - OpenTelemetry spans for langChain workflows and nodes as well as LLM invocations and tool calls.
 - OpenTelemetry metrics for LLM token consumption, tool invocations, agent requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions & active_users
-- Quota enforcement via `cds.agent.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made (via conditional node for StateGraph agents and middleware for Markdown agents).
+- Quota enforcement via `cds.agents.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made (via conditional node for StateGraph agents and middleware for Markdown agents).
 - Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
-- Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agent.pool.maxLLMCallTimeoutMs` (default 30s).
-- Content filtering with Azure Content Safety prompt injection shield via `cds.agent.contentFilter` (default: `true`). Supports per-service override via `this.agent = { contentFilter }` (async function, object, or `false` to disable).
-- Support export to MLFlow via `cds.agent.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["databricks-mlflow"]`.
+- Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agents.pool.maxLLMCallTimeoutMs` (default 30s).
+- Content filtering with Azure Content Safety prompt injection shield via `cds.agents.contentFilter` (default: `true`). Supports per-service override via `this.agent = { contentFilter }` (async function, object, or `false` to disable).
+- Support export to MLFlow via `cds.agents.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["databricks-mlflow"]`.
 - Agent Tasks and Checkpoints can only be accessed by the user who created it
 - `configMapper` option on `GraphExecutor` (`this.agent = { graph, configMapper }`) to inject request-scoped data into `config.configurable` before `graph.invoke()`. Enables use cases such as supplying uploaded file capabilities to deepagents' `CapabilityBackend` via LangGraph's `getConfig()` AsyncLocalStorage. The mapper is `await`ed, so async implementations work correctly. Reserved keys (`thread_id`, `_taskId`, `_service`) always take precedence over mapper output. Non-object return values fail the task with a clear error.
 - Custom tools override via `this.agent = { tools }`

@@ -25,12 +25,12 @@ describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
   }
 
   afterEach(async () => {
-    cds.env.agent.contentFilter = true
+    cds.env.agents.contentFilter = true
     await resetExecutorCache()
   })
 
   it("should let injection through when filter is disabled", async () => {
-    cds.env.agent.contentFilter = false
+    cds.env.agents.contentFilter = false
     await resetExecutorCache()
 
     const res = await sendMessage(
@@ -45,7 +45,7 @@ describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
   }, 120000)
 
   it("should block same injection when filter is re-enabled", async () => {
-    expect(cds.env.agent.contentFilter).toBe(true)
+    expect(cds.env.agents.contentFilter).toBe(true)
 
     const res = await sendMessage(
       "catalog",

@@ -29,8 +29,8 @@ cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
-// LangChain monkey-patching for tracing (opt-out via cds.env.agent.trace_langchain = false)
-if (hasTelemetry && cds.env.agent?.trace_langchain !== false) {
+// LangChain monkey-patching for tracing (opt-out via cds.env.agents.trace_langchain = false)
+if (hasTelemetry && cds.env.agents?.trace_langchain !== false) {
   patchLangChain()
 }
 
@@ -68,7 +68,7 @@ cds.on("served", async () => {
     setupActiveUsersMetric()
   }
 
-  if (cds.env.agent?.mlflow) {
+  if (cds.env.agents?.mlflow) {
     const { setupMlflowExporter } = await import("./lib/telemetry/mlflow.js")
     setupMlflowExporter()
   }

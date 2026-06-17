@@ -33,11 +33,11 @@ describe("@cap-js/agents - LLM Circuit Breaker", { skip: !canLoad }, () => {
 
   let originalQuota
   before(() => {
-    originalQuota = cds.env.agent.pool.maxTasksPerHourPerUser
-    cds.env.agent.pool.maxTasksPerHourPerUser = 200
+    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
+    cds.env.agents.pool.maxTasksPerHourPerUser = 200
   })
   after(() => {
-    cds.env.agent.pool.maxTasksPerHourPerUser = originalQuota
+    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
     mock.stop()
   })
   beforeEach(() => {
@@ -49,7 +49,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", { skip: !canLoad }, () => {
   })
 
   it("should have maxLLMCallTimeoutMs configured", () => {
-    assert.strictEqual(cds.env.agent.pool.maxLLMCallTimeoutMs, 120000)
+    assert.strictEqual(cds.env.agents.pool.maxLLMCallTimeoutMs, 120000)
   })
 
   it("should complete task when AI Core returns 200", async () => {

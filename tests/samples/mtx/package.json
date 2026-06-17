@@ -9,7 +9,7 @@
     "@sap/cds-mtxs": ">=2"
   },
   "cds": {
-    "agent": {
+    "agents": {
       "activeUsersInterval": "1s"
     },
     "requires": {

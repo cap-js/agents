@@ -22,7 +22,7 @@ const MOCK_EXECUTOR_TEXT = /Here is a sample from|No data found\.|Could not quer
 // Independent of the `deepagents` package — exercises only resolveModelName().
 
 describe("@cap-js/agents - @agent.model annotation", () => {
-  it("annotation overrides cds.env.agent.llm for the annotated service", () => {
+  it("annotation overrides cds.env.agents.llm for the annotated service", () => {
     const srv = cds.services.LlmOverrideService
     assert.ok(srv, "LlmOverrideService should be loaded")
 
@@ -30,19 +30,19 @@ describe("@cap-js/agents - @agent.model annotation", () => {
     assert.strictEqual(annotated, "test-only--annotated-model")
 
     // Sanity: the global config is set to a different model in package.json
-    assert.notStrictEqual(cds.env.agent.llm, annotated)
+    assert.notStrictEqual(cds.env.agents.llm, annotated)
 
-    // Resolution: annotation wins over cds.env.agent.llm
+    // Resolution: annotation wins over cds.env.agents.llm
     assert.strictEqual(resolveModelName(srv), "test-only--annotated-model")
   })
 
-  it("falls back to cds.env.agent.llm when service has no @agent.model annotation", () => {
+  it("falls back to cds.env.agents.llm when service has no @agent.model annotation", () => {
     const srv = cds.services.ProductAgentService
     assert.ok(srv, "ProductAgentService should be loaded")
 
     assert.strictEqual(srv.definition["@agent.model"], undefined)
-    assert.ok(cds.env.agent?.llm, "cds.env.agent.llm must be set for this test to be meaningful")
-    assert.strictEqual(resolveModelName(srv), cds.env.agent.llm)
+    assert.ok(cds.env.agents?.llm, "cds.env.agents.llm must be set for this test to be meaningful")
+    assert.strictEqual(resolveModelName(srv), cds.env.agents.llm)
   })
 })
 

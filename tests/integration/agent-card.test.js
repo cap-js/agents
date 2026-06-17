@@ -24,7 +24,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       assert.notStrictEqual(submitSkill, undefined)
     })
 
-    it("capabilities.streaming reflects cds.env.agent.streaming config", async () => {
+    it("capabilities.streaming reflects cds.env.agents.streaming config", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
       assert.strictEqual(card.capabilities.streaming, true)

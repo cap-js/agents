@@ -20,8 +20,8 @@ const sendMessage = createSendMessage(POST)
 // Enable mlflow after cds.test() bootstrap — cds.test() re-resolves cds.env from
 // package.json + .cdsrc.json, so mutations before it are overwritten.
 before(() => {
-  cds.env.agent ??= {}
-  cds.env.agent.mlflow = true
+  cds.env.agents ??= {}
+  cds.env.agents.mlflow = true
 })
 
 describe("@cap-js/agents - MLflow Databricks span attributes", () => {
@@ -34,11 +34,11 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
   describe("mlflowAttrs()", () => {
     it("should return empty object when mlflow disabled", async () => {
       const { mlflowAttrs, mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
-      const saved = cds.env.agent.mlflow
-      cds.env.agent.mlflow = false
+      const saved = cds.env.agents.mlflow
+      cds.env.agents.mlflow = false
       assert.deepStrictEqual(mlflowAttrs("LLM"), {})
       assert.deepStrictEqual(mlflowTraceAttrs(), {})
-      cds.env.agent.mlflow = saved
+      cds.env.agents.mlflow = saved
     })
 
     it("should return mlflow attributes when enabled", async () => {

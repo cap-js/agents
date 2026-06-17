@@ -36,7 +36,7 @@ export default class CircuitBreakerService extends cds.ApplicationService {
      */
     class CircuitBreakerTestModel extends OrchestrationClient {
       async _generate(messages, opts, runManager) {
-        const llmTimeout = cds.env.agent?.pool?.maxLLMCallTimeoutMs || 120000
+        const llmTimeout = cds.env.agents?.pool?.maxLLMCallTimeoutMs || 120000
         opts = {
           ...opts,
           customRequestConfig: {

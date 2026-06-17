@@ -182,7 +182,7 @@ export function generateTools(srv, options = {}) {
   }
 
   // Action/function tools — per-action (default) or combined call_action
-  const usePerActionTools = cds.env.agent?.per_action_tool !== false
+  const usePerActionTools = cds.env.agents?.per_action_tool !== false
   if (actionNames.length > 0) {
     if (usePerActionTools) {
       for (const [name, action] of Object.entries(actions)) {

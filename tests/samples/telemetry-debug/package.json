@@ -12,7 +12,7 @@
     "@cap-js/sqlite": "^2"
   },
   "cds": {
-    "agent": {
+    "agents": {
       "trace_langchain": false
     },
     "log": {

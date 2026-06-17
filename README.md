@@ -99,9 +99,9 @@ service. Per-service configuration takes precedence over the global default.
 
 **Global**
 
-| Setting         | Description                            |
-| --------------- | -------------------------------------- |
-| `cds.agent.llm` | Default LLM model name for all agents. |
+| Setting          | Description                            |
+| ---------------- | -------------------------------------- |
+| `cds.agents.llm` | Default LLM model name for all agents. |
 
 **Per service**
 
@@ -121,13 +121,13 @@ service. Per-service configuration takes precedence over the global default.
 
 **Global**
 
-| Setting                         | Description                                                              | Default                  |
-| ------------------------------- | ------------------------------------------------------------------------ | ------------------------ |
-| `cds.agent.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                   |
-| `cds.agent.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                  |
-| `cds.agent.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                   |
-| `cds.agent.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                   |
-| `cds.agent.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable) |
+| Setting                          | Description                                                              | Default                  |
+| -------------------------------- | ------------------------------------------------------------------------ | ------------------------ |
+| `cds.agents.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                   |
+| `cds.agents.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                  |
+| `cds.agents.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                   |
+| `cds.agents.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                   |
+| `cds.agents.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable) |
 
 **Per service**
 
@@ -173,7 +173,7 @@ The plugin enforces configurable rate limits and resource quotas at two levels:
 <details>
 <summary>Configuration</summary>
 
-All limits are configured via `cds.env.agent.pool` (defaults provided by the plugin):
+All limits are configured via `cds.env.agents.pool` (defaults provided by the plugin):
 
 ```json
 {
@@ -434,7 +434,7 @@ const executor = await cds.connect.to("agent-executor")
 await executor.emit("computeActiveUsers")
 ```
 
-Set `cds.agent.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
+Set `cds.agents.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
 
 </details>
 
@@ -469,7 +469,7 @@ The `@Core.SchemaVersion` annotation takes precedence over credentials. Since it
 
 The plugin reads credentials from `cds.env.requires["databricks-mlflow"].credentials` and adds a `BatchSpanProcessor` with an OTLP exporter pointed at the Databricks endpoint.
 
-**Span attributes added** (only when `cds.agent.mlflow` is truthy):
+**Span attributes added** (only when `cds.agents.mlflow` is truthy):
 
 | Attribute                | Source                                                                                                |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
@@ -501,7 +501,7 @@ Traces appear at http://localhost:5678/#/experiments/0.
 
 ## Content Filter
 
-By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https://sap.github.io/ai-sdk/docs/js/orchestration/chat-completion#azure-content-filter) with a prompt injection shield (`cds.agent.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
+By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https://sap.github.io/ai-sdk/docs/js/orchestration/chat-completion#azure-content-filter) with a prompt injection shield (`cds.agents.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
 
 <details>
 <summary>Configuration options</summary>
@@ -555,7 +555,7 @@ this.agent = {
 }
 ```
 
-Resolution order: `srv.agent.contentFilter` → `cds.env.agent.contentFilter` → default (Azure Content Safety).
+Resolution order: `srv.agent.contentFilter` → `cds.env.agents.contentFilter` → default (Azure Content Safety).
 
 </details>
 
@@ -637,7 +637,7 @@ export default class MyAgent extends cds.ApplicationService {
 
 `srv.agent.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.agent.contentFilter` or `srv.agent.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.agent = { graph: createMyAgent(this), … }` _without_ `await`.
 
-Why this matters: the right-hand side of `this.agent = { … }` is fully evaluated **before** the assignment to `this.agent` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.agent` is still `undefined`, so per-service overrides like `srv.agent.contentFilter` and `srv.agent.model` are silently ignored and fall back to the global `cds.env.agent.*` defaults. With the unawaited-Promise form, `this.agent` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.agent.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
+Why this matters: the right-hand side of `this.agent = { … }` is fully evaluated **before** the assignment to `this.agent` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.agent` is still `undefined`, so per-service overrides like `srv.agent.contentFilter` and `srv.agent.model` are silently ignored and fall back to the global `cds.env.agents.*` defaults. With the unawaited-Promise form, `this.agent` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.agent.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
 
 Compiled-graph form (`this.agent = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
 
@@ -751,14 +751,14 @@ If your application uses a custom graph with parallel branches, enable full writ
 
 Set in your service handler's `init()` to customize the default behavior:
 
-| Pattern             | What you provide                    | Plugin provides                            |
-| ------------------- | ----------------------------------- | ------------------------------------------ |
-| `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL    |
-| `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card          |
-| `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)                |
-| `{ tools }`         | Array or factory of LangChain tools | Everything else (zero-code)                |
-| `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.agent.contentFilter` |
-| _(default)_         | Nothing                             | Everything (zero-code)                     |
+| Pattern             | What you provide                    | Plugin provides                             |
+| ------------------- | ----------------------------------- | ------------------------------------------- |
+| `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL     |
+| `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card           |
+| `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)                 |
+| `{ tools }`         | Array or factory of LangChain tools | Everything else (zero-code)                 |
+| `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.agents.contentFilter` |
+| _(default)_         | Nothing                             | Everything (zero-code)                      |
 
 #### Custom Model
 
