@@ -11,6 +11,7 @@ import quotaEnforcerAtNode from "./lib/agents/react/nodes/quotaEnforcerAtNode.js
 import quotaEnforcerAtStart from "./lib/agents/react/nodes/quotaEnforcerAtStart.js"
 import shouldContinue from "./lib/agents/react/nodes/shouldContinue.js"
 import { contentFilterRecoveryMiddleware } from "./lib/agents/markdown/middlewares/content-filter-recovery.js"
+import { quotaEnforcerMiddleware } from "./lib/agents/markdown/middlewares/quota-enforcer.js"
 
 /**
  * - CdsCheckpointSaver: LangGraph checkpointer backed by CDS entities (multi-turn, HITL)
@@ -30,6 +31,7 @@ export {
   buildContentFilter,
   generateTools,
   instrumentTools,
+  quotaEnforcerMiddleware,
 }
 
 export const nodes = {

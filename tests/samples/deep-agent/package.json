@@ -5,11 +5,23 @@
   "private": true,
   "dependencies": {
     "@cap-js/agents": "file:../../../",
+    "@cap-js/audit-logging": ">=1",
     "@cap-js/sqlite": "*",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
     "deepagents": "^1.9.0",
-    "zod": "^3.24.0"
+    "zod": "^4"
+  },
+  "cds": {
+    "requires": {
+      "audit-log": false,
+      "[test]": {
+        "audit-log": {
+          "kind": "audit-log-to-console",
+          "outbox": false
+        }
+      }
+    }
   }
 }

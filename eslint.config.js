@@ -3,6 +3,9 @@ import cds from "@sap/cds/eslint.config.mjs"
 export default [
   ...cds,
   {
+    ignores: ["**/__snapshots__/**"],
+  },
+  {
     files: ["**/*.js"],
     rules: {
       "no-await-in-loop": "error",
