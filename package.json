@@ -37,7 +37,7 @@
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
-    "@cap-js/mcp": "^1",
+    "@cap-js/mcp": "^1.1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",

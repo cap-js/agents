@@ -157,7 +157,7 @@ export function generateTools(srv, options = {}) {
         description: def.description,
         schema: def.inputSchema,
         func: async (args) => {
-          const result = await executeGenericReadTool(srv, entities, args)
+          const result = await executeGenericReadTool(srv, entities, args, { log: LOG })
           return result.content[0].text
         },
       }),
@@ -174,7 +174,7 @@ export function generateTools(srv, options = {}) {
         description: def.description,
         schema: def.inputSchema,
         func: async (args) => {
-          const result = await executeDescribe(srv, entities, actions, args)
+          const result = await executeDescribe(srv, entities, actions, args, { log: LOG })
           return result.content[0].text
         },
       }),
@@ -193,7 +193,7 @@ export function generateTools(srv, options = {}) {
             description: def.description,
             schema: def.inputSchema,
             func: async (args) => {
-              const result = await executePerActionTool(srv, name, action, args)
+              const result = await executePerActionTool(srv, name, action, args, { log: LOG })
               return result.content[0].text
             },
           }),
@@ -207,7 +207,7 @@ export function generateTools(srv, options = {}) {
           description: def.description,
           schema: def.inputSchema,
           func: async (args) => {
-            const result = await executeCallActionTool(srv, actions, args)
+            const result = await executeCallActionTool(srv, actions, args, { log: LOG })
             return result.content[0].text
           },
         }),
