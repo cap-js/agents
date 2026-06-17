@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  XMAKE_PROJECT_ID: ght-cap-agent
+  XMAKE_PROJECT_ID: ght-cap-agents
   XMAKE_RELEASE_MODE: stage_and_promote
 
 jobs:
@@ -26,10 +26,6 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Configure internal registry
-        run: |
-          echo "@cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/" >> .npmrc
-          echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ secrets.NPM_REGISTRY_TOKEN }}" >> .npmrc
       - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
       - run: npm i
       - run: cd tests/samples/bookshop && npm i
@@ -37,7 +33,7 @@ jobs:
 
   # Pre-release: upload test results and run BlackDuck scans
   upload-test-results:
-    uses: cap/.github/.github/workflows/pre-release.yml@87c2db57786c5525a56271a7370075ff0cf20a3d # main
+    uses: cap/.github/.github/workflows/pre-release.yml@9f7b60fd8374f26f57c64546ea8a82e7e11f6adc # main
     secrets:
       cumulus-token: ${{ secrets.CUMULUS_TOKEN_CDS_UMBRELLA }}
     with:
@@ -49,7 +45,7 @@ jobs:
       npm-script: "test:reporting"
 
   blackduck-scans:
-    uses: cap/.github/.github/workflows/scans.yml@87c2db57786c5525a56271a7370075ff0cf20a3d # main
+    uses: cap/.github/.github/workflows/scans.yml@9f7b60fd8374f26f57c64546ea8a82e7e11f6adc # main
     secrets: inherit
     with:
       project: CDSUMBRELLA
@@ -58,7 +54,7 @@ jobs:
     needs: [upload-test-results, blackduck-scans, test]
     runs-on: [self-hosted, solinas-medium]
     steps:
-      - uses: cap/.github/.github/actions/release@87c2db57786c5525a56271a7370075ff0cf20a3d # main
+      - uses: cap/.github/.github/actions/release@9f7b60fd8374f26f57c64546ea8a82e7e11f6adc # main
         with:
           xmake-token: ${{ secrets.XMAKE_TOKEN }}
           xmake-user: ${{ secrets.XMAKE_USER }}
