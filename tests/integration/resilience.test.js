@@ -28,7 +28,7 @@ try {
   canLoad = false
 }
 
-describe("@cap-js/agent - LLM Circuit Breaker", { skip: !canLoad }, () => {
+describe("@cap-js/agents - LLM Circuit Breaker", { skip: !canLoad }, () => {
   axios.defaults.validateStatus = () => true
 
   let originalQuota

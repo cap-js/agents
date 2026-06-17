@@ -1,1 +1,1 @@
-using from '@cap-js/agent';
+using from '@cap-js/agents';

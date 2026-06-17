@@ -14,7 +14,7 @@ const { GET } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 // These tests require deep-agent-sample which has deepagents ESM deps.
 // Skip if deepagents can't be loaded.
 
-describe("@cap-js/agent - Agent Card (deep agent modes)", { skip: !canLoadDeepAgent }, () => {
+describe("@cap-js/agents - Agent Card (deep agent modes)", { skip: !canLoadDeepAgent }, () => {
   // ── skills/ directory scan ──────────────────────────────────────────
 
   describe("skills/ directory scan", () => {

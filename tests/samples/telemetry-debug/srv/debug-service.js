@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { AIMessage } from "@langchain/core/messages"
-import { generateTools } from "@cap-js/agent"
+import { generateTools } from "@cap-js/agents"
 
 /**
  * Service with two modes:

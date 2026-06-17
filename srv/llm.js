@@ -402,6 +402,10 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
   return InstrumentedOrchestrationClient
 }
 
+export function resolveModelName(srv) {
+  return srv?.definition?.["@agent.model"] || cds.env.agent?.llm || process.env.AICORE_MODEL
+}
+
 /**
  * Create an LLM model (OrchestrationClient from @sap-ai-sdk/langchain).
  *
@@ -441,9 +445,11 @@ export async function createModel(options = {}) {
     }
   }
 
-  const modelName = options.name || cds.env.agent?.llm || process.env.AICORE_MODEL
+  const modelName = options.name ?? resolveModelName(srv)
   if (!modelName) {
-    throw new Error("No LLM model configured. Set cds.env.agent.llm or AICORE_MODEL.")
+    throw new Error(
+      "No LLM model configured. Set @agent.model on the service, cds.env.agent.llm, or AICORE_MODEL.",
+    )
   }
 
   const params =

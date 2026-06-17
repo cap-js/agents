@@ -4,7 +4,7 @@ import path from "node:path"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
-describe("@cap-js/agent - Agent Card Generation", () => {
+describe("@cap-js/agents - Agent Card Generation", () => {
   // ── Agentify mode (CDS model) ────────────────────────────────────────
 
   describe("Agentify mode (CDS model)", () => {

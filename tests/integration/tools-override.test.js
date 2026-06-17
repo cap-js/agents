@@ -5,8 +5,8 @@ import { z } from "zod"
 
 import { resolveTools, instrumentTools } from "../../srv/tools.js"
 
-// Symbol marking a tool as instrumented by @cap-js/agent
-const INSTRUMENTED = Symbol.for("@cap-js/agent:instrumented")
+// Symbol marking a tool as instrumented by @cap-js/agents
+const INSTRUMENTED = Symbol.for("@cap-js/agents:instrumented")
 
 function makeTool(name = "weather") {
   return tool(async ({ city }) => `Sunny in ${city}`, {

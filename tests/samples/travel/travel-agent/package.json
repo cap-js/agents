@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@cap-js/agent": "file:../../../..",
+    "@cap-js/agents": "file:../../../..",
     "@cap-js/sqlite": "*",
     "@a2a-js/sdk": "^0.3.12",
     "@langchain/core": "^1",

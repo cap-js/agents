@@ -19,7 +19,7 @@ const sendMessage = createSendMessage(POST)
 
 // ─── Unit Tests: buildContentFilter resolution ────────────────────────────
 
-describe("@cap-js/agent - Content Filter Configuration", () => {
+describe("@cap-js/agents - Content Filter Configuration", () => {
   axios.defaults.validateStatus = () => true
   afterAll(teardown)
   beforeEach(resetCapture)

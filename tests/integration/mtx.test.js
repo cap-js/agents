@@ -4,7 +4,7 @@ import cds from "@sap/cds"
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 axios.defaults.validateStatus = () => true
 
-describe("@cap-js/agent - Multi-tenancy (active_users)", () => {
+describe("@cap-js/agents - Multi-tenancy (active_users)", () => {
   it("attributes tasks to the correct tenant via per-tenant iteration", async () => {
     const { computeActiveUsers, observeActiveUsers } =
       await import("../../lib/telemetry/active-users.js")

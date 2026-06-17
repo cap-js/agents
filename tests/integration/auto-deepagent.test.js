@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
+import { resolveModelName } from "../../srv/llm.js"
 
 let canLoadDeepAgent = true
 try {
@@ -17,8 +18,36 @@ const { sendMessage } = createHelpers({ POST, axios })
 // auto-deepagent path is taken, the response will NOT match this.
 const MOCK_EXECUTOR_TEXT = /Here is a sample from|No data found\.|Could not query data/
 
+// ── @agent.model annotation (per-service LLM override) ─────────────────────
+// Independent of the `deepagents` package — exercises only resolveModelName().
+
+describe("@cap-js/agents - @agent.model annotation", () => {
+  it("annotation overrides cds.env.agent.llm for the annotated service", () => {
+    const srv = cds.services.LlmOverrideService
+    assert.ok(srv, "LlmOverrideService should be loaded")
+
+    const annotated = srv.definition["@agent.model"]
+    assert.strictEqual(annotated, "test-only--annotated-model")
+
+    // Sanity: the global config is set to a different model in package.json
+    assert.notStrictEqual(cds.env.agent.llm, annotated)
+
+    // Resolution: annotation wins over cds.env.agent.llm
+    assert.strictEqual(resolveModelName(srv), "test-only--annotated-model")
+  })
+
+  it("falls back to cds.env.agent.llm when service has no @agent.model annotation", () => {
+    const srv = cds.services.ProductAgentService
+    assert.ok(srv, "ProductAgentService should be loaded")
+
+    assert.strictEqual(srv.definition["@agent.model"], undefined)
+    assert.ok(cds.env.agent?.llm, "cds.env.agent.llm must be set for this test to be meaningful")
+    assert.strictEqual(resolveModelName(srv), cds.env.agent.llm)
+  })
+})
+
 describe(
-  "@cap-js/agent - Auto-built deep agents (zero-code convention)",
+  "@cap-js/agents - Auto-built deep agents (zero-code convention)",
   { skip: !canLoadDeepAgent },
   () => {
     // ── Slug-only convention (no .js handler at all) ──────────────────────

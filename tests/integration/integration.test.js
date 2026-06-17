@@ -8,7 +8,7 @@ const isMock = cds.env.requires?.["agent-executor"]?.kind === "agent-executor-mo
 
 // HITL tests only work with mock executor (keyword-triggered)
 const describeHitl = isMock ? describe : describe.skip
-describeHitl("@cap-js/agent - HITL (mock executor)", () => {
+describeHitl("@cap-js/agents - HITL (mock executor)", () => {
   setupErrorDetection()
 
   it("returns input-required when message contains 'hitl'", async () => {

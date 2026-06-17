@@ -18,7 +18,7 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 const { sendMessage: sendMessageWithContext } = createHelpers({ POST, axios })
 
-describe("@cap-js/agent - Prompt Injection Shield (AI Core)", () => {
+describe("@cap-js/agents - Prompt Injection Shield (AI Core)", () => {
   axios.defaults.validateStatus = () => true
 
   beforeAll(async () => {

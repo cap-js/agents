@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@cap-js/agent": "file:../../../.",
+    "@cap-js/agents": "file:../../../.",
     "@cap-js/sqlite": "^2",
     "@sap/cds": ">=8",
     "@sap/cds-mtxs": ">=2"

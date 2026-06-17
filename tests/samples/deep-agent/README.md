@@ -1,6 +1,6 @@
 # Deep Agent Sample
 
-Markdown-based agent using `deepagents` with `@cap-js/agent` as runtime. Defines agent identity and behavior in `AGENTS.md`, defines skills in `skills/`, and uses CAP tools + custom logic to interact with a product catalog.
+Markdown-based agent using `deepagents` with `@cap-js/agents` as runtime. Defines agent identity and behavior in `AGENTS.md`, defines skills in `skills/`, and uses CAP tools + custom logic to interact with a product catalog.
 
 ## What the Agent Can Do
 

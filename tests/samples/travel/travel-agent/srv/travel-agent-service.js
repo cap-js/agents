@@ -1,7 +1,7 @@
 /* eslint-disable no-await-in-loop */
 // import { ChatAnthropic } from "@langchain/anthropic"
 /**
- * Travel Agent — Deep agent orchestrator for @cap-js/agent.
+ * Travel Agent — Deep agent orchestrator for @cap-js/agents.
  *
  * Coordinates downstream A2A agents (hotel, activity) and MCP servers (flights)
  * using createDeepAgent() with progressive disclosure via AGENTS.md.
@@ -21,7 +21,7 @@ import {
   createDeepAgentModel,
   contentFilterRecoveryMiddleware,
   instrumentTools,
-} from "@cap-js/agent"
+} from "@cap-js/agents"
 
 const LOG = cds.log("travel-agent")
 const __agentDir = path.join(import.meta.dirname, "travel-agent")

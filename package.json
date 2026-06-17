@@ -1,5 +1,5 @@
 {
-  "name": "@cap-js/agent",
+  "name": "@cap-js/agents",
   "version": "0.1.0",
   "description": "CDS plugin for building agents",
   "license": "Apache-2.0",
@@ -98,7 +98,7 @@
     },
     "requires": {
       "agent": {
-        "model": "@cap-js/agent"
+        "model": "@cap-js/agents"
       },
       "databricks-mlflow": {
         "vcap": {
@@ -108,10 +108,10 @@
       },
       "kinds": {
         "agent-executor-mock": {
-          "impl": "@cap-js/agent/srv/mock"
+          "impl": "@cap-js/agents/srv/mock"
         },
         "agent-executor-langgraph": {
-          "impl": "@cap-js/agent/srv/langgraph"
+          "impl": "@cap-js/agents/srv/langgraph"
         }
       },
       "[development]": {

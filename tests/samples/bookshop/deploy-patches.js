@@ -17,7 +17,7 @@ if (mode === "apply") {
   fs.writeFileSync(rootPkg, JSON.stringify(pkg, null, 2) + "\n")
 
   let cds = fs.readFileSync(cdsFile, "utf8")
-  cds = cds.replace("from '../../../../index.cds'", "from '@cap-js/agent/index'")
+  cds = cds.replace("from '../../../../index.cds'", "from '@cap-js/agents/index'")
   fs.writeFileSync(cdsFile, cds)
 
   console.log("Deploy patches applied")
@@ -29,7 +29,7 @@ if (mode === "revert") {
   fs.writeFileSync(rootPkg, JSON.stringify(pkg, null, 2) + "\n")
 
   let cds = fs.readFileSync(cdsFile, "utf8")
-  cds = cds.replace("from '@cap-js/agent/index'", "from '../../../../index.cds'")
+  cds = cds.replace("from '@cap-js/agents/index'", "from '../../../../index.cds'")
   fs.writeFileSync(cdsFile, cds)
 
   const bookshopPkg = path.resolve(bookshopDir, "package.json")

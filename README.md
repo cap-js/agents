@@ -1,7 +1,7 @@
 > [!WARNING]
 > This plugin is in an early experimental state and not recommended for production use.
 
-# @cap-js/agent
+# @cap-js/agents
 
 CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
@@ -92,24 +92,22 @@ You help users find and explore products in the catalog. Use ...
 
 → See [Deep Agent Sample](./tests/samples/deep-agent/)
 
-#### Custom locations: `@agent.directory` and `@agent.card`
+## Configuration
 
-Two annotations override the convention when your layout doesn't match. Both
-paths are resolved relative to the `.cds` file.
+The LLM model used by an agent can be configured globally or overridden per
+service. Per-service configuration takes precedence over the global default.
 
-| Annotation         | Purpose                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| `@agent.directory` | Path to the agent directory (overrides the slug convention). |
-| `@agent.card`      | Path to a hand-crafted agent card markdown file.             |
+**Global**
 
-```cds
-@agent
-@agent.directory: 'agents/product'
-@agent.card     : 'cards/product-card.md'
-service ProductAgent {
-  @readonly entity Products as projection on my.Products;
-}
-```
+| Setting         | Description                            |
+| --------------- | -------------------------------------- |
+| `cds.agent.llm` | Default LLM model name for all agents. |
+
+**Per service**
+
+| Annotation     | Description                                                   |
+| -------------- | ------------------------------------------------------------- |
+| `@agent.model` | LLM model for a single service. Overrides the global default. |
 
 ---
 
@@ -119,16 +117,26 @@ service ProductAgent {
 
 ---
 
-## Configuration
+## Advanced Configuration
 
-| Setting                         | Description                                                              | Default                        |
-| ------------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
-| `cds.agent.llm`                 | LLM model name                                                           | `anthropic--claude-4.5-sonnet` |
-| `cds.agent.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                         |
-| `cds.agent.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                        |
-| `cds.agent.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                         |
-| `cds.agent.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                         |
-| `cds.agent.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable)       |
+**Global**
+
+| Setting                         | Description                                                              | Default                  |
+| ------------------------------- | ------------------------------------------------------------------------ | ------------------------ |
+| `cds.agent.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                   |
+| `cds.agent.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                  |
+| `cds.agent.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                   |
+| `cds.agent.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                   |
+| `cds.agent.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable) |
+
+**Per service**
+
+Path-valued annotations are resolved relative to the `.cds` source file.
+
+| Annotation         | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| `@agent.directory` | Path to the agent directory (overrides the slug convention). |
+| `@agent.card`      | Path to a hand-crafted agent card markdown file.             |
 
 <details>
 <summary>Customize Agent Card URL</summary>
@@ -260,7 +268,7 @@ For custom graphs (`this.agent = { graph }`), import `shouldContinue` to get quo
 const { StateGraph, END } = require("@langchain/langgraph")
 const {
   nodes: { shouldContinue },
-} = require("@cap-js/agent")
+} = require("@cap-js/agents")
 
 const graph = new StateGraph(MyState)
   .addNode("agent", agentNode)
@@ -595,7 +603,7 @@ checkpointer behaviour, or non-`deepagents` tooling.
 
 ```js
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, generateTools } from "@cap-js/agent"
+import { createDeepAgentModel, generateTools } from "@cap-js/agents"
 
 // Extract the async construction so it returns a Promise.
 // See "Lazy graph construction" below for why.
@@ -645,7 +653,7 @@ flattening automatically and uses defaults appropriate for deepagents
 (`max_tokens: 4096`, `temperature: 0`, no tool binding).
 
 ```js
-const { createDeepAgentModel } = require("@cap-js/agent")
+const { createDeepAgentModel } = require("@cap-js/agents")
 
 const model = await createDeepAgentModel()
 const model = await createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
@@ -658,7 +666,7 @@ langgraph executor or custom graphs). Binds tools and checks `srv.agent.model`
 overrides. For deepagents, use `createDeepAgentModel()` instead.
 
 ```js
-import { createModel } from "@cap-js/agent"
+import { createModel } from "@cap-js/agents"
 
 // Managed agent mode (binds tools, uses srv for content filter/model override)
 const model = await createModel({ srv, tools })
@@ -673,7 +681,7 @@ crashing the task. Add it to your deepagent's middleware chain to keep
 
 ```js
 import { createDeepAgent } from "deepagents"
-import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/agent"
+import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/agents"
 
 const agent = createDeepAgent({
   model: await createDeepAgentModel(),
@@ -689,7 +697,7 @@ const agent = createDeepAgent({
 Generates LangChain tools from a CDS service model. Reuses tool definitions from `@cap-js/mcp`.
 
 ```js
-import { generateTools } from "@cap-js/agent"
+import { generateTools } from "@cap-js/agents"
 const { tools } = generateTools(srv)
 // tools: [query, describe, ...perActionTools]
 ```
@@ -701,7 +709,7 @@ Wraps tools' `.invoke()` with OpenTelemetry tracing, audit logging, and the `age
 For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed. The plugin also calls `instrumentTool` on every tool resolved via `srv.agent.tools`, so you only need it when you build tools outside that resolution path.
 
 ```js
-import { instrumentTools } from "@cap-js/agent"
+import { instrumentTools } from "@cap-js/agents"
 
 // Pass a list (one or many — mutates and returns the tools)
 instrumentTools(mcpTools)
@@ -726,7 +734,7 @@ Re-throws errors after recording them (unlike CDS tools which swallow errors for
 LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `this.agent = { graph }`. Exported for custom executors or direct checkpoint access.
 
 ```js
-import { CdsCheckpointSaver } from "@cap-js/agent"
+import { CdsCheckpointSaver } from "@cap-js/agents"
 const checkpointer = new CdsCheckpointSaver()
 ```
 
@@ -771,7 +779,7 @@ this.agent = {
 `this.agent.tools` replaces or extends the auto-generated CDS tools (`query`, `describe`, per-action). User tools are auto-instrumented (telemetry, audit, metrics).
 
 ```js
-import { generateTools } from "@cap-js/agent"
+import { generateTools } from "@cap-js/agents"
 
 this.agent = { tools: [weatherTool] }                               // replace
 this.agent = { tools: [...generateTools(this).tools, weatherTool] } // extend

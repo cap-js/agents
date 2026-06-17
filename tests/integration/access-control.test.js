@@ -29,7 +29,7 @@ function sendMessageAs(service, text, auth, { contextId, taskId } = {}) {
   )
 }
 
-describe("@cap-js/agent - Access Control", () => {
+describe("@cap-js/agents - Access Control", () => {
   describe("Tasks", () => {
     it("bob cannot access alice's task via tasks/get", async () => {
       // Alice creates a task

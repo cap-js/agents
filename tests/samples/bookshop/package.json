@@ -2,9 +2,9 @@
   "name": "bookshop",
   "version": "1.0.0",
   "type": "module",
-  "description": "Sample CAP bookshop for @cap-js/agent tests",
+  "description": "Sample CAP bookshop for @cap-js/agents tests",
   "dependencies": {
-    "@cap-js/agent": "file:../../../.",
+    "@cap-js/agents": "file:../../../.",
     "@cap-js/audit-logging": ">=1",
     "@cap-js/hana": "^2",
     "@cap-js/mcp": "^1",

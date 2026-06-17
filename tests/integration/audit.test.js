@@ -11,7 +11,7 @@ const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
 /** Filter audit logs by original event name (stored in data.data.event) */
 const byEvent = (name) => (l) => l.event === "SecurityEvent" && l.data?.data?.event === name
 
-describe("@cap-js/agent - Audit Logging", () => {
+describe("@cap-js/agents - Audit Logging", () => {
   let _auditLogs
   let _skipAudit = false
 

@@ -14,7 +14,7 @@ const isMock = !isHybrid
 // unread SSE streams open, exhausting the concurrent-task quota in hybrid.
 const describeMock = isMock ? describe : describe.skip
 
-describe("@cap-js/agent - JSON-RPC Protocol", () => {
+describe("@cap-js/agents - JSON-RPC Protocol", () => {
   setupErrorDetection()
 
   it("returns error for invalid JSON-RPC (missing method)", async () => {
@@ -57,7 +57,7 @@ describe("@cap-js/agent - JSON-RPC Protocol", () => {
   })
 })
 
-describeMock("@cap-js/agent - SSE Streaming (message/stream)", () => {
+describeMock("@cap-js/agents - SSE Streaming (message/stream)", () => {
   setupErrorDetection()
 
   it("returns text/event-stream content-type", async () => {

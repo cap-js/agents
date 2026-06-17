@@ -8,7 +8,7 @@ import { createSendMessage } from "../utils/telemetry-utils.js"
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/agent - Content Filter (hybrid: AI Core)", () => {
+describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
   axios.defaults.validateStatus = () => true
 
   beforeAll(async () => {

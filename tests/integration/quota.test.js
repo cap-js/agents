@@ -14,7 +14,7 @@ setup()
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/agent - Quota enforcement", () => {
+describe("@cap-js/agents - Quota enforcement", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)

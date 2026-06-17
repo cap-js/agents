@@ -12,7 +12,7 @@ try {
   canLoad = false
 }
 
-describe("@cap-js/agent - Custom Graph (deepagents)", { skip: !canLoad }, () => {
+describe("@cap-js/agents - Custom Graph (deepagents)", { skip: !canLoad }, () => {
   let sendMessage, jsonrpc, setupErrorDetection
   before(async () => {
     const helpers = createHelpers({ POST, axios })

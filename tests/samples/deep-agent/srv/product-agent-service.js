@@ -1,5 +1,5 @@
 /**
- * Product Agent — Zero-code-with-tool-override example for @cap-js/agent.
+ * Product Agent — Zero-code-with-tool-override example for @cap-js/agents.
  *
  * Demonstrates the *minimal handler* pattern for deep agents:
  *  - The CDS service is annotated with `@agent` only.
@@ -16,7 +16,7 @@
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { generateTools } from "@cap-js/agent"
+import { generateTools } from "@cap-js/agents"
 
 export default class ProductAgentService extends cds.ApplicationService {
   async init() {

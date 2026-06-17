@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
-describe("@cap-js/agent plugin", () => {
+describe("@cap-js/agents plugin", () => {
   it("should register agent protocol adapter", () => {
     assert.notStrictEqual(cds.env.protocols.agent, undefined)
     assert.strictEqual(cds.env.protocols.agent.path, "/a2a")

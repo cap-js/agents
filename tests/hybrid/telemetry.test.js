@@ -22,7 +22,7 @@ setup()
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/agent - Hybrid telemetry (AI Core)", () => {
+describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
 
@@ -37,19 +37,19 @@ describe("@cap-js/agent - Hybrid telemetry (AI Core)", () => {
   // ─── CJS Patches ───────────────────────────────────────────────────────
 
   it("should patch CJS BaseChatModel prototype", async () => {
-    const PATCHED = Symbol.for("@cap-js/agent:patched")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
     assert.strictEqual(BaseChatModel.prototype[PATCHED], true)
   })
 
   it("should patch CJS RunnableSequence prototype", async () => {
-    const PATCHED = Symbol.for("@cap-js/agent:patched")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
     const { RunnableSequence } = await import("@langchain/core/runnables")
     assert.strictEqual(RunnableSequence.prototype[PATCHED], true)
   })
 
   it("should patch CJS StructuredTool prototype", async () => {
-    const PATCHED = Symbol.for("@cap-js/agent:patched")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
     const { StructuredTool } = await import("@langchain/core/tools")
     assert.strictEqual(StructuredTool.prototype[PATCHED], true)
   })

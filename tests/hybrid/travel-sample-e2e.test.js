@@ -207,7 +207,7 @@ async function collectToolCallsFromCheckpoints(threadId) {
   return tools
 }
 
-describe("@cap-js/agent - Travel Sample E2E", { skip: !canLoadDeepagents }, () => {
+describe("@cap-js/agents - Travel Sample E2E", { skip: !canLoadDeepagents }, () => {
   let helpers
 
   before(async () => {

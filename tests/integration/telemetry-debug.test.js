@@ -17,7 +17,7 @@ setup()
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/telemetry-debug")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/agent - Debug tracing & error handling", () => {
+describe("@cap-js/agents - Debug tracing & error handling", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -28,19 +28,19 @@ describe("@cap-js/agent - Debug tracing & error handling", () => {
     it("should NOT patch BaseChatModel when trace_langchain is false", async () => {
       assert.strictEqual(cds.env.agent.trace_langchain, false)
       const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
-      const PATCHED = Symbol.for("@cap-js/agent:patched")
+      const PATCHED = Symbol.for("@cap-js/agents:patched")
       assert.strictEqual(BaseChatModel.prototype[PATCHED], undefined)
     })
 
     it("should NOT patch StructuredTool when trace_langchain is false", async () => {
       const { StructuredTool } = await import("@langchain/core/tools")
-      const PATCHED = Symbol.for("@cap-js/agent:patched")
+      const PATCHED = Symbol.for("@cap-js/agents:patched")
       assert.strictEqual(StructuredTool.prototype[PATCHED], undefined)
     })
 
     it("should NOT patch RunnableLambda when trace_langchain is false", async () => {
       const { RunnableLambda } = await import("@langchain/core/runnables")
-      const PATCHED = Symbol.for("@cap-js/agent:patched")
+      const PATCHED = Symbol.for("@cap-js/agents:patched")
       assert.strictEqual(RunnableLambda.prototype[PATCHED], undefined)
     })
   })

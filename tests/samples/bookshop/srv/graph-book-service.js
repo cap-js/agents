@@ -3,8 +3,8 @@ import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgra
 import { AIMessage } from "@langchain/core/messages"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { generateTools } from "@cap-js/agent"
-import * as metrics from "@cap-js/agent/lib/telemetry/metrics.js"
+import { generateTools } from "@cap-js/agents"
+import * as metrics from "@cap-js/agents/lib/telemetry/metrics.js"
 
 /**
  * Custom tool (not CDS-generated) to verify prototype-level tracing covers it.

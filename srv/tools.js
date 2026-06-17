@@ -336,7 +336,7 @@ function _instrumentTool(t) {
  * is overridden on the instance — cases where the prototype-level patch alone
  * cannot intercept the call.
  *
- * Idempotent: tools already instrumented by `@cap-js/agent` are returned untouched.
+ * Idempotent: tools already instrumented by `@cap-js/agents` are returned untouched.
  *
  * Unlike CDS tools (which swallow errors so the LLM can retry), this re-throws
  * errors after recording them. Wrap with a try/catch if you need error swallowing.

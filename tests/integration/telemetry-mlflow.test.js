@@ -24,7 +24,7 @@ before(() => {
   cds.env.agent.mlflow = true
 })
 
-describe("@cap-js/agent - MLflow Databricks span attributes", () => {
+describe("@cap-js/agents - MLflow Databricks span attributes", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)

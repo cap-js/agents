@@ -26,7 +26,7 @@ const sendMessage = createSendMessage(POST)
 // In hybrid mode, telemetry uses different exporters that our in-memory capture can't intercept.
 const isHybrid = cds.env.profiles?.includes("hybrid")
 
-describe("@cap-js/agent - OpenTelemetry integration", { skip: isHybrid }, () => {
+describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -161,19 +161,19 @@ describe("@cap-js/agent - OpenTelemetry integration", { skip: isHybrid }, () => 
   it("should have LangChain patches applied (feature flag default on)", async () => {
     assert.notStrictEqual(cds.env.agent.trace_langchain, false)
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
-    const PATCHED = Symbol.for("@cap-js/agent:patched")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
     assert.strictEqual(BaseChatModel.prototype[PATCHED], true)
   })
 
   it("should patch StructuredTool.invoke", async () => {
     const { StructuredTool } = await import("@langchain/core/tools")
-    const PATCHED = Symbol.for("@cap-js/agent:patched")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
     assert.strictEqual(StructuredTool.prototype[PATCHED], true)
   })
 
   it("should patch RunnableLambda.invoke", async () => {
     const { RunnableLambda } = await import("@langchain/core/runnables")
-    const PATCHED = Symbol.for("@cap-js/agent:patched")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
     assert.strictEqual(RunnableLambda.prototype[PATCHED], true)
   })
 

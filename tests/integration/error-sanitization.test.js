@@ -7,7 +7,7 @@ const { sendMessage } = createHelpers({ POST, axios })
 
 const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
 
-describe("@cap-js/agent - Production error sanitization", () => {
+describe("@cap-js/agents - Production error sanitization", () => {
   let originalNodeEnv
 
   beforeEach(() => {
