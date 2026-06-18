@@ -13,11 +13,24 @@
       "activeUsersInterval": "1s"
     },
     "requires": {
+      "toggles": true,
+      "extensibility": false,
       "[with-mtx]": {
         "multitenancy": true
       },
-      "toggles": false,
-      "extensibility": false
+      "auth": {
+        "kind": "mocked",
+        "users": {
+          "alice": {
+            "features": [
+              "experimental"
+            ]
+          },
+          "bob": {
+            "features": []
+          }
+        }
+      }
     },
     "profile": "with-mtx-sidecar"
   }

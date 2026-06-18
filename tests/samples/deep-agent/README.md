@@ -10,18 +10,6 @@ Markdown-based agent using `deepagents` with `@cap-js/agents` as runtime. Define
 - **HITL approval** — when `interruptOn` is configured, orders pause for user approval before execution
 - **Progressive disclosure** — reads `AGENTS.md` for identity, loads skills on demand
 
-## Architecture
-
-```
-createDeepAgent()
-├── model: createModel({ deepAgent: true }) - Claude via AI Core
-├── tools: CAP-based Tools (query, describe, orderProduct) (CDS) + Custom Tools (calculate_bulk_pricing)
-├── memory: AGENTS.md - agent identity and behavior rules
-├── skills: product-search/, order-management/ - loaded on demand
-├── backend: FilesystemBackend - sandboxed virtual filesystem
-└── checkpointer: CdsCheckpointSaver - multi-turn persistence
-```
-
 ## Running
 
 Requires AI Core credentials:

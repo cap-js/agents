@@ -1,12 +1,7 @@
 import { CdsCheckpointSaver } from "./lib/protocol/persistence/checkpoint-saver.js"
 import { CdsTaskStore } from "./lib/protocol/persistence/task-store.js"
-import {
-  createModel,
-  createDeepAgentModel,
-  flattenMessages,
-  buildContentFilter,
-} from "./srv/llm.js"
-import { generateTools, instrumentTools } from "./srv/tools.js"
+import { createModel, flattenMessages, buildContentFilter } from "./srv/handlers/model.js"
+import { generateTools, instrumentTools } from "./srv/handlers/tools.js"
 import quotaEnforcerAtNode from "./lib/agents/react/nodes/quotaEnforcerAtNode.js"
 import quotaEnforcerAtStart from "./lib/agents/react/nodes/quotaEnforcerAtStart.js"
 import shouldContinue from "./lib/agents/react/nodes/shouldContinue.js"
@@ -25,7 +20,6 @@ export {
   CdsCheckpointSaver,
   CdsTaskStore,
   contentFilterRecoveryMiddleware,
-  createDeepAgentModel,
   createModel,
   flattenMessages,
   buildContentFilter,

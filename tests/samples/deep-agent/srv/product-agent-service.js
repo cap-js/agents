@@ -8,7 +8,7 @@
  *    `deepagent` from `AGENTS.md`+`skills/`
  *  - This handler only customises tools (adds a business-logic tool to the
  *    auto-generated CDS tools).
- *  - No `createDeepAgent`, `FilesystemBackend`, `createDeepAgentModel`, or
+ *  - No `createDeepAgent`, `FilesystemBackend`, `buildModel` event, or
  *    `agentDir` boilerplate — all auto-derived by the plugin.
  *
  * Run with: cds watch tests/samples/deep-agent
@@ -16,16 +16,17 @@
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { generateTools } from "@cap-js/agents"
 
 export default class ProductAgentService extends cds.ApplicationService {
   async init() {
-    // Tool override: extend auto-generated CDS tools (query, describe,
-    // orderProduct) with a custom business-logic tool. The plugin's
-    // auto-deepagent picks `srv.agent.tools` up via `resolveTools(srv)`.
-    this.agent = {
-      tools: ({ srv }) => [...generateTools(srv).tools, calculateBulkPricing],
-    }
+    // Override buildTools: extend default CDS tools with custom business-logic tool
+    this.on("buildTools", async (req, next) => {
+      const tools = await next()
+      const { instrumentTools } = await import("@cap-js/agents")
+      instrumentTools([calculateBulkPricing])
+      tools.push(calculateBulkPricing)
+      return tools
+    })
 
     this.on("orderProduct", async (req) => {
       const { productName, quantity } = req.data

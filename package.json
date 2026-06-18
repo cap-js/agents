@@ -9,8 +9,8 @@
     ".": "./index.js",
     "./cds-plugin": "./cds-plugin.js",
     "./index.cds": "./index.cds",
-    "./srv/mock": "./srv/mock.js",
-    "./srv/langgraph": "./srv/langgraph/index.js",
+    "./srv/mock-executor-srv": "./srv/mock-executor-srv.js",
+    "./srv/langgraph-executor-srv": "./srv/langgraph-executor-srv.js",
     "./srv/*": "./srv/*",
     "./lib/*": "./lib/*"
   },
@@ -49,7 +49,8 @@
     "@cap-js/cds-test": ">=0",
     "@cap-js/sqlite": "^2",
     "@sap/cds-mtxs": ">=2",
-    "@toon-format/toon": ">=0"
+    "@toon-format/toon": ">=0",
+    "deepagents": "^1.10.2"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
@@ -108,10 +109,10 @@
       },
       "kinds": {
         "agent-executor-mock": {
-          "impl": "@cap-js/agents/srv/mock"
+          "impl": "@cap-js/agents/srv/mock-executor-srv"
         },
         "agent-executor-langgraph": {
-          "impl": "@cap-js/agents/srv/langgraph"
+          "impl": "@cap-js/agents/srv/langgraph-executor-srv"
         }
       },
       "[development]": {

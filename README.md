@@ -259,41 +259,6 @@ Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](
 
 </details>
 
-<details>
-<summary>Using Per-Node Quota in Custom Graphs</summary>
-
-For custom graphs (`this.agent = { graph }`), import `shouldContinue` to get quota enforcement in your loop:
-
-```js
-const { StateGraph, END } = require("@langchain/langgraph")
-const {
-  nodes: { shouldContinue },
-} = require("@cap-js/agents")
-
-const graph = new StateGraph(MyState)
-  .addNode("agent", agentNode)
-  .addNode("tools", toolNode)
-  .addEdge("__start__", "agent")
-  .addConditionalEdges("agent", shouldContinue, { tools: "tools", end: END })
-  .addEdge("tools", "agent")
-```
-
-The state must include `_iterations`, `_totalTokens`, and `_totalToolCalls` fields (updated by your agent node):
-
-```js
-const MyState = Annotation.Root({
-  messages: Annotation({ reducer: messagesStateReducer }),
-  toolCalls: Annotation({ reducer: (_, v) => v, default: () => [] }),
-  _iterations: Annotation({ reducer: (_, v) => v, default: () => 0 }),
-  _totalTokens: Annotation({ reducer: (_, v) => v, default: () => 0 }),
-  _totalToolCalls: Annotation({ reducer: (_, v) => v, default: () => 0 }),
-})
-```
-
-When quota is exceeded, `shouldContinue` throws — the `GraphExecutor` catches it and publishes the task as `failed`.
-
-</details>
-
 ## Audit Trail
 
 The plugin records immutable audit logs of agent decisions, actions, tool usage, and outcomes via [`@cap-js/audit-logging`](https://github.com/cap-js/audit-logging). All events are emitted as `SecurityEvent` for compatibility with the SAP Audit Log Service.
@@ -326,11 +291,11 @@ All events include the original event name in the `data` field for filtering and
 <details>
 <summary>Coverage</summary>
 
-| Scenario                                      | Audit coverage                                                                                                                                                               |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Built-in ReAct (`@agent` annotation)          | Full — all events fire automatically                                                                                                                                         |
-| Custom graph (`this.agent = { graph }`)       | Full — task lifecycle, CDS tools, custom tools, and deepagents built-in tools are all covered automatically. LLM decisions covered if `config` carries `_taskId`/`_service`. |
-| Custom executor (`this.agent = { executor }`) | None — custom executors manage their own lifecycle                                                                                                                           |
+| Scenario                                                       | Audit coverage                                                                                                                                                               |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Built-in ReAct (`@agent` annotation)                           | Full — all events fire automatically                                                                                                                                         |
+| Built-in Skill-based Agent (`@agent` annotation and AGENTS.md) | Full — all events fire automatically                                                                                                                                         |
+| Custom graph (`buildGraph` event)                              | Full — task lifecycle, CDS tools, custom tools, and deepagents built-in tools are all covered automatically. LLM decisions covered if `config` carries `_taskId`/`_service`. |
 
 </details>
 
@@ -531,31 +496,27 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 }
 ```
 
-**Per-service override** via `this.agent.contentFilter`:
+**Per-service override** via `buildContentFilter` event handler:
 
 ```js
 // Disable for one service
-this.agent = { contentFilter: false }
+this.on("buildContentFilter", () => undefined)
 
 // Custom filter object
-this.agent = {
-  contentFilter: {
-    input: { filters: [myCustomFilter] },
-    output: { filters: [] },
-  },
-}
+this.on("buildContentFilter", () => ({
+  input: { filters: [myCustomFilter] },
+  output: { filters: [] },
+}))
 
-// Async factory function (full control)
-this.agent = {
-  contentFilter: async () => {
-    const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
-    const filter = buildAzureContentSafetyFilter("input", { prompt_shield: true })
-    return { input: { filters: [filter] }, output: { filters: [] } }
-  },
-}
+// Async factory (full control)
+this.on("buildContentFilter", async () => {
+  const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
+  const filter = buildAzureContentSafetyFilter("input", { prompt_shield: true })
+  return { input: { filters: [filter] }, output: { filters: [] } }
+})
 ```
 
-Resolution order: `srv.agent.contentFilter` → `cds.env.agents.contentFilter` → default (Azure Content Safety).
+Resolution order: `buildContentFilter` event handler → `cds.env.agents.contentFilter` → default (Azure Content Safety).
 
 </details>
 
@@ -564,30 +525,10 @@ Resolution order: `srv.agent.contentFilter` → `cds.env.agents.contentFilter` �
 The default `prompt_shield` filter (Azure Content Safety) has a request payload
 size limit. Markdown-based agents accumulate large contexts — system prompt,
 skill files, multiple tool results — that can exceed it. The fix for now is to
-disable filtering for the affected services.
-
-`contentFilter: false` only takes effect on per-service models if `srv.agent` is
-assigned **before** the model is constructed; the unawaited-Promise pattern
-guarantees that ordering:
+disable filtering for the affected services:
 
 ```js
-async function createMyAgent(srv) {
-  const model = await createDeepAgentModel({ srv })
-  return createDeepAgent({
-    model,
-    /* ... */
-  })
-}
-
-export default class MyAgent extends cds.ApplicationService {
-  async init() {
-    this.agent = {
-      contentFilter: false, // visible by the time createDeepAgentModel reads srv.agent
-      graph: createMyAgent(this), // unawaited Promise
-    }
-    await super.init()
-  }
-}
+this.on("buildContentFilter", () => undefined)
 ```
 
 If you want to keep the content filter enabled and recover from filter errors
@@ -597,80 +538,34 @@ API section.
 
 ## Manual graph wiring
 
-For full control, plug a compiled LangGraph graph in directly via
-`this.agent = { graph }`. Useful when you need a multi-agent graph, custom
-checkpointer behaviour, or non-`deepagents` tooling.
+For full control, override the `buildGraph` event to provide a compiled LangGraph graph directly. Useful when you need a multi-agent graph, custom checkpointer behaviour, or non-`deepagents` tooling.
 
 ```js
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import { createDeepAgentModel, generateTools } from "@cap-js/agents"
-
-// Extract the async construction so it returns a Promise.
-// See "Lazy graph construction" below for why.
-async function createMyAgent(srv) {
-  const { tools } = generateTools(srv)
-  const model = await createDeepAgentModel({ srv })
-  return createDeepAgent({
-    model,
-    tools,
-    memory: ["./AGENTS.md"],
-    skills: ["./skills/"],
-    backend: new FilesystemBackend({
-      rootDir: import.meta.dirname + "/my-agent",
-      virtualMode: true,
-    }),
-    // checkpointer auto-injected by plugin (CdsCheckpointSaver)
-  })
-}
 
 export default class MyAgent extends cds.ApplicationService {
   async init() {
-    this.agent = {
-      graph: createMyAgent(this), // unawaited Promise — see "Lazy graph construction"
-    }
+    this.on("buildGraph", async () => {
+      const { tools } = await this.send("buildTools", {})
+      const model = await this.send("buildModel", { deepAgent: true })
+      return createDeepAgent({
+        model,
+        tools,
+        memory: ["./AGENTS.md"],
+        skills: ["./skills/"],
+        backend: new FilesystemBackend({
+          rootDir: import.meta.dirname + "/my-agent",
+          virtualMode: true,
+        }),
+        // checkpointer auto-injected by plugin (CdsCheckpointSaver)
+      })
+    })
     await super.init()
   }
 }
 ```
 
-### Lazy graph construction
-
-`srv.agent.graph` accepts either a compiled LangGraph graph **or** a `Promise<Graph>`. For deepagents and any setup that depends on per-service overrides like `srv.agent.contentFilter` or `srv.agent.model`, **prefer the Promise form**: extract an `async function createMyAgent(srv) { … }` and assign `this.agent = { graph: createMyAgent(this), … }` _without_ `await`.
-
-Why this matters: the right-hand side of `this.agent = { … }` is fully evaluated **before** the assignment to `this.agent` commits. If you `await createDeepAgentModel({ srv: this })` inline inside the object literal, the model is built while `this.agent` is still `undefined`, so per-service overrides like `srv.agent.contentFilter` and `srv.agent.model` are silently ignored and fall back to the global `cds.env.agents.*` defaults. With the unawaited-Promise form, `this.agent` is assigned synchronously first; the factory's body resumes in a microtask afterwards, by which time `srv.agent.*` is visible. The plugin's `GraphExecutor` awaits the Promise on first request.
-
-Compiled-graph form (`this.agent = { graph: alreadyCompiledGraph }`) is also supported, and fine when the graph has no per-service runtime configuration.
-
 ## API
-
-### `createDeepAgentModel(options?)`
-
-Creates an LLM model for use with `deepagents`' `createDeepAgent()`. Handles
-SAP AI Core's array-content compatibility issue: deepagents' built-in tools
-(`read_file`, `ls`, `grep`, …) return content as `[{ type: "text", text: "..." }]`
-arrays, but AI Core requires plain strings. This factory enables message
-flattening automatically and uses defaults appropriate for deepagents
-(`max_tokens: 4096`, `temperature: 0`, no tool binding).
-
-```js
-const { createDeepAgentModel } = require("@cap-js/agents")
-
-const model = await createDeepAgentModel()
-const model = await createDeepAgentModel({ params: { max_tokens: 4096, temperature: 0.2 } })
-```
-
-### `createModel(options?)`
-
-Creates an LLM model (OrchestrationClient) for **managed agents** (default
-langgraph executor or custom graphs). Binds tools and checks `srv.agent.model`
-overrides. For deepagents, use `createDeepAgentModel()` instead.
-
-```js
-import { createModel } from "@cap-js/agents"
-
-// Managed agent mode (binds tools, uses srv for content filter/model override)
-const model = await createModel({ srv, tools })
-```
 
 ### `contentFilterRecoveryMiddleware()`
 
@@ -681,10 +576,10 @@ crashing the task. Add it to your deepagent's middleware chain to keep
 
 ```js
 import { createDeepAgent } from "deepagents"
-import { createDeepAgentModel, contentFilterRecoveryMiddleware } from "@cap-js/agents"
+import { contentFilterRecoveryMiddleware } from "@cap-js/agents"
 
 const agent = createDeepAgent({
-  model: await createDeepAgentModel(),
+  model: await srv.send("buildModel", { deepAgent: true }),
   tools: [
     /* ... */
   ],
@@ -692,46 +587,9 @@ const agent = createDeepAgent({
 })
 ```
 
-### `generateTools(srv)`
-
-Generates LangChain tools from a CDS service model. Reuses tool definitions from `@cap-js/mcp`.
-
-```js
-import { generateTools } from "@cap-js/agents"
-const { tools } = generateTools(srv)
-// tools: [query, describe, ...perActionTools]
-```
-
-### `instrumentTools(tools)`
-
-Wraps tools' `.invoke()` with OpenTelemetry tracing, audit logging, and the `agent.tool.invocations` metric. Use this when you override `.invoke` on a tool instance (e.g., to catch errors for the LLM) — the override bypasses the automatic prototype-level patch.
-
-For standard tools (created via `tool()` or `generateTools()`), instrumentation is automatic — no call needed. The plugin also calls `instrumentTool` on every tool resolved via `srv.agent.tools`, so you only need it when you build tools outside that resolution path.
-
-```js
-import { instrumentTools } from "@cap-js/agents"
-
-// Pass a list (one or many — mutates and returns the tools)
-instrumentTools(mcpTools)
-instrumentTools([myMcpTool])
-
-// Typical pattern: instrument first, then wrap with error handling
-instrumentTools([mcpTool])
-const tracedInvoke = mcpTool.invoke.bind(mcpTool)
-mcpTool.invoke = async (args, config) => {
-  try {
-    return await tracedInvoke(args, config)
-  } catch (err) {
-    return `Error: ${err.message}`
-  }
-}
-```
-
-Re-throws errors after recording them (unlike CDS tools which swallow errors for LLM retry).
-
 ### `CdsCheckpointSaver`
 
-LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `this.agent = { graph }`. Exported for custom executors or direct checkpoint access.
+LangGraph `BaseCheckpointSaver` backed by CDS entities. Auto-injected when using `buildGraph`. Exported for custom executors or direct checkpoint access.
 
 ```js
 import { CdsCheckpointSaver } from "@cap-js/agents"
@@ -747,58 +605,50 @@ If your application uses a custom graph with parallel branches, enable full writ
 "cds": { "agent": { "persistAllCheckpointWrites": true } }
 ```
 
-### `this.agent = { ... }`
+### Service Events (CAP Handler Pattern)
 
-Set in your service handler's `init()` to customize the default behavior:
+Override default behavior by registering event handlers in your service's `init()`. FIFO semantics give app handlers priority over plugin defaults.
 
-| Pattern             | What you provide                    | Plugin provides                             |
-| ------------------- | ----------------------------------- | ------------------------------------------- |
-| `{ graph }`         | Compiled LangGraph graph            | Protocol, persistence, agent card, HITL     |
-| `{ executor }`      | Full `AgentExecutor` impl           | Protocol, persistence, agent card           |
-| `{ model }`         | LangChain `BaseChatModel` instance  | Everything else (zero-code)                 |
-| `{ tools }`         | Array or factory of LangChain tools | Everything else (zero-code)                 |
-| `{ contentFilter }` | Filter config, function, or `false` | Overrides global `cds.agents.contentFilter` |
-| _(default)_         | Nothing                             | Everything (zero-code)                      |
+All `build*` events are called **once on first request** (lazy initialization), not at server startup. The compiled graph is then cached per feature vector (`cds.context.features`). Different feature combinations produce different cached graphs — enabling feature-toggled agent behavior without restart.
+
+| Event                | Default behavior                                                                         | Return type                     |
+| -------------------- | ---------------------------------------------------------------------------------------- | ------------------------------- |
+| `buildGraph`         | Auto deep-agent or ReAct graph. Calls `buildTools`, `buildModel` and `buildSystemPrompt` | Compiled graph or GraphExecutor |
+| `buildTools`         | Query & describe tool and actions as tool                                                | `Array<tools>`                  |
+| `buildModel`         | Customized AI Core Orchestration client. Calls `buildContentFilter`                      | LangChain `BaseChatModel`       |
+| `buildSystemPrompt`  | `@description` of service                                                                | `string`                        |
+| `buildContentFilter` | Checking for prompt injection and harmful content.                                       | Filter config or `undefined`    |
 
 #### Custom Model
 
-`this.agent.model` offers an extension point to overwrite the model that is used by the Plugin. By default, an instance of `OrchestrationClient` for AI Core Access is used. You can pass everything in there that implements LangGraph's `BaseChatModel`. An example with the usage of the local [https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/](https://ai-docs.portal.hyperspace.tools.sap/llm-proxy/quickstart/) looks like this:
+Override the LLM model via `buildModel`. Tools are automatically bound after the handler returns.
 
 ```js
-this.agent = {
-  model: new ChatAnthropic({
+this.on("buildModel", async () => {
+  const { ChatAnthropic } = await import("@langchain/anthropic")
+  return new ChatAnthropic({
     model: "claude-sonnet-4-5",
     anthropicApiKey: "<api-key>",
     anthropicApiUrl: "http://localhost:6655/anthropic",
-  }),
-}
+  })
+})
 ```
 
 #### Custom Tools
 
-`this.agent.tools` replaces or extends the auto-generated CDS tools (`query`, `describe`, per-action). User tools are auto-instrumented (telemetry, audit, metrics).
+Override tool generation via `buildTools`:
 
 ```js
-import { generateTools } from "@cap-js/agents"
+import { instrumentTools } from "@cap-js/agents"
 
-this.agent = { tools: [weatherTool] }                               // replace
-this.agent = { tools: [...generateTools(this).tools, weatherTool] } // extend
-this.agent = { tools: ({ srv, generateTools }) => [...] }           // factory
+// Extend default tools
+this.on("buildTools", async (req, next) => {
+  const result = await next()
+  instrumentTools([weatherTool])
+  result.push(weatherTool)
+  return result
+})
 ```
-
-<details>
-<summary>
-Notes
-</summary>
-
-- Plugin throws at startup if a tool item is missing `name`/`invoke` or if two
-  tools share the same name.
-- When you supply tools, the plugin does **not** apply `checkAuthorization`
-  filtering — your tools are your responsibility. Call `generateTools(srv)`
-  (which auth-filters by default) inside your factory to opt back in.
-- Empty array (`tools: []`) is allowed: the model runs without function
-calling.
-</details>
 
 ### Human-in-the-Loop (HITL)
 
@@ -815,7 +665,7 @@ createDeepAgent({
 
 No additional plugin configuration needed — interrupt detection, checkpoint persistence, and resume are handled automatically.
 
-Alternatively, HITL can be achieved without `interruptOn` by instructing the agent in its `AGENTS.md` or skills to ask the user for confirmation before proceeding — a pure prompt-based approach with no framework configuration required.
+For regular markdown-based agents, `@UI.IsActionCritical` will automatically trigger the HITL flow for an action.
 
 ## Samples
 

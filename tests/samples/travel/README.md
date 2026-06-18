@@ -35,7 +35,7 @@ Then send a message to the travel agent at `http://localhost:4004/a2a/travel-age
 
 ## Key Concepts
 
-- **Markdown-based orchestrator** - The travel agent uses `createDeepAgent()` with `AGENTS.md` for identity and `skills/` for progressive workflow disclosure. Plugged into CAP via `this.agent = { graph }`.
+- **Markdown-based orchestrator** - The travel agent uses `createDeepAgent()` with `AGENTS.md` for identity and `skills/` for progressive workflow disclosure. Plugged into CAP via the `buildGraph` event.
 - **Agentified CAP services** - Hotels and activities are standard CAP services annotated with `@agent`. They get their own LLM and tools automatically - no custom code needed.
 - **Natural-language delegation** - The orchestrator sends descriptive messages to downstream agents. They handle tool selection and execution independently.
 - **MCP for structured tool access** - Flight data is accessed via MCP tools with structured parameters (query, describe, bookFlight, cancelFlight). The orchestrator calls these directly.

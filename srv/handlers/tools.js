@@ -11,10 +11,10 @@ import {
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
-import { getFilteredEntities, getFilteredActions, audit } from "../lib/utils/utils.js"
-import * as metrics from "../lib/telemetry/metrics.js"
-import { INSTRUMENTED } from "../lib/telemetry/tracing.js"
-import { mlflowAttrs, setSpanAttrs } from "../lib/telemetry/mlflow.js"
+import { getFilteredEntities, getFilteredActions, audit } from "../../lib/utils/utils.js"
+import * as metrics from "../../lib/telemetry/metrics.js"
+import { INSTRUMENTED } from "../../lib/telemetry/tracing.js"
+import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 
 const LOG = cds.log("agent")
 
@@ -34,13 +34,12 @@ export function generateTools(srv, options = {}) {
     actions = getFilteredActions(srv)
   } else {
     const authResult = checkAuthorization(srv)
-    if (authResult.error) return { tools: [], toolMap: {} }
+    if (authResult.error) return []
     entities = authResult.entities
     actions = authResult.actions
   }
 
   const tools = []
-  const toolMap = {}
 
   function register(dstool) {
     // Wrap invoke to catch errors (become normal tool results the LLM can learn from)
@@ -144,7 +143,6 @@ export function generateTools(srv, options = {}) {
     }
     dstool[INSTRUMENTED] = true
     tools.push(dstool)
-    toolMap[dstool.name] = dstool
   }
 
   // Query tool — one tool for reading all entities
@@ -215,7 +213,7 @@ export function generateTools(srv, options = {}) {
     }
   }
 
-  return { tools, toolMap }
+  return tools
 }
 
 /**
@@ -347,60 +345,4 @@ function _instrumentTool(t) {
 export function instrumentTools(tools) {
   tools.forEach(_instrumentTool)
   return tools
-}
-
-/**
- * Resolve the tool list for a managed agent based on `srv.agent.tools`.
- *
- * Resolution order:
- *   undefined  -> generateTools(srv)        (default: query, describe, per-action)
- *   array      -> use as-is (full replace)  — auto-instrumented for telemetry/audit
- *   function   -> await fn({ srv, generateTools }) (factory; user composes)
- *
- * @param {object} srv - CDS ApplicationService
- * @returns {Promise<{tools: object[], toolMap: Record<string, object>}>}
- */
-export async function resolveTools(srv) {
-  const override = srv?.agent?.tools
-
-  // Default path
-  if (override === undefined) return generateTools(srv)
-
-  let arr
-  if (typeof override === "function") {
-    arr = await override({ srv, generateTools })
-  } else if (Array.isArray(override)) {
-    arr = override
-  } else {
-    throw new Error(
-      `srv.agent.tools must be an array of LangChain tools or a factory function ({srv, generateTools}) => tools[]. Got: ${typeof override}`,
-    )
-  }
-
-  if (!Array.isArray(arr)) {
-    throw new Error(
-      `srv.agent.tools factory must return an array of LangChain tools. Got: ${typeof arr}`,
-    )
-  }
-
-  const toolMap = {}
-  const tools = []
-  for (const t of arr) {
-    if (!t || typeof t.invoke !== "function" || typeof t.name !== "string") {
-      throw new Error(
-        `srv.agent.tools contains an invalid item: must be a LangChain tool with a "name" string and "invoke" function. Got: ${JSON.stringify(
-          { name: t?.name, hasInvoke: typeof t?.invoke === "function" },
-        )}`,
-      )
-    }
-    if (toolMap[t.name]) {
-      throw new Error(
-        `srv.agent.tools contains duplicate tool name "${t.name}" for service "${srv?.name}". Tool names must be unique.`,
-      )
-    }
-    _instrumentTool(t) // idempotent — already-instrumented tools (e.g. from generateTools) are left unchanged
-    toolMap[t.name] = t
-    tools.push(t)
-  }
-  return { tools, toolMap }
 }

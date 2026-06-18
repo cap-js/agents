@@ -8,7 +8,7 @@
  */
 import cds from "@sap/cds"
 import { setup, teardown, resetCapture, createSendMessage } from "../utils/telemetry-utils.js"
-import { buildContentFilter } from "../../srv/llm.js"
+import { buildContentFilter } from "../../srv/handlers/model.js"
 
 process.env.CDS_TEST_SILENT = "false"
 setup()
@@ -71,7 +71,7 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
     })
   })
 
-  describe("srv.agent.contentFilter (per-service override)", () => {
+  describe("buildContentFilter event (per-service override)", () => {
     let originalValue
 
     beforeEach(() => {
@@ -83,57 +83,18 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       cds.env.agents.contentFilter = originalValue
     })
 
-    it("should disable when srv.agent.contentFilter = false (overrides global true)", async () => {
-      const srv = { agent: { contentFilter: false } }
-      const result = await buildContentFilter(srv)
+    it("should use global default when no service override", async () => {
+      const result = await buildContentFilter()
+
+      expect(result.input.filters).toHaveLength(1)
+      expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
+    })
+
+    it("should return undefined (disabled) when global is false", async () => {
+      cds.env.agents.contentFilter = false
+      const result = await buildContentFilter()
 
       expect(result).toBeUndefined()
-    })
-
-    it("should passthrough object from srv.agent.contentFilter", async () => {
-      const custom = {
-        input: { filters: [{ type: "my_filter", config: {} }] },
-        output: { filters: [{ type: "my_output_filter", config: {} }] },
-      }
-      const srv = { agent: { contentFilter: custom } }
-      const result = await buildContentFilter(srv)
-
-      expect(result).toBe(custom)
-    })
-
-    it("should call async function and use its return value", async () => {
-      const custom = {
-        input: { filters: [{ type: "dynamic_filter" }] },
-        output: { filters: [] },
-      }
-      const srv = { agent: { contentFilter: async () => custom } }
-      const result = await buildContentFilter(srv)
-
-      expect(result).toBe(custom)
-    })
-
-    it("should fall back to global config when srv.agent.contentFilter is undefined", async () => {
-      const srv = { agent: {} }
-      const result = await buildContentFilter(srv)
-
-      // Global is true → Azure defaults
-      expect(result.input.filters).toHaveLength(1)
-      expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
-    })
-
-    it("should fall back to global config when srv.agent is undefined", async () => {
-      const srv = {}
-      const result = await buildContentFilter(srv)
-
-      expect(result.input.filters).toHaveLength(1)
-      expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
-    })
-
-    it("should fall back to global config when srv is undefined", async () => {
-      const result = await buildContentFilter(undefined)
-
-      expect(result.input.filters).toHaveLength(1)
-      expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
     })
   })
 })

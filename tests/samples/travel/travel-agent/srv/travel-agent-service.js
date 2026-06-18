@@ -9,7 +9,7 @@
  * Demonstrates:
  * - Downstream A2A agent delegation (natural language tools)
  * - MCP server tool access (structured parameters)
- * - createDeepAgentModel() for AI Core compatibility
+ * - "buildModel" for AI Core compatibility
  * - CdsCheckpointSaver auto-injected by the plugin for multi-turn conversations
  */
 import cds from "@sap/cds"
@@ -17,11 +17,7 @@ const { path } = cds.utils
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 import { createDeepAgent, FilesystemBackend } from "deepagents"
-import {
-  createDeepAgentModel,
-  contentFilterRecoveryMiddleware,
-  instrumentTools,
-} from "@cap-js/agents"
+import { contentFilterRecoveryMiddleware, instrumentTools } from "@cap-js/agents"
 
 const LOG = cds.log("travel-agent")
 const __agentDir = path.join(import.meta.dirname, "travel-agent")
@@ -173,7 +169,7 @@ async function discoverTools() {
 
 async function createTravelAgent(srv) {
   const tools = await discoverTools()
-  const model = await createDeepAgentModel({ srv })
+  const model = await srv.send("buildModel", { deepAgent: true, tools })
 
   LOG.info("Creating travel deep agent", { tools: tools.length, agentDir: __agentDir })
 
@@ -198,15 +194,14 @@ async function createTravelAgent(srv) {
 
 export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
-    this.agent = {
-      graph: createTravelAgent(this),
-      // Deepagents accumulate large contexts (system prompt + skills + tool
-      // results) that exceed Azure Content Safety prompt_shield's payload size
-      // limit (surfaces as HTTP 503 + `AI-External-Failure: true`). When enabled,
-      // make sure to use the `contentFilterRecoveryMiddleware` to not
-      // block the agent with an error
-      contentFilter: false,
-    }
+    // Disable content filter: deepagents accumulate large contexts that exceed
+    // Azure Content Safety prompt_shield's payload size limit
+    this.on("buildContentFilter", () => undefined)
+
+    // Override buildGraph to provide custom deep agent graph
+    this.on("buildGraph", async () => {
+      return createTravelAgent(this)
+    })
 
     await super.init()
   }

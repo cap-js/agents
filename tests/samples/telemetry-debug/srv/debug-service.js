@@ -10,13 +10,15 @@ import { generateTools } from "@cap-js/agents"
  */
 export default class DebugService extends cds.ApplicationService {
   init() {
-    this.agent = { graph: this._buildGraph() }
+    this.on("buildGraph", async () => {
+      return this._buildGraph()
+    })
     return super.init()
   }
 
   async _buildGraph() {
     const srv = this
-    const { tools } = generateTools(srv, { skipAuth: true })
+    const tools = generateTools(srv, { skipAuth: true })
 
     const GraphState = Annotation.Root({
       messages: Annotation({ reducer: messagesStateReducer }),

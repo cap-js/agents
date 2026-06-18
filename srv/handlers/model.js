@@ -1,9 +1,9 @@
 import cds from "@sap/cds"
 import { circuitBreaker, timeout } from "@sap-cloud-sdk/resilience"
-import * as metrics from "../lib/telemetry/metrics.js"
-import { INSTRUMENTED } from "../lib/telemetry/tracing.js"
-import { mlflowAttrs, setSpanAttrs } from "../lib/telemetry/mlflow.js"
-import { audit } from "../lib/utils/utils.js"
+import * as metrics from "../../lib/telemetry/metrics.js"
+import { INSTRUMENTED } from "../../lib/telemetry/tracing.js"
+import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
+import { audit } from "../../lib/utils/utils.js"
 
 import { SystemMessage, ToolMessage, HumanMessage, AIMessage } from "@langchain/core/messages"
 
@@ -135,25 +135,11 @@ export function flattenMessages(messages) {
 
 /**
  * Build content filter configuration for the OrchestrationClient.
- * Resolution order:
- *   1. srv.agent.contentFilter as async function → await fn()
- *   2. srv.agent.contentFilter === false → disabled for this service
- *   3. srv.agent.contentFilter as object → passthrough
- *   4. No srv override → fall back to cds.env.agents.contentFilter:
- *      - falsy → disabled
- *      - object → passthrough
- *      - truthy (default: true) → Azure Content Safety with prompt_shield
+ * Resolves from cds.env.agents.contentFilter (global config).
+ * Per-service override: handle the `buildContentFilter` event on the service.
  */
-export async function buildContentFilter(srv) {
-  const override = srv?.agent?.contentFilter
+export async function buildContentFilter() {
   const disabled = undefined
-
-  // Per-service override takes precedence
-  if (override !== undefined) {
-    if (typeof override === "function") return await override()
-    if (override === false) return disabled
-    if (typeof override === "object") return override
-  }
 
   // Global config fallback
   if (!cds.env.agents.contentFilter) return disabled
@@ -276,7 +262,7 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
             LOG.warn(
               "Content filter service rejected the request (likely payload too large for prompt_shield). " +
                 "Disable input filter or content filtering for this service: " +
-                "this.agent = { contentFilter: false } — see README → Content Filter → Limitations.",
+                "Disable content filtering via the buildContentFilter event handler — see README → Content Filter → Limitations.",
               {
                 model: modelName,
                 node,
@@ -402,8 +388,13 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
   return InstrumentedOrchestrationClient
 }
 
-export function resolveModelName(srv) {
-  return srv?.definition?.["@agent.model"] || cds.env.agents?.llm || process.env.AICORE_MODEL
+function resolveModelName(srv) {
+  return (
+    cds.context.model?.[srv.name]?.["@agent.model"] ||
+    srv?.definition?.["@agent.model"] ||
+    cds.env.agents?.llm ||
+    process.env.AICORE_MODEL
+  )
 }
 
 /**
@@ -414,8 +405,7 @@ export function resolveModelName(srv) {
  * and skips tool binding.
  *
  * Resolution order for the model (managed agent only, i.e. deepAgent=false):
- *   1. srv.agent.model as factory function (tools) => model
- *   2. srv.agent.model as a LangChain BaseChatModel instance (plugin calls .bindTools)
+ * Apps customize the model by handling the `buildModel` event on their service.
  *   3. Default: OrchestrationClient from @sap-ai-sdk/langchain
  *
  * @param {object} [options]
@@ -428,24 +418,9 @@ export function resolveModelName(srv) {
  * @returns {Promise<import("@sap-ai-sdk/langchain").OrchestrationClient>} A LangChain-compatible chat model
  */
 export async function createModel(options = {}) {
-  const { srv, tools, deepAgent } = options
+  const { srv, contentFilter, tools, deepAgent } = options
 
-  // Custom model override (managed agent only)
-  if (!deepAgent) {
-    const override = srv?.agent?.model
-
-    if (typeof override === "function") {
-      LOG.info("Using custom model factory", { service: srv?.name })
-      return await override(tools)
-    }
-
-    if (override && typeof override.bindTools === "function") {
-      LOG.info("Using custom model instance", { service: srv?.name })
-      return tools && tools.length > 0 ? override.bindTools(tools) : override
-    }
-  }
-
-  const modelName = options.name ?? resolveModelName(srv)
+  const modelName = resolveModelName(srv)
   if (!modelName) {
     throw new Error(
       "No LLM model configured. Set @agent.model on the service, cds.env.agents.llm, or AICORE_MODEL.",
@@ -459,7 +434,7 @@ export async function createModel(options = {}) {
   LOG.debug("Initializing LLM", { model: modelName, deepAgent: !!deepAgent })
 
   const Client = await createInstrumentedClient({ modelName, params, flatten })
-  const filtering = await buildContentFilter(srv)
+  const filtering = contentFilter ?? (await buildContentFilter(srv))
 
   const rawModel = new Client(
     {
@@ -480,23 +455,4 @@ export async function createModel(options = {}) {
     return rawModel.bindTools(tools)
   }
   return rawModel
-}
-
-/**
- * Create an LLM model for use with deepagents (createDeepAgent).
- *
- * Thin wrapper around createModel({ deepAgent: true }) that enables:
- *   - Message flattening: deepagents' built-in tools (read_file, ls, grep, etc.)
- *     return content as [{type:"text",text:"..."}] arrays. SAP AI Core requires
- *     plain strings — flattenMessages() converts them before each LLM call.
- *   - Default params: { max_tokens: 4096, temperature: 0 } unless overridden.
- *   - No tool binding: deepagents manages its own tool execution.
- *
- * @param {object} [options]
- * @param {string} [options.name] - Model name (default: cds.env.agents.llm)
- * @param {object} [options.params] - Model params (default: { max_tokens: 4096, temperature: 0 })
- * @returns {Promise<import("@sap-ai-sdk/langchain").OrchestrationClient>}
- */
-export async function createDeepAgentModel(options = {}) {
-  return createModel({ ...options, deepAgent: true })
 }

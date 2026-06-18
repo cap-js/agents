@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
-import { short, audit } from "../lib/utils/utils.js"
-import * as metrics from "../lib/telemetry/metrics.js"
-import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../lib/telemetry/mlflow.js"
+import { short, audit } from "../../lib/utils/utils.js"
+import * as metrics from "../../lib/telemetry/metrics.js"
+import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 
 const LOG = cds.log("agent")
 
@@ -101,8 +101,8 @@ function extractInterruptDescription(resultOrErr) {
  * - Configurable timeout, input/output mappers
  *
  * Usage:
- *   this.agent = { graph: myCompiledGraph }
- *   this.agent = { graph: asyncGraphPromise, inputMapper, outputMapper, timeout, configMapper }
+ * Created by the default `buildGraph` event handler or by apps returning a
+ * compiled graph from their custom `buildGraph` handler.
  */
 class GraphExecutor {
   constructor(graph, srv, options = {}) {
@@ -120,12 +120,13 @@ class GraphExecutor {
     const resolved = await this._rawGraph
     if (!resolved || typeof resolved.invoke !== "function") {
       throw new Error(
-        `srv.agent.graph must be a compiled LangGraph graph (with an invoke() method). Got: ${typeof resolved}`,
+        `buildGraph must return a compiled LangGraph graph (with an invoke() method). Got: ${typeof resolved}`,
       )
     }
     // Auto-inject CdsCheckpointSaver if graph has no checkpointer (enables multi-turn + HITL)
     if (!resolved.checkpointer && this._options?.checkpointer !== false) {
-      const { CdsCheckpointSaver } = await import("../lib/protocol/persistence/checkpoint-saver.js")
+      const { CdsCheckpointSaver } =
+        await import("../../lib/protocol/persistence/checkpoint-saver.js")
       resolved.checkpointer = new CdsCheckpointSaver()
       LOG.debug("Auto-injected CdsCheckpointSaver", { service: this._srv.name })
     }

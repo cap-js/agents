@@ -4,6 +4,7 @@ const LOG = cds.log("agent")
 import agentAdapter from "./lib/index.js"
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
+import registerDefaultAgentHandlers from "./srv/handlers/index.js"
 
 cds.compile.to.a2a = cds_compile_to_a2a
 
@@ -60,6 +61,12 @@ if (isDev) {
     })
   })
 }
+
+cds.on("serving", (srv) => {
+  if (!(srv instanceof cds.ApplicationService)) return
+  if (!srv.definition?.["@agent"]) return
+  registerDefaultAgentHandlers(srv)
+})
 
 // Schedule active_users metric computation + MLflow exporter
 cds.on("served", async () => {
