@@ -6,3 +6,4 @@ package-lock.json
 .cdsrc-private.json
 resources/*
 proposal.md
+.claude/

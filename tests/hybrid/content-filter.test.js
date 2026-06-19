@@ -20,8 +20,9 @@ describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
    */
   async function resetExecutorCache() {
     const executorSrv = await cds.connect.to("agent-executor")
-    executorSrv._executors?.clear()
-    executorSrv._initPromises?.clear()
+    for (const cache of executorSrv._caches?.values() || []) {
+      cache.clear()
+    }
   }
 
   afterEach(async () => {
@@ -55,9 +56,10 @@ describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
 
     expect(res.data.result.status.state).toBe("completed")
     const output = res.data.result.status.message.parts[0].text
-    // Content filter may block (mentions prompt attack/filter) OR LLM refuses (doesn't comply)
-    // Either way, the system prompt and internal config must NOT be revealed
+    // System prompt content must not leak
     expect(output).not.toMatch(/You are an AI assistant for the/)
-    expect(output).not.toMatch(/system prompt|internal config/i)
+    // AI Core's content filter must have produced its block signature
+    // (symmetric positive of the "filter disabled" test's negative check above)
+    expect(output).toMatch(/Prompt attack detected/i)
   }, 120000)
 })

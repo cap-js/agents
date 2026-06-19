@@ -104,32 +104,43 @@ function _cloneMessageWithContent(msg, newContent) {
   return { ...msg, content: newContent }
 }
 
-/**
- * deepagents' built-in tools (read_file, ls, grep, etc.) return content as
- * [{type: "text", text: "..."}] arrays (MCP-style content blocks).
- * SAP AI Core's orchestration API expects content as a plain string.
- * Without flattening, AI Core rejects the request with HTTP 400.
- */
 export function flattenMessages(messages) {
   return messages.map((m) => {
     if (!Array.isArray(m.content)) return m
-    // AIMessages may have tool_calls alongside content — leave those untouched
-    if (m.tool_calls?.length > 0) return m
-    const text = m.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text || "")
-      .join("\n\n")
-    if (ToolMessage.isInstance?.(m) || m._getType?.() === "tool") {
-      return new ToolMessage({ content: text, tool_call_id: m.tool_call_id, name: m.name })
+    // Only flatten SystemMessage and ToolMessage — the two types the SAP
+    // AI Core harmonizer rejects when content is a list.
+    const isSystem = SystemMessage.isInstance?.(m) || m._getType?.() === "system"
+    const isTool = ToolMessage.isInstance?.(m) || m._getType?.() === "tool"
+    if (!isSystem && !isTool) return m
+
+    const parts = m.content.map((b) => {
+      if (typeof b === "string") return b
+      if (!b || typeof b !== "object") return ""
+      if (b.type === "text") return b.text || ""
+      if (b.type === "image" || b.type === "audio" || b.type === "video" || b.type === "file") {
+        const mime = b.mimeType || b.mime_type || "application/octet-stream"
+        const data = b.data || b.source?.data || ""
+        const bytes = typeof data === "string" ? Buffer.byteLength(data, "base64") : 0
+        return `[binary ${mime}, ${bytes} bytes]`
+      }
+      return JSON.stringify(b).slice(0, 200)
+    })
+    const text = parts.join("\n")
+
+    if (isTool) {
+      return new ToolMessage({
+        content: text,
+        tool_call_id: m.tool_call_id,
+        name: m.name,
+        status: m.status,
+        additional_kwargs: m.additional_kwargs,
+      })
     }
-    if (SystemMessage.isInstance?.(m) || m._getType?.() === "system") {
-      return new SystemMessage(text)
-    }
-    if (HumanMessage.isInstance?.(m) || m._getType?.() === "human") {
-      return new HumanMessage(text)
-    }
-    // Fallback: flatten content for any other message type
-    return { ...m, content: text }
+    return new SystemMessage({
+      content: text,
+      additional_kwargs: m.additional_kwargs,
+      response_metadata: m.response_metadata,
+    })
   })
 }
 
@@ -390,7 +401,7 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
 
 function resolveModelName(srv) {
   return (
-    cds.context.model?.[srv.name]?.["@agent.model"] ||
+    cds.context?.model?.[srv.name]?.["@agent.model"] ||
     srv?.definition?.["@agent.model"] ||
     cds.env.agents?.llm ||
     process.env.AICORE_MODEL
@@ -434,7 +445,12 @@ export async function createModel(options = {}) {
   LOG.debug("Initializing LLM", { model: modelName, deepAgent: !!deepAgent })
 
   const Client = await createInstrumentedClient({ modelName, params, flatten })
-  const filtering = contentFilter ?? (await buildContentFilter(srv))
+
+  const resolved = contentFilter == null ? await buildContentFilter(srv) : contentFilter
+  const filtering =
+    resolved && typeof resolved === "object" && Object.keys(resolved).length > 0
+      ? resolved
+      : undefined
 
   const rawModel = new Client(
     {

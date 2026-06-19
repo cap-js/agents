@@ -14,8 +14,26 @@
     "zod": "^4"
   },
   "cds": {
+    "agents": {
+      "pool": {
+        "maxLLMInvocationsPerTask": 50
+      },
+      "fileIO": {
+        "enabled": true,
+        "defaultInputModes": [
+          "text/csv"
+        ],
+        "defaultOutputModes": [
+          "text/plain",
+          "text/markdown"
+        ]
+      }
+    },
     "server": {
       "port": 4004
+    },
+    "requires": {
+      "audit-log": false
     }
   }
 }

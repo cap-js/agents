@@ -14,10 +14,20 @@
     "pushNotifications": false
   },
   "defaultInputModes": [
-    "text/plain"
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/pdf",
+    "image/png",
+    "image/jpeg"
   ],
   "defaultOutputModes": [
-    "text/plain"
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/pdf",
+    "image/png",
+    "image/jpeg"
   ],
   "skills": [
     {

@@ -14,6 +14,12 @@ export function buildSystemPrompt(srv) {
     cds.env.agents?.per_action_tool !== false
       ? "Call action and function tools directly by name."
       : "Use the `call_action` tool to invoke actions and functions.",
+    ...(cds.env.agents?.fileIO?.enabled
+      ? [
+          "When the user's message contains '[Uploaded files: ...]', use the `read_file` tool to read each listed file before answering.",
+          "Use `emit_file_part` to return files in your response.",
+        ]
+      : []),
     "Be concise and helpful.",
   ].join("\n")
 }

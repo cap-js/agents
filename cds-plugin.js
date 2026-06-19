@@ -30,10 +30,6 @@ cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
-// LangChain monkey-patching for tracing (opt-out via cds.env.agents.trace_langchain = false)
-if (hasTelemetry && cds.env.agents?.trace_langchain !== false) {
-  patchLangChain()
-}
 
 // Register A2A as a CDS protocol adapter
 const protocols = (cds.env.protocols ??= {})
@@ -73,6 +69,11 @@ cds.on("served", async () => {
   if (hasTelemetry) {
     const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
+    // Defer LangChain patching so the CDS model is fully loaded before patches land.
+    // opt-out via cds.env.agents.trace_langchain = false
+    if (cds.env.agents?.trace_langchain !== false) {
+      await patchLangChain()
+    }
   }
 
   if (cds.env.agents?.mlflow) {

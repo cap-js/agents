@@ -1,5 +1,6 @@
 import cds from "@sap/cds"
-import { DynamicStructuredTool } from "@langchain/core/tools"
+import { DynamicStructuredTool, tool } from "@langchain/core/tools"
+import z from "zod"
 import {
   createGenericReadToolDefinition,
   createDescribeToolDefinition,
@@ -12,6 +13,7 @@ import {
 } from "@cap-js/mcp/lib/tools.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 import { getFilteredEntities, getFilteredActions, audit } from "../../lib/utils/utils.js"
+import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { INSTRUMENTED } from "../../lib/telemetry/tracing.js"
 import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
@@ -213,6 +215,13 @@ export function generateTools(srv, options = {}) {
     }
   }
 
+  // File tools — only when fileIO is enabled
+  // emit_file_part: stateless protocol emitter; safe to register once at startup.
+  // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
+  if (cds.env.agents?.fileIO?.enabled) {
+    register(createEmitFilePartTool())
+  }
+
   return tools
 }
 
@@ -345,4 +354,151 @@ function _instrumentTool(t) {
 export function instrumentTools(tools) {
   tools.forEach(_instrumentTool)
   return tools
+}
+/**
+ * Instrument a single tool. Re-exported as a thin alias over the internal
+ * `_instrumentTool` so prior consumers of `instrumentTool` (singular) keep
+ * working — destructured ES imports of an undefined export fail silently.
+ *
+ * @param {import("@langchain/core/tools").StructuredTool} t
+ * @returns {import("@langchain/core/tools").StructuredTool}
+ */
+export const instrumentTool = _instrumentTool
+
+// ── File tools ────────────────────────────────────────────────────────
+
+/**
+ * Render a byte count as a human-readable string ("123 B" / "12.3 KB" / "1.2 MB").
+ * Exported so callers (e.g. GraphExecutor's file manifest) format sizes identically.
+ */
+export function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/**
+ * Sanitize a user-supplied filename so it is safe to use as a stable key,
+ * a /uploads/<name> path component, and an artifactId fragment.
+ *
+ * - Strips any directory components (path.basename) — defeats `../../etc/passwd`
+ *   tricks that would otherwise produce confusing artifactIds and DB keys.
+ * - Replaces characters that are not letters, digits, dot, dash, underscore, or
+ *   space with `_`. Leaves Unicode letters (CJK/etc.) intact.
+ * - Collapses leading dots so the name cannot start with `.` (avoids hidden-file
+ *   surprises and `..` artifacts).
+ * - Falls back to "unnamed" for empty input.
+ */
+export function sanitizeFilename(raw) {
+  const name = String(raw ?? "").trim()
+  if (!name) return "unnamed"
+  // path.basename equivalent without pulling in node:path: drop everything up to
+  // the last forward- or back-slash. Also drop any pure ".."/"." segments.
+  const base = name.replace(/^.*[\\/]/, "")
+  const cleaned = base.replace(/[^\p{L}\p{N}._\-\s]/gu, "_").replace(/^\.+/, "")
+  return cleaned || "unnamed"
+}
+
+/**
+ * Create a tool that emits a file as part of the A2A response.
+ * Pure protocol emitter — caller provides the bytes, no generation, no placeholders.
+ * The executor's toolResults collection loop parses `kind:'file'` JSON from this tool.
+ */
+export function createEmitFilePartTool() {
+  return tool(
+    async ({ filename, mimeType, content, encoding = "utf-8" }) => {
+      const bytes =
+        encoding === "base64" ? content : Buffer.from(content, "utf-8").toString("base64")
+      const decodedSize =
+        encoding === "base64"
+          ? Buffer.byteLength(content, "base64")
+          : Buffer.byteLength(content, "utf-8")
+      LOG.info("emit_file_part", { filename, mimeType, encoding, bytes: decodedSize })
+      return JSON.stringify({ kind: "file", file: { name: filename, mimeType, bytes } })
+    },
+    {
+      name: "emit_file_part",
+      description:
+        'Emit a file as part of the A2A response. For text formats (CSV, JSON, plain text) provide raw text content. For binary formats provide base64-encoded content and set encoding to "base64". You are responsible for obtaining or generating the file content before calling this tool.',
+      schema: z.object({
+        filename: z.string().describe("Filename with extension, e.g. report.csv"),
+        mimeType: z.string().describe("MIME type, e.g. text/csv, application/json, image/png"),
+        content: z
+          .string()
+          .describe("File content: raw text for text formats, base64 string for binary formats"),
+        encoding: z.enum(["utf-8", "base64"]).optional().default("utf-8"),
+      }),
+    },
+  )
+}
+
+/**
+ * Create a read_file tool scoped to the given conversation.
+ * For the default LangGraph path only — deepagents registers its own read_file
+ * tool via FilesystemMiddleware, which routes through UploadsBackend.
+ *
+ * Created per-request because contextId is request-scoped. The userId is
+ * captured at request entry (cds.context can be lost mid-graph across
+ * AsyncLocalStorage boundaries) and threaded through to the file store.
+ *
+ * @param {import('../../lib/protocol/persistence/file-store.js').CdsFileStore} fileStore
+ * @param {string} contextId
+ * @param {string} [userId] - Captured at request entry; falls back to cds.context inside the store.
+ */
+export function createReadFileTool(fileStore, contextId, userId) {
+  return tool(
+    async ({ path: filePath }) => {
+      try {
+        const name = filePath.replace(/^\/uploads\//, "")
+        if (!fileStore) {
+          return `read_file is not available in this context (no file store configured).`
+        }
+        const file = await fileStore.getInputFile(contextId, name, userId)
+        if (!file) {
+          const available =
+            (await fileStore.listInputFiles(contextId, userId))
+              .map((f) => `/uploads/${f.name}`)
+              .join(", ") || "none"
+          LOG.info("read_file (not found)", { contextId, path: filePath, available })
+          return `File not found: ${filePath}. Available files: ${available}`
+        }
+        if (file.mimeType?.startsWith("image/")) {
+          LOG.info("read_file (image, not returned as text)", {
+            contextId,
+            path: filePath,
+            mimeType: file.mimeType,
+            size: file.size,
+          })
+          return `"${name}" is an image (${formatFileSize(file.size)}). Use an image analysis tool to process it.`
+        }
+        if (!isTextMime(file.mimeType)) {
+          LOG.info("read_file (binary, not returned as text)", {
+            contextId,
+            path: filePath,
+            mimeType: file.mimeType,
+            size: file.size,
+          })
+          return `"${name}" is a binary file (${file.mimeType}, ${formatFileSize(file.size)}). Cannot be read as text.`
+        }
+        LOG.info("read_file", {
+          contextId,
+          path: filePath,
+          mimeType: file.mimeType,
+          size: file.size,
+        })
+        return file.bytes.toString("utf-8")
+      } catch (err) {
+        LOG.error("read_file failed", { filePath, error: err.message })
+        return `Error reading file: ${err.message}`
+      }
+    },
+    {
+      name: "read_file",
+      description:
+        "Read the contents of an uploaded file. Use the /uploads/<filename> path from the file manifest. Returns file content for text-based formats.",
+      schema: z.object({
+        path: z.string().describe("File path, e.g. /uploads/report.csv"),
+      }),
+    },
+  )
 }

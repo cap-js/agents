@@ -10,10 +10,11 @@ export default [
     rules: {
       "no-await-in-loop": "error",
       "no-console": ["error", { allow: ["warn", "error"] }],
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
   {
-    files: ["tests/**"],
+    files: ["tests/**", "scripts/**"],
     rules: {
       "no-console": "off",
       "no-undef": "off",

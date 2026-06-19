@@ -2,11 +2,17 @@ import cds from "@sap/cds"
 import { short, audit } from "../../lib/utils/utils.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
+import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
+import { formatFileSize, sanitizeFilename } from "./tools.js"
 
 const LOG = cds.log("agent")
 
 /**
  * Default input mapper: extracts text from A2A message parts and wraps as HumanMessage.
+ *
+ * NOTE TO CUSTOM INPUTMAPPER AUTHORS: when fileIO is enabled and you replace
+ * this mapper, copy the `_fileManifest` handling below or files will be silently
+ * persisted but invisible to the model.
  */
 async function defaultInputMapper(requestContext) {
   const { HumanMessage } = await import("@langchain/core/messages")
@@ -15,7 +21,8 @@ async function defaultInputMapper(requestContext) {
       ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
       .map((p) => p.text)
       .join(" ") || ""
-  return { messages: [new HumanMessage(text)] }
+  const fullText = requestContext._fileManifest ? `${text}\n${requestContext._fileManifest}` : text
+  return { messages: [new HumanMessage(fullText)] }
 }
 
 /**
@@ -171,6 +178,22 @@ class GraphExecutor {
     metrics.concurrentExecutions.add(1, mAttrs)
 
     if (!isResume) {
+      if (cds.context?.["agent.new.task"]) {
+        await INSERT.into("cap.agent.Tasks").entries({
+          taskId,
+          contextId,
+          state: "submitted",
+          data: JSON.stringify({
+            id: taskId,
+            contextId,
+            kind: "task",
+            status: { state: "submitted", timestamp: new Date().toISOString() },
+          }),
+          agentService: serviceName,
+        })
+        delete cds.context["agent.new.task"]
+      }
+
       eventBus.publish({
         kind: "task",
         id: taskId,
@@ -182,6 +205,46 @@ class GraphExecutor {
       audit("AgentTaskStarted", {
         data: { taskId, contextId, service: serviceName, userMessage: requestContext.userMessage },
       })
+    }
+
+    // ── File I/O: persist incoming FileParts to cap.agent.Tasks.inputFiles ──
+    // Build a manifest string so the LLM sees /uploads/<name> paths, not raw bytes.
+    const fileStore = cds.env.agents?.fileIO?.enabled ? new CdsFileStore() : null
+    if (fileStore && !isResume) {
+      const fileParts = requestContext.userMessage?.parts?.filter((p) => p.kind === "file") || []
+      const manifestLines = await Promise.all(
+        fileParts.map(async (fp) => {
+          const file = fp.file || fp
+          if (file.bytes) {
+            try {
+              // Sanitize: strips path components and unsafe characters so the name
+              // is a stable DB key, /uploads/ path fragment, and artifactId.
+              const safeName = sanitizeFilename(file.name)
+              const safeMime = file.mimeType || "application/octet-stream"
+              const buf = Buffer.from(file.bytes, "base64")
+              await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
+              LOG.info("file uploaded", {
+                task: short(taskId),
+                service: serviceName,
+                name: safeName,
+                mimeType: safeMime,
+                size: buf.length,
+              })
+              return `/uploads/${safeName} (${safeMime}, ${formatFileSize(buf.length)})`
+            } catch (err) {
+              LOG.error("Failed to persist uploaded file", { name: file.name, error: err.message })
+              return `/uploads/${sanitizeFilename(file.name)} (persist failed: ${err.message})`
+            }
+          } else if (file.uri) {
+            return `${file.uri} (${file.mimeType || "unknown"}, URI reference)`
+          }
+          return null
+        }),
+      )
+      const validLines = manifestLines.filter(Boolean)
+      if (validLines.length) {
+        requestContext._fileManifest = `[Uploaded files: ${validLines.join(", ")}]`
+      }
     }
 
     eventBus.publish({
@@ -220,6 +283,10 @@ class GraphExecutor {
             thread_id: `${serviceName}:${contextId}`,
             _taskId: taskId,
             _service: serviceName,
+            // Captured at request entry — backends/tools running inside graph
+            // callbacks should prefer this over cds.context, which can drift to
+            // "anonymous" across AsyncLocalStorage boundaries.
+            _userId: cds.context?.user?.id,
           },
         }
 
@@ -254,7 +321,9 @@ class GraphExecutor {
           result = await this._invokeWithTimeout(graph, new Command({ resume }), config)
         } else {
           const inputMapper = this._inputMapper || defaultInputMapper
-          const input = await inputMapper(requestContext)
+          const rawInput = await inputMapper(requestContext)
+          const { _toolMapOverride, ...input } = rawInput
+          if (_toolMapOverride) config.configurable._toolMapOverride = _toolMapOverride
           result = await this._invokeWithTimeout(graph, input, config)
         }
 
@@ -331,6 +400,168 @@ class GraphExecutor {
           contextId,
           artifact: { artifactId: "response", parts: [{ kind: "text", text: output }] },
         })
+
+        // ── File I/O: collect output files from cap.agent.Tasks.outputFiles ──────
+        // Covers two sources:
+        //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
+        //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
+        const fileArtifacts = []
+        const maxFileBytes = cds.env.agents.fileIO.maxOutputFileSizeBytes
+
+        // Artifacts from emit_file_part are this agent's own outputs — they must be
+        // published as A2A FileParts but must NOT be re-persisted as inputFiles
+        // (that would make them reappear as /uploads/ entries next turn).
+        // ToolMessage.name is not set by the tool node, so derive the tool name
+        // by matching tool_call_id against AIMessage.tool_calls[].
+        const allMessages = result.messages || []
+        const emitFilePartCallIds = new Set()
+        for (const msg of allMessages) {
+          if (msg.tool_calls?.length > 0) {
+            for (const tc of msg.tool_calls) {
+              if (tc.name === "emit_file_part") emitFilePartCallIds.add(tc.id)
+            }
+          }
+        }
+        for (const msg of allMessages) {
+          const isFromEmitFilePart = !!(
+            msg.tool_call_id && emitFilePartCallIds.has(msg.tool_call_id)
+          )
+          const content = typeof msg.content === "string" ? msg.content : ""
+          let pos = 0
+          while (pos < content.length) {
+            const start = content.indexOf('{"kind":"file"', pos)
+            if (start === -1) break
+            // Walk forward tracking depth and quoted strings so that '}' inside
+            // a string value (e.g. a filename like "result_{final}.csv") does not
+            // prematurely close the object.
+            let depth = 0
+            let inString = false
+            let i = start
+            while (i < content.length) {
+              const ch = content[i]
+              if (inString) {
+                if (ch === "\\") {
+                  i += 2 // skip escaped character — cannot be a structural char
+                  continue
+                }
+                if (ch === '"') inString = false
+              } else {
+                if (ch === '"') inString = true
+                else if (ch === "{") depth++
+                else if (ch === "}") {
+                  depth--
+                  if (depth === 0) break
+                }
+              }
+              i++
+            }
+            const raw = content.slice(start, i + 1)
+            try {
+              const artifact = JSON.parse(raw)
+              // Apply the same per-file size cap as Source 2. Decode-length is
+              // computed by Buffer.byteLength (zero allocation — pure formula
+              // over string length + padding) so an oversized blob never pins
+              // memory just to be discarded.
+              const declaredBytes =
+                typeof artifact.file?.bytes === "string"
+                  ? Buffer.byteLength(artifact.file.bytes, "base64")
+                  : 0
+              if (declaredBytes > maxFileBytes) {
+                LOG.warn("emit_file_part artifact exceeds cap; skipping", {
+                  task: short(taskId),
+                  service: serviceName,
+                  name: artifact.file?.name,
+                  size: declaredBytes,
+                  cap: maxFileBytes,
+                })
+                pos = i + 1
+                continue
+              }
+              // Tag emit_file_part artifacts so the re-persist step can exclude them.
+              // The tag is stripped before publishing so clients never see it.
+              if (isFromEmitFilePart) artifact._fromEmitFilePart = true
+              fileArtifacts.push(artifact)
+            } catch {
+              /* not valid JSON — skip */
+            }
+            pos = i + 1
+          }
+        }
+
+        // Source 2: output files written by deep agent via /outputs/ path.
+        if (fileStore) {
+          const source1Count = fileArtifacts.length
+          const outputMeta = await fileStore.listOutputFilesMeta(taskId)
+          for (const meta of outputMeta) {
+            if (meta.size > maxFileBytes) {
+              LOG.warn("output file exceeds cap; skipping", {
+                task: short(taskId),
+                service: serviceName,
+                name: meta.name,
+                size: meta.size,
+                cap: maxFileBytes,
+              })
+              continue
+            }
+            // eslint-disable-next-line no-await-in-loop
+            const f = await fileStore.getOutputFile(taskId, meta.name)
+            if (!f) continue
+            fileArtifacts.push({
+              kind: "file",
+              file: { name: f.name, mimeType: f.mimeType, bytes: f.bytes.toString("base64") },
+            })
+          }
+          // Re-persist inline file artifacts from downstream agents to Tasks.inputFiles.
+          // Exclude emit_file_part outputs — those are this agent's own artifacts, not
+          // downstream files, and re-persisting them would create spurious /uploads/ entries.
+          await Promise.all(
+            fileArtifacts
+              .slice(0, source1Count)
+              .filter((fa) => fa.file?.bytes && fa.file?.name && !fa._fromEmitFilePart)
+              .map((fa) => {
+                const buf = Buffer.from(fa.file.bytes, "base64")
+                const safeName = sanitizeFilename(fa.file.name)
+                return fileStore.saveInputFile(taskId, safeName, fa.file.mimeType, buf)
+              }),
+          )
+        }
+
+        // Strip internal tag before publishing — clients must not see _fromEmitFilePart.
+        // Capture source classification for the log line below.
+        for (const filePart of fileArtifacts) {
+          if (!filePart.file?.name) {
+            LOG.warn("skipping malformed file artifact", {
+              task: short(taskId),
+              service: serviceName,
+            })
+            continue
+          }
+          const source = filePart._fromEmitFilePart ? "emit_file_part" : "outputs/"
+          delete filePart._fromEmitFilePart
+          const safeName = sanitizeFilename(filePart.file.name)
+          const decodedSize =
+            typeof filePart.file?.bytes === "string"
+              ? Buffer.byteLength(filePart.file.bytes, "base64")
+              : 0
+          LOG.info("file emitted", {
+            task: short(taskId),
+            service: serviceName,
+            name: safeName,
+            mimeType: filePart.file?.mimeType,
+            bytes: decodedSize,
+            source,
+          })
+          eventBus.publish({
+            kind: "artifact-update",
+            taskId,
+            contextId,
+            artifact: {
+              artifactId: `file-${safeName}`,
+              name: safeName,
+              parts: [filePart],
+            },
+          })
+        }
 
         eventBus.publish({
           kind: "status-update",

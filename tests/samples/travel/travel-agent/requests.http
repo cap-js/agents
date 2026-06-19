@@ -1,0 +1,128 @@
+# A2A Protocol — Travel Agent Sample Requests
+#
+# Start the 3 services:
+#   Terminal 1: cds w tests/samples/travel/xflights              (port 4005)
+#   Terminal 2: cds w tests/samples/travel/leisure-services       (port 4006)
+#   Terminal 3: cds w tests/samples/travel/travel-agent           (port 4004)
+
+###
+# Agent Card — skills derived from AGENTS.md + skills/ scan
+GET http://localhost:4004/a2a/travel-agent/.well-known/agent-card.json HTTP/1.1
+
+###
+# Plan a weekend trip
+POST http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "messageId": "msg-001",
+      "contextId": null,
+      "role": "user",
+      "parts": [{"kind": "text", "text": "Plan a weekend trip to Paris. I'm flying from New York, luxury budget, I love food and culture."}]
+    }
+  }
+}
+
+###
+# Multi-turn: book everything (replace <CONTEXT_ID>)
+POST http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "messageId": "msg-002",
+      "role": "user",
+      "contextId": "<CONTEXT_ID>",
+      "parts": [{"kind": "text", "text": "Sounds great! My name is Simon Engel, traveling alone. Book everything as you suggested. Select a weekend that fits, it doesnt really matter"}]
+    }
+  }
+}
+
+###
+# Streaming
+POST http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "message/stream",
+  "params": {
+    "message": {
+      "messageId": "msg-003",
+      "role": "user",
+      "parts": [{"kind": "text", "text": "What hotels are available in Rome?"}]
+    }
+  }
+}
+
+###
+# File I/O scenario — upload CSV, read_file via UploadsBackend, write_file via OutputsBackend.
+#
+# What this exercises end-to-end:
+#   1. Executor stores the CSV bytes in cap.agent.Tasks.inputFiles
+#   2. Executor adds "[Uploaded files: /uploads/trip-requests.csv ...]" to the LLM message
+#   3. Deep agent calls deepagents' built-in read_file('/uploads/trip-requests.csv')
+#      → routed through UploadsBackend → cap.agent.Tasks.inputFiles → returns CSV text
+#   4. Agent searches flights (FRA→JFK), hotel in New York, food/culture activities
+#   5. Agent calls write_file('/outputs/alice-plan.md', '<itinerary>')
+#      → routed through OutputsBackend → cap.agent.Tasks.outputFiles
+#   6. After graph.invoke(), executor lists output files for the task and emits
+#      alice-plan.md as an A2A FilePart artifact in the response
+#
+# Generate base64 yourself:  base64 < trip-requests.csv | tr -d '\n'
+POST http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "messageId": "msg-004",
+      "contextId": null,
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Here is the data for three people. Read the file, then plan the first person's trip — search for flights from Frankfurt to New York, a hotel in New York, and food or culture activities. Save the plan to /outputs/alice-plan.md"
+        },
+        {
+          "kind": "file",
+          "file": {
+            "name": "trip-requests.csv",
+            "mimeType": "text/csv",
+            "bytes": "dHJhdmVsbGVyLG9yaWdpbixkZXN0aW5hdGlvbixkZXBhcnRfZGF0ZSxyZXR1cm5fZGF0ZSxidWRnZXRfbGV2ZWwsaW50ZXJlc3RzCkFsaWNlIE3DvGxsZXIsRnJhbmtmdXJ0LE5ldyBZb3JrLDIwMjYtMDctMTQsMjAyNi0wNy0yMSxtb2RlcmF0ZSxmb29kIGN1bHR1cmUKQm9iIFRhbmFrYSxOZXcgWW9yayxUb2t5bywyMDI2LTA4LTAxLDIwMjYtMDgtMTAsbHV4dXJ5LGZvb2QgdG91cgpDbGFyYSBEdXBvbnQsU2FuIEZyYW5jaXNjbyxQYXJpcywyMDI2LTA5LTA1LDIwMjYtMDktMTIsbHV4dXJ5LGN1bHR1cmUgdG91cgo="
+          }
+        }
+      ]
+    }
+  }
+}
+
+###
+# Verify output file was returned — replace <TASK_ID> from the response above.
+# The artifact with artifactId "file-alice-plan.md" should contain the itinerary
+# as a base64-encoded FilePart (mimeType: text/markdown).
+GET http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tasks/get",
+  "params": {
+    "id": "<TASK_ID>"
+  }
+}

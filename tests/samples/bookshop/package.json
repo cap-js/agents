@@ -25,6 +25,9 @@
   },
   "cds": {
     "agents": {
+      "fileIO": {
+        "enabled": true
+      },
       "activeUsersInterval": "1s",
       "[tracing]": {
         "mlflow": true
@@ -38,6 +41,9 @@
     },
     "requires": {
       "audit-log": false,
+      "attachments": {
+        "kind": "db"
+      },
       "telemetry": {
         "tracing": false,
         "metrics": false

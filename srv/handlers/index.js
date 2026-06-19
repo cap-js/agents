@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { createModel, buildContentFilter } from "./model.js"
-import { generateTools } from "./tools.js"
+import { generateTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 
 /**
@@ -23,7 +23,7 @@ export default function registerDefaultAgentHandlers(srv) {
   // Default buildModel: create OrchestrationClient
   srv.on("buildModel", async (req) => {
     const contentFilter = await srv.send("buildContentFilter", {})
-    return createModel({ srv, ...req.data })
+    return createModel({ srv, contentFilter, ...req.data })
   })
 
   // Default buildSystemPrompt: build from service definition
@@ -57,6 +57,17 @@ export default function registerDefaultAgentHandlers(srv) {
     // Auto-instrument tools for tracing/audit/metrics (idempotent)
     if (tools?.length > 0) instrumentTools(tools)
 
+    // File-IO: add a static read_file tool so the bound model knows its schema.
+    // The per-request implementation (contextId-scoped, with real fileStore) is
+    // injected via _toolMapOverride from the configMapper below.
+    let fileStore
+    if (cds.env.agents?.fileIO?.enabled) {
+      const { CdsFileStore } = await import("../../lib/protocol/persistence/file-store.js")
+      fileStore = new CdsFileStore()
+      const staticReadFile = createReadFileTool(null, "_static_")
+      tools.push(staticReadFile)
+    }
+
     // Build toolMap from tools array for createManagedAgentNodes
     const toolMap = {}
     for (const t of tools || []) toolMap[t.name] = t
@@ -77,6 +88,19 @@ export default function registerDefaultAgentHandlers(srv) {
 
     return new GraphExecutor(graph, srv, {
       checkpointer: false,
+      // configMapper runs on every invocation (fresh + HITL resume) — used to
+      // inject the contextId-scoped read_file tool when fileIO is enabled. The
+      // userId is captured here while cds.context is reliable; reading it later
+      // inside the LangGraph tool node is unsafe (AsyncLocalStorage drift).
+      configMapper: (requestContext) => {
+        if (!fileStore || !requestContext.contextId) return {}
+        const userId = cds.context?.user?.id
+        return {
+          _toolMapOverride: {
+            read_file: createReadFileTool(fileStore, requestContext.contextId, userId),
+          },
+        }
+      },
       inputMapper: async (requestContext) => {
         const { HumanMessage, SystemMessage } = await import("@langchain/core/messages")
         const text =
@@ -85,13 +109,18 @@ export default function registerDefaultAgentHandlers(srv) {
             .map((p) => p.text)
             .join(" ") || ""
 
+        // Append file manifest injected by GraphExecutor.execute() (fileIO path)
+        const fullText = requestContext._fileManifest
+          ? `${text}\n${requestContext._fileManifest}`
+          : text
+
         const config = { configurable: { thread_id: `${srv.name}:${requestContext.contextId}` } }
         const existing = await checkpointer.getTuple(config)
 
         if (existing) {
-          return { messages: [new HumanMessage(text)] }
+          return { messages: [new HumanMessage(fullText)] }
         }
-        return { messages: [new SystemMessage(systemPrompt), new HumanMessage(text)] }
+        return { messages: [new SystemMessage(systemPrompt), new HumanMessage(fullText)] }
       },
     })
   })

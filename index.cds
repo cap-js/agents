@@ -1,4 +1,5 @@
 using {managed} from '@sap/cds/common';
+using {Attachments} from '@cap-js/attachments';
 
 namespace cap.agent;
 
@@ -21,7 +22,7 @@ entity Tasks : managed {
       /**
        * Full serialized A2A Task JSON
        */
-      data           : LargeString; 
+      data           : LargeString;
       /**
        * Fully qualified CDS service name
        */
@@ -34,6 +35,17 @@ entity Tasks : managed {
        * Amount of tool calls made by this task
        */
       usageToolCalls : Integer default 0;
+
+      /**
+       * Files received from user or downstream agents for this task.
+       * Conversation-scoped reads use up_.contextId path expression.
+       */
+      inputFiles     : Composition of many Attachments;
+
+      /**
+       * Files written by agent via /outputs/ path for this task.
+       */
+      outputFiles    : Composition of many Attachments;
 }
 
 entity Checkpoints : managed {

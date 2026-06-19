@@ -8,11 +8,11 @@ Multi-agent travel planner demonstrating agent-to-agent orchestration with MCP t
 
 ## Services
 
-| Service             | Port | Protocol | Description                                                                                                 |
-| ------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `travel-agent/`     | 4004 | `@agent` | Markdown-based deep agent orchestrator. Delegates to downstream agents and MCP servers via `deepagents`.    |
-| `leisure-services/` | 4006 | `@agent` | Agentified CAP services. Exposes `HotelService` and `ActivityService` as autonomous agents with LLM access. |
-| `xflights/`         | 4005 | `@mcp`   | Flight master data service. Exposes airlines, airports, flights, and booking actions as MCP tools.          |
+| Service             | Port | Protocol | Description                                                                                                                                      |
+| ------------------- | ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `travel-agent/`     | 4004 | `@agent` | Markdown-based deep agent orchestrator (AGENTS.md + skills/). Delegates to downstream agents and MCP servers; supports file uploads + emissions. |
+| `leisure-services/` | 4006 | `@agent` | Agentified CAP services. Exposes `HotelService` and `ActivityService` as autonomous agents with LLM access.                                      |
+| `xflights/`         | 4005 | `@mcp`   | Flight master data service. Exposes airlines, airports, flights, and booking actions as MCP tools.                                               |
 
 ## Running the Sample
 
@@ -35,9 +35,10 @@ Then send a message to the travel agent at `http://localhost:4004/a2a/travel-age
 
 ## Key Concepts
 
-- **Markdown-based orchestrator** - The travel agent uses `createDeepAgent()` with `AGENTS.md` for identity and `skills/` for progressive workflow disclosure. Plugged into CAP via the `buildGraph` event.
+- **Markdown-based orchestrator** — `AGENTS.md` for identity, `skills/` for progressive workflow disclosure. The plugin's auto-build path (`createAutoDeepAgent`) wires the deepagents graph; the service handler only contributes external A2A + MCP tools through the `buildTools` event.
 - **Agentified CAP services** - Hotels and activities are standard CAP services annotated with `@agent`. They get their own LLM and tools automatically - no custom code needed.
 - **Natural-language delegation** - The orchestrator sends descriptive messages to downstream agents. They handle tool selection and execution independently.
+- **File I/O** — `cds.agents.fileIO.enabled = true` in the sample's `package.json` enables A2A `FilePart` ingestion + `read_file('/uploads/…')` + `write_file('/outputs/…')` (deepagents backends auto-wired). See `requests.http` request #4 for an end-to-end CSV-to-itinerary scenario.
 - **MCP for structured tool access** - Flight data is accessed via MCP tools with structured parameters (query, describe, bookFlight, cancelFlight). The orchestrator calls these directly.
 - **Multi-turn conversations** - `CdsCheckpointSaver` (auto-injected) persists LangGraph state, enabling multi-turn conversations across requests (plan first, then book).
 - **Parallel tool invocation** - The orchestrator calls multiple downstream agents and MCP tools in parallel when the request spans multiple domains.

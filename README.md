@@ -128,6 +128,7 @@ service. Per-service configuration takes precedence over the global default.
 | `cds.agents.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                   |
 | `cds.agents.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                   |
 | `cds.agents.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable) |
+| `cds.agents.fileIO.enabled`      | Enable A2A file uploads + emissions (see below)                          | `false`                  |
 
 **Per service**
 
@@ -162,6 +163,27 @@ Only available when agentifying existing services with `@agent` annotation.
 
 - **`development`** - Mock executor. No LLM needed.
 - **`hybrid` / `production`** - LangGraph ReAct agent with AI Core.
+
+### File I/O
+
+Set `cds.agents.fileIO.enabled = true` to let agents receive uploads and emit files via the A2A protocol.
+
+```jsonc
+{
+  "cds": {
+    "agents": {
+      "fileIO": {
+        "enabled": true,
+        "maxOutputFileSizeBytes": 10485760, // 10 MB cap per emitted file
+        "defaultInputModes": ["text/csv"], // overrides advertised MIME types
+        "defaultOutputModes": ["text/plain"],
+      },
+    },
+  },
+}
+```
+
+Sending a file - A2A clients send a `FilePart` (`{ kind: "file", file: { name, mimeType, bytes } }`) and the plugin persists the file and prepends a `[Uploaded files: /uploads/<name> (<mime>, <size>)]` manifest to the user message. It uses `@cap-js/attachments` to persist the files.
 
 ## Quota Enforcement
 
@@ -499,8 +521,8 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 **Per-service override** via `buildContentFilter` event handler:
 
 ```js
-// Disable for one service
-this.on("buildContentFilter", () => undefined)
+// Disable for one service (return an empty object)
+this.on("buildContentFilter", () => ({}))
 
 // Custom filter object
 this.on("buildContentFilter", () => ({
@@ -516,7 +538,7 @@ this.on("buildContentFilter", async () => {
 })
 ```
 
-Resolution order: `buildContentFilter` event handler → `cds.env.agents.contentFilter` → default (Azure Content Safety).
+Resolution order: `buildContentFilter` event handler → `cds.env.agents.contentFilter` → default (Azure Content Safety). Return `{}` from the event handler to disable filtering for the service; returning nothing falls through to the global config.
 
 </details>
 
@@ -528,7 +550,7 @@ skill files, multiple tool results — that can exceed it. The fix for now is to
 disable filtering for the affected services:
 
 ```js
-this.on("buildContentFilter", () => undefined)
+this.on("buildContentFilter", () => ({}))
 ```
 
 If you want to keep the content filter enabled and recover from filter errors
@@ -611,13 +633,13 @@ Override default behavior by registering event handlers in your service's `init(
 
 All `build*` events are called **once on first request** (lazy initialization), not at server startup. The compiled graph is then cached per feature vector (`cds.context.features`). Different feature combinations produce different cached graphs — enabling feature-toggled agent behavior without restart.
 
-| Event                | Default behavior                                                                         | Return type                     |
-| -------------------- | ---------------------------------------------------------------------------------------- | ------------------------------- |
-| `buildGraph`         | Auto deep-agent or ReAct graph. Calls `buildTools`, `buildModel` and `buildSystemPrompt` | Compiled graph or GraphExecutor |
-| `buildTools`         | Query & describe tool and actions as tool                                                | `Array<tools>`                  |
-| `buildModel`         | Customized AI Core Orchestration client. Calls `buildContentFilter`                      | LangChain `BaseChatModel`       |
-| `buildSystemPrompt`  | `@description` of service                                                                | `string`                        |
-| `buildContentFilter` | Checking for prompt injection and harmful content.                                       | Filter config or `undefined`    |
+| Event                | Default behavior                                                                         | Return type                      |
+| -------------------- | ---------------------------------------------------------------------------------------- | -------------------------------- |
+| `buildGraph`         | Auto deep-agent or ReAct graph. Calls `buildTools`, `buildModel` and `buildSystemPrompt` | Compiled graph or GraphExecutor  |
+| `buildTools`         | Query & describe tool and actions as tool                                                | `Array<tools>`                   |
+| `buildModel`         | Customized AI Core Orchestration client. Calls `buildContentFilter`                      | LangChain `BaseChatModel`        |
+| `buildSystemPrompt`  | `@description` of service                                                                | `string`                         |
+| `buildContentFilter` | Checking for prompt injection and harmful content.                                       | Filter config or `{}` to disable |
 
 #### Custom Model
 

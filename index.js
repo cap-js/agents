@@ -1,7 +1,7 @@
 import { CdsCheckpointSaver } from "./lib/protocol/persistence/checkpoint-saver.js"
 import { CdsTaskStore } from "./lib/protocol/persistence/task-store.js"
 import { createModel, flattenMessages, buildContentFilter } from "./srv/handlers/model.js"
-import { generateTools, instrumentTools } from "./srv/handlers/tools.js"
+import { generateTools, instrumentTool, instrumentTools } from "./srv/handlers/tools.js"
 import quotaEnforcerAtNode from "./lib/agents/react/nodes/quotaEnforcerAtNode.js"
 import quotaEnforcerAtStart from "./lib/agents/react/nodes/quotaEnforcerAtStart.js"
 import shouldContinue from "./lib/agents/react/nodes/shouldContinue.js"
@@ -14,7 +14,7 @@ import { quotaEnforcerMiddleware } from "./lib/agents/markdown/middlewares/quota
  * - createModel: LLM model factory — use { deepAgent: true } for deepagents to handle
  *   array-content messages from deepagents' built-in tools that SAP AI Core would otherwise reject
  * - generateTools: Creates LangChain tools from a CDS service model (query, describe, per-action)
- * - instrumentTools: Wrap custom tools with tracing, audit, and metrics
+ * - instrumentTool / instrumentTools: Wrap custom tools with tracing, audit, and metrics
  */
 export {
   CdsCheckpointSaver,
@@ -24,6 +24,7 @@ export {
   flattenMessages,
   buildContentFilter,
   generateTools,
+  instrumentTool,
   instrumentTools,
   quotaEnforcerMiddleware,
 }
