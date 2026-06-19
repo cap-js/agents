@@ -22,8 +22,6 @@ export default class ProductAgentService extends cds.ApplicationService {
     // Override buildTools: extend default CDS tools with custom business-logic tool
     this.on("buildTools", async (req, next) => {
       const tools = await next()
-      const { instrumentTools } = await import("@cap-js/agents")
-      instrumentTools([calculateBulkPricing])
       tools.push(calculateBulkPricing)
       return tools
     })

@@ -1,7 +1,6 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { AIMessage } from "@langchain/core/messages"
-import { generateTools } from "@cap-js/agents"
 
 /**
  * Service with two modes:
@@ -18,7 +17,7 @@ export default class DebugService extends cds.ApplicationService {
 
   async _buildGraph() {
     const srv = this
-    const tools = generateTools(srv, { skipAuth: true })
+    const tools = await srv.send("buildTools")
 
     const GraphState = Annotation.Root({
       messages: Annotation({ reducer: messagesStateReducer }),

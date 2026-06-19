@@ -3,7 +3,6 @@ import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgra
 import { AIMessage } from "@langchain/core/messages"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { generateTools } from "@cap-js/agents"
 import * as metrics from "@cap-js/agents/lib/telemetry/metrics.js"
 
 /**
@@ -27,7 +26,7 @@ const getBookCount = tool(
 
 /**
  * Deterministic graph-based agent for telemetry e2e testing.
- * Uses @cap-js/mcp tools (via generateTools) + mock LLM metrics + custom tool.
+ * Uses @cap-js/mcp tools (via buildTools) + mock LLM metrics + custom tool.
  */
 export default class GraphBookService extends cds.ApplicationService {
   init() {
@@ -39,7 +38,7 @@ export default class GraphBookService extends cds.ApplicationService {
 
   async _buildGraph() {
     const srv = this
-    const tools = generateTools(srv, { skipAuth: true })
+    const tools = await srv.send("buildTools")
 
     const GraphState = Annotation.Root({
       messages: Annotation({ reducer: messagesStateReducer }),

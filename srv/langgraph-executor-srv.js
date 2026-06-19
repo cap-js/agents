@@ -2,8 +2,6 @@ import cds from "@sap/cds"
 import { GraphExecutor } from "./handlers/graph-executor.js"
 import { GraphCache, hashFeatures } from "./graph-cache.js"
 
-const LOG = cds.log("agent")
-
 /**
  * LangGraph-based executor service for @agent annotated services.
  *

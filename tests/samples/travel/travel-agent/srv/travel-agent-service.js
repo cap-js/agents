@@ -13,14 +13,16 @@
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { instrumentTools } from "@cap-js/agents"
 
 const LOG = cds.log("travel-agent")
 
 const A2A_AGENTS = ["http://localhost:4006/a2a/hotel", "http://localhost:4006/a2a/activity"]
 
 const MCP_SERVERS = {
-  flights: { url: "http://localhost:4005/mcp/data" },
+  flights: {
+    url: "http://localhost:4005/mcp/data",
+    transport: "http",
+  },
 }
 
 /**
@@ -63,10 +65,12 @@ function extractResult(result) {
  * Wrap an A2A client as a LangChain tool the deep agent can call.
  */
 function createA2ATool(client, agentCard) {
-  const name = agentCard.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")
-  const skills =
-    agentCard.skills?.map((s) => `  - ${s.name}: ${s.description || ""}`).join("\n") || ""
-  const description = `${agentCard.description || agentCard.name}${skills ? "\nSkills:\n" + skills : ""}`
+  const name = agentCard.name
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .toLowerCase()
+    .slice(0, 60)
+  const skills = agentCard.skills?.map((s) => `- ${s.name}: ${s.description}`).join("\n") || ""
+  const description = `Delegate to the "${agentCard.name}" agent. ${agentCard.description || ""}\n\nSkills:\n${skills}`
 
   return tool(
     async ({ message }) => {
@@ -74,8 +78,8 @@ function createA2ATool(client, agentCard) {
         const result = await client.sendMessage({
           message: {
             kind: "message",
-            messageId: cds.utils.uuid(),
             role: "user",
+            messageId: cds.utils.uuid(),
             parts: [{ kind: "text", text: message }],
           },
         })
@@ -134,7 +138,6 @@ async function discoverTools() {
         LOG.info("Connecting to MCP server", { server: serverName })
         const mcpClient = new MultiServerMCPClient({ mcpServers: { [serverName]: serverConfig } })
         const mcpTools = await mcpClient.getTools()
-        instrumentTools(mcpTools)
         for (const mcpTool of mcpTools) {
           // Wrap to catch schema validation errors — deepagents' ToolNode re-throws
           // these as MiddlewareErrors which crash graph.invoke(). Catching here

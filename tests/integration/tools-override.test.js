@@ -33,7 +33,7 @@ describe("buildTools — default behavior", () => {
     })
     await srv.init()
 
-    const result = await srv.send("buildTools", { srv })
+    const result = await srv.send("buildTools")
     assert.ok(Array.isArray(result), "buildTools should return an array")
   })
 })

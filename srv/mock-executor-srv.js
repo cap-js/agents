@@ -1,4 +1,3 @@
-import cds from "@sap/cds"
 import LangGraphExecutorService from "./langgraph-executor-srv.js"
 import { GraphExecutor } from "./handlers/graph-executor.js"
 
@@ -44,7 +43,7 @@ export default class MockExecutorService extends LangGraphExecutorService {
       output: Annotation({ reducer: (_, v) => v }),
     })
 
-    async function agentNode(state) {
+    async function agentNode() {
       let data = "No data found."
       if (queryTool && entities.length > 0) {
         try {

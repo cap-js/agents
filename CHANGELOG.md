@@ -25,7 +25,7 @@
 - Support export to MLFlow via `cds.agents.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["databricks-mlflow"]`.
 - Agent Tasks and Checkpoints can only be accessed by the user who created it
 - `configMapper` option on `GraphExecutor` to inject request-scoped data into `config.configurable` before `graph.invoke()`.
-- Custom tools override via `buildTools` event handler
+- Custom tools override via `buildTools` event handler. Results are automatically instrumented via an after handler and in `buildGraph`
 - Feature-toggled agent graphs: FIFO cache keyed by `cds.context.features` hash, lazy init on first request. Configure max cache size via `cds.agent.graphCacheSize` (default 20).
 - Markdown-based agents auto-built by convention: a `@agent` service with a sibling directory matching the slugified service name (containing `AGENTS.md`) becomes a deep agent — no `.js` handler required. Tools, model, content-filter recovery middleware, and checkpoint persistence are wired automatically.
   - Tools marked with `@UI.IsActionCritical` are automatically considered for human-in-the-loop

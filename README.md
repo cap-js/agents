@@ -658,17 +658,14 @@ this.on("buildModel", async () => {
 
 #### Custom Tools
 
-Override tool generation via `buildTools`:
+Override tool generation via `buildTools`. Tools are auto-instrumented (tracing, audit, metrics) via an `after` handler:
 
 ```js
-import { instrumentTools } from "@cap-js/agents"
-
 // Extend default tools
 this.on("buildTools", async (req, next) => {
-  const result = await next()
-  instrumentTools([weatherTool])
-  result.push(weatherTool)
-  return result
+  const tools = await next()
+  tools.push(weatherTool)
+  return tools
 })
 ```
 

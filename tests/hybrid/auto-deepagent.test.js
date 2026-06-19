@@ -100,7 +100,7 @@ describe("@cap-js/agents - Auto-built deep agents (zero-code convention)", () =>
       assert.ok(srv, "ProductAgentService should be loaded")
 
       // Dispatch buildTools event — app handler extends default tools with custom tool
-      const tools = await srv.send("buildTools", { srv })
+      const tools = await srv.send("buildTools")
       const names = tools.map((t) => t.name)
       assert.ok(
         names.includes("calculate_bulk_pricing"),

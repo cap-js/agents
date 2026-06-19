@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { createModel, buildContentFilter } from "./model.js"
-import { generateTools, createReadFileTool } from "./tools.js"
+import { generateTools, instrumentTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 
 /**
@@ -20,7 +20,18 @@ export default function registerDefaultAgentHandlers(srv) {
     return generateTools(srv)
   })
 
-  // Default buildModel: create OrchestrationClient
+  // Auto-instrument all tools returned by buildTools (tracing, audit, metrics)
+  srv.after("buildTools", (tools) => {
+    if (Array.isArray(tools) && tools.length > 0) {
+      instrumentTools(tools)
+    }
+    return tools
+  })
+
+  // Default buildModel: create OrchestrationClient.
+  // Resolve contentFilter via event so user-registered buildContentFilter handlers
+  // (FIFO override pattern) participate — createModel's internal fallback would
+  // bypass them since it calls the imported function directly.
   srv.on("buildModel", async (req) => {
     const contentFilter = await srv.send("buildContentFilter", {})
     return createModel({ srv, contentFilter, ...req.data })
@@ -50,11 +61,11 @@ export default function registerDefaultAgentHandlers(srv) {
     const { createManagedAgentNodes } = await import("../../lib/agents/react/nodes/index.js")
     const { createAgentGraph } = await import("../../lib/agents/react/graph.js")
     const { GraphExecutor } = await import("./graph-executor.js")
-    const { instrumentTools } = await import("./tools.js")
 
-    const tools = await srv.send("buildTools", { srv })
+    const tools = await srv.send("buildTools")
 
-    // Auto-instrument tools for tracing/audit/metrics (idempotent)
+    // Ensure all tools are instrumented (idempotent — after handler covers event path,
+    // this covers tools added by custom buildGraph handlers outside the event)
     if (tools?.length > 0) instrumentTools(tools)
 
     // File-IO: add a static read_file tool so the bound model knows its schema.
@@ -72,14 +83,14 @@ export default function registerDefaultAgentHandlers(srv) {
     const toolMap = {}
     for (const t of tools || []) toolMap[t.name] = t
 
-    let model = await srv.send("buildModel", { srv, tools })
+    let model = await srv.send("buildModel", { tools })
 
     // Auto-bind tools if model supports it and wasn't already bound
     if (tools?.length > 0 && typeof model.bindTools === "function" && !model.tools?.length) {
       model = model.bindTools(tools)
     }
 
-    const systemPrompt = await srv.send("buildSystemPrompt", { srv })
+    const systemPrompt = await srv.send("buildSystemPrompt")
 
     const checkpointer = new CdsCheckpointSaver()
     const agentState = await createAgentState()
