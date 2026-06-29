@@ -31,6 +31,7 @@
   - Tools marked with `@UI.IsActionCritical` are automatically considered for human-in-the-loop
   * `@agent.directory` and `@agent.card` annotations to override the convention with explicit paths to the agent directory and the agent card markdown file.
 - CDS-native file I/O for agents via `cds.agents.fileIO.enabled = true`. Incoming `FilePart` bytes are persisted to `cap.agent.Tasks.inputFiles` (composition of `@cap-js/attachments`) and injected into the LLM context as a file manifest. The default LangGraph path gains `read_file` and `emit_file_part` tools; deep agents wire `UploadsBackend` and `OutputsBackend` into their `CompositeBackend`. Output files written via the agent (`emit_file_part` or `/outputs/` writes) are collected and published as A2A artifacts after graph completion, capped per-file at `cds.agents.fileIO.maxOutputFileSizeBytes` (default 10 MB). Advertised MIME types are merged into the Agent Card's `defaultInputModes` / `defaultOutputModes`.
+- Agent preview UI at `/<service-endpoint>/preview` for agents, with a back button to the CDS index page. The preview UI is served from `lib/ui/chat.html` and is injected with the agent name.
 
 ### Changed
 

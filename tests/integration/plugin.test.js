@@ -27,4 +27,11 @@ describe("@cap-js/agents plugin", () => {
     assert.notStrictEqual(data.value, undefined)
     assert.ok(data.value.length > 0)
   })
+
+  it("should serve the preview UI for @agent services", async () => {
+    const res = await GET("/a2a/catalog/preview")
+    assert.strictEqual(res.status, 200)
+    assert.match(res.headers["content-type"], /text\/html/)
+    assert.ok(res.data.includes("CatalogService"))
+  })
 })
