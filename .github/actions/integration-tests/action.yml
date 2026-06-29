@@ -20,7 +20,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup CF CLI and authenticate
-      uses: cap/.github/.github/actions/cf-setup@87c2db57786c5525a56271a7370075ff0cf20a3d # main
+      uses: cap/.github/.github/actions/cf-setup@a10b981add83215f0e5fb043670ac1547950199b # main
       with:
         org: ${{ inputs.CF_ORG }}
         space: ${{ inputs.CF_SPACE }}

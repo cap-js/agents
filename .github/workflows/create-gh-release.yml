@@ -7,5 +7,5 @@ on:
 
 jobs:
   create-github-release:
-    uses: cap/.github/.github/workflows/create-gh-release.yml@87c2db57786c5525a56271a7370075ff0cf20a3d # main
+    uses: cap/.github/.github/workflows/create-gh-release.yml@a10b981add83215f0e5fb043670ac1547950199b # main
     secrets: inherit
