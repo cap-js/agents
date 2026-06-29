@@ -294,17 +294,18 @@ In development, audit events are logged to the console. In production, they are 
 <details>
 <summary>Events</summary>
 
-| Event                | Trigger                       | Key Fields                                                                                        |
-| -------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------- |
-| `AgentTaskStarted`   | New task submitted            | `taskId`, `contextId`, `service`, `userMessage`                                                   |
-| `AgentTaskResumed`   | HITL resume (approve/reject)  | `taskId`, `contextId`, `service`, `decision`, `userMessage`                                       |
-| `AgentDecision`      | LLM invocation returns        | `taskId`, `service`, `model`, `iteration`, `toolCalls`, `inputTokens`, `outputTokens`, `duration` |
-| `ToolInvocation`     | Tool executed                 | `taskId`, `service`, `tool`, `args`, `outcome`, `result`, `duration`                              |
-| `AgentInputRequired` | Agent requests human approval | `taskId`, `contextId`, `service`, `description`, `userMessage`                                    |
-| `AgentTaskCompleted` | Task succeeds                 | `taskId`, `contextId`, `service`, `duration`, `tokens`, `toolCalls`, `output`, `task`             |
-| `AgentTaskFailed`    | Task fails                    | `taskId`, `contextId`, `service`, `error`, `errorCode`, `task`                                    |
-| `AgentTaskCanceled`  | Task canceled                 | `taskId`, `service`                                                                               |
-| `QuotaExceeded`      | Quota breach                  | `action`, `service`, `user`, `reason`, `forwardedIp` + `ip` (top-level)                           |
+| Event                  | Trigger                         | Key Fields                                                                                        |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `AgentTaskStarted`     | New task submitted              | `taskId`, `contextId`, `service`, `userMessage`                                                   |
+| `AgentTaskResumed`     | HITL resume (approve/reject)    | `taskId`, `contextId`, `service`, `decision`, `userMessage`                                       |
+| `AgentDecision`        | LLM invocation returns          | `taskId`, `service`, `model`, `iteration`, `toolCalls`, `inputTokens`, `outputTokens`, `duration` |
+| `ToolInvocation`       | Tool executed                   | `taskId`, `service`, `tool`, `args`, `outcome`, `result`, `duration`                              |
+| `AgentInputRequired`   | Agent requests human approval   | `taskId`, `contextId`, `service`, `description`, `userMessage`                                    |
+| `AgentTaskCompleted`   | Task succeeds                   | `taskId`, `contextId`, `service`, `duration`, `tokens`, `toolCalls`, `output`, `task`             |
+| `AgentTaskFailed`      | Task fails                      | `taskId`, `contextId`, `service`, `error`, `errorCode`, `task`                                    |
+| `AgentTaskCanceled`    | Task canceled                   | `taskId`, `service`                                                                               |
+| `QuotaExceeded`        | Quota breach                    | `action`, `service`, `user`, `reason`, `forwardedIp` + `ip` (top-level)                           |
+| `ContentFilterBlocked` | Input blocked by content filter | `service`, `user`, `taskId`, `reason`, `source` (`user` or `tool`)                                |
 
 All events include the original event name in the `data` field for filtering and forensic reconstruction. Common fields (`uuid`, `tenant`, `user`, `time`) are auto-filled by `@cap-js/audit-logging`. Every event also carries a `correlationId` (`cds.context.id`) for cross-referencing with auto-emitted DPP events.
 
@@ -488,7 +489,7 @@ Traces appear at http://localhost:5678/#/experiments/0.
 
 ## Content Filter
 
-By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https://sap.github.io/ai-sdk/docs/js/orchestration/chat-completion#azure-content-filter) with a prompt injection shield (`cds.agents.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
+By default, all LLM calls pass through [SAP AI Core content filtering](https://help.sap.com/docs/sap-ai-core/generative-ai/input-filtering) with Azure Content Safety and a prompt injection shield (`cds.agents.contentFilter: true`). This blocks prompt injection attacks both from user messages and from tool output (e.g. malicious data in database fields).
 
 <details>
 <summary>Configuration options</summary>
@@ -496,22 +497,34 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 **Disable globally:**
 
 ```json
-{ "cds": { "agent": { "contentFilter": false } } }
+{ "cds": { "agents": { "contentFilter": false } } }
 ```
 
-**Custom filter object globally:**
+**Custom filter dictionary:**
+
+Azure content safety levels: ALLOW_SAFE -> ALLOW_SAFE_LOW -> ALLOW_SAFE_LOW_MEDIUM -> ALLOW_ALL
 
 ```json
 {
   "cds": {
-    "agent": {
+    "agents": {
       "contentFilter": {
         "input": {
-          "filters": [
-            { "type": "azure_content_safety", "config": { "hate": 0, "prompt_shield": true } }
-          ]
+          "azure_content_safety": {
+            "hate": "ALLOW_SAFE_LOW",
+            "violence": "ALLOW_SAFE_LOW_MEDIUM",
+            "prompt_shield": true
+          },
+          "llama_guard_3_8b": {
+            "violent_crimes": true
+          }
         },
-        "output": { "filters": [] }
+        "output": {
+          "azure_content_safety": {
+            "hate": "ALLOW_SAFE",
+            "violence": "ALLOW_SAFE_LOW_MEDIUM"
+          }
+        }
       }
     }
   }
@@ -524,39 +537,21 @@ By default, all LLM calls pass through [SAP AI Core Azure Content Safety](https:
 // Disable for one service (return an empty object)
 this.on("buildContentFilter", () => ({}))
 
-// Custom filter object
+// Custom filter
 this.on("buildContentFilter", () => ({
-  input: { filters: [myCustomFilter] },
-  output: { filters: [] },
+  input: {
+    azure_content_safety: { prompt_shield: true, hate: "ALLOW_SAFE" },
+    llama_guard_3_8b: { violent_crimes: true },
+  },
+  output: {
+    azure_content_safety: { hate: "ALLOW_SAFE", violence: "ALLOW_SAFE" },
+  },
 }))
-
-// Async factory (full control)
-this.on("buildContentFilter", async () => {
-  const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
-  const filter = buildAzureContentSafetyFilter("input", { prompt_shield: true })
-  return { input: { filters: [filter] }, output: { filters: [] } }
-})
 ```
 
 Resolution order: `buildContentFilter` event handler → `cds.env.agents.contentFilter` → default (Azure Content Safety). Return `{}` from the event handler to disable filtering for the service; returning nothing falls through to the global config.
 
 </details>
-
-### Limitations: prompt_shield + large contexts
-
-The default `prompt_shield` filter (Azure Content Safety) has a request payload
-size limit. Markdown-based agents accumulate large contexts — system prompt,
-skill files, multiple tool results — that can exceed it. The fix for now is to
-disable filtering for the affected services:
-
-```js
-this.on("buildContentFilter", () => ({}))
-```
-
-If you want to keep the content filter enabled and recover from filter errors
-gracefully instead of failing the task, see
-[`contentFilterRecoveryMiddleware()`](#contentfilterrecoverymiddleware) in the
-API section.
 
 ## Manual graph wiring
 
@@ -589,23 +584,20 @@ export default class MyAgent extends cds.ApplicationService {
 
 ## API
 
-### `contentFilterRecoveryMiddleware()`
+### `contentFilterMiddleware()`
 
-LangChain agent middleware for use with `createDeepAgent({ middleware: [...] })`
-that gracefully recovers from SAP AI Core content filter errors instead of
-crashing the task. Add it to your deepagent's middleware chain to keep
-`prompt_shield` enabled while still handling filter rejections politely:
+Deep agent middleware that proactively checks user input against content filters without sending the full context. Extracts only the latest human message / tool result and sends it to a cheap model (`gpt-4o-mini`, `max_tokens: 1`) with input filters. If blocked, returns a polite refusal. The main model only runs output filters.
+
+Applied automatically for auto-built deep agents. For custom deep agents:
 
 ```js
 import { createDeepAgent } from "deepagents"
-import { contentFilterRecoveryMiddleware } from "@cap-js/agents"
+import { contentFilterMiddleware } from "@cap-js/agents"
 
 const agent = createDeepAgent({
   model: await srv.send("buildModel", { deepAgent: true }),
-  tools: [
-    /* ... */
-  ],
-  middleware: [await contentFilterRecoveryMiddleware()],
+  tools,
+  middleware: [await contentFilterMiddleware()],
 })
 ```
 

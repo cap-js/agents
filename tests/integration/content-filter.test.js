@@ -5,7 +5,7 @@
  */
 import cds from "@sap/cds"
 import { setup, teardown, resetCapture, createSendMessage } from "../utils/telemetry-utils.js"
-import { buildContentFilter } from "../../srv/handlers/model.js"
+import { buildContentFilter } from "../../srv/handlers/content-filter.js"
 
 process.env.CDS_TEST_SILENT = "false"
 setup()
@@ -32,39 +32,37 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       cds.env.agents.contentFilter = originalValue
     })
 
-    it("should return undefined when set to false (disables filtering)", async () => {
+    it("should return undefined when set to false (disables filtering)", () => {
       cds.env.agents.contentFilter = false
-      const result = await buildContentFilter()
-
+      const result = buildContentFilter()
       expect(result).toBeUndefined()
     })
 
-    it("should return undefined when set to 0", async () => {
+    it("should return undefined when set to 0", () => {
       cds.env.agents.contentFilter = 0
-      const result = await buildContentFilter()
-
+      const result = buildContentFilter()
       expect(result).toBeUndefined()
     })
 
-    it("should passthrough object directly", async () => {
+    it("should passthrough dictionary object directly", () => {
       const custom = {
-        input: { filters: [{ type: "custom", config: { level: 1 } }] },
-        output: { filters: [] },
+        input: { llama_guard_3_8b: { violent_crimes: true } },
+        output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
       }
       cds.env.agents.contentFilter = custom
-      const result = await buildContentFilter()
-
+      const result = buildContentFilter()
       expect(result).toBe(custom)
     })
 
-    it("should return Azure defaults when set to true", async () => {
+    it("should return default dictionary when set to true", () => {
       cds.env.agents.contentFilter = true
-      const result = await buildContentFilter()
+      const result = buildContentFilter()
 
-      expect(result.input.filters).toHaveLength(1)
-      expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
-      expect(result.output.filters).toHaveLength(1)
-      expect(result.output.filters[0]).toHaveProperty("type", "azure_content_safety")
+      expect(result.input.azure_content_safety).toBeDefined()
+      expect(result.input.azure_content_safety.prompt_shield).toBe(true)
+      expect(result.input.azure_content_safety.hate).toBe("ALLOW_SAFE_LOW")
+      expect(result.output.azure_content_safety).toBeDefined()
+      expect(result.output.azure_content_safety.hate).toBe("ALLOW_SAFE")
     })
   })
 
@@ -73,24 +71,22 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
 
     beforeEach(() => {
       originalValue = cds.env.agents.contentFilter
-      cds.env.agents.contentFilter = true // global enabled
+      cds.env.agents.contentFilter = true
     })
 
     afterEach(() => {
       cds.env.agents.contentFilter = originalValue
     })
 
-    it("should use global default when no service override", async () => {
-      const result = await buildContentFilter()
-
-      expect(result.input.filters).toHaveLength(1)
-      expect(result.input.filters[0]).toHaveProperty("type", "azure_content_safety")
+    it("should use global default when no service override", () => {
+      const result = buildContentFilter()
+      expect(result.input.azure_content_safety).toBeDefined()
+      expect(result.input.azure_content_safety.prompt_shield).toBe(true)
     })
 
-    it("should return undefined (disabled) when global is false", async () => {
+    it("should return undefined (disabled) when global is false", () => {
       cds.env.agents.contentFilter = false
-      const result = await buildContentFilter()
-
+      const result = buildContentFilter()
       expect(result).toBeUndefined()
     })
   })
@@ -149,8 +145,8 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       expect(model.orchestrationConfig.filtering).toBeUndefined()
     })
 
-    it("falls through to global config when override returns undefined", async () => {
-      override(() => undefined)
+    it("falls through to global config when override calls next()", async () => {
+      override((req, next) => next())
       const model = await srv.send("buildModel", { srv })
       expect(model.orchestrationConfig.filtering).toBeDefined()
       expect(model.orchestrationConfig.filtering.input.filters[0]).toHaveProperty(
@@ -165,14 +161,17 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       expect(model.orchestrationConfig.filtering).toBeUndefined()
     })
 
-    it("passes a non-empty filter object straight through to the client", async () => {
+    it("passes a non-empty filter dictionary through to the client (converted to SDK format)", async () => {
       const custom = {
-        input: { filters: [{ type: "azure_content_safety", config: {} }] },
-        output: { filters: [] },
+        input: { azure_content_safety: { hate: "ALLOW_SAFE", prompt_shield: true } },
+        output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
       }
       override(() => custom)
       const model = await srv.send("buildModel", { srv })
-      expect(model.orchestrationConfig.filtering).toBe(custom)
+      expect(model.orchestrationConfig.filtering).toBeDefined()
+      expect(model.orchestrationConfig.filtering.input.filters[0].type).toBe("azure_content_safety")
+      expect(model.orchestrationConfig.filtering.input.filters[0].config.hate).toBe(0) // ALLOW_SAFE → 0
+      expect(model.orchestrationConfig.filtering.input.filters[0].config.prompt_shield).toBe(true)
     })
   })
 })

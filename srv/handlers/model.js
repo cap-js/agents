@@ -6,6 +6,7 @@ import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { audit } from "../../lib/utils/utils.js"
 
 import { SystemMessage, ToolMessage, HumanMessage, AIMessage } from "@langchain/core/messages"
+import { instrumentTools } from "./tools.js"
 
 const LOG = cds.log("agent")
 
@@ -144,36 +145,7 @@ export function flattenMessages(messages) {
   })
 }
 
-/**
- * Build content filter configuration for the OrchestrationClient.
- * Resolves from cds.env.agents.contentFilter (global config).
- * Per-service override: handle the `buildContentFilter` event on the service.
- */
-export async function buildContentFilter() {
-  const disabled = undefined
-
-  // Global config fallback
-  if (!cds.env.agents.contentFilter) return disabled
-  if (typeof cds.env.agents.contentFilter === "object") return cds.env.agents.contentFilter
-
-  // Default: Azure Content Safety with prompt injection shield
-  const { buildAzureContentSafetyFilter } = await import("@sap-ai-sdk/orchestration")
-
-  const inputFilter = buildAzureContentSafetyFilter("input", {
-    hate: "ALLOW_SAFE_LOW",
-    violence: "ALLOW_SAFE_LOW_MEDIUM",
-    prompt_shield: true,
-  })
-
-  const outputFilter = buildAzureContentSafetyFilter("output", {
-    hate: "ALLOW_SAFE",
-    violence: "ALLOW_SAFE_LOW_MEDIUM",
-  })
-  return {
-    input: { filters: [inputFilter] },
-    output: { filters: [outputFilter] },
-  }
-}
+import { buildContentFilter, toSdkFilterFormat } from "./content-filter.js"
 
 /**
  * Creates an instrumented OrchestrationClient subclass.
@@ -285,7 +257,7 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
           } else if (isFilterModule && status === 400) {
             // The input filter blocked the request (e.g. detected prompt injection).
             // Managed agents recover from this in lib/agents/react/nodes/agent.js.
-            // DeepAgents do not — see contentFilterRecoveryMiddleware for an opt-in fix.
+            // DeepAgents handle input filtering via contentFilterMiddleware (separate cheap model call).
             LOG.warn("Content filter blocked the request", {
               model: modelName,
               node,
@@ -429,7 +401,7 @@ function resolveModelName(srv) {
  * @returns {Promise<import("@sap-ai-sdk/langchain").OrchestrationClient>} A LangChain-compatible chat model
  */
 export async function createModel(options = {}) {
-  const { srv, contentFilter, tools, deepAgent } = options
+  const { srv, tools, deepAgent } = options
 
   const modelName = resolveModelName(srv)
   if (!modelName) {
@@ -445,12 +417,12 @@ export async function createModel(options = {}) {
   LOG.debug("Initializing LLM", { model: modelName, deepAgent: !!deepAgent })
 
   const Client = await createInstrumentedClient({ modelName, params, flatten })
-
-  const resolved = contentFilter == null ? await buildContentFilter(srv) : contentFilter
-  const filtering =
-    resolved && typeof resolved === "object" && Object.keys(resolved).length > 0
-      ? resolved
-      : undefined
+  let filterConfig = srv ? await srv.send("buildContentFilter") : buildContentFilter()
+  // Deep agent: only output filters (input handled by contentFilterMiddleware)
+  if (deepAgent && filterConfig) {
+    filterConfig = filterConfig.output ? { output: filterConfig.output } : undefined
+  }
+  const filtering = toSdkFilterFormat(filterConfig)
 
   const rawModel = new Client(
     {
@@ -468,6 +440,7 @@ export async function createModel(options = {}) {
   )
 
   if (!deepAgent && tools && tools.length > 0) {
+    instrumentTools(tools)
     return rawModel.bindTools(tools)
   }
   return rawModel

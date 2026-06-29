@@ -1,5 +1,6 @@
 import cds from "@sap/cds"
-import { createModel, buildContentFilter } from "./model.js"
+import { createModel } from "./model.js"
+import { buildContentFilter } from "./content-filter.js"
 import { generateTools, instrumentTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 
@@ -10,8 +11,8 @@ import { buildSystemPrompt } from "./system-prompt.js"
  * give app handlers (registered first) priority over these defaults.
  */
 export default function registerDefaultAgentHandlers(srv) {
-  // Default buildContentFilter: resolve from cds.env.a2a.contentFilter
-  srv.on("buildContentFilter", async () => {
+  // Default buildContentFilter: resolve from cds.env.agents.contentFilter
+  srv.on("buildContentFilter", () => {
     return buildContentFilter()
   })
 
@@ -28,13 +29,9 @@ export default function registerDefaultAgentHandlers(srv) {
     return tools
   })
 
-  // Default buildModel: create OrchestrationClient.
-  // Resolve contentFilter via event so user-registered buildContentFilter handlers
-  // (FIFO override pattern) participate — createModel's internal fallback would
-  // bypass them since it calls the imported function directly.
+  // Default buildModel: create OrchestrationClient
   srv.on("buildModel", async (req) => {
-    const contentFilter = await srv.send("buildContentFilter", {})
-    return createModel({ srv, contentFilter, ...req.data })
+    return createModel({ srv, ...req.data })
   })
 
   // Default buildSystemPrompt: build from service definition

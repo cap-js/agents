@@ -4,18 +4,19 @@ import { flattenMessages } from "./srv/handlers/model.js"
 import quotaEnforcerAtNode from "./lib/agents/react/nodes/quotaEnforcerAtNode.js"
 import quotaEnforcerAtStart from "./lib/agents/react/nodes/quotaEnforcerAtStart.js"
 import shouldContinue from "./lib/agents/react/nodes/shouldContinue.js"
-import { contentFilterRecoveryMiddleware } from "./lib/agents/markdown/middlewares/content-filter-recovery.js"
+import { contentFilterMiddleware } from "./lib/agents/markdown/middlewares/content-filter.js"
 import { quotaEnforcerMiddleware } from "./lib/agents/markdown/middlewares/quota-enforcer.js"
 
 /**
  * - CdsCheckpointSaver: LangGraph checkpointer backed by CDS entities (multi-turn, HITL)
  * - CdsTaskStore: A2A task persistence backed by CDS entities
- *   array-content messages from deepagents' built-in tools that SAP AI Core would otherwise reject
+ * - contentFilterMiddleware: Deep agent middleware for proactive input content filtering
+ * - quotaEnforcerMiddleware: Deep agent middleware for per-task quota enforcement
  */
 export {
   CdsCheckpointSaver,
   CdsTaskStore,
-  contentFilterRecoveryMiddleware,
+  contentFilterMiddleware,
   flattenMessages,
   quotaEnforcerMiddleware,
 }

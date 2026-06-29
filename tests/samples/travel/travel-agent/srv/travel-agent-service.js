@@ -1,14 +1,14 @@
+/* eslint-disable no-await-in-loop */
 /**
  * Travel Agent — Deep agent orchestrator for @cap-js/agents.
  *
  * Coordinates downstream A2A agents (hotel, activity) and MCP servers (flights)
  * via the plugin's auto-build path: AGENTS.md + skills/ are wired into a
- * deepagents graph by `createAutoDeepAgent` (in @cap-js/agents).
+ * deepagents graph by plugin.
  *
- * The only JS code needed is to discover the external A2A + MCP tools and
- * contribute them through the buildTools event. Everything else — model,
- * filesystem backend for AGENTS.md, fileIO backends for /uploads & /outputs,
- * checkpoint persistence, content-filter recovery — is handled by the plugin.
+ * Demonstrates:
+ * - buildTools event to discover downstream A2A agents and MCP servers
+ * - buildContentFilter event to disable filter (large contexts)
  */
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"
@@ -174,14 +174,8 @@ async function discoverTools() {
 
 export default class TravelAgentServiceHandler extends cds.ApplicationService {
   async init() {
-    // Contribute discovered A2A + MCP tools through the event bus. The default
-    // buildTools handler (which generates CDS entity/action tools) is overridden
-    // because this service has no CDS data model — only external tools.
+    // Override buildTools: discover downstream A2A agents and MCP servers
     this.on("buildTools", () => discoverTools())
-
-    // Disable content filter: deepagents accumulate large contexts that exceed
-    // Azure Content Safety prompt_shield's payload size limit.
-    this.on("buildContentFilter", () => ({}))
 
     await super.init()
   }

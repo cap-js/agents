@@ -21,7 +21,7 @@
 - Quota enforcement via `cds.agents.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made (via conditional node for StateGraph agents and middleware for Markdown agents).
 - Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
 - Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agents.pool.maxLLMCallTimeoutMs` (default 30s).
-- Content filtering with Azure Content Safety prompt injection shield via `cds.agents.contentFilter` (default: `true`). Per-service override via `buildContentFilter` event handler.
+- Content filtering with Azure Content Safety prompt injection shield via `cds.agents.contentFilter` (default: `true`) via middleware. Per-service override via `buildContentFilter` event handler. Works for MD and react agents.
 - Support export to MLFlow via `cds.agents.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["databricks-mlflow"]`.
 - Agent Tasks and Checkpoints can only be accessed by the user who created it
 - `configMapper` option on `GraphExecutor` to inject request-scoped data into `config.configurable` before `graph.invoke()`.
