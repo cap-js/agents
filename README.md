@@ -582,6 +582,42 @@ export default class MyAgent extends cds.ApplicationService {
 }
 ```
 
+## MCP Server Connections
+
+Connect an agent to one or more [MCP](https://modelcontextprotocol.io) servers declaratively via the `@agent.mcps` annotation — no manual wiring needed.
+
+Declare the remote service in `cds.requires` (supports direct URLs and BTP destinations):
+
+```json
+"cds": {
+  "requires": {
+    "MCP1": {
+      "kind": "rest",
+      "credentials": {
+        "url": "http://localhost:4004/my-mcp"
+      }
+    },
+    "MCP2": {
+      "kind": "rest",
+      "credentials": {
+        "destination": "sapit-mcp"
+      }
+    }
+  }
+}
+```
+
+Then annotate the agent service with the service keys to connect:
+
+```cds
+@agent
+@agent.mcps: [{ service: 'MCP1' }, { service: 'MCP2' }]
+@path: '/my-agent'
+service MyAgent {}
+```
+
+The plugin resolves the URL and authentication headers at startup using the SAP Cloud SDK (`getDestination`), passing the user's JWT for OAuth2UserTokenExchange destinations. All destination authentication types supported by the Cloud SDK are supported. CAP profiles and connectivity mechanisms work as usual.
+
 ## API
 
 ### `contentFilterMiddleware()`

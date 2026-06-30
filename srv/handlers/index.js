@@ -16,9 +16,24 @@ export default function registerDefaultAgentHandlers(srv) {
     return buildContentFilter()
   })
 
-  // Default buildTools: generate tools from CDS model (returns array)
-  srv.on("buildTools", () => {
-    return generateTools(srv)
+  // Default buildTools: generate tools from CDS model + any configured MCP connections.
+  // MCP connections are declared via @agent.mcps annotation on the service:
+  //   @agent.mcps: [{ service: 'MyConnection' }, { service: 'AnotherConnection' }]
+  // Each service name must be defined as a cds.requires entry in package.json.
+  srv.on("buildTools", async () => {
+    const cdsTools = generateTools(srv)
+
+    const def = cds.context?.model?.definitions?.[srv.name] || srv.definition
+    const mcpEntries = def?.["@agent.mcps"] ?? []
+
+    if (mcpEntries.length === 0) return cdsTools
+
+    const { buildMcpToolsFromConnection } = await import("./mcp-tools.js")
+    const mcpTools = (
+      await Promise.all(mcpEntries.map((entry) => buildMcpToolsFromConnection(entry.service)))
+    ).flat()
+
+    return [...cdsTools, ...mcpTools]
   })
 
   // Auto-instrument all tools returned by buildTools (tracing, audit, metrics)
