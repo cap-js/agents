@@ -53,6 +53,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          allow-unsafe-pr-checkout: true
       - uses: cap/.github/.github/actions/git-setup@a10b981add83215f0e5fb043670ac1547950199b # main
         with:
           com-github-token: ${{ secrets.COM_GITHUB_TOKEN }}
