@@ -7,6 +7,7 @@
     "@cap-js/agents": "file:../../../",
     "@cap-js/audit-logging": ">=1",
     "@cap-js/sqlite": "*",
+    "@cap-js/telemetry": "^1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
@@ -16,10 +17,38 @@
   "cds": {
     "requires": {
       "audit-log": false,
+      "telemetry": {
+        "tracing": false,
+        "metrics": false
+      },
       "[test]": {
         "audit-log": {
           "kind": "audit-log-to-console",
           "outbox": false
+        },
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        }
+      },
+      "[tracing]": {
+        "audit-log": {
+          "kind": "audit-log-to-console",
+          "outbox": false
+        },
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
         }
       }
     }

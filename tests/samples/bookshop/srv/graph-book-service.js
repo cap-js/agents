@@ -55,6 +55,7 @@ export default class GraphBookService extends cds.ApplicationService {
       metrics.llmInvocations.add(1, { ...mAttrs, outcome: "success" })
       metrics.llmInputTokens.add(usage.input_tokens, mAttrs)
       metrics.llmOutputTokens.add(usage.output_tokens, mAttrs)
+      metrics.agentActions.add(1, { "sap.tenantId": mAttrs["sap.tenantId"] })
 
       return {
         messages: [

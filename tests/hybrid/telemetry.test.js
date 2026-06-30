@@ -7,9 +7,11 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import {
+  captured,
   setup,
   teardown,
   resetCapture,
+  flushMetrics,
   getSpansAfterRequest,
   findSpan,
   findSpans,
@@ -124,5 +126,14 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
     assert.notStrictEqual(wfSpan, undefined)
     assert.notStrictEqual(chatSpan, undefined)
     assert.strictEqual(chatSpan.spanContext().traceId, wfSpan.spanContext().traceId)
+  })
+
+  // ─── agent_actions metric (per LLM invocation) ─────────────────────────
+
+  it("should emit agent_actions metric per LLM call in react agent", async () => {
+    resetCapture()
+    await sendMessage("catalog", "What books are available?")
+    const output = await flushMetrics()
+    assert.match(output, /agent_actions/, "agent_actions metric should fire on each LLM invocation")
   })
 })

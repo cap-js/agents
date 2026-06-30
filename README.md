@@ -404,7 +404,7 @@ The bookshop's `telemetry` profile is preconfigured with OTLP export to `localho
 | `agent.errors.total`          | Counter          | Requests resulting in error                   | `sap.tenantId`, `agent.service`, `agent.error.code` |
 | `agent.executions.concurrent` | UpDownCounter    | Currently active workflow executions          | `sap.tenantId`, `agent.service`                     |
 | `agent.workflows.completed`   | Counter          | Completed agent workflows                     | `sap.tenantId`, `agent.service`                     |
-| `agent_actions`               | Counter          | Successful workflow completions per tenant    | `sap.tenantId`                                      |
+| `agent_actions`               | Counter          | LLM invocations (agent node calls) per tenant | `sap.tenantId`                                      |
 | `agent.llm.input_tokens`      | Counter          | LLM input tokens consumed                     | `sap.tenantId`, `model`, `node`                     |
 | `agent.llm.output_tokens`     | Counter          | LLM output tokens generated                   | `sap.tenantId`, `model`, `node`                     |
 | `agent.llm.invocations`       | Counter          | LLM invocation count                          | `sap.tenantId`, `model`, `node`, `outcome`          |

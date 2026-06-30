@@ -378,7 +378,6 @@ class GraphExecutor {
         }
 
         metrics.workflowsCompleted.add(1, mAttrs)
-        metrics.agentActions.add(1, { "sap.tenantId": mAttrs["sap.tenantId"] })
 
         // Audit: task completed
         audit("AgentTaskCompleted", {
