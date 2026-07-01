@@ -433,38 +433,44 @@ export function createEmitFilePartTool() {
 }
 
 /**
- * Create a read_file tool scoped to the given conversation.
+ * Create a read_file tool scoped to the current conversation.
  * For the default LangGraph path only — deepagents registers its own read_file
  * tool via FilesystemMiddleware, which routes through UploadsBackend.
  *
- * Created per-request because contextId is request-scoped. The userId is
- * captured at request entry (cds.context can be lost mid-graph across
- * AsyncLocalStorage boundaries) and threaded through to the file store.
+ * When contextId is omitted, the tool resolves it from cds.context at invocation
+ * time (set by GraphExecutor before graph.invoke). This allows a single tool
+ * instance to be reused across requests in createAgent-based graphs.
  *
  * @param {import('../../lib/protocol/persistence/file-store.js').CdsFileStore} fileStore
- * @param {string} contextId
- * @param {string} [userId] - Captured at request entry; falls back to cds.context inside the store.
+ * @param {string} [contextId] - If omitted, read from cds.context["agent.context.id"]
+ * @param {string} [userId] - If omitted, read from cds.context.user.id
  */
 export function createReadFileTool(fileStore, contextId, userId) {
   return tool(
     async ({ path: filePath }) => {
       try {
+        const resolvedContextId = contextId || cds.context?.["agent.context.id"]
+        const resolvedUserId = userId || cds.context?.user?.id
         const name = filePath.replace(/^\/uploads\//, "")
         if (!fileStore) {
           return `read_file is not available in this context (no file store configured).`
         }
-        const file = await fileStore.getInputFile(contextId, name, userId)
+        const file = await fileStore.getInputFile(resolvedContextId, name, resolvedUserId)
         if (!file) {
           const available =
-            (await fileStore.listInputFiles(contextId, userId))
+            (await fileStore.listInputFiles(resolvedContextId, resolvedUserId))
               .map((f) => `/uploads/${f.name}`)
               .join(", ") || "none"
-          LOG.info("read_file (not found)", { contextId, path: filePath, available })
+          LOG.info("read_file (not found)", {
+            contextId: resolvedContextId,
+            path: filePath,
+            available,
+          })
           return `File not found: ${filePath}. Available files: ${available}`
         }
         if (file.mimeType?.startsWith("image/")) {
           LOG.info("read_file (image, not returned as text)", {
-            contextId,
+            contextId: resolvedContextId,
             path: filePath,
             mimeType: file.mimeType,
             size: file.size,
@@ -473,7 +479,7 @@ export function createReadFileTool(fileStore, contextId, userId) {
         }
         if (!isTextMime(file.mimeType)) {
           LOG.info("read_file (binary, not returned as text)", {
-            contextId,
+            contextId: resolvedContextId,
             path: filePath,
             mimeType: file.mimeType,
             size: file.size,
@@ -481,7 +487,7 @@ export function createReadFileTool(fileStore, contextId, userId) {
           return `"${name}" is a binary file (${file.mimeType}, ${formatFileSize(file.size)}). Cannot be read as text.`
         }
         LOG.info("read_file", {
-          contextId,
+          contextId: resolvedContextId,
           path: filePath,
           mimeType: file.mimeType,
           size: file.size,

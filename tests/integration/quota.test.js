@@ -126,7 +126,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
   })
 
-  describe("quotaEnforcerAtNode (e2e)", () => {
+  describe("quotaEnforcerMiddleware (e2e)", () => {
     it("should fail task when maxLLMInvocationsPerTask exceeded during graph execution", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 2
 
@@ -134,7 +134,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
       assert.strictEqual(res.status, 200)
       assert.notStrictEqual(res.data.result, undefined)
       assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /quota exceeded/i)
+      assert.match(res.data.result.status.message.parts[0].text, /LLM call limit exceeded/i)
     })
 
     it("should fail task when maxToolCallsPerTask exceeded during graph execution", async () => {
@@ -145,7 +145,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
       assert.strictEqual(res.status, 200)
       assert.notStrictEqual(res.data.result, undefined)
       assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /quota exceeded/i)
+      assert.match(res.data.result.status.message.parts[0].text, /Tool call limit exceeded/i)
     })
 
     it("should fail task when maxLLMTokensPerTask exceeded during graph execution", async () => {
@@ -157,306 +157,117 @@ describe("@cap-js/agents - Quota enforcement", () => {
       assert.strictEqual(res.status, 200)
       assert.notStrictEqual(res.data.result, undefined)
       assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /quota exceeded/i)
+      assert.match(res.data.result.status.message.parts[0].text, /Token limit exceeded/i)
     })
 
     it("should complete normally when per-task limits are high", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 3
       cds.env.agents.pool.maxToolCallsPerTask = 100
       cds.env.agents.pool.maxLLMTokensPerTask = 100000
-
-      // LoopingService always loops — but shouldContinue won't stop it by quota.
-      // It will loop until it hits the limit... actually it always produces toolCalls
-      // so it will loop forever unless quota stops it. Set a reasonable iteration limit.
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 3
 
       const res = await sendMessage("looping", "limited loop")
       assert.strictEqual(res.status, 200)
       assert.notStrictEqual(res.data.result, undefined)
-      // Will fail because the loop always exceeds the limit
+      // Will fail because the looping model always exceeds the limit
       assert.strictEqual(res.data.result.status.state, "failed")
     })
   })
 
-  describe("quotaEnforcerAtNode (unit)", () => {
-    let quotaEnforcerAtNode
-    let shouldContinue
+  describe("quotaEnforcerMiddleware (unit)", () => {
+    let quotaEnforcerMiddleware
 
     before(async () => {
-      quotaEnforcerAtNode = (await import("../../lib/agents/react/nodes/quotaEnforcerAtNode.js"))
-        .default
-      shouldContinue = (await import("../../lib/agents/react/nodes/shouldContinue.js")).default
+      quotaEnforcerMiddleware = (await import("../../lib/agents/middlewares/quota-enforcer.js"))
+        .quotaEnforcerMiddleware
     })
 
-    it("should return 'next' when within per-task limits", async () => {
-      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 2 }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      assert.strictEqual(result, "next")
+    it("should return middleware with afterModel hook", async () => {
+      const [mw] = await quotaEnforcerMiddleware()
+      assert.strictEqual(mw.name, "agentQuotaEnforcerMiddleware")
+      assert.notStrictEqual(mw.afterModel, undefined)
+      assert.strictEqual(typeof mw.afterModel.hook, "function")
     })
 
-    it("should return 'end' when maxLLMInvocationsPerTask exceeded", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 5
-      const state = { _iterations: 5, _totalTokens: 100, _totalToolCalls: 2 }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      assert.strictEqual(result, "end")
-    })
-
-    it("should return 'end' when maxLLMTokensPerTask exceeded", async () => {
-      cds.env.agents.pool.maxLLMTokensPerTask = 1000
-      const state = { _iterations: 1, _totalTokens: 1000, _totalToolCalls: 2 }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      assert.strictEqual(result, "end")
-    })
-
-    it("should return 'end' when maxToolCallsPerTask exceeded", async () => {
-      cds.env.agents.pool.maxToolCallsPerTask = 10
-      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 10 }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      assert.strictEqual(result, "end")
-    })
-
-    it("should return 'next' when limits not yet reached", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 15
-      cds.env.agents.pool.maxLLMTokensPerTask = 20000
-      cds.env.agents.pool.maxToolCallsPerTask = 50
-      const state = { _iterations: 14, _totalTokens: 19999, _totalToolCalls: 49 }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      assert.strictEqual(result, "next")
-    })
-
-    it("shouldContinue throws QUOTA_EXCEEDED_AT_NODE when quota exceeded", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+    it("afterModel hook should throw when maxLLMInvocationsPerTask exceeded", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 2
+      const [mw] = await quotaEnforcerMiddleware()
+      const { AIMessage } = await import("@langchain/core/messages")
       const state = {
-        _iterations: 1,
-        _totalTokens: 100,
-        _totalToolCalls: 0,
-        toolCalls: [{ name: "query" }],
-      }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-
-      await assert.rejects(
-        () => shouldContinue(state, config),
-        (err) => {
-          assert.ok(err.message.includes("Task quota exceeded"))
-          return true
-        },
-      )
-      try {
-        await shouldContinue(state, config)
-      } catch (err) {
-        assert.strictEqual(err.code, "QUOTA_EXCEEDED_AT_NODE")
-      }
-    })
-
-    it("shouldContinue returns 'tools' when within quota and toolCalls present", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 15
-      const state = {
-        _iterations: 1,
-        _totalTokens: 100,
-        _totalToolCalls: 0,
-        toolCalls: [{ name: "query" }],
-      }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await shouldContinue(state, config)
-      assert.strictEqual(result, "tools")
-    })
-
-    it("shouldContinue returns 'end' when within quota and no toolCalls", async () => {
-      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 0, toolCalls: [] }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await shouldContinue(state, config)
-      assert.strictEqual(result, "end")
-    })
-
-    it("should emit QuotaExceeded audit log when quota breached", async (t) => {
-      // Ensure audit-log is connectable
-      const origAuditLog = cds.env.requires["audit-log"]
-      if (!origAuditLog?.kind)
-        cds.env.requires["audit-log"] = { kind: "audit-log-to-console", outbox: false }
-
-      let audit
-      try {
-        audit = await cds.connect.to("audit-log")
-      } catch {
-        t.skip("audit-log not connectable")
-        return
-      }
-
-      const auditLogs = []
-      const handler = (_, req) => {
-        auditLogs.push(JSON.parse(JSON.stringify(req.data)))
-      }
-      audit.after("*", handler)
-
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 3
-      const state = { _iterations: 3, _totalTokens: 100, _totalToolCalls: 2 }
-      const config = { configurable: { _taskId: "task-abc-123", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      await new Promise((r) => setTimeout(r, 100))
-
-      assert.strictEqual(result, "end")
-      const evt = auditLogs.find((l) => l.data?.event === "QuotaExceeded")
-      assert.ok(evt, "QuotaExceeded audit event should have been emitted")
-      assert.strictEqual(evt.data.service, "TestService")
-      assert.strictEqual(evt.data.taskId, "task-abc-123")
-      assert.ok(evt.data.reason.includes("Max iterations reached"))
-
-      cds.env.requires["audit-log"] = origAuditLog
-    })
-
-    it("should not emit audit log when within quota", async (t) => {
-      const origAuditLog = cds.env.requires["audit-log"]
-      if (!origAuditLog?.kind)
-        cds.env.requires["audit-log"] = { kind: "audit-log-to-console", outbox: false }
-
-      let audit
-      try {
-        audit = await cds.connect.to("audit-log")
-      } catch {
-        t.skip("audit-log not connectable")
-        return
-      }
-
-      const auditLogs = []
-      const handler = (_, req) => {
-        auditLogs.push(JSON.parse(JSON.stringify(req.data)))
-      }
-      audit.after("*", handler)
-
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 15
-      cds.env.agents.pool.maxLLMTokensPerTask = 20000
-      cds.env.agents.pool.maxToolCallsPerTask = 50
-      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 2 }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      await new Promise((r) => setTimeout(r, 100))
-
-      assert.strictEqual(result, "next")
-      const evt = auditLogs.find((l) => l.data?.event === "QuotaExceeded")
-      assert.strictEqual(evt, undefined)
-
-      cds.env.requires["audit-log"] = origAuditLog
-    })
-
-    it("should emit audit log with token quota reason", async (t) => {
-      const origAuditLog = cds.env.requires["audit-log"]
-      if (!origAuditLog?.kind)
-        cds.env.requires["audit-log"] = { kind: "audit-log-to-console", outbox: false }
-
-      let audit
-      try {
-        audit = await cds.connect.to("audit-log")
-      } catch {
-        t.skip("audit-log not connectable")
-        return
-      }
-
-      const auditLogs = []
-      const handler = (_, req) => {
-        auditLogs.push(JSON.parse(JSON.stringify(req.data)))
-      }
-      audit.after("*", handler)
-
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 500
-      const state = { _iterations: 1, _totalTokens: 500, _totalToolCalls: 0 }
-      const config = { configurable: { _taskId: "task-xyz", _service: "TokenService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      await new Promise((r) => setTimeout(r, 100))
-
-      assert.strictEqual(result, "end")
-      const evt = auditLogs.find((l) => l.data?.event === "QuotaExceeded")
-      assert.ok(evt, "QuotaExceeded audit event should have been emitted")
-      assert.strictEqual(evt.data.service, "TokenService")
-      assert.strictEqual(evt.data.taskId, "task-xyz")
-      assert.ok(evt.data.reason.includes("Max tokens per task reached"))
-
-      cds.env.requires["audit-log"] = origAuditLog
-    })
-
-    it("should emit audit log with tool calls quota reason", async (t) => {
-      const origAuditLog = cds.env.requires["audit-log"]
-      if (!origAuditLog?.kind)
-        cds.env.requires["audit-log"] = { kind: "audit-log-to-console", outbox: false }
-
-      let audit
-      try {
-        audit = await cds.connect.to("audit-log")
-      } catch {
-        t.skip("audit-log not connectable")
-        return
-      }
-
-      const auditLogs = []
-      const handler = (_, req) => {
-        auditLogs.push(JSON.parse(JSON.stringify(req.data)))
-      }
-      audit.after("*", handler)
-
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 20000
-      cds.env.agents.pool.maxToolCallsPerTask = 5
-      const state = { _iterations: 1, _totalTokens: 100, _totalToolCalls: 5 }
-      const config = { configurable: { _taskId: "task-tools", _service: "ToolService" } }
-      const result = await quotaEnforcerAtNode(state, config)
-      await new Promise((r) => setTimeout(r, 100))
-
-      assert.strictEqual(result, "end")
-      const evt = auditLogs.find((l) => l.data?.event === "QuotaExceeded")
-      assert.ok(evt, "QuotaExceeded audit event should have been emitted")
-      assert.strictEqual(evt.data.service, "ToolService")
-      assert.strictEqual(evt.data.taskId, "task-tools")
-      assert.ok(evt.data.reason.includes("Max tool calls per task reached"))
-
-      cds.env.requires["audit-log"] = origAuditLog
-    })
-  })
-
-  describe("toolNode _totalToolCalls tracking", () => {
-    let createToolNode
-
-    before(async () => {
-      createToolNode = (await import("../../lib/agents/react/nodes/tool.js")).default
-    })
-
-    it("should increment _totalToolCalls by toolCalls.length, not by 1", async () => {
-      const fakeTool = { invoke: jest.fn(async () => "ok") }
-      const toolMap = { alpha: fakeTool, beta: fakeTool, gamma: fakeTool }
-      const toolNode = createToolNode(toolMap)
-
-      const state = {
-        _totalToolCalls: 5,
-        toolCalls: [
-          { name: "alpha", args: {}, id: "c1" },
-          { name: "beta", args: {}, id: "c2" },
-          { name: "gamma", args: {}, id: "c3" },
+        runModelCallCount: 5,
+        runTokenCount: 0,
+        runToolCallCount: 0,
+        messages: [
+          new AIMessage({
+            content: "test",
+            usage_metadata: { input_tokens: 10, output_tokens: 5 },
+          }),
         ],
       }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await toolNode(state, config)
-
-      // Result is aggregated via state so that the next node has 8 as the totalToolCalls
-      assert.strictEqual(result._totalToolCalls, 3)
-      assert.strictEqual(result.messages.length, 3)
+      assert.throws(() => mw.afterModel.hook(state), /LLM call limit exceeded/)
     })
 
-    it("should increment by 1 when single tool call", async () => {
-      const fakeTool = { invoke: jest.fn(async () => "done") }
-      const toolNode = createToolNode({ single: fakeTool })
-
+    it("afterModel hook should throw when maxLLMTokensPerTask exceeded", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agents.pool.maxLLMTokensPerTask = 500
+      const [mw] = await quotaEnforcerMiddleware()
+      const { AIMessage } = await import("@langchain/core/messages")
       const state = {
-        _totalToolCalls: 0,
-        toolCalls: [{ name: "single", args: {}, id: "c1" }],
+        runModelCallCount: 0,
+        runTokenCount: 600,
+        runToolCallCount: 0,
+        messages: [
+          new AIMessage({
+            content: "test",
+            usage_metadata: { input_tokens: 10, output_tokens: 5 },
+          }),
+        ],
       }
-      const config = { configurable: { _taskId: "test", _service: "TestService" } }
-      const result = await toolNode(state, config)
+      assert.throws(() => mw.afterModel.hook(state), /Token limit exceeded/)
+    })
 
-      assert.strictEqual(result._totalToolCalls, 1)
+    it("afterModel hook should throw when maxToolCallsPerTask exceeded", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agents.pool.maxLLMTokensPerTask = 100000
+      cds.env.agents.pool.maxToolCallsPerTask = 5
+      const [mw] = await quotaEnforcerMiddleware()
+      const { AIMessage } = await import("@langchain/core/messages")
+      const state = {
+        runModelCallCount: 0,
+        runTokenCount: 0,
+        runToolCallCount: 10,
+        messages: [
+          new AIMessage({
+            content: "test",
+            tool_calls: [{ name: "a" }, { name: "b" }],
+            usage_metadata: { input_tokens: 10, output_tokens: 5 },
+          }),
+        ],
+      }
+      assert.throws(() => mw.afterModel.hook(state), /Tool call limit exceeded/)
+    })
+
+    it("afterModel hook should return updated counts when within limits", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agents.pool.maxLLMTokensPerTask = 100000
+      cds.env.agents.pool.maxToolCallsPerTask = 100
+      const [mw] = await quotaEnforcerMiddleware()
+      const { AIMessage } = await import("@langchain/core/messages")
+      const state = {
+        runModelCallCount: 0,
+        runTokenCount: 0,
+        runToolCallCount: 0,
+        messages: [
+          new AIMessage({
+            content: "test",
+            tool_calls: [{ name: "a" }],
+            usage_metadata: { input_tokens: 10, output_tokens: 5 },
+          }),
+        ],
+      }
+      const result = mw.afterModel.hook(state)
+      assert.strictEqual(result.runModelCallCount, 1)
+      assert.strictEqual(result.runTokenCount, 15)
+      assert.strictEqual(result.runToolCallCount, 1)
     })
   })
 
@@ -485,7 +296,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
       assert.notStrictEqual(row, undefined)
-      assert.ok(row.usageToolCalls >= 1)
+      assert.strictEqual(row.agentService, "LoopingService")
+      assert.ok(row.usageToolCalls >= 1, `expected usageToolCalls >= 1, got ${row.usageToolCalls}`)
     })
 
     it("should write usage fields even when task fails", async () => {
@@ -499,8 +311,11 @@ describe("@cap-js/agents - Quota enforcement", () => {
       const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
       assert.notStrictEqual(row, undefined)
       assert.strictEqual(row.agentService, "LoopingService")
-      assert.ok(row.usageLlmTokens >= 100)
-      assert.ok(row.usageToolCalls >= 1)
+      assert.ok(
+        row.usageLlmTokens >= 100,
+        `expected usageLlmTokens >= 100, got ${row.usageLlmTokens}`,
+      )
+      assert.ok(row.usageToolCalls >= 1, `expected usageToolCalls >= 1, got ${row.usageToolCalls}`)
     })
   })
 

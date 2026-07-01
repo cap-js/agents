@@ -58,8 +58,7 @@ describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
     const output = res.data.result.status.message.parts[0].text
     // System prompt content must not leak
     expect(output).not.toMatch(/You are an AI assistant for the/)
-    // AI Core's content filter must have produced its block signature
-    // (symmetric positive of the "filter disabled" test's negative check above)
-    expect(output).toMatch(/Prompt attack detected/i)
+    // AI Core's content filter must have blocked the injection
+    expect(output).toMatch(/blocked by the content safety filter|Prompt attack detected/i)
   }, 120000)
 })

@@ -54,8 +54,22 @@ export default function registerDefaultAgentHandlers(srv) {
     return buildSystemPrompt(srv)
   })
 
+  // Default buildMiddlewares: quota enforcement, content filtering, agent_actions metric
+  srv.on("buildMiddlewares", async () => {
+    const { quotaEnforcerMiddleware } =
+      await import("../../lib/agents/middlewares/quota-enforcer.js")
+    const { contentFilterMiddleware } =
+      await import("../../lib/agents/middlewares/content-filter.js")
+    const { agentActionsMiddleware } = await import("../../lib/agents/middlewares/agent-actions.js")
+    return [
+      ...(await quotaEnforcerMiddleware()),
+      await contentFilterMiddleware(),
+      await agentActionsMiddleware(),
+    ]
+  })
+
   // Default buildGraph: if agent dir with AGENTS.md exists → auto-build deep agent.
-  // Otherwise orchestrates sub-events → wires ReAct graph.
+  // Otherwise orchestrates sub-events → wires ReAct agent via langchain's createAgent.
   srv.on("buildGraph", async () => {
     const { resolveAgentDir, isDeepAgentDir } = await import("../../lib/utils/markdown.js")
     const agentDir = resolveAgentDir(srv)
@@ -66,12 +80,10 @@ export default function registerDefaultAgentHandlers(srv) {
       return createAutoDeepAgent(srv, agentDir)
     }
 
-    // Standard ReAct graph
+    // Standard ReAct agent via langchain's createAgent
+    const { createAgent } = await import("langchain")
     const { CdsCheckpointSaver } =
       await import("../../lib/protocol/persistence/checkpoint-saver.js")
-    const { createAgentState } = await import("../../lib/agents/react/state.js")
-    const { createManagedAgentNodes } = await import("../../lib/agents/react/nodes/index.js")
-    const { createAgentGraph } = await import("../../lib/agents/react/graph.js")
     const { GraphExecutor } = await import("./graph-executor.js")
 
     const tools = await srv.send("buildTools")
@@ -80,52 +92,34 @@ export default function registerDefaultAgentHandlers(srv) {
     // this covers tools added by custom buildGraph handlers outside the event)
     if (tools?.length > 0) instrumentTools(tools)
 
-    // File-IO: add a static read_file tool so the bound model knows its schema.
-    // The per-request implementation (contextId-scoped, with real fileStore) is
-    // injected via _toolMapOverride from the configMapper below.
-    let fileStore
+    // File-IO: add a read_file tool that resolves context at invocation time.
+    // cds.context["agent.context.id"] and user.id are set by GraphExecutor before invoke.
     if (cds.env.agents?.fileIO?.enabled) {
       const { CdsFileStore } = await import("../../lib/protocol/persistence/file-store.js")
-      fileStore = new CdsFileStore()
-      const staticReadFile = createReadFileTool(null, "_static_")
-      tools.push(staticReadFile)
+      const fileStore = new CdsFileStore()
+      const readFileTool = createReadFileTool(fileStore)
+      tools.push(readFileTool)
     }
-
-    // Build toolMap from tools array for createManagedAgentNodes
-    const toolMap = {}
-    for (const t of tools || []) toolMap[t.name] = t
 
     let model = await srv.send("buildModel", { tools })
 
-    // Auto-bind tools if model supports it and wasn't already bound
-    if (tools?.length > 0 && typeof model.bindTools === "function" && !model.tools?.length) {
-      model = model.bindTools(tools)
-    }
-
     const systemPrompt = await srv.send("buildSystemPrompt")
+    const middleware = await srv.send("buildMiddlewares")
 
     const checkpointer = new CdsCheckpointSaver()
-    const agentState = await createAgentState()
-    const nodes = createManagedAgentNodes(model, toolMap)
-    const graph = await createAgentGraph(agentState, nodes, checkpointer)
 
-    return new GraphExecutor(graph, srv, {
-      checkpointer: false,
-      // configMapper runs on every invocation (fresh + HITL resume) — used to
-      // inject the contextId-scoped read_file tool when fileIO is enabled. The
-      // userId is captured here while cds.context is reliable; reading it later
-      // inside the LangGraph tool node is unsafe (AsyncLocalStorage drift).
-      configMapper: (requestContext) => {
-        if (!fileStore || !requestContext.contextId) return {}
-        const userId = cds.context?.user?.id
-        return {
-          _toolMapOverride: {
-            read_file: createReadFileTool(fileStore, requestContext.contextId, userId),
-          },
-        }
-      },
+    const agent = createAgent({
+      model,
+      tools,
+      systemPrompt,
+      middleware,
+      checkpointer,
+    })
+
+    return new GraphExecutor(agent, srv, {
+      checkpointer: false, // already set on createAgent
       inputMapper: async (requestContext) => {
-        const { HumanMessage, SystemMessage } = await import("@langchain/core/messages")
+        const { HumanMessage } = await import("@langchain/core/messages")
         const text =
           requestContext.userMessage?.parts
             ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
@@ -137,13 +131,7 @@ export default function registerDefaultAgentHandlers(srv) {
           ? `${text}\n${requestContext._fileManifest}`
           : text
 
-        const config = { configurable: { thread_id: `${srv.name}:${requestContext.contextId}` } }
-        const existing = await checkpointer.getTuple(config)
-
-        if (existing) {
-          return { messages: [new HumanMessage(fullText)] }
-        }
-        return { messages: [new SystemMessage(systemPrompt), new HumanMessage(fullText)] }
+        return { messages: [new HumanMessage(fullText)] }
       },
     })
   })

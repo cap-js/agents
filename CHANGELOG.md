@@ -13,12 +13,13 @@
   - Customize the agent card URL with `@Core.Links` annotated to the service
 - Agent protocol adapter that converts incoming requests into LangGraph execution
 - Langgraph Executor with AI Core integration to agentify CAP services
+- Standard ReAct agent built via `createAgent` from `langchain` with shared middleware (quota enforcement, content filtering, `agent_actions` metric). Override behaviour via `buildMiddlewares` event handler.
 - Mock Executor for testing purposes
 - Multi-turn conversations with checkpointing
 - Option to overwrite the ootb executor
 - OpenTelemetry spans for langChain workflows and nodes as well as LLM invocations and tool calls.
 - OpenTelemetry metrics for LLM token consumption, tool invocations, agent requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions (per agent node invocation / LLM call) & active_users
-- Quota enforcement via `cds.agents.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made (via conditional node for StateGraph agents and middleware for Markdown agents).
+- Quota enforcement via `cds.agents.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made via middleware (`afterModel` hook). Shared between react agents and deep agents via `buildMiddlewares` event.
 - Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
 - Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agents.pool.maxLLMCallTimeoutMs` (default 30s).
 - Content filtering with Azure Content Safety prompt injection shield via `cds.agents.contentFilter` (default: `true`) via middleware. Per-service override via `buildContentFilter` event handler. Works for MD and react agents.

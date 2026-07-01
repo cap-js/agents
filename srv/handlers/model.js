@@ -6,7 +6,6 @@ import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { audit } from "../../lib/utils/utils.js"
 
 import { SystemMessage, ToolMessage, HumanMessage, AIMessage } from "@langchain/core/messages"
-import { instrumentTools } from "./tools.js"
 
 const LOG = cds.log("agent")
 
@@ -256,7 +255,7 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
             )
           } else if (isFilterModule && status === 400) {
             // The input filter blocked the request (e.g. detected prompt injection).
-            // Managed agents recover from this in lib/agents/react/nodes/agent.js.
+            // Content filter middleware handles recovery for managed agents.
             // DeepAgents handle input filtering via contentFilterMiddleware (separate cheap model call).
             LOG.warn("Content filter blocked the request", {
               model: modelName,
@@ -439,9 +438,5 @@ export async function createModel(options = {}) {
     },
   )
 
-  if (!deepAgent && tools && tools.length > 0) {
-    instrumentTools(tools)
-    return rawModel.bindTools(tools)
-  }
   return rawModel
 }

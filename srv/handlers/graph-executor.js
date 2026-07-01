@@ -386,8 +386,8 @@ class GraphExecutor {
             contextId,
             service: serviceName,
             duration,
-            tokens: lastResult?._totalTokens,
-            toolCalls: lastResult?._totalToolCalls,
+            tokens: lastResult?.runTokenCount,
+            toolCalls: lastResult?.runToolCallCount,
             output: output?.slice(0, 2000),
             task: requestContext.task,
           },
@@ -628,9 +628,9 @@ class GraphExecutor {
               })
               usageState = cp?.checkpoint?.channel_values
             }
-            if (usageState?._totalTokens != null) updates.usageLlmTokens = usageState._totalTokens
-            if (usageState?._totalToolCalls != null)
-              updates.usageToolCalls = usageState._totalToolCalls
+            if (usageState?.runTokenCount != null) updates.usageLlmTokens = usageState.runTokenCount
+            if (usageState?.runToolCallCount != null)
+              updates.usageToolCalls = usageState.runToolCallCount
             await UPDATE("cap.agent.Tasks").where({ taskId }).with(updates)
           } catch (err) {
             LOG.debug("usage update failed", { task: short(taskId), error: err.message })

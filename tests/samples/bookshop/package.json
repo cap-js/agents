@@ -28,11 +28,13 @@
       "fileIO": {
         "enabled": true
       },
+      "contentFilter": false,
       "activeUsersInterval": "1s",
       "[tracing]": {
         "mlflow": true
       },
       "[hybrid]": {
+        "contentFilter": true,
         "activeUsersInterval": "24h"
       }
     },
