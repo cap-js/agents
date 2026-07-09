@@ -17,8 +17,6 @@
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "generate-agent-card-snapshot": "cd tests/samples/bookshop && cds compile ./srv -s CatalogService -2 a2a | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const c=JSON.parse(d);delete c.url;if(c.supportedInterfaces)for(const i of c.supportedInterfaces)delete i.url;require('node:fs').writeFileSync('../../integration/__snapshots__/agent-card.json',JSON.stringify(c,null,2)+'\\n');})\"",
-    "pretest": "npm run generate-agent-card-snapshot",
     "test": "CDS_ENV=test node --test --test-force-exit tests/integration/*.test.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- node --test --test-force-exit --test-timeout=900000 tests/integration/*.test.js tests/hybrid/*.test.js",
     "test:mtx": "CDS_ENV=test node --test --test-force-exit tests/integration/mtx.test.js",
@@ -41,24 +39,24 @@
     "@cap-js/mcp": "^1.1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
-    "langchain": "^1",
     "@sap-ai-sdk/langchain": "^2",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/resilience": "^4.7.0",
+    "langchain": "^1",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@cap-js/cds-test": ">=0",
+    "@cap-js/cds-test": "^0.4.1",
+    "@cap-js/hana": "^2",
     "@cap-js/sqlite": "^2",
-    "@sap/cds-mtxs": ">=2",
+    "@sap/cds-mtxs": "^3",
     "@toon-format/toon": ">=0",
     "deepagents": "^1.10.2"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=8",
-    "express": "^4 || ^5"
+    "@sap/cds": ">=8"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {

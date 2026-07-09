@@ -6,7 +6,8 @@
   "private": true,
   "dependencies": {
     "@cap-js/mcp": "^1",
-    "@cap-js/sqlite": "*"
+    "@cap-js/sqlite": "*",
+    "@sap/cds": ">=8"
   },
   "license": "Apache-2.0",
   "cds": {

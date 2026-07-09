@@ -7,7 +7,7 @@ const CHECKPOINTS = "cap.agent.Checkpoints"
 const WRITES = "cap.agent.CheckpointWrites"
 
 function runAs(userId, fn) {
-  return cds._with({ user: new cds.User({ id: userId }) }, fn)
+  return cds.tx({ user: new cds.User({ id: userId }) }, fn)
 }
 
 function makeCheckpoint(id) {

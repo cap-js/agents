@@ -28,6 +28,7 @@ describe("buildTools — default behavior", () => {
     // Simulate: register default handler then dispatch
     const srv = new cds.ApplicationService()
     srv.name = "TestBuildTools"
+    srv.model = { definitions: {} }
     srv.on("buildTools", () => {
       return generateTools(srv)
     })

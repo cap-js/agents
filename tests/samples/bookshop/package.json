@@ -6,12 +6,12 @@
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
     "@cap-js/audit-logging": ">=1",
-    "@cap-js/hana": "^2",
+    "@cap-js/hana": ">=1",
     "@cap-js/mcp": "^1",
     "@cap-js/telemetry": "^1",
     "@langchain/anthropic": "^1.4.0",
     "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
-    "@sap/cds": "^9.8.5",
+    "@sap/cds": ">=8",
     "@sap/xssec": "^4",
     "@toon-format/toon": "^2.1.0",
     "zod": "^4.3.6"
@@ -20,8 +20,8 @@
     "start": "cds-serve"
   },
   "devDependencies": {
-    "@cap-js/sqlite": "^2",
-    "@sap/cds-dk": "^9"
+    "@cap-js/sqlite": ">=1",
+    "@sap/cds-dk": ">=8"
   },
   "cds": {
     "agents": {

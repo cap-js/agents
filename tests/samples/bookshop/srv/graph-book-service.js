@@ -10,7 +10,7 @@ import * as metrics from "@cap-js/agents/lib/telemetry/metrics.js"
  */
 const getBookCount = tool(
   async ({ genre_ID }) => {
-    const { Books } = cds.entities("sap.capire.bookshop")
+    const { Books } = cds.model.entities("sap.capire.bookshop")
     const where = genre_ID ? { genre_ID } : {}
     const result = await SELECT.from(Books).where(where)
     return JSON.stringify({ count: result.length, genre_ID: genre_ID || "all" })

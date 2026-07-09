@@ -74,7 +74,7 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
     const contextId = res.data.result.contextId
     const taskId = res.data.result.id
 
-    const InputFiles = cds.entities("cap.agent")["Tasks.inputFiles"]
+    const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
     const rows = await cds.run(
       SELECT.from(InputFiles).where({ "up_.contextId": contextId, filename: "reading-list.csv" }),
     )
@@ -151,7 +151,7 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
     )
     const taskId2 = turn2.data.result.id
 
-    const InputFiles = cds.entities("cap.agent")["Tasks.inputFiles"]
+    const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
     // Both rows exist (always-insert)
     const all = await cds.run(
       SELECT.from(InputFiles).where({ "up_.contextId": contextId, filename: "data.csv" }),

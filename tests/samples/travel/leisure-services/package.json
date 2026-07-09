@@ -5,7 +5,8 @@
   "private": true,
   "dependencies": {
     "@cap-js/agents": "file:../../../..",
-    "@cap-js/sqlite": "*"
+    "@cap-js/sqlite": "*",
+    "@sap/cds": ">=8"
   },
   "cds": {
     "server": {

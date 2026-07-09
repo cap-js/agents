@@ -3,8 +3,7 @@ import { ChatAnthropic } from "@langchain/anthropic"
 
 export default class CatalogService extends cds.ApplicationService {
   init() {
-    const { Books } = cds.entities("sap.capire.bookshop")
-    const { ListOfBooks } = this.entities
+    const { Books, ListOfBooks } = this.entities
 
     // Add some discount for overstocked books
     this.after("each", ListOfBooks, (book) => {

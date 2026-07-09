@@ -41,10 +41,7 @@ runs:
       run: npm i -g @sap/cds-dk@${{ inputs.CDS_VERSION }}
     - name: Install all dependencies
       shell: bash
-      run: npm install
-    - name: Install bookshop dependencies
-      shell: bash
-      run: cd tests/samples/bookshop && npm install
+      run: npm install --legacy-peer-deps
 
     - name: CDS Versions being used
       shell: bash

@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 class DataService extends cds.ApplicationService {
   init() {
-    const { Flights, FlightBookings } = cds.entities("sap.capire.flights")
+    const { Flights, FlightBookings } = this.entities
 
     this.on("BookingCreated", async (req) => {
       const { flight, date, seats = [null] } = req.data

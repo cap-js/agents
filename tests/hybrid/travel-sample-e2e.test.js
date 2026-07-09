@@ -382,7 +382,7 @@ describe(
         const contextId = result.contextId
 
         // Persisted upload
-        const InputFiles = cds.entities("cap.agent")["Tasks.inputFiles"]
+        const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
         const inputs = await cds.run(
           SELECT.from(InputFiles).where({
             "up_.contextId": contextId,
@@ -408,7 +408,7 @@ describe(
         )
 
         // Output file persisted in CDS
-        const OutputFiles = cds.entities("cap.agent")["Tasks.outputFiles"]
+        const OutputFiles = cds.model.definitions["cap.agent.Tasks.outputFiles"]
         const outputs = await cds.run(SELECT.from(OutputFiles).where({ up__taskId: savedTaskId }))
         assert.ok(outputs.length >= 1, "expected at least one output file row")
 

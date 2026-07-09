@@ -11,12 +11,12 @@ jobs:
   test:
     runs-on: [self-hosted, solinas]
     timeout-minutes: 10
-    name: SQLite Tests with Node.js ${{ matrix.node-version }}
+    name: SQLite Tests with Node.js ${{ matrix.node-version }} (CDS ${{ matrix.cds-version }})
     strategy:
       fail-fast: false
       matrix:
         node-version: [22.x, 24.x]
-        cds-version: [latest]
+        cds-version: [8, 9, latest]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -30,9 +30,26 @@ jobs:
         run: |
           echo "@cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/" >> .npmrc
           echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ secrets.NPM_REGISTRY_TOKEN }}" >> .npmrc
+      - name: Pin CDS 8 compatible stack
+        if: matrix.cds-version == '8'
+        run: |
+          npm pkg set "overrides.@sap/cds=^8"
+          npm pkg set "overrides.@cap-js/sqlite=^1"
+          npm pkg set "overrides.@cap-js/hana=^1"
+          npm pkg set "overrides.@sap/cds-mtxs=^2"
+          npm pkg set "overrides.express=^4"
+          npm pkg delete "devDependencies.@cap-js/hana"
+          npm pkg delete "devDependencies.@cap-js/sqlite"
+          npm pkg delete "devDependencies.@sap/cds-mtxs"
+      - name: Pin CDS 9 compatible stack
+        if: matrix.cds-version == '9'
+        run: |
+          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
+          npm pkg set "dependencies.@sap/cds=^9" -ws
+          npm pkg set "peerDependencies.@sap/cds=^9"
       - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
-      - run: npm i
-      - run: cd tests/samples/bookshop && npm i
+      - run: npm i --legacy-peer-deps
+      - run: cds v
       - run: npm run test
 
   test-hybrid:
@@ -44,7 +61,6 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22.x, 24.x]
-        cds-version: [latest]
     env:
       CF_USERNAME: ${{ secrets.CF_USERNAME }}
       CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
@@ -63,5 +79,5 @@ jobs:
           CF_ORG: ${{ secrets.CF_ORG }}
           CF_SPACE: ${{ secrets.CF_SPACE }}
           NODE_VERSION: ${{ matrix.node-version }}
-          CDS_VERSION: ${{ matrix.cds-version }}
+          CDS_VERSION: latest
           NPM_REGISTRY_TOKEN: ${{ secrets.NPM_REGISTRY_TOKEN }}

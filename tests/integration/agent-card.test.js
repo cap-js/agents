@@ -1,5 +1,4 @@
 import assert from "node:assert/strict"
-import fs from "node:fs"
 import path from "node:path"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
@@ -30,7 +29,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       assert.strictEqual(card.capabilities.streaming, true)
     })
 
-    it("agent card matches snapshot", async () => {
+    it("agent card matches snapshot", async (t) => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
       // Strip dynamic placeholder URLs (compile uses "https://HOST/..." vs
@@ -40,8 +39,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
         for (const iface of card.supportedInterfaces) delete iface.url
       }
       const snapshotPath = path.join(import.meta.dirname, "__snapshots__", "agent-card.json")
-      const expected = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
-      assert.deepStrictEqual(card, expected)
+      t.assert.fileSnapshot(card, snapshotPath)
     })
   })
 

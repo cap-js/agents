@@ -51,7 +51,7 @@ export default class ProductAgentService extends cds.ApplicationService {
 
 const calculateBulkPricing = tool(
   async ({ productName, quantity }) => {
-    const { Products } = cds.entities("sample.products")
+    const { Products } = cds.model.entities("sample.products")
     const results = await SELECT.from(Products)
       .where({ name: { like: `%${productName}%` } })
       .limit(1)
