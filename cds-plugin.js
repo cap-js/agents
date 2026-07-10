@@ -32,6 +32,7 @@ if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
 
 // Register A2A as a CDS protocol adapter
+// Cant switch to package.json yet due to CAP not correctly reading ESM default export
 const protocols = (cds.env.protocols ??= {})
 if (!protocols.agent) {
   protocols.agent = {
