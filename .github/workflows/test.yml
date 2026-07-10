@@ -55,7 +55,7 @@ jobs:
   test-hybrid:
     runs-on: [self-hosted, solinas-medium]
     container:
-      image: public.int.repositories.cloud.sap/ubuntu:24.04@sha256:786a8b558f7be160c6c8c4a54f9a57274f3b4fb1491cf65146521ae77ff1dc54
+      image: public.int.repositories.cloud.sap/ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
     name: Hybrid Tests with Node.js ${{ matrix.node-version }}
     strategy:
       fail-fast: false
