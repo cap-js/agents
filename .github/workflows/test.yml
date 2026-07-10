@@ -38,15 +38,18 @@ jobs:
           npm pkg set "overrides.@cap-js/hana=^1"
           npm pkg set "overrides.@sap/cds-mtxs=^2"
           npm pkg set "overrides.express=^4"
+          npm pkg set "devDependencies.@cap-js/cds-test=>0"
           npm pkg delete "devDependencies.@cap-js/hana"
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
         run: |
+          npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
-          npm pkg set "dependencies.@sap/cds=^9" -ws
+          npm pkg set "dependencies.@sap/cds=^9" --ws
           npm pkg set "peerDependencies.@sap/cds=^9"
+          npm pkg set "devDependencies.@cap-js/sqlite=^2"
       - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
       - run: npm i --legacy-peer-deps
       - run: cds v
