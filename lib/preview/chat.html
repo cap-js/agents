@@ -256,6 +256,12 @@
         background: #91adc5;
         cursor: not-allowed;
       }
+      #send.cancel {
+        background: #e53935;
+      }
+      #send.cancel:hover {
+        background: #c62828;
+      }
 
       .approval-actions {
         display: flex;
@@ -334,6 +340,12 @@
         #send:disabled {
           background: #304c65;
         }
+        #send.cancel {
+          background: #e53935;
+        }
+        #send.cancel:hover {
+          background: #ef5350;
+        }
         .msg.approval {
           background: #1a3d58;
           color: #c8dff0;
@@ -387,6 +399,13 @@
       let busy = false
       let contextId = null
       let pendingTaskId = null
+      let activeTaskId = null
+      let activeAbort = null
+
+      const HISTORY_KEY = "chatHistory_" + AGENT_URL
+      let inputHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]")
+      let historyIndex = -1
+      let currentDraft = ""
 
       const md = (text) => marked.parse(text, { breaks: true, gfm: true })
 
@@ -397,10 +416,33 @@
       prompt.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault()
-          send()
+          if (busy) cancel()
+          else send()
+        } else if (e.key === "ArrowUp" && prompt.selectionStart === 0) {
+          e.preventDefault()
+          if (historyIndex === -1) currentDraft = prompt.value
+          if (historyIndex < inputHistory.length - 1) {
+            historyIndex++
+            prompt.value = inputHistory[inputHistory.length - 1 - historyIndex]
+            prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+          }
+        } else if (e.key === "ArrowDown" && prompt.selectionEnd === prompt.value.length) {
+          e.preventDefault()
+          if (historyIndex > 0) {
+            historyIndex--
+            prompt.value = inputHistory[inputHistory.length - 1 - historyIndex]
+            prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+          } else if (historyIndex === 0) {
+            historyIndex = -1
+            prompt.value = currentDraft
+            prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+          }
         }
       })
-      sendBtn.addEventListener("click", send)
+      sendBtn.addEventListener("click", () => {
+        if (busy) cancel()
+        else send()
+      })
 
       function addMessage(role, text) {
         const el = document.createElement("div")
@@ -449,10 +491,20 @@
 
       function setBusy(val) {
         busy = val
-        sendBtn.disabled = val
         prompt.disabled = val
         typing.style.display = val ? "block" : "none"
         dot.className = "status-dot" + (val ? " busy" : "")
+        if (val) {
+          sendBtn.textContent = "Cancel"
+          sendBtn.classList.add("cancel")
+          sendBtn.disabled = false
+        } else {
+          sendBtn.textContent = "Send"
+          sendBtn.classList.remove("cancel")
+          sendBtn.disabled = false
+          activeTaskId = null
+          activeAbort = null
+        }
         messages.scrollTop = messages.scrollHeight
       }
 
@@ -460,15 +512,20 @@
         const taskId = pendingTaskId
         pendingTaskId = null
 
+        const abort = new AbortController()
+        activeAbort = abort
+        activeTaskId = taskId
+
         setBusy(true)
 
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
-              method: "message/send",
+              method: "message/stream",
               id: crypto.randomUUID(),
               params: {
                 message: {
@@ -482,12 +539,9 @@
             }),
           })
 
-          const { result, error } = await resp.json()
-          if (error) throw new Error(error.message || JSON.stringify(error))
-
-          contextId = result?.contextId ?? result?.status?.contextId ?? contextId
-          await handleResult(result)
+          await handleSSEResponse(resp)
         } catch (err) {
+          if (err.name === "AbortError") return
           dot.className = "status-dot error"
           addMessage("error", "⚠ " + (err.message || String(err)))
           setTimeout(() => (dot.className = "status-dot"), 3000)
@@ -512,7 +566,8 @@
           return
         }
 
-        const parts = result?.parts ?? result?.artifacts?.[0]?.parts ?? []
+        const parts =
+          result?.parts ?? result?.artifacts?.[0]?.parts ?? result?.status?.message?.parts ?? []
         const reply = parts
           .filter((p) => p.kind === "text" || p.text)
           .map((p) => p.text)
@@ -524,18 +579,28 @@
         const text = prompt.value.trim()
         if (!text || busy) return
 
+        // Save to input history
+        inputHistory.push(text)
+        if (inputHistory.length > 100) inputHistory.shift()
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(inputHistory))
+        historyIndex = -1
+        currentDraft = ""
+
         addMessage("user", text)
         prompt.value = ""
         prompt.style.height = "auto"
+        const abort = new AbortController()
+        activeAbort = abort
         setBusy(true)
 
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
-              method: "message/send",
+              method: "message/stream",
               id: crypto.randomUUID(),
               params: {
                 message: {
@@ -548,12 +613,9 @@
             }),
           })
 
-          const { result, error } = await resp.json()
-          if (error) throw new Error(error.message || JSON.stringify(error))
-
-          contextId = result?.contextId ?? result?.status?.contextId ?? contextId
-          await handleResult(result)
+          await handleSSEResponse(resp)
         } catch (err) {
+          if (err.name === "AbortError") return
           dot.className = "status-dot error"
           addMessage("error", "⚠ " + (err.message || String(err)))
           setTimeout(() => {
@@ -563,6 +625,112 @@
           setBusy(false)
           prompt.focus()
         }
+      }
+
+      async function handleSSEResponse(resp) {
+        if (!resp.ok) {
+          const body = await resp.text()
+          let parsed
+          try {
+            parsed = JSON.parse(body)
+          } catch (e) {
+            /* not JSON */
+          }
+          throw new Error(parsed?.error?.message || `HTTP ${resp.status}: ${body.slice(0, 200)}`)
+        }
+
+        const reader = resp.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let lastResult = null
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          let lineEnd
+          while ((lineEnd = buffer.indexOf("\n")) !== -1) {
+            const line = buffer.slice(0, lineEnd).trim()
+            buffer = buffer.slice(lineEnd + 1)
+
+            if (line.startsWith("data: ")) {
+              try {
+                const frame = JSON.parse(line.slice(6))
+                // SSE frames are JSON-RPC envelopes: {jsonrpc, id, result} or {jsonrpc, id, error}
+                if (frame.error) throw new Error(frame.error.message || "Stream error")
+                if (frame.result) {
+                  lastResult = processSSEEvent(frame.result) || lastResult
+                }
+              } catch (e) {
+                if (e instanceof SyntaxError) continue
+                throw e
+              }
+            } else if (line.startsWith("event: error")) {
+              // Next data line will have the error
+            }
+          }
+        }
+
+        if (lastResult) await handleResult(lastResult)
+      }
+
+      function processSSEEvent(event) {
+        // Extract taskId from first task event
+        if (event.kind === "task" && event.id) {
+          activeTaskId = event.id
+          contextId = event.contextId ?? contextId
+        }
+
+        // Track contextId from status-updates
+        if (event.contextId) contextId = event.contextId
+
+        // Status update with final=true means terminal state
+        if (event.kind === "status-update" && event.final) {
+          return {
+            id: event.taskId || activeTaskId,
+            contextId: event.contextId || contextId,
+            status: event.status,
+            artifacts: event.artifacts,
+          }
+        }
+
+        // Artifact event
+        if (event.kind === "artifact") {
+          return {
+            id: event.taskId || activeTaskId,
+            contextId: event.contextId || contextId,
+            status: event.status || { state: "completed" },
+            artifacts: [event.artifact || event],
+          }
+        }
+
+        return null
+      }
+
+      async function cancel() {
+        const taskId = activeTaskId
+
+        // Abort ongoing fetch
+        if (activeAbort) activeAbort.abort()
+
+        // Send tasks/cancel if we have a taskId
+        if (taskId) {
+          fetch(AGENT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "tasks/cancel",
+              id: crypto.randomUUID(),
+              params: { id: taskId },
+            }),
+          }).catch(() => {})
+        }
+
+        addMessage("agent", "⊘ Task canceled.")
+        setBusy(false)
+        prompt.focus()
       }
     </script>
   </body>
