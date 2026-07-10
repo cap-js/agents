@@ -98,4 +98,16 @@ describe("@cap-js/agents - Agent Card (deep agent modes)", { skip: !canLoadDeepA
     assert.notStrictEqual(listing, undefined, "skills/ scan should yield product-listing skill")
     assert.ok(listing.tags.includes("read-only"))
   })
+
+  // ── Co-located convention (AGENTS.md next to service.cds) ─────────────
+  it("Co-located convention: AGENTS.md in srcDir is picked up without a dedicated sub-directory", async () => {
+    const res = await GET("/a2a/colocated-agent/.well-known/agent-card.json")
+    const card = res.data
+    assert.strictEqual(card.name, "colocated-agent")
+    assert.ok(card.description.includes("Co-located agent"))
+
+    const browse = card.skills.find((s) => s.id === "product-browse")
+    assert.notStrictEqual(browse, undefined, "skills/ scan should yield product-browse skill")
+    assert.ok(browse.tags.includes("read-only"))
+  })
 })
