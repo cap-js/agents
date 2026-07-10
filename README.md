@@ -60,7 +60,7 @@ Define an agent's identity, behaviour, and skills entirely in markdown — no Ja
 service ProductAgent {
   @readonly entity Products as projection on my.Products;
 
-  @UI.IsActionCritical // > Action is considered for Human-in-the-loop
+  @Common.IsActionCritical // > Action is considered for Human-in-the-loop
   action doSomething();
 }
 ```
@@ -713,7 +713,7 @@ createDeepAgent({
 
 No additional plugin configuration needed — interrupt detection, checkpoint persistence, and resume are handled automatically.
 
-For regular markdown-based agents, `@UI.IsActionCritical` will automatically trigger the HITL flow for an action.
+For regular markdown-based agents, `@Common.IsActionCritical` will automatically trigger the HITL flow for an action.
 
 ## Samples
 
