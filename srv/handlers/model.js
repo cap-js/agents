@@ -422,7 +422,7 @@ function resolveModelName(srv) {
  * @returns {Promise<import("@sap-ai-sdk/langchain").OrchestrationClient>} A LangChain-compatible chat model
  */
 export async function createModel(options = {}) {
-  const { srv, tools, deepAgent } = options
+  const { srv, deepAgent } = options
 
   const modelName = resolveModelName(srv)
   if (!modelName) {
