@@ -112,6 +112,37 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
     )
   })
 
+  it("should set gen_ai.response.model on chat span (actual model returned by AI Core)", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("catalog", "What books exist?"))
+    const chatSpan = findSpan(spans, /^chat /)
+    assert.notStrictEqual(chatSpan, undefined)
+    assert.notStrictEqual(
+      chatSpan.attributes["gen_ai.response.model"],
+      undefined,
+      "expected gen_ai.response.model to be set",
+    )
+    assert.ok(
+      chatSpan.attributes["gen_ai.response.model"].length > 0,
+      "expected non-empty gen_ai.response.model",
+    )
+  })
+
+  it("should set gen_ai.response.finish_reasons as array on chat span", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("catalog", "List books"))
+    const chatSpan = findSpan(spans, /^chat /)
+    assert.notStrictEqual(chatSpan, undefined)
+    const finishReasons = chatSpan.attributes["gen_ai.response.finish_reasons"]
+    assert.ok(Array.isArray(finishReasons), `expected array, got ${typeof finishReasons}`)
+    assert.ok(finishReasons.length > 0, "expected at least one finish reason")
+    // Normal response should be "stop" or "end_turn" (Anthropic); "length"/"max_tokens" = truncated
+    assert.ok(
+      ["stop", "end_turn", "tool_calls", "tool_use", "length", "max_tokens"].includes(
+        finishReasons[0],
+      ),
+      `unexpected finish_reason: ${finishReasons[0]}`,
+    )
+  })
+
   it("should produce tool execution spans", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "Show me books"))
     const toolSpans = findSpans(spans, "execute_tool")

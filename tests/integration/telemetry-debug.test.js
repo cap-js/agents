@@ -48,20 +48,20 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
   // ─── Debug content capture ──────────────────────────────────────────
 
   describe("debug content on spans", () => {
-    it("should include agent.entity.input on tool spans when log level is debug", async () => {
+    it("should include gen_ai.tool.call.arguments on tool spans when log level is debug", async () => {
       const spans = await getSpansAfterRequest(() => sendMessage("debug", "Show books"))
       const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")
       assert.notStrictEqual(toolSpan, undefined)
-      assert.notStrictEqual(toolSpan.attributes["agent.entity.input"], undefined)
-      assert.match(toolSpan.attributes["agent.entity.input"], /Books/)
+      assert.notStrictEqual(toolSpan.attributes["gen_ai.tool.call.arguments"], undefined)
+      assert.match(toolSpan.attributes["gen_ai.tool.call.arguments"], /Books/)
     })
 
-    it("should include agent.entity.output on tool spans when log level is debug", async () => {
+    it("should include gen_ai.tool.call.result on tool spans when log level is debug", async () => {
       const spans = await getSpansAfterRequest(() => sendMessage("debug", "List books"))
       const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")
       assert.notStrictEqual(toolSpan, undefined)
-      assert.notStrictEqual(toolSpan.attributes["agent.entity.output"], undefined)
-      assert.match(toolSpan.attributes["agent.entity.output"], /Wuthering Heights|Jane Eyre/)
+      assert.notStrictEqual(toolSpan.attributes["gen_ai.tool.call.result"], undefined)
+      assert.match(toolSpan.attributes["gen_ai.tool.call.result"], /Wuthering Heights|Jane Eyre/)
     })
   })
 

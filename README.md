@@ -368,7 +368,7 @@ POST /a2a/CatalogService/
        └─ execute_tool DynamicStructuredTool submitOrder
 ```
 
-**Privacy:** By default, spans contain only names, IDs, token counts, and outcomes — no message content. Set `DEBUG=agent` (or `cds.log.levels.agent: "debug"`) to include full input/output as `agent.entity.input` and `agent.entity.output` span attributes.
+**Privacy:** By default, spans contain only names, IDs, token counts, and outcomes — no message content. Set `DEBUG=agent` (or `cds.log.levels.agent: "debug"`) to include full input/output as `gen_ai.input.messages` and `gen_ai.output.messages` span attributes.
 
 </details>
 

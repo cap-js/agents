@@ -181,19 +181,23 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
             span.setAttribute("gen_ai.request.max_tokens", params.max_tokens)
           if (cds.context?.["agent.context.id"])
             span.setAttribute("gen_ai.conversation.id", cds.context["agent.context.id"])
-          span.setAttribute("agent.span.kind", "chat")
+          if (this.streaming) span.setAttribute("gen_ai.request.stream", true)
           span.setAttribute("agent.llm.node", node)
           if (claudeModel) span.setAttribute("gen_ai.request.cache_control", true)
-          // MLflow Databricks: LLM span type + model info + inputs summary
-          const inputSummary = messages.map((m) => m.content?.slice?.(0, 200) || "").join(" | ")
-          setSpanAttrs(
-            span,
-            mlflowAttrs("LLM", { model: modelName, provider: "sap-ai-core", inputs: inputSummary }),
-          )
-          if (LOG._debug) {
-            const content = JSON.stringify(messages.map((m) => m.content))
-            span.setAttribute("gen_ai.input.messages", content)
-            span.setAttribute("agent.entity.input", content)
+          if (cds.env.agents?.mlflow || LOG._debug) {
+            const inputSummary = JSON.stringify(messages.map((m) => m.content))
+            // MLflow Databricks: LLM span type + model info + inputs summary
+            setSpanAttrs(
+              span,
+              mlflowAttrs("LLM", {
+                model: modelName,
+                provider: "sap-ai-core",
+                inputs: inputSummary,
+              }),
+            )
+            if (LOG._debug) {
+              span.setAttribute("gen_ai.input.messages", inputSummary)
+            }
           }
         }
 
@@ -202,14 +206,12 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
         try {
           const llmTimeout = cds.env.agents?.pool?.maxLLMCallTimeoutMs || 120000
           const middleware = [timeout(llmTimeout), circuitBreaker()]
-          // For Claude: add response-capture middleware to extract raw usage with cache details
-          if (claudeModel) {
-            middleware.unshift((options) => async (arg) => {
-              const res = await options.fn(arg)
-              this._lastRawUsage = res?.data?.final_result?.usage || null
-              return res
-            })
-          }
+          // Response-capture middleware: extract raw usage for cache + reasoning token details
+          middleware.unshift((options) => async (arg) => {
+            const res = await options.fn(arg)
+            this._lastRawUsage = res?.data?.final_result?.usage || null
+            return res
+          })
 
           opts = {
             ...opts,
@@ -284,21 +286,32 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
           metrics.llmOutputTokens.add(usage.output_tokens, mAttrs)
           if (span) span.setAttribute("gen_ai.usage.output_tokens", usage.output_tokens)
         }
-        // Claude prompt caching: extract cache_creation and cache_read tokens from raw usage
+        // Prompt caching: extract cache_creation and cache_read tokens from raw usage (Claude)
         if (span && claudeModel && this._lastRawUsage) {
           const details = this._lastRawUsage.prompt_tokens_details
           if (details?.cached_tokens) {
-            span.setAttribute("gen_ai.usage.cache_read_input_tokens", details.cached_tokens)
+            span.setAttribute("gen_ai.usage.cache_read.input_tokens", details.cached_tokens)
           }
           if (details?.cache_creation_tokens) {
             span.setAttribute(
-              "gen_ai.usage.cache_creation_input_tokens",
+              "gen_ai.usage.cache_creation.input_tokens",
               details.cache_creation_tokens,
             )
           }
         }
+        // Reasoning tokens (o1, gpt-5, etc.)
+        if (span && this._lastRawUsage?.completion_tokens_details?.reasoning_tokens) {
+          span.setAttribute(
+            "gen_ai.usage.reasoning.output_tokens",
+            this._lastRawUsage.completion_tokens_details.reasoning_tokens,
+          )
+        }
         const msg = result.generations?.[0]?.message
+        const finishReason = result.generations?.[0]?.generationInfo?.finish_reason
         if (span) {
+          if (finishReason) span.setAttribute("gen_ai.response.finish_reasons", [finishReason])
+          const responseModel = result.llmOutput?.model
+          if (responseModel) span.setAttribute("gen_ai.response.model", responseModel)
           const responseId = msg?.response_metadata?.id || msg?.id
           if (responseId) span.setAttribute("gen_ai.response.id", responseId)
           if (msg?.tool_calls?.length > 0) {
@@ -308,10 +321,19 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
             )
           }
         }
+        // Detect max_tokens truncation: "length" (OpenAI) or "max_tokens" (Anthropic)
+        if (finishReason === "length" || finishReason === "max_tokens") {
+          LOG.warn("LLM response truncated: output_tokens reached max_tokens limit", {
+            model: modelName,
+            node,
+            max_tokens: params?.max_tokens,
+            output_tokens: usage?.output_tokens,
+          })
+          if (span) span.setAttribute("gen_ai.response.truncated", true)
+        }
         if (span && LOG._debug) {
           const output = JSON.stringify(result.generations?.[0]?.message?.content)
           span.setAttribute("gen_ai.output.messages", output)
-          span.setAttribute("agent.entity.output", output)
         }
         // MLflow Databricks: combined token usage + outputs
         if (span && usage) {

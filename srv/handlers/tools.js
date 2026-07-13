@@ -59,11 +59,10 @@ export function generateTools(srv, options = {}) {
         if (span) {
           span.setAttribute("gen_ai.operation.name", "execute_tool")
           span.setAttribute("gen_ai.provider.name", "langchain")
-          span.setAttribute("agent.span.kind", "tool")
-          span.setAttribute("agent.tool.name", dstool.name)
+          span.setAttribute("gen_ai.tool.call.id", dstool.name)
           if (LOG._debug) {
             const input = JSON.stringify(args)
-            span.setAttribute("agent.entity.input", input)
+            span.setAttribute("gen_ai.tool.call.arguments", input)
           }
         }
         const t0 = Date.now()
@@ -72,10 +71,10 @@ export function generateTools(srv, options = {}) {
           const duration = Date.now() - t0
           metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "success" })
           if (span) {
-            span.setAttribute("agent.tool.outcome", "success")
+            span.setAttribute("gen_ai.tool.call.outcome", "success")
             if (LOG._debug) {
               const output = typeof result === "string" ? result : JSON.stringify(result)
-              span.setAttribute("agent.entity.output", output)
+              span.setAttribute("gen_ai.tool.call.result", output)
             }
             setSpanAttrs(
               span,
@@ -105,7 +104,7 @@ export function generateTools(srv, options = {}) {
           const duration = Date.now() - t0
           metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "error" })
           if (span) {
-            span.setAttribute("agent.tool.outcome", "error")
+            span.setAttribute("gen_ai.tool.call.outcome", "error")
             span.setStatus({ code: 2, message: err.message })
           }
 
@@ -254,9 +253,8 @@ function _instrumentTool(t) {
       if (span) {
         span.setAttribute("gen_ai.operation.name", "execute_tool")
         span.setAttribute("gen_ai.provider.name", "langchain")
-        span.setAttribute("agent.span.kind", "tool")
-        span.setAttribute("agent.tool.name", t.name)
-        if (LOG._debug) span.setAttribute("agent.entity.input", JSON.stringify(args))
+        span.setAttribute("gen_ai.tool.call.id", t.name)
+        if (LOG._debug) span.setAttribute("gen_ai.tool.call.arguments", JSON.stringify(args))
       }
       const t0 = Date.now()
       try {
@@ -264,10 +262,10 @@ function _instrumentTool(t) {
         const duration = Date.now() - t0
         metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "success" })
         if (span) {
-          span.setAttribute("agent.tool.outcome", "success")
+          span.setAttribute("gen_ai.tool.call.outcome", "success")
           if (LOG._debug) {
             const output = typeof result === "string" ? result : JSON.stringify(result)
-            span.setAttribute("agent.entity.output", output)
+            span.setAttribute("gen_ai.tool.call.result", output)
           }
         }
 
@@ -293,7 +291,7 @@ function _instrumentTool(t) {
         const duration = Date.now() - t0
         metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "error" })
         if (span) {
-          span.setAttribute("agent.tool.outcome", "error")
+          span.setAttribute("gen_ai.tool.call.outcome", "error")
           span.setStatus({ code: 2, message: err.message })
         }
 

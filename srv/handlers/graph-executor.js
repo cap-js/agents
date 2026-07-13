@@ -260,7 +260,6 @@ class GraphExecutor {
       if (wfSpan) {
         wfSpan.setAttribute("gen_ai.operation.name", "invoke_agent")
         wfSpan.setAttribute("gen_ai.agent.name", serviceName)
-        wfSpan.setAttribute("agent.span.kind", "workflow")
         wfSpan.setAttribute("agent.task.id", taskId)
         wfSpan.setAttribute("agent.context.id", contextId)
         wfSpan.setAttribute("agent.service", serviceName)

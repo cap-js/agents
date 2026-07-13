@@ -9,21 +9,32 @@ import http from "node:http"
 export function createMockAICore() {
   let responseStatus = 200
   let callCount = 0
+  let finishReason = "stop"
+  let responseContent = "Mock LLM response from AI Core."
+  let modelName = "mock-gpt-4"
+  let reasoningTokens = null
 
-  const successBody = JSON.stringify({
-    request_id: "mock-req-001",
-    final_result: {
-      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-      choices: [
-        {
-          index: 0,
-          message: { role: "assistant", content: "Mock LLM response from AI Core." },
-          finish_reason: "stop",
-        },
-      ],
-    },
-    intermediate_results: {},
-  })
+  function buildSuccessBody() {
+    const usage = { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+    if (reasoningTokens != null) {
+      usage.completion_tokens_details = { reasoning_tokens: reasoningTokens }
+    }
+    return JSON.stringify({
+      request_id: "mock-req-001",
+      final_result: {
+        model: modelName,
+        usage,
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: responseContent },
+            finish_reason: finishReason,
+          },
+        ],
+      },
+      intermediate_results: {},
+    })
+  }
 
   const server = http.createServer((req, res) => {
     callCount++
@@ -37,7 +48,7 @@ export function createMockAICore() {
       )
     } else {
       res.writeHead(200)
-      res.end(successBody)
+      res.end(buildSuccessBody())
     }
   })
 
@@ -51,6 +62,18 @@ export function createMockAICore() {
     getCallCount: () => callCount,
     resetCallCount: () => {
       callCount = 0
+    },
+    setFinishReason: (reason) => {
+      finishReason = reason
+    },
+    setResponseContent: (content) => {
+      responseContent = content
+    },
+    setModel: (name) => {
+      modelName = name
+    },
+    setReasoningTokens: (n) => {
+      reasoningTokens = n
     },
   }
 }
