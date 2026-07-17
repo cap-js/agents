@@ -73,7 +73,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           allow-unsafe-pr-checkout: true
-      - uses: cap/.github/.github/actions/git-setup@725cb63379e2e73f163abfa7d77f12ec7c1e1a81 # main
+      - uses: cap/.github/.github/actions/git-setup@5507e8e09411e392cc3e81bacd6773358c1d6b24 # main
         with:
           com-github-token: ${{ secrets.COM_GITHUB_TOKEN }}
       - name: Run hybrid integration tests

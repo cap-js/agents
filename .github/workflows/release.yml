@@ -33,7 +33,7 @@ jobs:
 
   # Pre-release: upload test results and run BlackDuck scans
   upload-test-results:
-    uses: cap/.github/.github/workflows/pre-release.yml@725cb63379e2e73f163abfa7d77f12ec7c1e1a81 # main
+    uses: cap/.github/.github/workflows/pre-release.yml@5507e8e09411e392cc3e81bacd6773358c1d6b24 # main
     secrets:
       cumulus-token: ${{ secrets.CUMULUS_TOKEN_CDS_UMBRELLA }}
     with:
@@ -45,7 +45,7 @@ jobs:
       npm-script: "test:reporting"
 
   blackduck-scans:
-    uses: cap/.github/.github/workflows/scans.yml@725cb63379e2e73f163abfa7d77f12ec7c1e1a81 # main
+    uses: cap/.github/.github/workflows/scans.yml@5507e8e09411e392cc3e81bacd6773358c1d6b24 # main
     secrets: inherit
     with:
       project: CDSUMBRELLA
@@ -54,7 +54,7 @@ jobs:
     needs: [upload-test-results, blackduck-scans, test]
     runs-on: [self-hosted, solinas-medium]
     steps:
-      - uses: cap/.github/.github/actions/release@725cb63379e2e73f163abfa7d77f12ec7c1e1a81 # main
+      - uses: cap/.github/.github/actions/release@5507e8e09411e392cc3e81bacd6773358c1d6b24 # main
         with:
           xmake-token: ${{ secrets.XMAKE_TOKEN }}
           xmake-user: ${{ secrets.XMAKE_USER }}
