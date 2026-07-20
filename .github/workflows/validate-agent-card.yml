@@ -23,7 +23,7 @@ jobs:
       - run: npm i
       - run: cd tests/samples/bookshop && cds compile ./srv -s CatalogService -2 a2a > agent-card.json
       - name: Run API Metadata Validator
-        uses: CPA/api-metadata-validator@1375832056138d585cbd67e0240d93bdd9b166b4 # main
+        uses: CPA/api-metadata-validator@efe9630d53b76905912b00e23c50fc28c5ab6703 # main
         with:
           files: ./tests/samples/bookshop/*-card.json
           verbose: true
