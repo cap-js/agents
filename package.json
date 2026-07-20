@@ -49,7 +49,7 @@
   "devDependencies": {
     "@cap-js/cds-test": "^1",
     "@cap-js/sqlite": "^3",
-    "@sap/cds-mtxs": "^3",
+    "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=0",
     "deepagents": "^1.10.2"
   },
