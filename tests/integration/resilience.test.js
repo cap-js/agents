@@ -21,14 +21,7 @@ try {
   circuitBreakers = null
 }
 
-let canLoad = true
-try {
-  await import("@sap-ai-sdk/langchain")
-} catch {
-  canLoad = false
-}
-
-describe("@cap-js/agents - LLM Circuit Breaker", { skip: !canLoad }, () => {
+describe("@cap-js/agents - LLM Circuit Breaker", () => {
   axios.defaults.validateStatus = () => true
 
   let originalQuota

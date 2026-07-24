@@ -1,20 +1,9 @@
 import cds from "@sap/cds"
 import assert from "node:assert/strict"
 
-let canLoadDeepAgent = true
-try {
-  await import("deepagents")
-} catch {
-  canLoadDeepAgent = false
-}
-
 const { GET } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 
-// ── Deep agent modes (skills/ scan + AGENT_CARD.md convention) ──────────
-// These tests require deep-agent sample which has deepagents ESM deps.
-// Skip if deepagents can't be loaded.
-
-describe("@cap-js/agents - Agent Card (deep agent modes)", { skip: !canLoadDeepAgent }, () => {
+describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
   // ── skills/ directory scan ──────────────────────────────────────────
 
   describe("skills/ directory scan", () => {

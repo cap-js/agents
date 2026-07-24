@@ -3,14 +3,7 @@ import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 
-let canLoad = true
-try {
-  await import("deepagents")
-} catch {
-  canLoad = false
-}
-
-describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", { skip: !canLoad }, () => {
+describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
   let sendMessage
   let auditLogs = []
 

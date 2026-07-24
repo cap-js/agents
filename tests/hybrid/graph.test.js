@@ -3,16 +3,7 @@ import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 
-// deepagents has ESM-only transitive deps (p-retry) that fail to load in some
-// Node versions but succeed on others.
-let canLoad = true
-try {
-  await import("deepagents")
-} catch {
-  canLoad = false
-}
-
-describe("@cap-js/agents - Custom Graph (deepagents)", { skip: !canLoad }, () => {
+describe("@cap-js/agents - Custom Graph (deepagents)", () => {
   let sendMessage, jsonrpc, setupErrorDetection
   before(async () => {
     const helpers = createHelpers({ POST, axios })

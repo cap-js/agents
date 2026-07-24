@@ -15,13 +15,6 @@ const LEISURE_DIR = path.join(SAMPLE_DIR, "leisure-services")
 const XFLIGHTS_PORT = 4005
 const LEISURE_PORT = 4006
 
-let canLoadDeepagents = true
-try {
-  import.meta.resolve("deepagents")
-} catch {
-  canLoadDeepagents = false
-}
-
 let xflightsProc, leisureProc
 let reusedXflights = false
 let reusedLeisure = false
@@ -138,8 +131,6 @@ async function stopServer(proc, cwd) {
 }
 
 before(async () => {
-  if (!canLoadDeepagents) return
-
   const [xflightsBusy, leisureBusy] = await Promise.all([
     isPortOpen(XFLIGHTS_PORT),
     isPortOpen(LEISURE_PORT),
@@ -207,7 +198,7 @@ async function collectToolCallsFromCheckpoints(threadId) {
   return tools
 }
 
-describe("@cap-js/agents - Travel Sample E2E", { skip: !canLoadDeepagents }, () => {
+describe("@cap-js/agents - Travel Sample E2E", () => {
   let helpers
 
   before(async () => {
@@ -316,178 +307,174 @@ describe("@cap-js/agents - Travel Sample E2E", { skip: !canLoadDeepagents }, () 
 })
 
 // ─── File I/O E2E (deep-agent path): upload CSV → read_file → write_file → FilePart ───
-describe(
-  "@cap-js/agent - File I/O (travel-agent — deep-agent path)",
-  { skip: !canLoadDeepagents },
-  () => {
-    let csvBase64
-    let savedTaskId
-    let savedFileBytesB64
+describe("@cap-js/agent - File I/O (travel-agent — deep-agent path)", () => {
+  let csvBase64
+  let savedTaskId
+  let savedFileBytesB64
 
-    before(() => {
-      csvBase64 = readFileSync(path.join(TRAVEL_AGENT_DIR, "trip-requests.csv")).toString("base64")
-    })
+  before(() => {
+    csvBase64 = readFileSync(path.join(TRAVEL_AGENT_DIR, "trip-requests.csv")).toString("base64")
+  })
 
-    it("agent card reflects per-app fileIO MIME overrides (CSV in / markdown out)", async () => {
-      const res = await GET("/a2a/travel-agent/.well-known/agent-card.json")
-      assert.strictEqual(res.status, 200, `agent-card request failed: ${res.status}`)
-      const card = res.data
-      assert.ok(
-        Array.isArray(card.defaultInputModes) && card.defaultInputModes.includes("text/csv"),
-        `expected text/csv in defaultInputModes; got: ${JSON.stringify(card.defaultInputModes)}`,
-      )
-      assert.ok(
-        Array.isArray(card.defaultOutputModes) &&
-          card.defaultOutputModes.includes("text/plain") &&
-          card.defaultOutputModes.includes("text/markdown"),
-        `expected text/csv in defaultOutputModes; got: ${JSON.stringify(card.defaultOutputModes)}`,
-      )
-    })
-
-    it(
-      "ingests CSV → read_file → write_file('/outputs/alice-plan.md') → emits FilePart artifact",
-      { timeout: 5 * 60 * 1000 },
-      async () => {
-        const res = await POST(`/a2a/travel-agent/`, {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "message/send",
-          params: {
-            message: {
-              kind: "message",
-              messageId: cds.utils.uuid(),
-              role: "user",
-              parts: [
-                {
-                  kind: "text",
-                  text: "Here is the data for three people. Read the file, then plan the first person's trip — search for flights from Frankfurt to New York, a hotel in New York, and food or culture activities. Save the plan to /outputs/alice-plan.md",
-                },
-                {
-                  kind: "file",
-                  file: { name: "trip-requests.csv", mimeType: "text/csv", bytes: csvBase64 },
-                },
-              ],
-            },
-          },
-        })
-
-        const result = res.data.result
-        assert.strictEqual(
-          result?.status?.state,
-          "completed",
-          `Task did not complete:\n${JSON.stringify(res.data, null, 2).slice(0, 2000)}`,
-        )
-
-        savedTaskId = result.id
-        const contextId = result.contextId
-
-        // Persisted upload
-        const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
-        const inputs = await cds.run(
-          SELECT.from(InputFiles).where({
-            "up_.contextId": contextId,
-            filename: "trip-requests.csv",
-          }),
-        )
-        assert.equal(inputs.length, 1, "expected the uploaded CSV to be persisted")
-        assert.equal(inputs[0].mimeType, "text/csv")
-
-        // FilePart artifact emitted from /outputs/
-        const filePart = (result.artifacts || [])
-          .flatMap((a) => a.parts || [])
-          .find((p) => p.kind === "file" && /alice/i.test(p.file?.name || ""))
-        assert.ok(filePart, "expected an itinerary FilePart artifact for Alice")
-        savedFileBytesB64 = filePart.file.bytes
-        const decoded = Buffer.from(filePart.file.bytes, "base64").toString("utf-8")
-        // Loose content checks — LLM phrasing varies.
-        assert.match(decoded.toLowerCase(), /alice/, "itinerary should mention the traveller")
-        assert.match(
-          decoded.toLowerCase(),
-          /flight|hotel|activit/,
-          "itinerary should reference at least one booked domain",
-        )
-
-        // Output file persisted in CDS
-        const OutputFiles = cds.model.definitions["cap.agent.Tasks.outputFiles"]
-        const outputs = await cds.run(SELECT.from(OutputFiles).where({ up__taskId: savedTaskId }))
-        assert.ok(outputs.length >= 1, "expected at least one output file row")
-
-        // Tool-call witness: deepagents' built-in read_file + write_file fired.
-        const threadId = `TravelAgentService:${contextId}`
-        const toolNames = await collectToolCallsFromCheckpoints(threadId)
-        assert.ok(
-          toolNames.has("read_file"),
-          `expected read_file tool call. Recorded tools: ${[...toolNames].sort().join(", ")}`,
-        )
-        assert.ok(
-          toolNames.has("write_file"),
-          `expected write_file tool call. Recorded tools: ${[...toolNames].sort().join(", ")}`,
-        )
-      },
+  it("agent card reflects per-app fileIO MIME overrides (CSV in / markdown out)", async () => {
+    const res = await GET("/a2a/travel-agent/.well-known/agent-card.json")
+    assert.strictEqual(res.status, 200, `agent-card request failed: ${res.status}`)
+    const card = res.data
+    assert.ok(
+      Array.isArray(card.defaultInputModes) && card.defaultInputModes.includes("text/csv"),
+      `expected text/csv in defaultInputModes; got: ${JSON.stringify(card.defaultInputModes)}`,
     )
+    assert.ok(
+      Array.isArray(card.defaultOutputModes) &&
+        card.defaultOutputModes.includes("text/plain") &&
+        card.defaultOutputModes.includes("text/markdown"),
+      `expected text/csv in defaultOutputModes; got: ${JSON.stringify(card.defaultOutputModes)}`,
+    )
+  })
 
-    it("tasks/get returns the same FilePart artifact (round-trip persistence check)", async () => {
-      assert.ok(
-        savedTaskId,
-        "Previous test must have populated savedTaskId — was it skipped or did it fail?",
-      )
+  it(
+    "ingests CSV → read_file → write_file('/outputs/alice-plan.md') → emits FilePart artifact",
+    { timeout: 5 * 60 * 1000 },
+    async () => {
       const res = await POST(`/a2a/travel-agent/`, {
         jsonrpc: "2.0",
-        id: 2,
-        method: "tasks/get",
-        params: { id: savedTaskId },
+        id: 1,
+        method: "message/send",
+        params: {
+          message: {
+            kind: "message",
+            messageId: cds.utils.uuid(),
+            role: "user",
+            parts: [
+              {
+                kind: "text",
+                text: "Here is the data for three people. Read the file, then plan the first person's trip — search for flights from Frankfurt to New York, a hotel in New York, and food or culture activities. Save the plan to /outputs/alice-plan.md",
+              },
+              {
+                kind: "file",
+                file: { name: "trip-requests.csv", mimeType: "text/csv", bytes: csvBase64 },
+              },
+            ],
+          },
+        },
       })
+
       const result = res.data.result
-      assert.ok(result, `tasks/get returned no result: ${JSON.stringify(res.data).slice(0, 500)}`)
-      assert.strictEqual(result.id, savedTaskId)
-      assert.strictEqual(result.status?.state, "completed")
+      assert.strictEqual(
+        result?.status?.state,
+        "completed",
+        `Task did not complete:\n${JSON.stringify(res.data, null, 2).slice(0, 2000)}`,
+      )
+
+      savedTaskId = result.id
+      const contextId = result.contextId
+
+      // Persisted upload
+      const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
+      const inputs = await cds.run(
+        SELECT.from(InputFiles).where({
+          "up_.contextId": contextId,
+          filename: "trip-requests.csv",
+        }),
+      )
+      assert.equal(inputs.length, 1, "expected the uploaded CSV to be persisted")
+      assert.equal(inputs[0].mimeType, "text/csv")
+
+      // FilePart artifact emitted from /outputs/
       const filePart = (result.artifacts || [])
         .flatMap((a) => a.parts || [])
         .find((p) => p.kind === "file" && /alice/i.test(p.file?.name || ""))
-      assert.ok(filePart, "expected the FilePart to round-trip through tasks/get")
-      assert.equal(
-        filePart.file.bytes.length,
-        savedFileBytesB64.length,
-        "round-tripped FilePart byte count should match the originally emitted artifact",
+      assert.ok(filePart, "expected an itinerary FilePart artifact for Alice")
+      savedFileBytesB64 = filePart.file.bytes
+      const decoded = Buffer.from(filePart.file.bytes, "base64").toString("utf-8")
+      // Loose content checks — LLM phrasing varies.
+      assert.match(decoded.toLowerCase(), /alice/, "itinerary should mention the traveller")
+      assert.match(
+        decoded.toLowerCase(),
+        /flight|hotel|activit/,
+        "itinerary should reference at least one booked domain",
       )
-    })
 
-    it(
-      "graceful response when reading uploaded file from a fresh conversation (no-file probe)",
-      { timeout: 2 * 60 * 1000 },
-      async () => {
-        // No file part, no contextId → server generates a fresh contextId →
-        // no /uploads/ entry exists → UploadsBackend.read returns "not found".
-        const res = await POST(`/a2a/travel-agent/`, {
-          jsonrpc: "2.0",
-          id: 3,
-          method: "message/send",
-          params: {
-            message: {
-              kind: "message",
-              messageId: cds.utils.uuid(),
-              role: "user",
-              parts: [
-                {
-                  kind: "text",
-                  text: "Please read_file('/uploads/trip-requests.csv') and tell me what's in it.",
-                },
-              ],
-            },
-          },
-        })
-        const result = res.data.result
-        assert.ok(
-          ["completed", "input-required"].includes(result.status.state),
-          `expected graceful state, got: ${result.status.state}`,
-        )
-        const text = (result.status.message?.parts || []).map((p) => p.text || "").join(" ")
-        assert.match(
-          text.toLowerCase(),
-          /not found|no .* file|empty|doesn't|does not|don't|do not|upload|provide/,
-          "agent should acknowledge missing file or ask user to upload",
-        )
-      },
+      // Output file persisted in CDS
+      const OutputFiles = cds.model.definitions["cap.agent.Tasks.outputFiles"]
+      const outputs = await cds.run(SELECT.from(OutputFiles).where({ up__taskId: savedTaskId }))
+      assert.ok(outputs.length >= 1, "expected at least one output file row")
+
+      // Tool-call witness: deepagents' built-in read_file + write_file fired.
+      const threadId = `TravelAgentService:${contextId}`
+      const toolNames = await collectToolCallsFromCheckpoints(threadId)
+      assert.ok(
+        toolNames.has("read_file"),
+        `expected read_file tool call. Recorded tools: ${[...toolNames].sort().join(", ")}`,
+      )
+      assert.ok(
+        toolNames.has("write_file"),
+        `expected write_file tool call. Recorded tools: ${[...toolNames].sort().join(", ")}`,
+      )
+    },
+  )
+
+  it("tasks/get returns the same FilePart artifact (round-trip persistence check)", async () => {
+    assert.ok(
+      savedTaskId,
+      "Previous test must have populated savedTaskId — was it skipped or did it fail?",
     )
-  },
-)
+    const res = await POST(`/a2a/travel-agent/`, {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tasks/get",
+      params: { id: savedTaskId },
+    })
+    const result = res.data.result
+    assert.ok(result, `tasks/get returned no result: ${JSON.stringify(res.data).slice(0, 500)}`)
+    assert.strictEqual(result.id, savedTaskId)
+    assert.strictEqual(result.status?.state, "completed")
+    const filePart = (result.artifacts || [])
+      .flatMap((a) => a.parts || [])
+      .find((p) => p.kind === "file" && /alice/i.test(p.file?.name || ""))
+    assert.ok(filePart, "expected the FilePart to round-trip through tasks/get")
+    assert.equal(
+      filePart.file.bytes.length,
+      savedFileBytesB64.length,
+      "round-tripped FilePart byte count should match the originally emitted artifact",
+    )
+  })
+
+  it(
+    "graceful response when reading uploaded file from a fresh conversation (no-file probe)",
+    { timeout: 2 * 60 * 1000 },
+    async () => {
+      // No file part, no contextId → server generates a fresh contextId →
+      // no /uploads/ entry exists → UploadsBackend.read returns "not found".
+      const res = await POST(`/a2a/travel-agent/`, {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "message/send",
+        params: {
+          message: {
+            kind: "message",
+            messageId: cds.utils.uuid(),
+            role: "user",
+            parts: [
+              {
+                kind: "text",
+                text: "Please read_file('/uploads/trip-requests.csv') and tell me what's in it.",
+              },
+            ],
+          },
+        },
+      })
+      const result = res.data.result
+      assert.ok(
+        ["completed", "input-required"].includes(result.status.state),
+        `expected graceful state, got: ${result.status.state}`,
+      )
+      const text = (result.status.message?.parts || []).map((p) => p.text || "").join(" ")
+      assert.match(
+        text.toLowerCase(),
+        /not found|no .* file|empty|doesn't|does not|don't|do not|upload|provide/,
+        "agent should acknowledge missing file or ask user to upload",
+      )
+    },
+  )
+})
