@@ -21,8 +21,15 @@ describe("@cap-js/agents - Multi-turn (hybrid executor)", () => {
     assert.doesNotMatch(text1, /technical issue|not installed|configuration issue/i)
 
     const res2 = await sendMessage("catalog", "Order 2 copies of that book", { contextId })
-    assert.strictEqual(res2.data.result.status.state, "completed")
-    const text2 = res2.data.result.status.message.parts[0].text
+    let finalRes = res2
+
+    if (res2.data.result.status.state === "input-required") {
+      const taskId = res2.data.result.id
+      finalRes = await sendMessage("catalog", "yes", { taskId })
+    }
+
+    assert.strictEqual(finalRes.data.result.status.state, "completed")
+    const text2 = finalRes.data.result.status.message.parts[0].text
     assert.match(text2, /order|stock|cop/i)
     assert.doesNotMatch(text2, /technical issue|not installed|configuration issue/i)
   })

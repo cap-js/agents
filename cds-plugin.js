@@ -41,24 +41,6 @@ if (!protocols.agent) {
   }
 }
 
-// CORS support for browser-based A2A clients (development and hybrid profiles)
-const isDev = cds.env.profiles?.includes("development") || cds.env.profiles?.includes("hybrid")
-if (isDev) {
-  cds.on("bootstrap", (app) => {
-    app.use("/a2a", (req, res, next) => {
-      res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*")
-      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS")
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
-      res.setHeader("Access-Control-Allow-Credentials", "true")
-      if (req.method === "OPTIONS") {
-        res.writeHead(204)
-        return res.end()
-      }
-      next()
-    })
-  })
-}
-
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.["@agent"]) return

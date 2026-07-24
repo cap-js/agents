@@ -12,6 +12,6 @@ service ProductAgentService {
    *
    * Example: Order 5 Widget Pro
    */
-  @Common.IsActionCritical
+  @agent.hitl
   action orderProduct(productName: String, quantity: Integer) returns String;
 }

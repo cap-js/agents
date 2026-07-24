@@ -60,7 +60,7 @@ Define an agent's identity, behaviour, and skills entirely in markdown — no Ja
 service ProductAgent {
   @readonly entity Products as projection on my.Products;
 
-  @Common.IsActionCritical // > Action is considered for Human-in-the-loop
+  @agent.hitl // > Action is considered for Human-in-the-loop
   action doSomething();
 }
 ```
@@ -661,14 +661,14 @@ Override default behavior by registering event handlers in your service's `init(
 
 All `build*` events are called **once on first request** (lazy initialization), not at server startup. The compiled graph is then cached per feature vector (`cds.context.features`). Different feature combinations produce different cached graphs — enabling feature-toggled agent behavior without restart.
 
-| Event                | Default behavior                                                                                                              | Return type                      |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `buildGraph`         | Auto deep-agent or ReAct agent from `langchain`. Calls `buildTools`, `buildModel`, `buildSystemPrompt` and `buildMiddlewares` | Compiled graph or GraphExecutor  |
-| `buildTools`         | Query & describe tool and actions as tool                                                                                     | `Array<tools>`                   |
-| `buildModel`         | Customized AI Core Orchestration client. Calls `buildContentFilter`                                                           | LangChain `BaseChatModel`        |
-| `buildSystemPrompt`  | `@description` of service                                                                                                     | `string`                         |
-| `buildMiddlewares`   | Quota enforcement, content filtering, and `agent_actions` metric                                                              | `Array<AgentMiddleware>`         |
-| `buildContentFilter` | Checking for prompt injection and harmful content.                                                                            | Filter config or `{}` to disable |
+| Event                | Default behavior                                                                                                             | Return type                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `buildGraph`         | Auto deep-agent or ReAct agent from `langchain`. Calls `buildTools`, `buildModel`, `buildSystemPrompt` and `buildMiddleware` | Compiled graph or GraphExecutor  |
+| `buildTools`         | Query & describe tool and actions as tool                                                                                    | `Array<tools>`                   |
+| `buildModel`         | Customized AI Core Orchestration client. Calls `buildContentFilter`                                                          | LangChain `BaseChatModel`        |
+| `buildSystemPrompt`  | `@description` of service                                                                                                    | `string`                         |
+| `buildMiddleware`    | Quota enforcement, content filtering, and `agent_actions` metric                                                             | `Array<AgentMiddleware>`         |
+| `buildContentFilter` | Checking for prompt injection and harmful content.                                                                           | Filter config or `{}` to disable |
 
 #### Custom Model
 
@@ -713,7 +713,7 @@ createDeepAgent({
 
 No additional plugin configuration needed — interrupt detection, checkpoint persistence, and resume are handled automatically.
 
-For regular markdown-based agents, `@Common.IsActionCritical` will automatically trigger the HITL flow for an action.
+For regular markdown-based agents, `@agent.hitl` will automatically trigger the HITL flow for an action.
 
 ## Samples
 

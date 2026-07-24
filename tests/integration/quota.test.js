@@ -177,7 +177,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     let quotaEnforcerMiddleware
 
     before(async () => {
-      quotaEnforcerMiddleware = (await import("../../lib/agents/middlewares/quota-enforcer.js"))
+      quotaEnforcerMiddleware = (await import("../../lib/agents/middleware/quota-enforcer.js"))
         .quotaEnforcerMiddleware
     })
 

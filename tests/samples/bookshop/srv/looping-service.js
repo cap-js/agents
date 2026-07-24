@@ -23,7 +23,7 @@ export default class LoopingService extends cds.ApplicationService {
     const { AIMessage } = await import("@langchain/core/messages")
 
     const tools = await srv.send("buildTools")
-    const middleware = await srv.send("buildMiddlewares")
+    const middleware = await srv.send("buildMiddleware")
 
     // Mock model that always returns a tool call (forces looping)
     let iteration = 0

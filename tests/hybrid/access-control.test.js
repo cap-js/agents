@@ -33,7 +33,7 @@ describe("@cap-js/agents - Access Control (Checkpoints)", () => {
   it("bob cannot resume alice's conversation", async () => {
     const contextId = `ac-test-${Date.now()}`
 
-    // Alice triggers HITL via @Common.IsActionCritical on submitOrder
+    // Alice triggers HITL via @agent.hitl on submitOrder
     const aliceRes = await sendMessageAs("catalog", "Order 2 copies of Wuthering Heights", ALICE, {
       contextId,
     })

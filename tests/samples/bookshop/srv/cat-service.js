@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import { ChatAnthropic } from "@langchain/anthropic"
 
 export default class CatalogService extends cds.ApplicationService {
   init() {
@@ -33,15 +32,6 @@ export default class CatalogService extends cds.ApplicationService {
       if (!book) return req.error(404, `Book #${id} doesn't exist`)
       return book.stock
     })
-
-    // Use the Hyperspace AI Proxy
-    // this.agent = {
-    //   model: new ChatAnthropic({
-    //     model: "claude-sonnet-4-5",
-    //     anthropicApiKey: "<api-key>",
-    //     anthropicApiUrl: "http://localhost:6655/anthropic",
-    //   }),
-    // }
 
     return super.init()
   }

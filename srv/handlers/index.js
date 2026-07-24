@@ -3,6 +3,7 @@ import { createModel } from "./model.js"
 import { buildContentFilter } from "./content-filter.js"
 import { generateTools, instrumentTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
+import buildMiddleware from "../../lib/agents/middleware/index.js"
 
 /**
  * Register default event handlers for agent graph building on an @agent service.
@@ -54,18 +55,9 @@ export default function registerDefaultAgentHandlers(srv) {
     return buildSystemPrompt(srv)
   })
 
-  // Default buildMiddlewares: quota enforcement, content filtering, agent_actions metric
-  srv.on("buildMiddlewares", async () => {
-    const { quotaEnforcerMiddleware } =
-      await import("../../lib/agents/middlewares/quota-enforcer.js")
-    const { contentFilterMiddleware } =
-      await import("../../lib/agents/middlewares/content-filter.js")
-    const { agentActionsMiddleware } = await import("../../lib/agents/middlewares/agent-actions.js")
-    return [
-      ...(await quotaEnforcerMiddleware()),
-      await contentFilterMiddleware(),
-      await agentActionsMiddleware(),
-    ]
+  // Default buildMiddleware: quota enforcement, content filtering, agent_actions metric
+  srv.on("buildMiddleware", async (req) => {
+    return buildMiddleware(srv, req.data)
   })
 
   // Default buildGraph: if agent dir with AGENTS.md exists → auto-build deep agent.
@@ -104,7 +96,7 @@ export default function registerDefaultAgentHandlers(srv) {
     let model = await srv.send("buildModel", { tools })
 
     const systemPrompt = await srv.send("buildSystemPrompt")
-    const middleware = await srv.send("buildMiddlewares")
+    const middleware = await srv.send("buildMiddleware", { tools })
 
     const checkpointer = new CdsCheckpointSaver()
 
