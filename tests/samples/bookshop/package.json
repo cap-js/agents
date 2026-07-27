@@ -12,7 +12,6 @@
     "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
     "@sap/cds": ">=8",
     "@sap/xssec": "^4",
-    "@toon-format/toon": "^2.1.0",
     "zod": "^4.3.6"
   },
   "scripts": {
