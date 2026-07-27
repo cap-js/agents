@@ -8,7 +8,7 @@
  *    `deepagent` from `AGENTS.md`+`skills/`
  *  - This handler only customises tools (adds a business-logic tool to the
  *    auto-generated CDS tools).
- *  - No `createDeepAgent`, `FilesystemBackend`, `buildModel` event, or
+ *  - No `createDeepAgent`, `StateBackend`, `buildModel` event, or
  *    `agentDir` boilerplate — all auto-derived by the plugin.
  *
  * Run with: cds watch tests/samples/deep-agent

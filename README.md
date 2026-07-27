@@ -558,7 +558,7 @@ Resolution order: `buildContentFilter` event handler → `cds.env.agents.content
 For full control, override the `buildGraph` event to provide a compiled LangGraph graph directly. Useful when you need a multi-agent graph, custom checkpointer behaviour, or non-`deepagents` tooling.
 
 ```js
-import { createDeepAgent, FilesystemBackend } from "deepagents"
+import { createDeepAgent, StateBackend } from "deepagents"
 
 export default class MyAgent extends cds.ApplicationService {
   async init() {
@@ -570,10 +570,7 @@ export default class MyAgent extends cds.ApplicationService {
         tools,
         memory: ["./AGENTS.md"],
         skills: ["./skills/"],
-        backend: new FilesystemBackend({
-          rootDir: import.meta.dirname + "/my-agent",
-          virtualMode: true,
-        }),
+        backend: new StateBackend(),
         // checkpointer auto-injected by plugin (CdsCheckpointSaver)
       })
     })
