@@ -2,8 +2,6 @@
 // Exercise composition cascade-delete via @cap-js/attachments and the
 // HANA-driver-defeating upsert pattern in saveOutputFile.
 
-import { describe, it } from "node:test"
-import assert from "node:assert/strict"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import cds from "@sap/cds"
@@ -41,14 +39,14 @@ describe("@cap-js/agent - composition cascade delete", () => {
 
     // Verify child exists
     const beforeRows = await SELECT.from(InputFiles).where({ up__taskId: taskId })
-    assert.equal(beforeRows.length, 1)
+    expect(beforeRows.length).toBe(1)
 
     // Delete parent
     await DELETE.from("cap.agent.Tasks").where({ taskId })
 
     // Child must be gone (cascade delete via composition)
     const after = await SELECT.from(InputFiles).where({ up__taskId: taskId })
-    assert.equal(after.length, 0)
+    expect(after.length).toBe(0)
   })
 })
 
@@ -77,9 +75,9 @@ describe("@cap-js/agent - CdsFileStore.saveOutputFile upsert", () => {
     await store.saveOutputFile(taskId, "report.md", "text/markdown", v2)
 
     const rows = await SELECT.from(OutputFiles).where({ up__taskId: taskId, filename: "report.md" })
-    assert.equal(rows.length, 1, "expected exactly one row after two saves of the same filename")
+    expect(rows.length, "expected exactly one row after two saves of the same filename").toBe(1)
 
     const fetched = await store.getOutputFile(taskId, "report.md")
-    assert.equal(fetched.bytes.toString("utf-8"), "version 2 — the update")
+    expect(fetched.bytes.toString("utf-8")).toBe("version 2 — the update")
   })
 })

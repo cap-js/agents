@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 cds.test(import.meta.dirname + "/../samples/bookshop")
 import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
@@ -52,11 +51,11 @@ describe("CdsCheckpointSaver", () => {
         }
       })
 
-      assert.strictEqual(results.length, 3)
+      expect(results.length).toBe(3)
       // Descending order: last seeded first
-      assert.strictEqual(results[0].config.configurable.checkpoint_id, id2)
-      assert.strictEqual(results[1].config.configurable.checkpoint_id, id1)
-      assert.strictEqual(results[2].config.configurable.checkpoint_id, id0)
+      expect(results[0].config.configurable.checkpoint_id).toBe(id2)
+      expect(results[1].config.configurable.checkpoint_id).toBe(id1)
+      expect(results[2].config.configurable.checkpoint_id).toBe(id0)
     })
 
     it("respects options.limit", async () => {
@@ -70,7 +69,7 @@ describe("CdsCheckpointSaver", () => {
         }
       })
 
-      assert.strictEqual(results.length, 3)
+      expect(results.length).toBe(3)
     })
 
     it("respects options.before for cursor pagination", async () => {
@@ -90,11 +89,10 @@ describe("CdsCheckpointSaver", () => {
       })
 
       const returnedIds = results.map((r) => r.config.configurable.checkpoint_id)
-      assert.deepStrictEqual(
+      expect(
         returnedIds,
-        [ids[1], ids[0]],
         "should return exactly the two checkpoints older than the cursor, newest-first",
-      )
+      ).toEqual([ids[1], ids[0]])
     })
 
     it("isolates checkpoints by user (user B sees nothing from user A)", async () => {
@@ -108,7 +106,7 @@ describe("CdsCheckpointSaver", () => {
         }
       })
 
-      assert.strictEqual(results.length, 0)
+      expect(results.length).toBe(0)
     })
 
     it("yields checkpoint and parentConfig correctly", async () => {
@@ -124,8 +122,8 @@ describe("CdsCheckpointSaver", () => {
 
       // Most recent (ids[1]) has ids[0] as parent
       const latest = results.find((r) => r.config.configurable.checkpoint_id === ids[1])
-      assert.ok(latest, "latest checkpoint must be present")
-      assert.strictEqual(latest.parentConfig?.configurable?.checkpoint_id, ids[0])
+      expect(latest, "latest checkpoint must be present").toBeTruthy()
+      expect(latest.parentConfig?.configurable?.checkpoint_id).toBe(ids[0])
     })
 
     it("streams beyond a single batch without imposing a default cap", async () => {
@@ -142,7 +140,7 @@ describe("CdsCheckpointSaver", () => {
         }
       })
 
-      assert.strictEqual(count, seeded, "should yield every seeded checkpoint")
+      expect(count, "should yield every seeded checkpoint").toBe(seeded)
     })
   })
 
@@ -159,13 +157,13 @@ describe("CdsCheckpointSaver", () => {
       const aliceRows = await runAs("alice", () =>
         SELECT.from(CHECKPOINTS).where({ thread_id: thread, createdBy: "alice" }),
       )
-      assert.strictEqual(aliceRows.length, 0)
+      expect(aliceRows.length).toBe(0)
 
       // Bob's checkpoints are intact
       const bobRows = await runAs("bob", () =>
         SELECT.from(CHECKPOINTS).where({ thread_id: thread, createdBy: "bob" }),
       )
-      assert.strictEqual(bobRows.length, 2)
+      expect(bobRows.length).toBe(2)
     })
 
     it("deletes associated writes for the user", async () => {
@@ -175,7 +173,7 @@ describe("CdsCheckpointSaver", () => {
       await runAs("alice", () => saver.deleteThread(thread))
 
       const writeRows = await SELECT.from(WRITES).where({ thread_id: thread })
-      assert.strictEqual(writeRows.length, 0)
+      expect(writeRows.length).toBe(0)
     })
   })
 })

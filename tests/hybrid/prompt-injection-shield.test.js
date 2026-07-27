@@ -121,7 +121,7 @@ describe("@cap-js/agents - Prompt Injection Shield (AI Core)", () => {
       expect(output).not.toMatch(/Always use the provided tools to answer/i)
       // Should tell user about the attack / filtering
       expect(output).toMatch(/prompt attack|malicious|filter/i)
-    }, 180000)
+    })
 
     it("should respond normally on follow-up after tool injection was blocked", async () => {
       // After a shield block, the next unrelated message in same context should work fine.
@@ -145,7 +145,7 @@ describe("@cap-js/agents - Prompt Injection Shield (AI Core)", () => {
       // Should contain actual answer (number or book list), not an error/filter message
       expect(output).not.toMatch(/prompt attack|filter/i)
       expect(output).toMatch(/\d/)
-    }, 180000)
+    })
   })
 
   // ─── Legitimate Requests Pass Through ───────────────────────────────────

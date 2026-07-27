@@ -4,7 +4,6 @@
  *
  * Run with: npm run test:hybrid
  */
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import { captured, setup, teardown, resetCapture, flushMetrics } from "../utils/telemetry-utils.js"
 import createHelpers from "../utils/helpers.js"
@@ -28,10 +27,8 @@ describe("@cap-js/agents - agent_actions metric (deep agent, per LLM call)", () 
   it("should emit agent_actions metric when deep agent invokes LLM", async () => {
     await sendMessage("product-agent", "List all products")
     const output = await flushMetrics()
-    assert.match(
-      output,
+    expect(output, "agent_actions metric should fire per LLM call in deep agent").toMatch(
       /agent_actions/,
-      "agent_actions metric should fire per LLM call in deep agent",
     )
   })
 
@@ -45,10 +42,10 @@ describe("@cap-js/agents - agent_actions metric (deep agent, per LLM call)", () 
     const output = await flushMetrics()
     // Count occurrences — at minimum 1, typically >1 for multi-step
     const matches = output.match(/agent_actions/g)
-    assert.ok(matches, "agent_actions metric should appear in output")
-    assert.ok(
+    expect(matches, "agent_actions metric should appear in output").toBeTruthy()
+    expect(
       matches.length >= 1,
       `expected at least 1 agent_actions emission, got ${matches.length}`,
-    )
+    ).toBeTruthy()
   })
 })

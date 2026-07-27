@@ -1,5 +1,3 @@
-import assert from "node:assert/strict"
-import { describe, it, before, beforeEach, after } from "node:test"
 import cds from "@sap/cds"
 import {
   setup,
@@ -36,8 +34,8 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
       const { mlflowAttrs, mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
       const saved = cds.env.agents.mlflow
       cds.env.agents.mlflow = false
-      assert.deepStrictEqual(mlflowAttrs("LLM"), {})
-      assert.deepStrictEqual(mlflowTraceAttrs(), {})
+      expect(mlflowAttrs("LLM")).toEqual({})
+      expect(mlflowTraceAttrs()).toEqual({})
       cds.env.agents.mlflow = saved
     })
 
@@ -48,9 +46,9 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
       cds.context = { ...cds.context, "agent.service": "CatalogService" }
       try {
         const attrs = mlflowAttrs("TOOL", { inputs: { foo: "bar" } })
-        assert.strictEqual(attrs["mlflow.spanType"], "TOOL")
-        assert.strictEqual(attrs["mlflow.experimentId"], "0")
-        assert.strictEqual(attrs["mlflow.spanInputs"], '{"foo":"bar"}')
+        expect(attrs["mlflow.spanType"]).toBe("TOOL")
+        expect(attrs["mlflow.experimentId"]).toBe("0")
+        expect(attrs["mlflow.spanInputs"]).toBe('{"foo":"bar"}')
       } finally {
         cds.context = origCtx
       }
@@ -61,8 +59,7 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
       const attrs = mlflowAttrs("LLM", {
         tokenUsage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
       })
-      assert.strictEqual(
-        attrs["mlflow.chat.tokenUsage"],
+      expect(attrs["mlflow.chat.tokenUsage"]).toBe(
         '{"input_tokens":10,"output_tokens":20,"total_tokens":30}',
       )
     })
@@ -70,9 +67,9 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     it("should not include inputs/outputs/tokenUsage keys when not provided", async () => {
       const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
       const attrs = mlflowAttrs("AGENT")
-      assert.strictEqual(attrs["mlflow.spanInputs"], undefined)
-      assert.strictEqual(attrs["mlflow.spanOutputs"], undefined)
-      assert.strictEqual(attrs["mlflow.chat.tokenUsage"], undefined)
+      expect(attrs["mlflow.spanInputs"]).toBe(undefined)
+      expect(attrs["mlflow.spanOutputs"]).toBe(undefined)
+      expect(attrs["mlflow.chat.tokenUsage"]).toBe(undefined)
     })
 
     it("should throw when @Core.SchemaVersion is not numeric", async () => {
@@ -84,7 +81,7 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
       const origCtx = cds.context
       cds.context = { ...cds.context, "agent.service": "BadService" }
       try {
-        assert.throws(() => mlflowAttrs("LLM"), /must be a numeric string.*Got: "not-a-number"/)
+        expect(() => mlflowAttrs("LLM")).toThrow(/must be a numeric string.*Got: "not-a-number"/)
       } finally {
         cds.context = origCtx
         cds.services = origServices
@@ -96,14 +93,14 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     it("should return trace tag attributes when enabled", async () => {
       const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
       const attrs = mlflowTraceAttrs()
-      assert.ok(Object.keys(attrs).includes("mlflow.traceTag.session"))
-      assert.ok(Object.keys(attrs).includes("mlflow.traceTag.user"))
-      assert.ok(Object.keys(attrs).includes("mlflow.traceTag.tenant"))
-      assert.ok(Object.keys(attrs).includes("session.id"))
-      assert.ok(Object.keys(attrs).includes("user.id"))
+      expect(Object.keys(attrs).includes("mlflow.traceTag.session")).toBeTruthy()
+      expect(Object.keys(attrs).includes("mlflow.traceTag.user")).toBeTruthy()
+      expect(Object.keys(attrs).includes("mlflow.traceTag.tenant")).toBeTruthy()
+      expect(Object.keys(attrs).includes("session.id")).toBeTruthy()
+      expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
       // All values must be strings
       for (const v of Object.values(attrs)) {
-        assert.strictEqual(typeof v, "string")
+        expect(typeof v).toBe("string")
       }
     })
   })
@@ -113,18 +110,18 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
   it("should set mlflow.spanType=AGENT on workflow span", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow workflow"))
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
-    assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["mlflow.spanType"], "AGENT")
-    assert.ok(span.attributes["mlflow.experimentId"], "should have experimentId")
-    assert.strictEqual(span.attributes["mlflow.experimentId"], "2")
+    expect(span).not.toBe(undefined)
+    expect(span.attributes["mlflow.spanType"]).toBe("AGENT")
+    expect(span.attributes["mlflow.experimentId"], "should have experimentId").toBeTruthy()
+    expect(span.attributes["mlflow.experimentId"]).toBe("2")
   })
 
   it("should set mlflow trace tags on workflow span", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow trace tags"))
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
-    assert.notStrictEqual(span, undefined)
-    assert.notStrictEqual(span.attributes["mlflow.traceTag.session"], undefined)
-    assert.notStrictEqual(span.attributes["mlflow.traceTag.tenant"], undefined)
+    expect(span).not.toBe(undefined)
+    expect(span.attributes["mlflow.traceTag.session"]).not.toBe(undefined)
+    expect(span.attributes["mlflow.traceTag.tenant"]).not.toBe(undefined)
   })
 
   // ─── Tool spans ────────────────────────────────────────────────────
@@ -132,9 +129,9 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
   it("should set mlflow.spanType=TOOL on tool spans", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow tool test"))
     const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
-    assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["mlflow.spanType"], "TOOL")
-    assert.notStrictEqual(span.attributes["mlflow.spanInputs"], undefined)
+    expect(span).not.toBe(undefined)
+    expect(span.attributes["mlflow.spanType"]).toBe("TOOL")
+    expect(span.attributes["mlflow.spanInputs"]).not.toBe(undefined)
   })
 
   // ─── LLM / Chat spans ──────────────────────────────────────────────
@@ -165,8 +162,8 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, "chat MockLLM")
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.strictEqual(chatSpan.attributes["mlflow.spanType"], "LLM")
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["mlflow.spanType"]).toBe("LLM")
   })
 
   // ─── RunnableSequence spans ─────────────────────────────────────────
@@ -174,8 +171,8 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
   it("should set mlflow.spanType=CHAIN on RunnableSequence spans", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow chain test"))
     const seqSpans = findSpans(spans, "workflow RunnableSequence")
-    assert.ok(seqSpans.length > 0)
-    assert.strictEqual(seqSpans[0].attributes["mlflow.spanType"], "CHAIN")
+    expect(seqSpans.length > 0).toBeTruthy()
+    expect(seqSpans[0].attributes["mlflow.spanType"]).toBe("CHAIN")
   })
 
   // ─── HTTP span ──────────────────────────────────────────────────────
@@ -186,7 +183,7 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     // HTTP span may not always be captured by the in-memory exporter
     // (depends on @cap-js/telemetry wrapping express), so test conditionally
     if (httpSpan) {
-      assert.strictEqual(httpSpan.attributes["mlflow.spanType"], "CHAIN")
+      expect(httpSpan.attributes["mlflow.spanType"]).toBe("CHAIN")
     }
   })
 
@@ -213,10 +210,8 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     }
 
     const processorsAfter = delegate._registeredSpanProcessors?.length || 0
-    assert.strictEqual(
-      processorsAfter,
+    expect(processorsAfter, "no processor should be added without credentials").toBe(
       processorsBefore,
-      "no processor should be added without credentials",
     )
   })
 })

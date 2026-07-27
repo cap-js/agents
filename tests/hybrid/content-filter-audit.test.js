@@ -2,7 +2,6 @@
  * Hybrid test: ContentFilterBlocked audit event for deep agents.
  * Requires AI Core + deepagents.
  */
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
@@ -40,7 +39,7 @@ describe("@cap-js/agents - ContentFilterBlocked audit event (deep agent)", () =>
     )
 
     // Task should complete (middleware returns polite refusal, doesn't crash)
-    assert.strictEqual(res.data.result?.status?.state, "completed")
+    expect(res.data.result?.status?.state).toBe("completed")
 
     // Wait for async audit emit
     await new Promise((r) => setTimeout(r, 500))
@@ -48,8 +47,8 @@ describe("@cap-js/agents - ContentFilterBlocked audit event (deep agent)", () =>
     const blocked = auditLogs.find(
       (l) => l.event === "SecurityEvent" && l.data?.data?.event === "ContentFilterBlocked",
     )
-    assert.ok(blocked, "Should emit ContentFilterBlocked audit event")
-    assert.strictEqual(blocked.data.data.source, "user")
-    assert.ok(blocked.data.data.reason, "Should include filter reason")
-  }, 60000)
+    expect(blocked, "Should emit ContentFilterBlocked audit event").toBeTruthy()
+    expect(blocked.data.data.source).toBe("user")
+    expect(blocked.data.data.reason, "Should include filter reason").toBeTruthy()
+  })
 })

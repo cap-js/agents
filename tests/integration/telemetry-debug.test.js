@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import {
   captured,
@@ -26,22 +25,22 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
 
   describe("trace_langchain disabled", () => {
     it("should NOT patch BaseChatModel when trace_langchain is false", async () => {
-      assert.strictEqual(cds.env.agents.trace_langchain, false)
+      expect(cds.env.agents.trace_langchain).toBe(false)
       const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
-      assert.strictEqual(BaseChatModel.prototype[PATCHED], undefined)
+      expect(BaseChatModel.prototype[PATCHED]).toBe(undefined)
     })
 
     it("should NOT patch StructuredTool when trace_langchain is false", async () => {
       const { StructuredTool } = await import("@langchain/core/tools")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
-      assert.strictEqual(StructuredTool.prototype[PATCHED], undefined)
+      expect(StructuredTool.prototype[PATCHED]).toBe(undefined)
     })
 
     it("should NOT patch RunnableLambda when trace_langchain is false", async () => {
       const { RunnableLambda } = await import("@langchain/core/runnables")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
-      assert.strictEqual(RunnableLambda.prototype[PATCHED], undefined)
+      expect(RunnableLambda.prototype[PATCHED]).toBe(undefined)
     })
   })
 
@@ -51,17 +50,17 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
     it("should include gen_ai.tool.call.arguments on tool spans when log level is debug", async () => {
       const spans = await getSpansAfterRequest(() => sendMessage("debug", "Show books"))
       const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")
-      assert.notStrictEqual(toolSpan, undefined)
-      assert.notStrictEqual(toolSpan.attributes["gen_ai.tool.call.arguments"], undefined)
-      assert.match(toolSpan.attributes["gen_ai.tool.call.arguments"], /Books/)
+      expect(toolSpan).not.toBe(undefined)
+      expect(toolSpan.attributes["gen_ai.tool.call.arguments"]).not.toBe(undefined)
+      expect(toolSpan.attributes["gen_ai.tool.call.arguments"]).toMatch(/Books/)
     })
 
     it("should include gen_ai.tool.call.result on tool spans when log level is debug", async () => {
       const spans = await getSpansAfterRequest(() => sendMessage("debug", "List books"))
       const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")
-      assert.notStrictEqual(toolSpan, undefined)
-      assert.notStrictEqual(toolSpan.attributes["gen_ai.tool.call.result"], undefined)
-      assert.match(toolSpan.attributes["gen_ai.tool.call.result"], /Wuthering Heights|Jane Eyre/)
+      expect(toolSpan).not.toBe(undefined)
+      expect(toolSpan.attributes["gen_ai.tool.call.result"]).not.toBe(undefined)
+      expect(toolSpan.attributes["gen_ai.tool.call.result"]).toMatch(/Wuthering Heights|Jane Eyre/)
     })
   })
 
@@ -70,25 +69,25 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
   describe("failing graph", () => {
     it("should return failed state when graph throws", async () => {
       const res = await sendMessage("debug", "Please fail now")
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
-      assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /Simulated graph failure/)
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
+      expect(res.data.result.status.state).toBe("failed")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/Simulated graph failure/)
     })
 
     it("should record agent.errors.total metric on graph failure", async () => {
       await sendMessage("debug", "fail for metrics")
       const output = await flushMetrics()
-      assert.match(output, /agent\.errors\.total/)
-      assert.match(output, /execution_failed/)
+      expect(output).toMatch(/agent\.errors\.total/)
+      expect(output).toMatch(/execution_failed/)
     })
 
     it("should set agent.outcome=failed on workflow span when graph throws", async () => {
       const spans = await getSpansAfterRequest(() => sendMessage("debug", "fail for span"))
       const wfSpan = findSpan(spans, "workflow CompiledStateGraph DebugService")
-      assert.notStrictEqual(wfSpan, undefined)
-      assert.strictEqual(wfSpan.attributes["agent.outcome"], "failed")
-      assert.strictEqual(wfSpan.status.code, 2)
+      expect(wfSpan).not.toBe(undefined)
+      expect(wfSpan.attributes["agent.outcome"]).toBe("failed")
+      expect(wfSpan.status.code).toBe(2)
     })
   })
 })

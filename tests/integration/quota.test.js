@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import {
   captured,
@@ -33,77 +32,77 @@ describe("@cap-js/agents - Quota enforcement", () => {
   describe("quotaEnforcerAtStart", () => {
     it("should allow request when within quota limits", async () => {
       const res = await sendMessage("graph-book", "Show me books")
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
-      assert.strictEqual(res.data.result.status.state, "completed")
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
+      expect(res.data.result.status.state).toBe("completed")
     })
 
     it("should return 429 when maxTasksPerHourPerUser is exceeded", async () => {
       cds.env.agents.pool.maxTasksPerHourPerUser = 0
 
       const res = await sendMessage("graph-book", "Should reject")
-      assert.strictEqual(res.status, 429)
-      assert.notStrictEqual(res.data.error, undefined)
-      assert.match(res.data.error.message, /tasks per hour per user/)
+      expect(res.status).toBe(429)
+      expect(res.data.error).not.toBe(undefined)
+      expect(res.data.error.message).toMatch(/tasks per hour per user/)
       // Retry-After should be seconds until next hour
       const retryAfter = parseInt(res.headers["retry-after"])
-      assert.ok(retryAfter > 0, `expected ${retryAfter} > 0`)
-      assert.ok(retryAfter <= 3600)
+      expect(retryAfter > 0, `expected ${retryAfter} > 0`).toBeTruthy()
+      expect(retryAfter <= 3600).toBeTruthy()
     })
 
     it("should return 429 when maxTasksPerHour is exceeded", async () => {
       cds.env.agents.pool.maxTasksPerHour = 0
 
       const res = await sendMessage("graph-book", "Should reject")
-      assert.strictEqual(res.status, 429)
-      assert.notStrictEqual(res.headers["retry-after"], undefined)
-      assert.match(res.data.error.message, /tasks per hour/)
+      expect(res.status).toBe(429)
+      expect(res.headers["retry-after"]).not.toBe(undefined)
+      expect(res.data.error.message).toMatch(/tasks per hour/)
     })
 
     it("should return 429 when maxConcurrentTasks is exceeded", async () => {
       cds.env.agents.pool.maxConcurrentTasks = 0
 
       const res = await sendMessage("graph-book", "Should reject")
-      assert.strictEqual(res.status, 429)
+      expect(res.status).toBe(429)
       // Concurrent limit → short retry (30s)
-      assert.strictEqual(res.headers["retry-after"], "30")
-      assert.match(res.data.error.message, /concurrent tasks/)
+      expect(res.headers["retry-after"]).toBe("30")
+      expect(res.data.error.message).toMatch(/concurrent tasks/)
     })
 
     it("should return 429 when maxToolCallsPerHour is exceeded", async () => {
       cds.env.agents.pool.maxToolCallsPerHour = 0
 
       const res = await sendMessage("graph-book", "Should reject")
-      assert.strictEqual(res.status, 429)
-      assert.match(res.data.error.message, /tool calls per hour/)
+      expect(res.status).toBe(429)
+      expect(res.data.error.message).toMatch(/tool calls per hour/)
     })
 
     it("should return 429 when maxLLMTokensPerDay is exceeded", async () => {
       cds.env.agents.pool.maxLLMTokensPerDay = 0
 
       const res = await sendMessage("graph-book", "Should reject")
-      assert.strictEqual(res.status, 429)
+      expect(res.status).toBe(429)
       // Daily limit → retry at midnight
       const retryAfter = parseInt(res.headers["retry-after"])
-      assert.ok(retryAfter > 0, `expected ${retryAfter} > 0`)
-      assert.ok(retryAfter <= 86400)
-      assert.match(res.data.error.message, /LLM tokens/)
+      expect(retryAfter > 0, `expected ${retryAfter} > 0`).toBeTruthy()
+      expect(retryAfter <= 86400).toBeTruthy()
+      expect(res.data.error.message).toMatch(/LLM tokens/)
     })
 
     it("should include Retry-After header with specific values", async () => {
       cds.env.agents.pool.maxConcurrentTasksPerUser = 0
 
       const res = await sendMessage("graph-book", "Check header")
-      assert.strictEqual(res.status, 429)
+      expect(res.status).toBe(429)
       // Concurrent per-user → short retry (30s)
-      assert.strictEqual(res.headers["retry-after"], "30")
+      expect(res.headers["retry-after"]).toBe("30")
     })
 
     it("should include JSON-RPC error code -32029", async () => {
       cds.env.agents.pool.maxTasksPerHour = 0
 
       const res = await sendMessage("graph-book", "Check error code")
-      assert.strictEqual(res.data.error.code, -32029)
+      expect(res.data.error.code).toBe(-32029)
     })
   })
 
@@ -112,17 +111,17 @@ describe("@cap-js/agents - Quota enforcement", () => {
       cds.env.agents.pool.maxIncomingMessageLength = 10
 
       const res = await sendMessage("graph-book", "This message is longer than ten characters")
-      assert.strictEqual(res.status, 400)
-      assert.strictEqual(res.data.error.code, -32029)
-      assert.match(res.data.error.message, /must not exceed/)
+      expect(res.status).toBe(400)
+      expect(res.data.error.code).toBe(-32029)
+      expect(res.data.error.message).toMatch(/must not exceed/)
     })
 
     it("should allow messages within maxIncomingMessageLength", async () => {
       cds.env.agents.pool.maxIncomingMessageLength = 5000
 
       const res = await sendMessage("graph-book", "Short message")
-      assert.strictEqual(res.status, 200)
-      assert.strictEqual(res.data.result?.status?.state, "completed")
+      expect(res.status).toBe(200)
+      expect(res.data.result?.status?.state).toBe("completed")
     })
   })
 
@@ -131,10 +130,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 2
 
       const res = await sendMessage("looping", "trigger loop")
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
-      assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /LLM call limit exceeded/i)
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
+      expect(res.data.result.status.state).toBe("failed")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/LLM call limit exceeded/i)
     })
 
     it("should fail task when maxToolCallsPerTask exceeded during graph execution", async () => {
@@ -142,10 +141,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
       cds.env.agents.pool.maxToolCallsPerTask = 1
 
       const res = await sendMessage("looping", "trigger tool limit")
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
-      assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /Tool call limit exceeded/i)
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
+      expect(res.data.result.status.state).toBe("failed")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/Tool call limit exceeded/i)
     })
 
     it("should fail task when maxLLMTokensPerTask exceeded during graph execution", async () => {
@@ -154,10 +153,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
       cds.env.agents.pool.maxLLMTokensPerTask = 150 // agent adds 100 tokens per iteration → exceeds after 2nd
 
       const res = await sendMessage("looping", "trigger token limit")
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
-      assert.strictEqual(res.data.result.status.state, "failed")
-      assert.match(res.data.result.status.message.parts[0].text, /Token limit exceeded/i)
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
+      expect(res.data.result.status.state).toBe("failed")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/Token limit exceeded/i)
     })
 
     it("should complete normally when per-task limits are high", async () => {
@@ -166,10 +165,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
       cds.env.agents.pool.maxLLMTokensPerTask = 100000
 
       const res = await sendMessage("looping", "limited loop")
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
       // Will fail because the looping model always exceeds the limit
-      assert.strictEqual(res.data.result.status.state, "failed")
+      expect(res.data.result.status.state).toBe("failed")
     })
   })
 
@@ -183,9 +182,9 @@ describe("@cap-js/agents - Quota enforcement", () => {
 
     it("should return middleware with afterModel hook", async () => {
       const [mw] = await quotaEnforcerMiddleware()
-      assert.strictEqual(mw.name, "agentQuotaEnforcerMiddleware")
-      assert.notStrictEqual(mw.afterModel, undefined)
-      assert.strictEqual(typeof mw.afterModel.hook, "function")
+      expect(mw.name).toBe("agentQuotaEnforcerMiddleware")
+      expect(mw.afterModel).not.toBe(undefined)
+      expect(typeof mw.afterModel.hook).toBe("function")
     })
 
     it("afterModel hook should throw when maxLLMInvocationsPerTask exceeded", async () => {
@@ -203,7 +202,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      assert.throws(() => mw.afterModel.hook(state), /LLM call limit exceeded/)
+      expect(() => mw.afterModel.hook(state)).toThrow(/LLM call limit exceeded/)
     })
 
     it("afterModel hook should throw when maxLLMTokensPerTask exceeded", async () => {
@@ -222,7 +221,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      assert.throws(() => mw.afterModel.hook(state), /Token limit exceeded/)
+      expect(() => mw.afterModel.hook(state)).toThrow(/Token limit exceeded/)
     })
 
     it("afterModel hook should throw when maxToolCallsPerTask exceeded", async () => {
@@ -243,7 +242,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      assert.throws(() => mw.afterModel.hook(state), /Tool call limit exceeded/)
+      expect(() => mw.afterModel.hook(state)).toThrow(/Tool call limit exceeded/)
     })
 
     it("afterModel hook should return updated counts when within limits", async () => {
@@ -265,57 +264,63 @@ describe("@cap-js/agents - Quota enforcement", () => {
         ],
       }
       const result = mw.afterModel.hook(state)
-      assert.strictEqual(result.runModelCallCount, 1)
-      assert.strictEqual(result.runTokenCount, 15)
-      assert.strictEqual(result.runToolCallCount, 1)
+      expect(result.runModelCallCount).toBe(1)
+      expect(result.runTokenCount).toBe(15)
+      expect(result.runToolCallCount).toBe(1)
     })
   })
 
   describe("usage tracking on task record", () => {
     it("should write agentService to task record after completion", async () => {
       const res = await sendMessage("graph-book", "Track usage")
-      assert.strictEqual(res.status, 200)
-      assert.strictEqual(res.data.result.status.state, "completed")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("completed")
 
       // Usage update runs in cds.spawn — wait for it
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
-      assert.notStrictEqual(row, undefined)
-      assert.strictEqual(row.agentService, "GraphBookService")
+      expect(row).not.toBe(undefined)
+      expect(row.agentService).toBe("GraphBookService")
     })
 
     it("should write usageToolCalls to task record when graph tracks it", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 3
       const res = await sendMessage("looping", "Track tools")
-      assert.strictEqual(res.data.result.status.state, "failed")
+      expect(res.data.result.status.state).toBe("failed")
 
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
-      assert.notStrictEqual(row, undefined)
-      assert.strictEqual(row.agentService, "LoopingService")
-      assert.ok(row.usageToolCalls >= 1, `expected usageToolCalls >= 1, got ${row.usageToolCalls}`)
+      expect(row).not.toBe(undefined)
+      expect(row.agentService).toBe("LoopingService")
+      expect(
+        row.usageToolCalls >= 1,
+        `expected usageToolCalls >= 1, got ${row.usageToolCalls}`,
+      ).toBeTruthy()
     })
 
     it("should write usage fields even when task fails", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 2
       const res = await sendMessage("looping", "Fail and track")
-      assert.strictEqual(res.data.result.status.state, "failed")
+      expect(res.data.result.status.state).toBe("failed")
 
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
       const row = await SELECT.one.from("cap.agent.Tasks").where({ taskId })
-      assert.notStrictEqual(row, undefined)
-      assert.strictEqual(row.agentService, "LoopingService")
-      assert.ok(
+      expect(row).not.toBe(undefined)
+      expect(row.agentService).toBe("LoopingService")
+      expect(
         row.usageLlmTokens >= 100,
         `expected usageLlmTokens >= 100, got ${row.usageLlmTokens}`,
-      )
-      assert.ok(row.usageToolCalls >= 1, `expected usageToolCalls >= 1, got ${row.usageToolCalls}`)
+      ).toBeTruthy()
+      expect(
+        row.usageToolCalls >= 1,
+        `expected usageToolCalls >= 1, got ${row.usageToolCalls}`,
+      ).toBeTruthy()
     })
   })
 
@@ -335,8 +340,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
 
       // Captured console output should contain active_users gauge
       const output = captured.join("")
-      assert.match(output, /active_users/)
-      assert.match(output, /GraphBookService/)
+      expect(output).toMatch(/active_users/)
+      expect(output).toMatch(/GraphBookService/)
     })
 
     it("should be triggerable via computeActiveUsers event on agent-executor", async () => {
@@ -354,12 +359,12 @@ describe("@cap-js/agents - Quota enforcement", () => {
       await meterProvider.forceFlush()
 
       const output = captured.join("")
-      assert.match(output, /active_users/)
+      expect(output).toMatch(/active_users/)
     })
 
     it("should have activeUsersInterval configured", () => {
-      assert.notStrictEqual(cds.env.agents.activeUsersInterval, undefined)
-      assert.notStrictEqual(cds.env.agents.activeUsersInterval, 0)
+      expect(cds.env.agents.activeUsersInterval).not.toBe(undefined)
+      expect(cds.env.agents.activeUsersInterval).not.toBe(0)
     })
 
     it("should count distinct users per service via scheduled cds.spawn", async () => {
@@ -379,43 +384,49 @@ describe("@cap-js/agents - Quota enforcement", () => {
       await meterProvider.forceFlush()
 
       const output = captured.join("")
-      assert.match(output, /active_users/)
-      assert.match(output, /GraphBookService/)
+      expect(output).toMatch(/active_users/)
+      expect(output).toMatch(/GraphBookService/)
       // Same user sent both messages → distinct user count should be 1
-      assert.match(output, /value: 1/)
+      expect(output).toMatch(/value: 1/)
     })
 
     it("should parse interval strings correctly", async () => {
       const { parseInterval } = await import("../../lib/telemetry/active-users.js")
-      assert.strictEqual(parseInterval("24h"), 24 * 3600000)
-      assert.strictEqual(parseInterval("30m"), 30 * 60000)
-      assert.strictEqual(parseInterval("60s"), 60000)
-      assert.strictEqual(parseInterval("5000ms"), 5000)
-      assert.strictEqual(parseInterval(10000), 10000)
-      assert.strictEqual(parseInterval("1d"), 86400000)
+      expect(parseInterval("24h")).toBe(24 * 3600000)
+      expect(parseInterval("30m")).toBe(30 * 60000)
+      expect(parseInterval("60s")).toBe(60000)
+      expect(parseInterval("5000ms")).toBe(5000)
+      expect(parseInterval(10000)).toBe(10000)
+      expect(parseInterval("1d")).toBe(86400000)
     })
   })
 
   describe("pool config", () => {
     it("should have all expected pool limits defined", () => {
       const pool = cds.env.agents.pool
-      assert.notStrictEqual(cds.env.agents?.pool, undefined)
-      assert.ok(pool.maxConcurrentTasks > 0, `expected ${pool.maxConcurrentTasks} > 0`)
-      assert.ok(
+      expect(cds.env.agents?.pool).not.toBe(undefined)
+      expect(pool.maxConcurrentTasks > 0, `expected ${pool.maxConcurrentTasks} > 0`).toBeTruthy()
+      expect(
         pool.maxConcurrentTasksPerUser > 0,
         `expected ${pool.maxConcurrentTasksPerUser} > 0`,
-      )
-      assert.ok(pool.maxTasksPerHour > 0, `expected ${pool.maxTasksPerHour} > 0`)
-      assert.ok(pool.maxTasksPerHourPerUser > 0, `expected ${pool.maxTasksPerHourPerUser} > 0`)
-      assert.ok(pool.maxLLMTokensPerDay > 0, `expected ${pool.maxLLMTokensPerDay} > 0`)
-      assert.ok(pool.maxToolCallsPerHour > 0, `expected ${pool.maxToolCallsPerHour} > 0`)
-      assert.ok(pool.maxToolCallsPerTask > 0, `expected ${pool.maxToolCallsPerTask} > 0`)
-      assert.ok(pool.maxLLMInvocationsPerTask > 0, `expected ${pool.maxLLMInvocationsPerTask} > 0`)
-      assert.ok(pool.maxLLMTokensPerTask > 0, `expected ${pool.maxLLMTokensPerTask} > 0`)
-      assert.ok(
+      ).toBeTruthy()
+      expect(pool.maxTasksPerHour > 0, `expected ${pool.maxTasksPerHour} > 0`).toBeTruthy()
+      expect(
+        pool.maxTasksPerHourPerUser > 0,
+        `expected ${pool.maxTasksPerHourPerUser} > 0`,
+      ).toBeTruthy()
+      expect(pool.maxLLMTokensPerDay > 0, `expected ${pool.maxLLMTokensPerDay} > 0`).toBeTruthy()
+      expect(pool.maxToolCallsPerHour > 0, `expected ${pool.maxToolCallsPerHour} > 0`).toBeTruthy()
+      expect(pool.maxToolCallsPerTask > 0, `expected ${pool.maxToolCallsPerTask} > 0`).toBeTruthy()
+      expect(
+        pool.maxLLMInvocationsPerTask > 0,
+        `expected ${pool.maxLLMInvocationsPerTask} > 0`,
+      ).toBeTruthy()
+      expect(pool.maxLLMTokensPerTask > 0, `expected ${pool.maxLLMTokensPerTask} > 0`).toBeTruthy()
+      expect(
         pool.maxExecutionTimeMsPerTask > 0,
         `expected ${pool.maxExecutionTimeMsPerTask} > 0`,
-      )
+      ).toBeTruthy()
     })
   })
 })

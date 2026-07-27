@@ -1,5 +1,3 @@
-import assert from "node:assert/strict"
-import { describe, it } from "node:test"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
 import cds from "@sap/cds"
@@ -21,7 +19,7 @@ describe("buildTools — default behavior", () => {
   it("generateTools returns tools array and toolMap", () => {
     const srv = { name: "TestService", entities: {}, operations: {} }
     const result = generateTools(srv)
-    assert.ok(Array.isArray(result))
+    expect(Array.isArray(result)).toBeTruthy()
   })
 
   it("buildTools event returns tools array", async () => {
@@ -35,7 +33,7 @@ describe("buildTools — default behavior", () => {
     await srv.init()
 
     const result = await srv.send("buildTools")
-    assert.ok(Array.isArray(result), "buildTools should return an array")
+    expect(Array.isArray(result), "buildTools should return an array").toBeTruthy()
   })
 })
 
@@ -45,13 +43,13 @@ describe("instrumentTools", () => {
     instrumentTools([t])
     const wrapped = t.invoke
     instrumentTools([t])
-    assert.strictEqual(t.invoke, wrapped)
+    expect(t.invoke).toBe(wrapped)
   })
 
   it("marks tool with INSTRUMENTED symbol", () => {
     const t = makeTool()
     instrumentTools([t])
-    assert.strictEqual(t[INSTRUMENTED], true)
+    expect(t[INSTRUMENTED]).toBe(true)
   })
 
   it("instrumented tool: errors are recorded and re-thrown", async () => {
@@ -67,6 +65,6 @@ describe("instrumentTools", () => {
     )
     instrumentTools([failing])
 
-    await assert.rejects(failing.invoke({}), /boom/)
+    await expect(failing.invoke({})).rejects.toThrow(/boom/)
   })
 })

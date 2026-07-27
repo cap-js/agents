@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 
@@ -24,41 +23,41 @@ describe("@cap-js/agents - HITL (CatalogService)", () => {
 
   it("tasks/cancel cancels task in input-required state", async () => {
     const stockBefore = await getBookStock(BOOK_ID)
-    assert.notStrictEqual(stockBefore, undefined)
+    expect(stockBefore).not.toBe(undefined)
 
     // @agent.hitl on submitOrder should trigger HITL interrupt
     const res = await sendMessage("catalog", `Submit order for 2 copies of book ${BOOK_ID} hitl`)
     const state = res.data.result?.status?.state
 
     // LLM non-determinism: may not always call submitOrder action
-    assert.strictEqual(state, "input-required")
+    expect(state).toBe("input-required")
 
     const taskId = res.data.result.id
     const cancelRes = await jsonrpc("catalog", "tasks/cancel", { id: taskId })
-    assert.strictEqual(cancelRes.data.result.status.state, "canceled")
+    expect(cancelRes.data.result.status.state).toBe("canceled")
 
     const stockAfter = await getBookStock(BOOK_ID)
-    assert.strictEqual(stockAfter, stockBefore)
+    expect(stockAfter).toBe(stockBefore)
   })
 
   it("HITL approval resumes task and decreases stock", async () => {
     const quantity = 1
     const stockBefore = await getBookStock(BOOK_ID)
-    assert.notStrictEqual(stockBefore, undefined)
+    expect(stockBefore).not.toBe(undefined)
 
     const res = await sendMessage(
       "catalog",
       `Submit order for ${quantity} copies of book ${BOOK_ID} hitl`,
     )
     const state = res.data.result?.status?.state
-    assert.strictEqual(state, "input-required")
+    expect(state).toBe("input-required")
 
     const taskId = res.data.result.id
     const approveRes = await sendMessage("catalog", "yes", { taskId })
-    assert.strictEqual(approveRes.data.result.id, taskId)
-    assert.strictEqual(approveRes.data.result.status.state, "completed")
+    expect(approveRes.data.result.id).toBe(taskId)
+    expect(approveRes.data.result.status.state).toBe("completed")
 
     const stockAfter = await getBookStock(BOOK_ID)
-    assert.strictEqual(stockAfter, stockBefore - quantity)
+    expect(stockAfter).toBe(stockBefore - quantity)
   })
 })

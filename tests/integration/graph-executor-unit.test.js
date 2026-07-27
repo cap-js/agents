@@ -1,6 +1,3 @@
-import assert from "node:assert/strict"
-import { describe, it } from "node:test"
-
 const { GraphExecutor } = await import("../../srv/handlers/graph-executor.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
@@ -35,12 +32,11 @@ describe("GraphExecutor - configMapper", () => {
       fakeEventBus,
     )
 
-    assert.ok(capturedConfig, "graph.invoke must have been called")
-    assert.strictEqual(
+    expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
+    expect(
       capturedConfig.configurable.myKey,
-      "injected-value",
       "configMapper return value must appear in config.configurable",
-    )
+    ).toBe("injected-value")
   })
 
   it("reserved keys (thread_id, _taskId, _service) take precedence over configMapper", async () => {
@@ -78,10 +74,10 @@ describe("GraphExecutor - configMapper", () => {
       fakeEventBus,
     )
 
-    assert.notStrictEqual(capturedConfig.configurable.thread_id, "HACKER")
-    assert.notStrictEqual(capturedConfig.configurable._taskId, "HACKER")
-    assert.notStrictEqual(capturedConfig.configurable._service, "HACKER")
-    assert.strictEqual(capturedConfig.configurable.safe, "allowed")
+    expect(capturedConfig.configurable.thread_id).not.toBe("HACKER")
+    expect(capturedConfig.configurable._taskId).not.toBe("HACKER")
+    expect(capturedConfig.configurable._service).not.toBe("HACKER")
+    expect(capturedConfig.configurable.safe).toBe("allowed")
   })
 
   it("works without configMapper (no regression)", async () => {
@@ -107,8 +103,8 @@ describe("GraphExecutor - configMapper", () => {
       fakeEventBus,
     )
 
-    assert.ok(capturedConfig?.configurable?.thread_id, "thread_id must be set")
-    assert.ok(capturedConfig?.configurable?._taskId, "_taskId must be set")
+    expect(capturedConfig?.configurable?.thread_id, "thread_id must be set").toBeTruthy()
+    expect(capturedConfig?.configurable?._taskId, "_taskId must be set").toBeTruthy()
   })
 
   it("async configMapper is awaited — its resolved values reach config.configurable", async () => {
@@ -140,11 +136,10 @@ describe("GraphExecutor - configMapper", () => {
       fakeEventBus,
     )
 
-    assert.strictEqual(
+    expect(
       capturedConfig.configurable.asyncKey,
-      "async-value",
       "async configMapper value must be awaited and present in config.configurable",
-    )
+    ).toBe("async-value")
   })
 
   it("non-object return from configMapper fails the task with TypeError", async () => {
@@ -179,9 +174,8 @@ describe("GraphExecutor - configMapper", () => {
     )
 
     const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
-    assert.ok(failedEvent, "a failed status event must have been published")
-    assert.match(
-      failedEvent.status.message.parts[0].text,
+    expect(failedEvent, "a failed status event must have been published").toBeTruthy()
+    expect(failedEvent.status.message.parts[0].text).toMatch(
       /configMapper must return a plain object/,
     )
   })

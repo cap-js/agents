@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
@@ -16,32 +15,35 @@ const MOCK_EXECUTOR_TEXT = /Here is a sample from|No data found\.|Could not quer
 describe("@cap-js/agents - @agent.model annotation", () => {
   it("annotation overrides cds.env.agents.llm for the annotated service", async () => {
     const srv = cds.services.LlmOverrideService
-    assert.ok(srv, "LlmOverrideService should be loaded")
+    expect(srv, "LlmOverrideService should be loaded").toBeTruthy()
 
     const annotated = srv.definition["@agent.model"]
-    assert.strictEqual(annotated, "test-only--annotated-model")
+    expect(annotated).toBe("test-only--annotated-model")
 
     // Sanity: the global config is set to a different model in package.json
-    assert.notStrictEqual(cds.env.agents.llm, annotated)
+    expect(cds.env.agents.llm).not.toBe(annotated)
 
     // Resolution via buildModel: model created with annotated name
     const model = await srv.send("buildModel", { srv })
-    assert.ok(model, "buildModel should return a model")
+    expect(model, "buildModel should return a model").toBeTruthy()
     const resolvedName = model.orchestrationConfig?.promptTemplating?.model?.name
-    assert.strictEqual(resolvedName, annotated)
+    expect(resolvedName).toBe(annotated)
   })
 
   it("falls back to cds.env.agents.llm when service has no @agent.model annotation", async () => {
     const srv = cds.services.ProductAgentService
-    assert.ok(srv, "ProductAgentService should be loaded")
+    expect(srv, "ProductAgentService should be loaded").toBeTruthy()
 
-    assert.strictEqual(srv.definition["@agent.model"], undefined)
-    assert.ok(cds.env.agents?.llm, "cds.env.agents.llm must be set for this test to be meaningful")
+    expect(srv.definition["@agent.model"]).toBe(undefined)
+    expect(
+      cds.env.agents?.llm,
+      "cds.env.agents.llm must be set for this test to be meaningful",
+    ).toBeTruthy()
 
     const model = await srv.send("buildModel", { srv })
-    assert.ok(model, "buildModel should return a model")
+    expect(model, "buildModel should return a model").toBeTruthy()
     const resolvedName = model.orchestrationConfig?.promptTemplating?.model?.name
-    assert.strictEqual(resolvedName, cds.env.agents.llm)
+    expect(resolvedName).toBe(cds.env.agents.llm)
   })
 })
 
@@ -51,22 +53,21 @@ describe("@cap-js/agents - Auto-built deep agents (zero-code convention)", () =>
   describe("Slug-only convention (zero-code-agent)", () => {
     it("agent card auto-generated from <slug>/AGENTS.md + skills/", async () => {
       const res = await axios.get("/a2a/zero-code-agent/.well-known/agent-card.json")
-      assert.strictEqual(res.status, 200)
-      assert.strictEqual(res.data.name, "zero-code-agent")
-      assert.ok(
+      expect(res.status).toBe(200)
+      expect(res.data.name).toBe("zero-code-agent")
+      expect(
         res.data.skills.find((s) => s.id === "product-listing"),
         "skills/ scan should yield product-listing",
-      )
+      ).toBeTruthy()
     })
 
     it("message/send routes through the auto-deepagent (not the mock executor)", async () => {
       const res = await sendMessage("zero-code-agent", "Hi")
       const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-      assert.doesNotMatch(
+      expect(
         text,
-        MOCK_EXECUTOR_TEXT,
         `mock executor response received — auto-deepagent wiring failed: ${text}`,
-      )
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
     })
   })
 
@@ -75,20 +76,19 @@ describe("@cap-js/agents - Auto-built deep agents (zero-code convention)", () =>
   describe("@agent.directory annotation (override-card-service)", () => {
     it("agent card resolved from annotation-pointed dir + @agent.card file", async () => {
       const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
-      assert.strictEqual(res.status, 200)
+      expect(res.status).toBe(200)
       // @agent.card wins over the in-dir resolution chain.
-      assert.strictEqual(res.data.name, "card-override-explicit")
-      assert.strictEqual(res.data.version, "2.0.0")
+      expect(res.data.name).toBe("card-override-explicit")
+      expect(res.data.version).toBe("2.0.0")
     })
 
     it("message/send routes through auto-deepagent (annotation-resolved dir)", async () => {
       const res = await sendMessage("override-card", "Hi")
       const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-      assert.doesNotMatch(
+      expect(
         text,
-        MOCK_EXECUTOR_TEXT,
         `mock executor response received — @agent.directory wiring failed: ${text}`,
-      )
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
     })
   })
 
@@ -97,29 +97,28 @@ describe("@cap-js/agents - Auto-built deep agents (zero-code convention)", () =>
   describe("Tool override path (product-agent)", () => {
     it("auto-built deepagent includes both auto-generated CDS tools and the user's custom tool", async () => {
       const srv = cds.services.ProductAgentService
-      assert.ok(srv, "ProductAgentService should be loaded")
+      expect(srv, "ProductAgentService should be loaded").toBeTruthy()
 
       // Dispatch buildTools event — app handler extends default tools with custom tool
       const tools = await srv.send("buildTools")
       const names = tools.map((t) => t.name)
-      assert.ok(
+      expect(
         names.includes("calculate_bulk_pricing"),
         `custom tool missing — got: ${names.join(", ")}`,
-      )
-      assert.ok(
+      ).toBeTruthy()
+      expect(
         names.some((n) => /order|describe|query|Products/i.test(n)),
         `auto-generated CDS tools missing — got: ${names.join(", ")}`,
-      )
+      ).toBeTruthy()
     })
 
     it("message/send routes through the auto-deepagent (not the mock executor)", async () => {
       const res = await sendMessage("product-agent", "Hi")
       const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-      assert.doesNotMatch(
+      expect(
         text,
-        MOCK_EXECUTOR_TEXT,
         `mock executor response received — product-agent wiring failed: ${text}`,
-      )
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
     })
   })
 })

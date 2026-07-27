@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import { createRequire } from "node:module"
 import { createMockAICore } from "../utils/mock-ai-core.js"
@@ -42,19 +41,19 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
   })
 
   it("should have maxLLMCallTimeoutMs configured", () => {
-    assert.strictEqual(cds.env.agents.pool.maxLLMCallTimeoutMs, 120000)
+    expect(cds.env.agents.pool.maxLLMCallTimeoutMs).toBe(120000)
   })
 
   it("should complete task when AI Core returns 200", async () => {
     const res = await sendMessage("circuit-breaker", "hello")
-    assert.strictEqual(res.data.result?.status?.state, "completed")
-    assert.ok(mock.getCallCount() > 0, "expected HTTP call to mock")
+    expect(res.data.result?.status?.state).toBe("completed")
+    expect(mock.getCallCount() > 0, "expected HTTP call to mock").toBeTruthy()
   })
 
   it("should fail task when AI Core returns 502", async () => {
     mock.setStatus(502)
     const res = await sendMessage("circuit-breaker", "hello")
-    assert.strictEqual(res.data.result?.status?.state, "failed")
+    expect(res.data.result?.status?.state).toBe("failed")
   })
 
   it("should NOT open circuit breaker on 4xx errors (httpErrorFilter)", async () => {
@@ -67,8 +66,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
     mock.resetCallCount()
     mock.setStatus(200)
     const res = await sendMessage("circuit-breaker", "should-succeed-after-429s")
-    assert.ok(mock.getCallCount() > 0, "breaker should be closed after 4xx")
-    assert.strictEqual(res.data.result?.status?.state, "completed")
+    expect(mock.getCallCount() > 0, "breaker should be closed after 4xx").toBeTruthy()
+    expect(res.data.result?.status?.state).toBe("completed")
   })
 
   it("should open circuit breaker after repeated 5xx failures", async () => {
@@ -80,7 +79,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
     mock.resetCallCount()
     await sendMessage("circuit-breaker", "after-open")
-    assert.strictEqual(mock.getCallCount(), 0, "breaker open — no HTTP calls expected")
+    expect(mock.getCallCount(), "breaker open — no HTTP calls expected").toBe(0)
   })
 
   it("open circuit breaker should cause immediate failure, not timeout from retries", async () => {
@@ -98,9 +97,9 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
     const res = await sendMessage("circuit-breaker", "should-fail-fast")
     const duration = Date.now() - t0
 
-    assert.strictEqual(res.data.result?.status?.state, "failed")
-    assert.strictEqual(mock.getCallCount(), 0, "breaker open — no HTTP calls expected")
-    assert.ok(duration < 5000, `Expected fast failure, but took ${duration}ms`)
+    expect(res.data.result?.status?.state).toBe("failed")
+    expect(mock.getCallCount(), "breaker open — no HTTP calls expected").toBe(0)
+    expect(duration < 5000, `Expected fast failure, but took ${duration}ms`).toBeTruthy()
   })
 
   it("should recover after circuit breaker state is reset", async () => {
@@ -108,7 +107,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
       for (const key of Object.keys(circuitBreakers)) delete circuitBreakers[key]
     }
     const res = await sendMessage("circuit-breaker", "recovered")
-    assert.strictEqual(res.data.result?.status?.state, "completed")
-    assert.ok(mock.getCallCount() > 0, "expected HTTP calls after recovery")
+    expect(res.data.result?.status?.state).toBe("completed")
+    expect(mock.getCallCount() > 0, "expected HTTP calls after recovery").toBeTruthy()
   })
 })

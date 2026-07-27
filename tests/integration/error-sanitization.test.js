@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
@@ -27,9 +26,9 @@ describe("@cap-js/agents - Production error sanitization", () => {
       const res = await POST("/a2a/graph-book/", { invalid: true })
 
       if (res.status === 500) {
-        assert.strictEqual(res.data.error.message, "Internal Server Error")
-        assert.ok(!res.data.error.message.includes("Internal error:"))
-        assert.strictEqual(res.data.error.code, -32603)
+        expect(res.data.error.message).toBe("Internal Server Error")
+        expect(!res.data.error.message.includes("Internal error:")).toBeTruthy()
+        expect(res.data.error.code).toBe(-32603)
       }
     })
 
@@ -39,8 +38,8 @@ describe("@cap-js/agents - Production error sanitization", () => {
       const res = await POST("/a2a/graph-book/", { invalid: true })
 
       if (res.status === 500) {
-        assert.match(res.data.error.message, /^Internal error:/)
-        assert.strictEqual(res.data.error.code, -32603)
+        expect(res.data.error.message).toMatch(/^Internal error:/)
+        expect(res.data.error.code).toBe(-32603)
       }
     })
   })
@@ -59,8 +58,8 @@ describe("@cap-js/agents - Production error sanitization", () => {
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
-        assert.strictEqual(msg, "Internal Server Error")
-        assert.ok(!msg.includes("Agent error:"))
+        expect(msg).toBe("Internal Server Error")
+        expect(!msg.includes("Agent error:")).toBeTruthy()
       }
     })
 
@@ -77,7 +76,7 @@ describe("@cap-js/agents - Production error sanitization", () => {
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
-        assert.match(msg, /^Agent error:/)
+        expect(msg).toMatch(/^Agent error:/)
       }
     })
   })

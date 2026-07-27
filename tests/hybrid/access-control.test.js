@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
@@ -45,9 +44,9 @@ describe("@cap-js/agents - Access Control (Checkpoints)", () => {
     // Bob tries to resume Alice's HITL task — should fail
     const bobResume = await sendMessageAs("catalog", "yes", BOB, { taskId })
     if (bobResume.data.error) {
-      assert.notStrictEqual(bobResume.data.error, undefined)
+      expect(bobResume.data.error).not.toBe(undefined)
     } else {
-      assert.notStrictEqual(bobResume.data.result.id, taskId)
+      expect(bobResume.data.result.id).not.toBe(taskId)
     }
   })
 
@@ -66,7 +65,7 @@ describe("@cap-js/agents - Access Control (Checkpoints)", () => {
 
     // Alice resumes her own task
     const aliceResume = await sendMessageAs("catalog", "yes", ALICE, { taskId })
-    assert.strictEqual(aliceResume.data.result.id, taskId)
-    assert.strictEqual(aliceResume.data.result.status.state, "completed")
+    expect(aliceResume.data.result.id).toBe(taskId)
+    expect(aliceResume.data.result.status.state).toBe("completed")
   })
 })

@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import {
@@ -38,7 +37,7 @@ const { sendMessage: sendMsgHelper } = createHelpers({ POST, axios })
 // In hybrid mode, telemetry uses different exporters that our in-memory capture can't intercept.
 const isHybrid = cds.env.profiles?.includes("hybrid")
 
-describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () => {
+describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -47,11 +46,10 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
 
   it("should complete A2A request via graph with MCP tools", async () => {
     const res = await sendMessage("graph-book", "Show me books")
-    assert.strictEqual(res.status, 200)
-    assert.notStrictEqual(res.data.result, undefined)
-    assert.strictEqual(res.data.result.status.state, "completed")
-    assert.match(
-      res.data.result.status.message.parts[0].text,
+    expect(res.status).toBe(200)
+    expect(res.data.result).not.toBe(undefined)
+    expect(res.data.result.status.state).toBe("completed")
+    expect(res.data.result.status.message.parts[0].text).toMatch(
       /Wuthering Heights|Jane Eyre|Catweazle/,
     )
   })
@@ -61,45 +59,39 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
   it("should create workflow span with correct name and attributes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "workflow span test"))
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
-    assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["gen_ai.operation.name"], "invoke_agent")
-    assert.strictEqual(span.attributes["gen_ai.agent.name"], "GraphBookService")
-    assert.notStrictEqual(span.attributes["agent.task.id"], undefined)
-    assert.notStrictEqual(span.attributes["agent.context.id"], undefined)
-    assert.strictEqual(span.attributes["agent.outcome"], "completed")
+    expect(span).not.toBe(undefined)
+    expect(span.attributes["gen_ai.operation.name"]).toBe("invoke_agent")
+    expect(span.attributes["gen_ai.agent.name"]).toBe("GraphBookService")
+    expect(span.attributes["agent.task.id"]).not.toBe(undefined)
+    expect(span.attributes["agent.context.id"]).not.toBe(undefined)
+    expect(span.attributes["agent.outcome"]).toBe("completed")
   })
 
   it("should create tool span with correct name and attributes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "tool span test"))
     const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
-    assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["gen_ai.operation.name"], "execute_tool")
-    assert.strictEqual(span.attributes["gen_ai.tool.call.id"], "query")
-    assert.strictEqual(span.attributes["gen_ai.tool.call.outcome"], "success")
+    expect(span).not.toBe(undefined)
+    expect(span.attributes["gen_ai.operation.name"]).toBe("execute_tool")
+    expect(span.attributes["gen_ai.tool.call.id"]).toBe("query")
+    expect(span.attributes["gen_ai.tool.call.outcome"]).toBe("success")
   })
 
   it("should create tool span for custom (non-CDS) tools via prototype patch", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "custom tool test"))
     const span = findSpan(spans, "execute_tool DynamicStructuredTool getBookCount")
-    assert.notStrictEqual(span, undefined)
-    assert.strictEqual(span.attributes["gen_ai.operation.name"], "execute_tool")
-    assert.strictEqual(span.attributes["gen_ai.tool.call.id"], "getBookCount")
-    assert.strictEqual(span.attributes["gen_ai.tool.call.outcome"], "success")
+    expect(span).not.toBe(undefined)
+    expect(span.attributes["gen_ai.operation.name"]).toBe("execute_tool")
+    expect(span.attributes["gen_ai.tool.call.id"]).toBe("getBookCount")
+    expect(span.attributes["gen_ai.tool.call.outcome"]).toBe("success")
   })
 
   it("should create RunnableSequence spans for graph nodes", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "sequence test"))
     const seqSpans = findSpans(spans, "workflow RunnableSequence")
-    assert.ok(seqSpans.length > 0, `expected ${seqSpans.length} > 0`)
+    expect(seqSpans.length > 0, `expected ${seqSpans.length} > 0`).toBeTruthy()
     const nodeNames = seqSpans.map((s) => s.name)
-    assert.strictEqual(
-      nodeNames.some((n) => n.includes("llm")),
-      true,
-    )
-    assert.strictEqual(
-      nodeNames.some((n) => n.includes("tools")),
-      true,
-    )
+    expect(nodeNames.some((n) => n.includes("llm"))).toBe(true)
+    expect(nodeNames.some((n) => n.includes("tools"))).toBe(true)
   })
 
   it("should record tool_calls requested by LLM on chat span", async () => {
@@ -137,19 +129,19 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, "chat MockModelWithTools")
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.notStrictEqual(chatSpan.attributes["gen_ai.response.tool_calls"], undefined)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.tool_calls"]).not.toBe(undefined)
     const toolCalls = JSON.parse(chatSpan.attributes["gen_ai.response.tool_calls"])
-    assert.strictEqual(toolCalls.length, 2)
-    assert.strictEqual(toolCalls[0].name, "query")
-    assert.strictEqual(toolCalls[1].name, "getStock")
+    expect(toolCalls.length).toBe(2)
+    expect(toolCalls[0].name).toBe("query")
+    expect(toolCalls[1].name).toBe("getStock")
   })
 
   it("should NOT include input/output content at default log level", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "privacy test"))
     for (const span of spans) {
-      assert.strictEqual(span.attributes["gen_ai.input.messages"], undefined)
-      assert.strictEqual(span.attributes["gen_ai.output.messages"], undefined)
+      expect(span.attributes["gen_ai.input.messages"]).toBe(undefined)
+      expect(span.attributes["gen_ai.output.messages"]).toBe(undefined)
     }
   })
 
@@ -158,35 +150,35 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
     const wfSpan = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
     const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")
 
-    assert.notStrictEqual(wfSpan, undefined)
-    assert.notStrictEqual(toolSpan, undefined)
+    expect(wfSpan).not.toBe(undefined)
+    expect(toolSpan).not.toBe(undefined)
 
-    assert.strictEqual(toolSpan.spanContext().traceId, wfSpan.spanContext().traceId)
+    expect(toolSpan.spanContext().traceId).toBe(wfSpan.spanContext().traceId)
     const toolParent = spans.find((s) => s.spanContext().spanId === toolSpan.parentSpanId)
     const isDirectChild = toolSpan.parentSpanId === wfSpan.spanContext().spanId
     const isGrandchild = toolParent?.parentSpanId === wfSpan.spanContext().spanId
-    assert.strictEqual(isDirectChild || isGrandchild, true)
+    expect(isDirectChild || isGrandchild).toBe(true)
   })
 
   // ─── Monkey-patching ────────────────────────────────────────────────
 
   it("should have LangChain patches applied (feature flag default on)", async () => {
-    assert.notStrictEqual(cds.env.agents.trace_langchain, false)
+    expect(cds.env.agents.trace_langchain).not.toBe(false)
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
     const PATCHED = Symbol.for("@cap-js/agents:patched")
-    assert.strictEqual(BaseChatModel.prototype[PATCHED], true)
+    expect(BaseChatModel.prototype[PATCHED]).toBe(true)
   })
 
   it("should patch StructuredTool.invoke", async () => {
     const { StructuredTool } = await import("@langchain/core/tools")
     const PATCHED = Symbol.for("@cap-js/agents:patched")
-    assert.strictEqual(StructuredTool.prototype[PATCHED], true)
+    expect(StructuredTool.prototype[PATCHED]).toBe(true)
   })
 
   it("should patch RunnableLambda.invoke", async () => {
     const { RunnableLambda } = await import("@langchain/core/runnables")
     const PATCHED = Symbol.for("@cap-js/agents:patched")
-    assert.strictEqual(RunnableLambda.prototype[PATCHED], true)
+    expect(RunnableLambda.prototype[PATCHED]).toBe(true)
   })
 
   // ─── Metrics ────────────────────────────────────────────────────────
@@ -194,38 +186,38 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
   it("should record golden signal metrics", async () => {
     await sendMessage("graph-book", "Metrics test")
     const output = await flushMetrics()
-    assert.match(output, /agent\.requests\.total/)
-    assert.match(output, /agent\.request\.duration/)
-    assert.match(output, /agent\.workflows\.completed/)
-    assert.match(output, /agent_actions/)
-    assert.match(output, /agent\.tool\.invocations/)
-    assert.match(output, /sap\.tenantId/)
+    expect(output).toMatch(/agent\.requests\.total/)
+    expect(output).toMatch(/agent\.request\.duration/)
+    expect(output).toMatch(/agent\.workflows\.completed/)
+    expect(output).toMatch(/agent_actions/)
+    expect(output).toMatch(/agent\.tool\.invocations/)
+    expect(output).toMatch(/sap\.tenantId/)
   })
 
   it("should record LLM metrics (tokens, invocations)", async () => {
     await sendMessage("graph-book", "LLM test")
     const output = await flushMetrics()
-    assert.match(output, /agent\.llm\.input_tokens/)
-    assert.match(output, /agent\.llm\.output_tokens/)
-    assert.match(output, /agent\.llm\.invocations/)
-    assert.match(output, /mock-model-for-testing/)
+    expect(output).toMatch(/agent\.llm\.input_tokens/)
+    expect(output).toMatch(/agent\.llm\.output_tokens/)
+    expect(output).toMatch(/agent\.llm\.invocations/)
+    expect(output).toMatch(/mock-model-for-testing/)
   })
 
   // ─── Correlation ────────────────────────────────────────────────────
 
   it("should register cls_custom_fields for A2A correlation", () => {
     const cls_fields = cds.env.log.cls_custom_fields
-    assert.notStrictEqual(cls_fields, undefined)
-    assert.ok(cls_fields.includes("agent.task.id"))
-    assert.ok(cls_fields.includes("agent.context.id"))
+    expect(cls_fields).not.toBe(undefined)
+    expect(cls_fields.includes("agent.task.id")).toBeTruthy()
+    expect(cls_fields.includes("agent.context.id")).toBeTruthy()
   })
 
   it("should set A2A correlation IDs on responses", async () => {
     const res = await sendMessage("graph-book", "Correlation test")
-    assert.strictEqual(res.status, 200)
-    assert.notStrictEqual(res.data.result.id, undefined)
-    assert.ok(res.data.result.id.length > 0, `expected ${res.data.result.id.length} > 0`)
-    assert.notStrictEqual(res.data.result.contextId, undefined)
+    expect(res.status).toBe(200)
+    expect(res.data.result.id).not.toBe(undefined)
+    expect(res.data.result.id.length > 0, `expected ${res.data.result.id.length} > 0`).toBeTruthy()
+    expect(res.data.result.contextId).not.toBe(undefined)
   })
 })
 
@@ -233,7 +225,7 @@ describe("@cap-js/agents - OpenTelemetry integration", { skip: isHybrid }, () =>
 // GenAI Semantic Convention compliance tests (uses mock AI Core)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () => {
+describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
   axios.defaults.validateStatus = () => true
 
   let originalQuota
@@ -281,8 +273,8 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined, "expected chat span")
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.model"], "gpt-4-turbo-2024-04-09")
+    expect(chatSpan, "expected chat span").not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.model"]).toBe("gpt-4-turbo-2024-04-09")
   })
 
   it("should set gen_ai.response.model on BaseChatModel patch path", async () => {
@@ -316,8 +308,8 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, "chat ModelWithResponseModel")
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.model"], "claude-4-sonnet-20250514")
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.model"]).toBe("claude-4-sonnet-20250514")
   })
 
   // ─── gen_ai.response.finish_reasons ────────────────────────────────────
@@ -336,9 +328,9 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.deepStrictEqual(chatSpan.attributes["gen_ai.response.finish_reasons"], ["stop"])
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.truncated"], undefined)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.finish_reasons"]).toEqual(["stop"])
+    expect(chatSpan.attributes["gen_ai.response.truncated"]).toBe(undefined)
   })
 
   it("should warn and set truncated when finish_reason is 'length'", async () => {
@@ -355,13 +347,13 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.deepStrictEqual(chatSpan.attributes["gen_ai.response.finish_reasons"], ["length"])
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.truncated"], true)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.finish_reasons"]).toEqual(["length"])
+    expect(chatSpan.attributes["gen_ai.response.truncated"]).toBe(true)
 
     const truncWarn = warnings.find((w) => w.includes("truncated"))
-    assert.notStrictEqual(truncWarn, undefined, "expected truncation warning")
-    assert.match(truncWarn, /max_tokens/)
+    expect(truncWarn, "expected truncation warning").not.toBe(undefined)
+    expect(truncWarn).toMatch(/max_tokens/)
   })
 
   it("should warn and set truncated when finish_reason is 'max_tokens' (Anthropic)", async () => {
@@ -378,9 +370,9 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.deepStrictEqual(chatSpan.attributes["gen_ai.response.finish_reasons"], ["max_tokens"])
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.truncated"], true)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.finish_reasons"]).toEqual(["max_tokens"])
+    expect(chatSpan.attributes["gen_ai.response.truncated"]).toBe(true)
   })
 
   it("should detect truncation via BaseChatModel patch", async () => {
@@ -415,16 +407,12 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, "chat TruncatedMockModel")
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.deepStrictEqual(chatSpan.attributes["gen_ai.response.finish_reasons"], ["length"])
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.truncated"], true)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.finish_reasons"]).toEqual(["length"])
+    expect(chatSpan.attributes["gen_ai.response.truncated"]).toBe(true)
 
     const truncWarn = warnings.find((w) => w.includes("truncated"))
-    assert.notStrictEqual(
-      truncWarn,
-      undefined,
-      "expected truncation warning for BaseChatModel path",
-    )
+    expect(truncWarn, "expected truncation warning for BaseChatModel path").not.toBe(undefined)
   })
 
   it("should NOT set truncated for normal BaseChatModel responses", async () => {
@@ -459,12 +447,12 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, "chat NormalMockModel")
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.deepStrictEqual(chatSpan.attributes["gen_ai.response.finish_reasons"], ["stop"])
-    assert.strictEqual(chatSpan.attributes["gen_ai.response.truncated"], undefined)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.response.finish_reasons"]).toEqual(["stop"])
+    expect(chatSpan.attributes["gen_ai.response.truncated"]).toBe(undefined)
 
     const truncWarn = warnings.find((w) => w.includes("truncated"))
-    assert.strictEqual(truncWarn, undefined, "should not warn for normal responses")
+    expect(truncWarn, "should not warn for normal responses").toBe(undefined)
   })
 
   // ─── gen_ai.usage.reasoning.output_tokens ──────────────────────────────
@@ -483,8 +471,8 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.strictEqual(chatSpan.attributes["gen_ai.usage.reasoning.output_tokens"], undefined)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.usage.reasoning.output_tokens"]).toBe(undefined)
   })
 
   // ─── gen_ai.request.stream ─────────────────────────────────────────────
@@ -502,8 +490,8 @@ describe("@cap-js/agents - GenAI Semantic Conventions", { skip: isHybrid }, () =
 
     const spans = exporter.getFinishedSpans()
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
+    expect(chatSpan).not.toBe(undefined)
     // Per spec: unset means non-streaming
-    assert.strictEqual(chatSpan.attributes["gen_ai.request.stream"], undefined)
+    expect(chatSpan.attributes["gen_ai.request.stream"]).toBe(undefined)
   })
 })

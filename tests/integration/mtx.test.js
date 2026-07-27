@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
@@ -31,7 +30,7 @@ describe("@cap-js/agents - Multi-tenancy (active_users)", () => {
     if (res.data.result?.status?.state !== "completed") {
       console.error("DEBUG response:", res.status, JSON.stringify(res.data).slice(0, 400))
     }
-    assert.strictEqual(res.data.result?.status?.state, "completed")
+    expect(res.data.result?.status?.state).toBe("completed")
 
     // 2. Stub cds.connect.to and cds.spawn so:
     //    - DeploymentService.getTenants() returns ["t1"] (forces iteration branch)
@@ -55,12 +54,11 @@ describe("@cap-js/agents - Multi-tenancy (active_users)", () => {
       observeActiveUsers({ observe: (v, attrs) => observed.push({ value: v, attrs }) })
 
       const t1Entry = observed.find((o) => o.attrs["sap.tenantId"] === "t1")
-      assert.notStrictEqual(t1Entry, undefined, "expected an entry for tenant t1")
-      assert.ok(t1Entry.value >= 1)
-
+      expect(t1Entry, "expected an entry for tenant t1").not.toBe(undefined)
+      expect(t1Entry.value >= 1).toBeTruthy()
       // No "anonymous" — proves tenant resolved from iteration, not cds.context
       const anonEntry = observed.find((o) => o.attrs["sap.tenantId"] === "anonymous")
-      assert.strictEqual(anonEntry, undefined)
+      expect(anonEntry).toBe(undefined)
     } finally {
       cds.connect.to = realConnect
       cds.spawn = realSpawn
@@ -85,7 +83,7 @@ describe("@cap-js/agents - Multi-tenancy (active_users)", () => {
         },
       },
     })
-    assert.strictEqual(res.data.result?.status?.state, "completed")
+    expect(res.data.result?.status?.state).toBe("completed")
 
     // Force the "no DeploymentService" path
     const realConnect = cds.connect.to.bind(cds.connect)
@@ -101,7 +99,7 @@ describe("@cap-js/agents - Multi-tenancy (active_users)", () => {
       // In single-tenant fallback the tenant attr falls back to current
       // context (anonymous in cds.test default mock auth)
       const anonEntry = observed.find((o) => o.attrs["sap.tenantId"] === "anonymous")
-      assert.notStrictEqual(anonEntry, undefined, "expected fallback entry")
+      expect(anonEntry, "expected fallback entry").not.toBe(undefined)
     } finally {
       cds.connect.to = realConnect
     }

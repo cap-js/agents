@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import path from "node:path"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
@@ -11,25 +10,24 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
 
       const card = res.data
-      assert.strictEqual(card.name, "CatalogService")
-      assert.ok(card.skills.length > 0, `expected skills.length > 0`)
+      expect(card.name).toBe("CatalogService")
+      expect(card.skills.length > 0, `expected skills.length > 0`).toBeTruthy()
 
       const querySkill = card.skills.find((s) => s.id === "query")
-      assert.notStrictEqual(querySkill, undefined)
-      assert.strictEqual(querySkill.name, "Data Query")
-      assert.ok(querySkill.tags.includes("query"))
-
+      expect(querySkill).not.toBe(undefined)
+      expect(querySkill.name).toBe("Data Query")
+      expect(querySkill.tags.includes("query")).toBeTruthy()
       const submitSkill = card.skills.find((s) => s.id === "submitOrder")
-      assert.notStrictEqual(submitSkill, undefined)
+      expect(submitSkill).not.toBe(undefined)
     })
 
     it("capabilities.streaming reflects cds.env.agents.streaming config", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
-      assert.strictEqual(card.capabilities.streaming, true)
+      expect(card.capabilities.streaming).toBe(true)
     })
 
-    it("agent card matches snapshot", async (t) => {
+    it("agent card matches snapshot", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
       // Strip dynamic placeholder URLs (compile uses "https://HOST/..." vs
@@ -39,7 +37,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
         for (const iface of card.supportedInterfaces) delete iface.url
       }
       const snapshotPath = path.join(import.meta.dirname, "__snapshots__", "agent-card.json")
-      t.assert.fileSnapshot(card, snapshotPath)
+      await expect(card).toMatchFileSnapshot(snapshotPath)
     })
   })
 
@@ -50,27 +48,27 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
 
       const card = res.data
-      assert.strictEqual(card.name, "custom-book-agent")
-      assert.ok(card.description.includes("book recommendation"))
-      assert.strictEqual(card.version, "2.0.0")
+      expect(card.name).toBe("custom-book-agent")
+      expect(card.description.includes("book recommendation")).toBeTruthy()
+      expect(card.version).toBe("2.0.0")
     })
 
     it("skills come from the markdown file frontmatter", async () => {
       const res = await GET("/a2a/custom-agent-card/.well-known/agent-card.json")
       const card = res.data
 
-      assert.strictEqual(card.skills.length, 2)
+      expect(card.skills.length).toBe(2)
 
       const recSkill = card.skills.find((s) => s.id === "book-recommendations")
-      assert.notStrictEqual(recSkill, undefined)
-      assert.strictEqual(recSkill.name, "Book Recommendations")
-      assert.ok(recSkill.description.includes("personalized"))
-      assert.ok(recSkill.tags.includes("books"))
-      assert.ok(recSkill.examples.includes("Recommend a mystery novel"))
+      expect(recSkill).not.toBe(undefined)
+      expect(recSkill.name).toBe("Book Recommendations")
+      expect(recSkill.description.includes("personalized")).toBeTruthy()
+      expect(recSkill.tags.includes("books")).toBeTruthy()
+      expect(recSkill.examples.includes("Recommend a mystery novel")).toBeTruthy()
 
       const listSkill = card.skills.find((s) => s.id === "reading-list")
-      assert.notStrictEqual(listSkill, undefined)
-      assert.ok(listSkill.tags.includes("tracking"))
+      expect(listSkill).not.toBe(undefined)
+      expect(listSkill.tags.includes("tracking")).toBeTruthy()
     })
 
     it("overrides CDS-generated card (no auto query skill)", async () => {
@@ -78,7 +76,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       const card = res.data
 
       const querySkill = card.skills.find((s) => s.id === "query")
-      assert.strictEqual(querySkill, undefined)
+      expect(querySkill).toBe(undefined)
     })
   })
 
@@ -89,19 +87,16 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       const res = await GET("/a2a/circuit-breaker/.well-known/agent-card.json")
       const card = res.data
 
-      assert.strictEqual(card.url, "https://example.com/agent/circuit-breaker")
-      assert.strictEqual(
-        card.supportedInterfaces[0].url,
-        "https://example.com/agent/circuit-breaker",
-      )
+      expect(card.url).toBe("https://example.com/agent/circuit-breaker")
+      expect(card.supportedInterfaces[0].url).toBe("https://example.com/agent/circuit-breaker")
     })
 
     it("agent card without @Core.Links via still uses request-derived URL", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
 
-      assert.ok(card.url.includes("/a2a/catalog"), "URL should be request-derived")
-      assert.ok(!card.url.includes("example.com"), "URL should NOT be proxy URL")
+      expect(card.url.includes("/a2a/catalog"), "URL should be request-derived").toBeTruthy()
+      expect(!card.url.includes("example.com"), "URL should NOT be proxy URL").toBeTruthy()
     })
 
     it("compile to agent uses @Core.Links via href as URL", () => {
@@ -110,11 +105,8 @@ describe("@cap-js/agents - Agent Card Generation", () => {
         as: "object",
       })
 
-      assert.strictEqual(card.url, "https://example.com/agent/circuit-breaker")
-      assert.strictEqual(
-        card.supportedInterfaces[0].url,
-        "https://example.com/agent/circuit-breaker",
-      )
+      expect(card.url).toBe("https://example.com/agent/circuit-breaker")
+      expect(card.supportedInterfaces[0].url).toBe("https://example.com/agent/circuit-breaker")
     })
 
     it("compile to agent without @Core.Links via uses default HOST URL", () => {
@@ -123,8 +115,8 @@ describe("@cap-js/agents - Agent Card Generation", () => {
         as: "object",
       })
 
-      assert.ok(card.url.includes("HOST"), "URL should contain HOST placeholder")
-      assert.ok(card.url.includes("/a2a/catalog"), "URL should contain service path")
+      expect(card.url.includes("HOST"), "URL should contain HOST placeholder").toBeTruthy()
+      expect(card.url.includes("/a2a/catalog"), "URL should contain service path").toBeTruthy()
     })
   })
 })

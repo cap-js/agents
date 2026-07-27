@@ -1,37 +1,36 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
 describe("@cap-js/agents plugin", () => {
   it("should register agent protocol adapter", () => {
-    assert.notStrictEqual(cds.env.protocols.agent, undefined)
-    assert.strictEqual(cds.env.protocols.agent.path, "/a2a")
+    expect(cds.env.protocols.agent).not.toBe(undefined)
+    expect(cds.env.protocols.agent.path).toBe("/a2a")
   })
 
   it("should expose CatalogService with agent endpoint", () => {
     const srv = cds.services.CatalogService
-    assert.notStrictEqual(srv, undefined)
+    expect(srv).not.toBe(undefined)
     const agentEndpoint = srv.endpoints?.find((ep) => ep.kind === "agent")
-    assert.notStrictEqual(agentEndpoint, undefined)
+    expect(agentEndpoint).not.toBe(undefined)
   })
 
   it("should NOT expose AdminService (no @agent annotation)", () => {
     const srv = cds.services.AdminService
-    assert.notStrictEqual(srv, undefined)
+    expect(srv).not.toBe(undefined)
     const agentEndpoint = srv.endpoints?.find((ep) => ep.kind === "agent")
-    assert.strictEqual(agentEndpoint, undefined)
+    expect(agentEndpoint).toBe(undefined)
   })
 
   it("should still serve OData normally", async () => {
     const { data } = await GET("/odata/v4/catalog/Books")
-    assert.notStrictEqual(data.value, undefined)
-    assert.ok(data.value.length > 0)
+    expect(data.value).not.toBe(undefined)
+    expect(data.value.length > 0).toBeTruthy()
   })
 
   it("should serve the preview UI for @agent services", async () => {
     const res = await GET("/a2a/catalog/preview")
-    assert.strictEqual(res.status, 200)
-    assert.match(res.headers["content-type"], /text\/html/)
-    assert.ok(res.data.includes("CatalogService"))
+    expect(res.status).toBe(200)
+    expect(res.headers["content-type"]).toMatch(/text\/html/)
+    expect(res.data.includes("CatalogService")).toBeTruthy()
   })
 })

@@ -1,7 +1,5 @@
 // Hybrid integration tests for the File I/O capability — full HTTP round-trip through the A2A protocol.
 
-import { describe, it } from "node:test"
-import assert from "node:assert/strict"
 import path from "node:path"
 import fs from "node:fs"
 import cds from "@sap/cds"
@@ -48,7 +46,7 @@ function sendText(service, text, contextId) {
   })
 }
 
-describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 90000 }, () => {
+describe("@cap-js/agent - File I/O (CatalogService — React path)", () => {
   it("agent reads uploaded CSV and answers question about its contents", async () => {
     const res = await sendWithFile(
       "catalog",
@@ -58,9 +56,9 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
       csvBase64,
     )
     const result = res.data.result
-    assert.equal(result.status.state, "completed")
+    expect(result.status.state).toBe("completed")
     const text = result.status.message.parts.map((p) => p.text || "").join("")
-    assert.match(text.toLowerCase(), /poe|raven|eleonora/)
+    expect(text.toLowerCase()).toMatch(/poe|raven|eleonora/)
   })
 
   it("uploaded file bytes are persisted to Tasks.inputFiles with correct metadata", async () => {
@@ -78,9 +76,9 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
     const rows = await cds.run(
       SELECT.from(InputFiles).where({ "up_.contextId": contextId, filename: "reading-list.csv" }),
     )
-    assert.equal(rows.length, 1)
-    assert.equal(rows[0].mimeType, "text/csv")
-    assert.equal(rows[0].up__taskId, taskId)
+    expect(rows.length).toBe(1)
+    expect(rows[0].mimeType).toBe("text/csv")
+    expect(rows[0].up__taskId).toBe(taskId)
   })
 
   it("agent emits a file artifact via emit_file_part", async () => {
@@ -92,13 +90,13 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
       csvBase64,
     )
     const result = res.data.result
-    assert.equal(result.status.state, "completed")
+    expect(result.status.state).toBe("completed")
     const filePart = (result.artifacts || [])
       .flatMap((a) => a.parts || [])
       .find((p) => p.kind === "file")
-    assert.ok(filePart, "expected a file artifact")
+    expect(filePart, "expected a file artifact").toBeTruthy()
     const decoded = Buffer.from(filePart.file.bytes, "base64").toString("utf-8")
-    assert.match(decoded.toLowerCase(), /wuthering heights/)
+    expect(decoded.toLowerCase()).toMatch(/wuthering heights/)
   })
 
   it("multi-turn: file uploaded in turn 1 is readable in turn 2 via read_file", async () => {
@@ -110,7 +108,7 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
       "text/csv",
       csvBase64,
     )
-    assert.equal(turn1.data.result.status.state, "completed")
+    expect(turn1.data.result.status.state).toBe("completed")
     const contextId = turn1.data.result.contextId
 
     // Turn 2: same contextId, no file attached — ask agent to read the file from turn 1
@@ -120,10 +118,10 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
       contextId,
     )
     const result2 = turn2.data.result
-    assert.equal(result2.status.state, "completed")
+    expect(result2.status.state).toBe("completed")
     const text = result2.status.message.parts.map((p) => p.text || "").join("")
     // File has 6 data rows — agent should mention a number
-    assert.match(text, /\d+/)
+    expect(text).toMatch(/\d+/)
   })
 
   it("latest-wins: second upload of same filename supersedes first", async () => {
@@ -156,11 +154,11 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
     const all = await cds.run(
       SELECT.from(InputFiles).where({ "up_.contextId": contextId, filename: "data.csv" }),
     )
-    assert.equal(all.length, 2)
+    expect(all.length).toBe(2)
 
     // Latest-wins: the row anchored on task2 is the more recent one
     const latest = all.find((r) => r.up__taskId === taskId2)
-    assert.ok(latest, "expected a row anchored on task2")
+    expect(latest, "expected a row anchored on task2").toBeTruthy()
   })
 
   it("graceful response when reading a non-existent uploaded file (no-file probe)", async () => {
@@ -170,14 +168,13 @@ describe("@cap-js/agent - File I/O (CatalogService — React path)", { timeout: 
     )
     const result = res.data.result
     // The task should not crash; either completes with an explanatory response or marks input-required.
-    assert.ok(
+    expect(
       ["completed", "input-required"].includes(result.status.state),
       `expected graceful state, got: ${result.status.state}`,
-    )
+    ).toBeTruthy()
     const text = (result.status.message?.parts || []).map((p) => p.text || "").join(" ")
     // Agent should acknowledge the missing file (e.g. "no file", "not found", "empty", "doesn't exist", or ask user to upload).
-    assert.match(
-      text.toLowerCase(),
+    expect(text.toLowerCase()).toMatch(
       /not found|no .* file|empty|doesn't|does not|don't|do not|upload/,
     )
   })

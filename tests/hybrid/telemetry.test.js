@@ -4,7 +4,6 @@
  * Skipped under regular `npm test` (development profile, mock executor).
  * In hybrid, these tests will fail loudly if the AI Core binding is missing.
  */
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import {
   captured,
@@ -41,19 +40,19 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
   it("should patch CJS BaseChatModel prototype", async () => {
     const PATCHED = Symbol.for("@cap-js/agents:patched")
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
-    assert.strictEqual(BaseChatModel.prototype[PATCHED], true)
+    expect(BaseChatModel.prototype[PATCHED]).toBe(true)
   })
 
   it("should patch CJS RunnableSequence prototype", async () => {
     const PATCHED = Symbol.for("@cap-js/agents:patched")
     const { RunnableSequence } = await import("@langchain/core/runnables")
-    assert.strictEqual(RunnableSequence.prototype[PATCHED], true)
+    expect(RunnableSequence.prototype[PATCHED]).toBe(true)
   })
 
   it("should patch CJS StructuredTool prototype", async () => {
     const PATCHED = Symbol.for("@cap-js/agents:patched")
     const { StructuredTool } = await import("@langchain/core/tools")
-    assert.strictEqual(StructuredTool.prototype[PATCHED], true)
+    expect(StructuredTool.prototype[PATCHED]).toBe(true)
   })
 
   // ─── LangGraph Executor Spans ───────────────────────────────────────────
@@ -65,24 +64,24 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
       // Fallback: verify at least the workflow or chat span exists (proves graph ran)
       const wfSpan = findSpan(spans, "workflow CompiledStateGraph")
       const chatSpan = findSpan(spans, /^chat /)
-      assert.notStrictEqual(wfSpan || chatSpan, undefined)
+      expect(wfSpan || chatSpan).not.toBe(undefined)
     } else {
-      assert.ok(seqSpans.length > 0, `expected ${seqSpans.length} > 0`)
+      expect(seqSpans.length > 0, `expected ${seqSpans.length} > 0`).toBeTruthy()
     }
   })
 
   it("should produce chat span with model name", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "List books"))
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.strictEqual(chatSpan.attributes["gen_ai.operation.name"], "chat")
-    assert.notStrictEqual(chatSpan.attributes["gen_ai.request.model"], undefined)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.operation.name"]).toBe("chat")
+    expect(chatSpan.attributes["gen_ai.request.model"]).not.toBe(undefined)
   })
 
   it("should have HTTP outbound spans for AI Core call in same trace as chat span", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "What books exist?"))
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
+    expect(chatSpan).not.toBe(undefined)
 
     const traceId = chatSpan.spanContext().traceId
     const chatSpanId = chatSpan.spanContext().spanId
@@ -95,58 +94,57 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
           s.name.includes("HTTP") ||
           s.name.includes("GET")),
     )
-    assert.ok(outboundSpans.length >= 1)
+    expect(outboundSpans.length >= 1).toBeTruthy()
   })
 
   it("should record token usage on chat span", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "How many books?"))
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.ok(
+    expect(chatSpan).not.toBe(undefined)
+    expect(
       chatSpan.attributes["gen_ai.usage.input_tokens"] > 0,
       `expected ${chatSpan.attributes["gen_ai.usage.input_tokens"]} > 0`,
-    )
-    assert.ok(
+    ).toBeTruthy()
+    expect(
       chatSpan.attributes["gen_ai.usage.output_tokens"] > 0,
       `expected ${chatSpan.attributes["gen_ai.usage.output_tokens"]} > 0`,
-    )
+    ).toBeTruthy()
   })
 
   it("should set gen_ai.response.model on chat span (actual model returned by AI Core)", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "What books exist?"))
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.notStrictEqual(
+    expect(chatSpan).not.toBe(undefined)
+    expect(
       chatSpan.attributes["gen_ai.response.model"],
-      undefined,
       "expected gen_ai.response.model to be set",
-    )
-    assert.ok(
+    ).not.toBe(undefined)
+    expect(
       chatSpan.attributes["gen_ai.response.model"].length > 0,
       "expected non-empty gen_ai.response.model",
-    )
+    ).toBeTruthy()
   })
 
   it("should set gen_ai.response.finish_reasons as array on chat span", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "List books"))
     const chatSpan = findSpan(spans, /^chat /)
-    assert.notStrictEqual(chatSpan, undefined)
+    expect(chatSpan).not.toBe(undefined)
     const finishReasons = chatSpan.attributes["gen_ai.response.finish_reasons"]
-    assert.ok(Array.isArray(finishReasons), `expected array, got ${typeof finishReasons}`)
-    assert.ok(finishReasons.length > 0, "expected at least one finish reason")
+    expect(Array.isArray(finishReasons), `expected array, got ${typeof finishReasons}`).toBeTruthy()
+    expect(finishReasons.length > 0, "expected at least one finish reason").toBeTruthy()
     // Normal response should be "stop" or "end_turn" (Anthropic); "length"/"max_tokens" = truncated
-    assert.ok(
+    expect(
       ["stop", "end_turn", "tool_calls", "tool_use", "length", "max_tokens"].includes(
         finishReasons[0],
       ),
       `unexpected finish_reason: ${finishReasons[0]}`,
-    )
+    ).toBeTruthy()
   })
 
   it("should produce tool execution spans", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "Show me books"))
     const toolSpans = findSpans(spans, "execute_tool")
-    assert.ok(toolSpans.length > 0, `expected ${toolSpans.length} > 0`)
+    expect(toolSpans.length > 0, `expected ${toolSpans.length} > 0`).toBeTruthy()
   })
 
   it("should have complete span hierarchy: workflow > chat (all in same trace)", async () => {
@@ -154,9 +152,9 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
     const wfSpan = findSpan(spans, "workflow CompiledStateGraph CatalogService")
     const chatSpan = findSpan(spans, /^chat /)
 
-    assert.notStrictEqual(wfSpan, undefined)
-    assert.notStrictEqual(chatSpan, undefined)
-    assert.strictEqual(chatSpan.spanContext().traceId, wfSpan.spanContext().traceId)
+    expect(wfSpan).not.toBe(undefined)
+    expect(chatSpan).not.toBe(undefined)
+    expect(chatSpan.spanContext().traceId).toBe(wfSpan.spanContext().traceId)
   })
 
   // ─── agent_actions metric (per LLM invocation) ─────────────────────────
@@ -165,6 +163,8 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
     resetCapture()
     await sendMessage("catalog", "What books are available?")
     const output = await flushMetrics()
-    assert.match(output, /agent_actions/, "agent_actions metric should fire on each LLM invocation")
+    expect(output, "agent_actions metric should fire on each LLM invocation").toMatch(
+      /agent_actions/,
+    )
   })
 })

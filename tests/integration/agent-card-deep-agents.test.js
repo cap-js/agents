@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import assert from "node:assert/strict"
 
 const { GET } = cds.test(import.meta.dirname + "/../samples/deep-agent")
 
@@ -11,9 +10,9 @@ describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
       const res = await GET("/a2a/product-agent/.well-known/agent-card.json")
 
       const card = res.data
-      assert.strictEqual(card.name, "product-agent")
-      assert.ok(card.description.includes("Product catalog agent for searching products"))
-      assert.strictEqual(card.version, "1.0.0")
+      expect(card.name).toBe("product-agent")
+      expect(card.description.includes("Product catalog agent for searching products")).toBeTruthy()
+      expect(card.version).toBe("1.0.0")
     })
 
     it("public skills included, private skills excluded", async () => {
@@ -21,17 +20,17 @@ describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
       const card = res.data
 
       const searchSkill = card.skills.find((s) => s.id === "product-search")
-      assert.notStrictEqual(searchSkill, undefined)
-      assert.strictEqual(searchSkill.name, "Product Search")
-      assert.ok(searchSkill.tags.includes("products"))
-      assert.ok(searchSkill.examples.includes("Show me all products"))
+      expect(searchSkill).not.toBe(undefined)
+      expect(searchSkill.name).toBe("Product Search")
+      expect(searchSkill.tags.includes("products")).toBeTruthy()
+      expect(searchSkill.examples.includes("Show me all products")).toBeTruthy()
 
       const orderSkill = card.skills.find((s) => s.id === "order-management")
-      assert.notStrictEqual(orderSkill, undefined)
+      expect(orderSkill).not.toBe(undefined)
 
       // response-format has metadata.private: true
       const privateSkill = card.skills.find((s) => s.id === "response-format")
-      assert.strictEqual(privateSkill, undefined)
+      expect(privateSkill).toBe(undefined)
     })
 
     it("metadata.tags and metadata.examples in agent card", async () => {
@@ -39,9 +38,9 @@ describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
       const card = res.data
 
       const orderSkill = card.skills.find((s) => s.id === "order-management")
-      assert.deepStrictEqual(orderSkill.tags, ["orders", "products", "checkout"])
-      assert.ok(orderSkill.examples.includes("Order 5 Widget Pro"))
-      assert.ok(orderSkill.examples.includes("Place an order for 100 Gadget X"))
+      expect(orderSkill.tags).toEqual(["orders", "products", "checkout"])
+      expect(orderSkill.examples.includes("Order 5 Widget Pro")).toBeTruthy()
+      expect(orderSkill.examples.includes("Place an order for 100 Gadget X")).toBeTruthy()
     })
   })
 
@@ -54,12 +53,12 @@ describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
     const res = await GET("/a2a/dir-override/.well-known/agent-card.json")
     const card = res.data
     // From `card-override-agent/AGENTS.md` frontmatter:
-    assert.strictEqual(card.name, "card-override-agent")
-    assert.ok(card.description.includes("Read-only product browsing"))
+    expect(card.name).toBe("card-override-agent")
+    expect(card.description.includes("Read-only product browsing")).toBeTruthy()
     // From `card-override-agent/skills/product-overview/SKILL.md`:
     const skill = card.skills.find((s) => s.id === "product-overview")
-    assert.notStrictEqual(skill, undefined, "skills/ scan should yield product-overview")
-    assert.ok(skill.tags.includes("products"))
+    expect(skill, "skills/ scan should yield product-overview").not.toBe(undefined)
+    expect(skill.tags.includes("products")).toBeTruthy()
   })
 
   // ── @agent.card annotation (explicit card markdown file) ────────────────
@@ -69,34 +68,32 @@ describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
     const card = res.data
 
     // From `cards/card-override.md` frontmatter (NOT from the agent dir):
-    assert.strictEqual(card.name, "card-override-explicit")
-    assert.strictEqual(card.version, "2.0.0")
+    expect(card.name).toBe("card-override-explicit")
+    expect(card.version).toBe("2.0.0")
     const skill = card.skills.find((s) => s.id === "catalog-browse")
-    assert.notStrictEqual(skill, undefined, "card should expose @agent.card skill")
-    assert.ok(skill.tags.includes("override"))
+    expect(skill, "card should expose @agent.card skill").not.toBe(undefined)
+    expect(skill.tags.includes("override")).toBeTruthy()
   })
 
   // ── Slug-only convention (zero-code service) ──────────────────────────
   it("Slug-only convention: agent card auto-built from <slug>/AGENTS.md + skills/", async () => {
     const res = await GET("/a2a/zero-code-agent/.well-known/agent-card.json")
     const card = res.data
-    assert.strictEqual(card.name, "zero-code-agent")
-    assert.ok(card.description.includes("product catalog"))
-
+    expect(card.name).toBe("zero-code-agent")
+    expect(card.description.includes("product catalog")).toBeTruthy()
     const listing = card.skills.find((s) => s.id === "product-listing")
-    assert.notStrictEqual(listing, undefined, "skills/ scan should yield product-listing skill")
-    assert.ok(listing.tags.includes("read-only"))
+    expect(listing, "skills/ scan should yield product-listing skill").not.toBe(undefined)
+    expect(listing.tags.includes("read-only")).toBeTruthy()
   })
 
   // ── Co-located convention (AGENTS.md next to service.cds) ─────────────
   it("Co-located convention: AGENTS.md in srcDir is picked up without a dedicated sub-directory", async () => {
     const res = await GET("/a2a/colocated-agent/.well-known/agent-card.json")
     const card = res.data
-    assert.strictEqual(card.name, "colocated-agent")
-    assert.ok(card.description.includes("Co-located agent"))
-
+    expect(card.name).toBe("colocated-agent")
+    expect(card.description.includes("Co-located agent")).toBeTruthy()
     const browse = card.skills.find((s) => s.id === "product-browse")
-    assert.notStrictEqual(browse, undefined, "skills/ scan should yield product-browse skill")
-    assert.ok(browse.tags.includes("read-only"))
+    expect(browse, "skills/ scan should yield product-browse skill").not.toBe(undefined)
+    expect(browse.tags.includes("read-only")).toBeTruthy()
   })
 })

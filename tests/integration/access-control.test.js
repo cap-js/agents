@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import cds from "@sap/cds"
 const { GET, POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
 
@@ -33,28 +32,28 @@ describe("@cap-js/agents - Access Control", () => {
   describe("Tasks", () => {
     it("bob cannot access alice's task via tasks/get", async () => {
       const aliceRes = await sendMessageAs("catalog", "What books?", ALICE)
-      assert.strictEqual(aliceRes.data.result.status.state, "completed")
+      expect(aliceRes.data.result.status.state).toBe("completed")
       const aliceTaskId = aliceRes.data.result.id
 
       const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, ALICE)
-      assert.notStrictEqual(aliceGet.data.result, undefined)
-      assert.strictEqual(aliceGet.data.result.id, aliceTaskId)
+      expect(aliceGet.data.result).not.toBe(undefined)
+      expect(aliceGet.data.result.id).toBe(aliceTaskId)
 
       const bobGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, BOB)
-      assert.notStrictEqual(bobGet.data.error, undefined)
+      expect(bobGet.data.error).not.toBe(undefined)
     })
 
     it("alice cannot access bob's task via tasks/get", async () => {
       const bobRes = await sendMessageAs("catalog", "What books?", BOB)
-      assert.strictEqual(bobRes.data.result.status.state, "completed")
+      expect(bobRes.data.result.status.state).toBe("completed")
       const bobTaskId = bobRes.data.result.id
 
       const bobGet = await jsonrpcAs("catalog", "tasks/get", { id: bobTaskId }, BOB)
-      assert.notStrictEqual(bobGet.data.result, undefined)
-      assert.strictEqual(bobGet.data.result.id, bobTaskId)
+      expect(bobGet.data.result).not.toBe(undefined)
+      expect(bobGet.data.result.id).toBe(bobTaskId)
 
       const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: bobTaskId }, ALICE)
-      assert.notStrictEqual(aliceGet.data.error, undefined)
+      expect(aliceGet.data.error).not.toBe(undefined)
     })
   })
 
@@ -76,74 +75,72 @@ describe("@cap-js/agents - Access Control", () => {
           },
         },
       })
-      assert.strictEqual(res.status, 401)
-      assert.strictEqual(res.data.jsonrpc, "2.0")
-      assert.strictEqual(res.data.error.code, -32001)
-      assert.match(res.data.error.message, /Unauthorized/)
+      expect(res.status).toBe(401)
+      expect(res.data.jsonrpc).toBe("2.0")
+      expect(res.data.error.code).toBe(-32001)
+      expect(res.data.error.message).toMatch(/Unauthorized/)
     })
 
     it("should return 403 for user without admin role", async () => {
       const res = await sendMessageAs("restricted-agent", "hello", BOB)
-      assert.strictEqual(res.status, 403)
-      assert.strictEqual(res.data.jsonrpc, "2.0")
-      assert.strictEqual(res.data.error.code, -32003)
-      assert.strictEqual(res.data.error.message, "Forbidden")
+      expect(res.status).toBe(403)
+      expect(res.data.jsonrpc).toBe("2.0")
+      expect(res.data.error.code).toBe(-32003)
+      expect(res.data.error.message).toBe("Forbidden")
     })
 
     it("should allow user with admin role to send message", async () => {
       const res = await sendMessageAs("restricted-agent", "hello admin", ALICE)
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.result, undefined)
-      assert.strictEqual(res.data.result.status.state, "completed")
-      assert.match(res.data.result.status.message.parts[0].text, /Admin echo/)
+      expect(res.status).toBe(200)
+      expect(res.data.result).not.toBe(undefined)
+      expect(res.data.result.status.state).toBe("completed")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/Admin echo/)
     })
 
     it("should propagate cds.context.user through agent graph ($user resolves to caller)", async () => {
       const res = await sendMessageAs("restricted-agent", "who am I?", ALICE)
-      assert.strictEqual(res.status, 200)
-      assert.strictEqual(res.data.result.status.state, "completed")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("completed")
       const text = res.data.result.status.message.parts[0].text
       // The graph node reads cds.context.user.id and executes a CDS query with it
-      assert.match(text, /user=alice/, `expected user=alice in response, got: ${text}`)
-      assert.match(text, /query_ran=true/, `expected query_ran=true in response, got: ${text}`)
+      expect(text, `expected user=alice in response, got: ${text}`).toMatch(/user=alice/)
+      expect(text, `expected query_ran=true in response, got: ${text}`).toMatch(/query_ran=true/)
     })
 
     it("should return 401 for anonymous GET to agent card of restricted service", async () => {
       const res = await GET("/a2a/restricted-agent/.well-known/agent-card.json")
-      assert.strictEqual(res.status, 401)
+      expect(res.status).toBe(401)
     })
 
     it("should include WWW-Authenticate header on anonymous GET 401 to trigger browser credential dialog", async () => {
       const res = await GET("/a2a/restricted-agent/.well-known/agent-card.json")
-      assert.strictEqual(res.status, 401)
-      assert.match(
+      expect(res.status).toBe(401)
+      expect(
         res.headers["www-authenticate"] ?? "",
-        /Basic realm=/,
         "Expected WWW-Authenticate: Basic realm=... to prompt browser login dialog",
-      )
+      ).toMatch(/Basic realm=/)
     })
 
     it("should include WWW-Authenticate header on anonymous GET to preview of restricted service", async () => {
       const res = await GET("/a2a/restricted-agent/preview")
-      assert.strictEqual(res.status, 401)
-      assert.match(
+      expect(res.status).toBe(401)
+      expect(
         res.headers["www-authenticate"] ?? "",
-        /Basic realm=/,
         "Expected WWW-Authenticate: Basic realm=... to prompt browser login dialog",
-      )
+      ).toMatch(/Basic realm=/)
     })
 
     it("should allow admin to GET agent card of restricted service", async () => {
       const res = await GET("/a2a/restricted-agent/.well-known/agent-card.json", { auth: ALICE })
-      assert.strictEqual(res.status, 200)
-      assert.notStrictEqual(res.data.name, undefined)
+      expect(res.status).toBe(200)
+      expect(res.data.name).not.toBe(undefined)
     })
 
     it("should NOT restrict services without @requires in test profile", async () => {
       // catalog service has no @requires — should be accessible without auth
       const res = await sendMessageAs("catalog", "books", BOB)
-      assert.strictEqual(res.status, 200)
-      assert.strictEqual(res.data.result.status.state, "completed")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("completed")
     })
   })
 })
