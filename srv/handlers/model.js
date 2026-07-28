@@ -147,6 +147,28 @@ export function flattenMessages(messages) {
 import { buildContentFilter, toSdkFilterFormat } from "./content-filter.js"
 
 /**
+ * Extracts text from Anthropic content-block arrays in a streaming chunk.
+ *
+ * @sap-ai-sdk/langchain getDeltaContent() only handles string deltas
+ * (ChatDelta.content typed as string in the API spec). Anthropic returns
+ * content as Array<{type,text}> — getDeltaContent() returns "" for every
+ * chunk, silencing handleLLMNewToken. We extract the text manually.
+ *
+ * @param {object} chunk - LangChain streaming chunk from OrchestrationClient
+ * @returns {string} extracted text, or empty string if not a content-block array
+ */
+export function extractTextFromContentBlocks(chunk) {
+  const rawContent =
+    chunk._data?.intermediate_results?.llm?.choices?.[0]?.delta?.content ??
+    chunk._data?.final_result?.choices?.[0]?.delta?.content
+  if (!Array.isArray(rawContent)) return ""
+  return rawContent
+    .filter((b) => b && b.type === "text")
+    .map((b) => b.text ?? "")
+    .join("")
+}
+
+/**
  * Creates an instrumented OrchestrationClient subclass.
  *
  * @param {object} options
@@ -387,6 +409,50 @@ async function createInstrumentedClient({ modelName, params, flatten }) {
       }
       return invoke(null)
     }
+
+    /**
+     * Override _streamResponseChunks for three reasons:
+     *
+     * 1. Message flattening — same reason _generate is overridden: Anthropic content
+     *    arrays must be flattened to plain strings before reaching AI Core.
+     *
+     * 2. Claude prompt caching — injectCacheControl must be applied here too;
+     *    without it cache_control is silently skipped on the streaming path.
+     *
+     * 3. Content-block extraction — @sap-ai-sdk/langchain getDeltaContent() only handles
+     *    string deltas (ChatDelta.content: string in spec). Anthropic returns an array of
+     *    content blocks; getDeltaContent() returns "" for every chunk, silencing
+     *    handleLLMNewToken. We extract the text manually after each yield.
+     *    Unfixed in @sap-ai-sdk/langchain 2.11.0 (confirmed latest at time of writing).
+     */
+    async *_streamResponseChunks(messages, opts, runManager) {
+      const claudeModel = isClaude(modelName)
+      let inputMessages = flatten ? flattenMessages(messages) : messages
+      // For Claude: inject cache_control on messages — same as _generate does.
+      // Without this, prompt caching is silently skipped on the streaming path.
+      if (claudeModel) inputMessages = injectCacheControl(inputMessages)
+      for await (const chunk of super._streamResponseChunks(inputMessages, opts, runManager)) {
+        if (chunk.text) {
+          yield chunk
+          continue
+        }
+        const text = extractTextFromContentBlocks(chunk)
+        if (text) {
+          // Clone chunk before mutating to avoid corrupting upstream references
+          const patchedMessage = chunk.message
+            ? Object.assign(Object.create(Object.getPrototypeOf(chunk.message)), chunk.message, {
+                content: text,
+              })
+            : chunk.message
+          yield Object.assign(Object.create(Object.getPrototypeOf(chunk)), chunk, {
+            text,
+            ...(patchedMessage !== undefined && { message: patchedMessage }),
+          })
+          continue
+        }
+        yield chunk
+      }
+    }
   }
   InstrumentedOrchestrationClient[INSTRUMENTED] = true
   return InstrumentedOrchestrationClient
@@ -451,6 +517,8 @@ export async function createModel(options = {}) {
       ...(filtering && { filtering }),
     },
     {
+      // deep-agent models need streaming:true; managed agents keep the default (false) for bindTools()
+      ...(flatten ? { streaming: true } : {}),
       onFailedAttempt: (err) => {
         // Abort retries when circuit breaker is open (otherwise pRetry delays ~30-60s)
         if (err.code === "EOPENBREAKER" || err.message === "Breaker is open") {
