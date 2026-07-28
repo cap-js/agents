@@ -110,6 +110,10 @@ export default function registerDefaultAgentHandlers(srv) {
 
     return new GraphExecutor(agent, srv, {
       checkpointer: false, // already set on createAgent
+      // Standard ReAct agents have no built-in recursionLimit default (LangGraph's
+      // fallback is 25, which is too low for multi-tool tasks). Deep agents go through
+      // langgraph-executor-srv.js which passes no recursionLimit → deepagents' 10000 wins.
+      recursionLimit: cds.env.agents?.recursionLimit ?? 100,
       inputMapper: async (requestContext) => {
         const { HumanMessage } = await import("@langchain/core/messages")
         const text =

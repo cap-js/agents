@@ -42,6 +42,7 @@
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
     "@sap-ai-sdk/orchestration": "^2.11.0",
+    "@sap-cloud-sdk/connectivity": "^4.7.0",
     "@sap-cloud-sdk/resilience": "^4.7.0",
     "langchain": "^1",
     "zod": "^4.0.0"
@@ -76,6 +77,29 @@
       "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
+      "[development]": {
+        "pushNotifications": {
+          "allowedDomains": [
+            "127.0.0.1",
+            "localhost",
+            "cloud.sap"
+          ]
+        }
+      },
+      "[hybrid]": {
+        "pushNotifications": {
+          "allowedDomains": [
+            "127.0.0.1",
+            "localhost",
+            "cloud.sap"
+          ]
+        }
+      },
+      "pushNotifications": {
+        "allowedDomains": [
+          "cloud.sap"
+        ]
+      },
       "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
       "params": {
@@ -121,6 +145,9 @@
     "requires": {
       "agents": {
         "model": "@cap-js/agents"
+      },
+      "agent-push-notifications": {
+        "impl": "@cap-js/agents/srv/push-notification-srv.js"
       },
       "databricks-mlflow": {
         "vcap": {

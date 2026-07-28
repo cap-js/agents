@@ -36,6 +36,10 @@ entity Tasks : managed {
        */
       usageToolCalls : Integer default 0;
 
+      /** Push notification (webhook) configs for this task. Cascade-deleted. */
+      pushConfigs    : Composition of many PushNotificationConfigs
+                         on pushConfigs.taskId = taskId;
+
       /**
        * Files received from user or downstream agents for this task.
        * Conversation-scoped reads use up_.contextId path expression.
@@ -77,4 +81,25 @@ entity CheckpointWrites {
   key idx           : Integer;
       channel       : String;
       value         : LargeString;
+}
+
+/**
+ * Stores push notification (webhook) configs registered by clients for task updates.
+ *
+ * REVISIT: A2A spec supports `authentication: { schemes: ["Bearer"], credentials: "..." }`
+ * and `token` fields on PushNotificationConfig for authenticated callbacks. When needed:
+ * 1. Add `schemes: String(512)` column (non-secret metadata, JSON array e.g. '["Bearer"]')
+ * 2. Store token/credentials in SAP Credential Store — NOT in DB
+ *    - Use @sap-cloud-sdk/connectivity getServiceBinding("credstore") for binding
+ *    - Use @sap-cloud-sdk/http-client executeHttpRequest with mTLS destination
+ *    - Throw at save-time if credstore not bound but secret provided (not at startup)
+ * 3. Implement custom PushNotificationSender (6th arg to DefaultRequestHandler) that
+ *    sends `Authorization: <scheme> <credentials>` header from authentication field
+ *    and `X-A2A-Notification-Token` header from token field
+ */
+entity PushNotificationConfigs : managed {
+  key taskId    : String;
+  key configId  : String;
+      task      : Association to one Tasks on task.taskId = taskId;
+      url       : String(2048);
 }

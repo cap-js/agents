@@ -17,6 +17,8 @@
 - Mock Executor for testing purposes
 - Multi-turn conversations with checkpointing
 - Option to overwrite the ootb executor
+- Support for A2A pushNotifications
+- Agent middleware automatically sending status updates about current processing status
 - OpenTelemetry spans for langChain workflows and nodes as well as LLM invocations and tool calls.
 - OpenTelemetry metrics for LLM token consumption, tool invocations, agent requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions (per agent node invocation / LLM call) & active_users
 - Quota enforcement via `cds.agents.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made via middleware (`afterModel` hook). Shared between react agents and deep agents via `buildMiddleware` event.

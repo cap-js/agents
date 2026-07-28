@@ -120,6 +120,7 @@ class GraphExecutor {
     this._inputMapper = options.inputMapper || null
     this._outputMapper = options.outputMapper || null
     this._configMapper = options.configMapper || null
+    this._recursionLimit = options.recursionLimit ?? null
   }
 
   async _resolveGraph() {
@@ -173,6 +174,7 @@ class GraphExecutor {
       cds.context["agent.task.id"] = taskId
       cds.context["agent.context.id"] = contextId
       cds.context["agent.service"] = serviceName
+      cds.context["agent.eventBus"] = eventBus
     }
 
     metrics.concurrentExecutions.add(1, mAttrs)
@@ -277,6 +279,8 @@ class GraphExecutor {
           throw new TypeError(`configMapper must return a plain object, got ${typeof extraConfig}`)
         }
         const config = {
+          // Prefer limit at construction time, then cds.env then defaults (standard langchain -> 25, deepagent -> 10_000).
+          recursionLimit: this._recursionLimit || cds.env.agents.recursionLimit || undefined,
           configurable: {
             ...extraConfig,
             thread_id: `${serviceName}:${contextId}`,

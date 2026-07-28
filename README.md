@@ -121,14 +121,15 @@ service. Per-service configuration takes precedence over the global default.
 
 **Global**
 
-| Setting                          | Description                                                              | Default                  |
-| -------------------------------- | ------------------------------------------------------------------------ | ------------------------ |
-| `cds.agents.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off) | `true`                   |
-| `cds.agents.mlflow`              | MLflow Databricks tracing (`true` or `false`)                            | `false`                  |
-| `cds.agents.per_action_tool`     | One tool per action (vs combined `call_action`)                          | `true`                   |
-| `cds.agents.trace_langchain`     | Monkey-patch LangChain for tracing                                       | `true`                   |
-| `cds.agents.activeUsersInterval` | Schedule for `active_users` metric computation                           | `"24h"` (`0` to disable) |
-| `cds.agents.fileIO.enabled`      | Enable A2A file uploads + emissions (see below)                          | `false`                  |
+| Setting                          | Description                                                                | Default                  |
+| -------------------------------- | -------------------------------------------------------------------------- | ------------------------ |
+| `cds.agents.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off)   | `true`                   |
+| `cds.agents.pushNotifications`   | Push notifications (`true` = enabled, `false` = disabled, object = config) | `true`                   |
+| `cds.agents.mlflow`              | MLflow Databricks tracing (`true` or `false`)                              | `false`                  |
+| `cds.agents.per_action_tool`     | One tool per action (vs combined `call_action`)                            | `true`                   |
+| `cds.agents.trace_langchain`     | Monkey-patch LangChain for tracing                                         | `true`                   |
+| `cds.agents.activeUsersInterval` | Schedule for `active_users` metric computation                             | `"24h"` (`0` to disable) |
+| `cds.agents.fileIO.enabled`      | Enable A2A file uploads + emissions (see below)                            | `false`                  |
 
 **Per service**
 
@@ -184,6 +185,43 @@ Set `cds.agents.fileIO.enabled = true` to let agents receive uploads and emit fi
 ```
 
 Sending a file - A2A clients send a `FilePart` (`{ kind: "file", file: { name, mimeType, bytes } }`) and the plugin persists the file and prepends a `[Uploaded files: /uploads/<name> (<mime>, <size>)]` manifest to the user message. It uses `@cap-js/attachments` to persist the files.
+
+### Push Notifications
+
+Agents advertise push notification support via `capabilities.pushNotifications: true` in the agent card. Clients can register a webhook URL to receive task updates as HTTP POST callbacks instead of (or in addition to) SSE streaming.
+
+<details>
+<summary>Configuration</summary>
+
+Push notifications are enabled by default. To disable:
+
+```jsonc
+{
+  "cds": {
+    "agents": {
+      "pushNotifications": false,
+    },
+  },
+}
+```
+
+**Domain allowlist** — restrict which domains are accepted as callback URLs. By default, only `cloud.sap` (and its subdomains) is allowed:
+
+```jsonc
+{
+  "cds": {
+    "agents": {
+      "pushNotifications": {
+        "allowedDomains": ["cloud.sap", "mycompany.com"],
+      },
+    },
+  },
+}
+```
+
+When configured, the agent rejects push notification registrations whose callback URL does not match an allowed domain. Subdomains are accepted (e.g. `api.mycompany.com` matches `mycompany.com`). If you need to accept additional domains beyond `cloud.sap`, add them to the `allowedDomains` array.
+
+</details>
 
 ## Quota Enforcement
 

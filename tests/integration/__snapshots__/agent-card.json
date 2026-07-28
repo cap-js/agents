@@ -1,6 +1,6 @@
 {
   "capabilities": {
-    "pushNotifications": false,
+    "pushNotifications": true,
     "streaming": true,
   },
   "defaultInputModes": [
