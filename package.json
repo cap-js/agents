@@ -186,6 +186,7 @@
     "tests/samples/deep-agent/",
     "tests/samples/mtx/mtx/sidecar/",
     "tests/samples/telemetry-debug/",
+    "tests/samples/telemetry-v1/",
     "tests/samples/travel/travel-agent/",
     "tests/samples/travel/xflights/",
     "tests/samples/travel/leisure-services/"

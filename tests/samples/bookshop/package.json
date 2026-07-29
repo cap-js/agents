@@ -8,8 +8,7 @@
     "@cap-js/audit-logging": ">=1",
     "@cap-js/hana": ">=1",
     "@cap-js/mcp": "^1",
-    "@cap-js/telemetry": "^1",
-    "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
+    "@cap-js/telemetry": "^2",
     "@sap/cds": ">=8",
     "@sap/xssec": "^4",
     "zod": "^4.3.6"

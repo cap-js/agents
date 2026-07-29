@@ -154,9 +154,17 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(toolSpan).not.toBe(undefined)
 
     expect(toolSpan.spanContext().traceId).toBe(wfSpan.spanContext().traceId)
-    const toolParent = spans.find((s) => s.spanContext().spanId === toolSpan.parentSpanId)
-    const isDirectChild = toolSpan.parentSpanId === wfSpan.spanContext().spanId
-    const isGrandchild = toolParent?.parentSpanId === wfSpan.spanContext().spanId
+    // OTEL v1 uses parentSpanId, v2 uses parentSpanContext.spanId
+
+    const getParentId = (span) => {
+      if (span == null) return null
+      if (span.parentSpanContext?.spanId != null) return span.parentSpanContext.spanId
+      if (span.parentSpanId != null) return span.parentSpanId
+      return null
+    }
+    const toolParent = spans.find((s) => s.spanContext().spanId === getParentId(toolSpan))
+    const isDirectChild = getParentId(toolSpan) === wfSpan.spanContext().spanId
+    const isGrandchild = getParentId(toolParent) === wfSpan.spanContext().spanId
     expect(isDirectChild || isGrandchild).toBe(true)
   })
 

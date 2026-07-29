@@ -5,7 +5,7 @@
   "description": "Test project for debug tracing, failing graph, and trace_langchain=false",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
-    "@cap-js/telemetry": "^1",
+    "@cap-js/telemetry": "^2",
     "@sap/cds": ">=8"
   },
   "devDependencies": {

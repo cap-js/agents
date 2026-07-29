@@ -193,7 +193,12 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     const { trace } = await import("@opentelemetry/api")
     const provider = trace.getTracerProvider()
     const delegate = provider.getDelegate?.() || provider
-    const processorsBefore = delegate._registeredSpanProcessors?.length || 0
+    // v1: _registeredSpanProcessors, v2: _activeSpanProcessor._spanProcessors
+    const getCount = () =>
+      delegate._registeredSpanProcessors?.length ??
+      delegate._activeSpanProcessor?._spanProcessors?.length ??
+      0
+    const processorsBefore = getCount()
 
     // Temporarily remove credentials to test the guard path
     const savedCreds = cds.env.requires?.["databricks-mlflow"]?.credentials
@@ -209,7 +214,7 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
       cds.env.requires["databricks-mlflow"].credentials = savedCreds
     }
 
-    const processorsAfter = delegate._registeredSpanProcessors?.length || 0
+    const processorsAfter = getCount()
     expect(processorsAfter, "no processor should be added without credentials").toBe(
       processorsBefore,
     )

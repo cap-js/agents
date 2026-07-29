@@ -58,7 +58,11 @@ export async function getSpanExporter() {
   const provider = trace.getTracerProvider()
   const delegate = provider.getDelegate?.() || provider
   if (delegate.addSpanProcessor) {
+    // OTEL SDK v1: addSpanProcessor exists on BasicTracerProvider
     delegate.addSpanProcessor(new SimpleSpanProcessor(memExporter))
+  } else if (delegate._activeSpanProcessor?._spanProcessors) {
+    // OTEL SDK v2: no addSpanProcessor — push directly into MultiSpanProcessor
+    delegate._activeSpanProcessor._spanProcessors.push(new SimpleSpanProcessor(memExporter))
   }
   return memExporter
 }
