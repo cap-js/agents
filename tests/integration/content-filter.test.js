@@ -1,177 +1,183 @@
 /**
- * Integration tests for content filter configuration.
+ * Tests for content filter configuration.
  *
- * Unit tests: verify buildContentFilter resolution logic.
+ * - Unit tests: buildContentFilter() pure function and toSdkFilterFormat() conversion.
+ * - Integration tests: InstrumentedOrchestrationClient constructor behavior via buildModel.
  */
 import cds from "@sap/cds"
-import { setup, teardown, resetCapture, createSendMessage } from "../utils/telemetry-utils.js"
-import { buildContentFilter } from "../../srv/handlers/content-filter.js"
+import { buildContentFilter, toSdkFilterFormat } from "../../lib/models/aicore.js"
+import InstrumentedOrchestrationClient from "../../lib/models/aicore.js"
 
-process.env.CDS_TEST_SILENT = "false"
-setup()
-
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
-
-const sendMessage = createSendMessage(POST)
-
-// ─── Unit Tests: buildContentFilter resolution ────────────────────────────
+cds.test(import.meta.dirname + "/../samples/bookshop")
 
 describe("@cap-js/agents - Content Filter Configuration", () => {
-  axios.defaults.validateStatus = () => true
-  afterAll(teardown)
-  beforeEach(resetCapture)
+  // ─── Unit Tests: buildContentFilter() pure function ───────────────────────
 
-  describe("cds.env.agents.contentFilter (global config)", () => {
-    let originalValue
-
-    beforeEach(() => {
-      originalValue = cds.env.agents.contentFilter
-    })
-
-    afterEach(() => {
-      cds.env.agents.contentFilter = originalValue
-    })
-
-    it("should return undefined when set to false (disables filtering)", () => {
-      cds.env.agents.contentFilter = false
+  describe("buildContentFilter() - fixed defaults", () => {
+    it("returns the default input filter with azure_content_safety", () => {
       const result = buildContentFilter()
-      expect(result).toBeUndefined()
-    })
-
-    it("should return undefined when set to 0", () => {
-      cds.env.agents.contentFilter = 0
-      const result = buildContentFilter()
-      expect(result).toBeUndefined()
-    })
-
-    it("should passthrough dictionary object directly", () => {
-      const custom = {
-        input: { llama_guard_3_8b: { violent_crimes: true } },
-        output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
-      }
-      cds.env.agents.contentFilter = custom
-      const result = buildContentFilter()
-      expect(result).toBe(custom)
-    })
-
-    it("should return default dictionary when set to true", () => {
-      cds.env.agents.contentFilter = true
-      const result = buildContentFilter()
-
       expect(result.input.azure_content_safety).toBeDefined()
+    })
+
+    it("sets prompt_shield on input filter", () => {
+      const result = buildContentFilter()
       expect(result.input.azure_content_safety.prompt_shield).toBe(true)
+    })
+
+    it("sets hate threshold to ALLOW_SAFE_LOW on input filter", () => {
+      const result = buildContentFilter()
       expect(result.input.azure_content_safety.hate).toBe("ALLOW_SAFE_LOW")
+    })
+
+    it("returns the default output filter with azure_content_safety", () => {
+      const result = buildContentFilter()
       expect(result.output.azure_content_safety).toBeDefined()
+    })
+
+    it("sets hate threshold to ALLOW_SAFE on output filter", () => {
+      const result = buildContentFilter()
       expect(result.output.azure_content_safety.hate).toBe("ALLOW_SAFE")
     })
-  })
 
-  describe("buildContentFilter event (per-service override)", () => {
-    let originalValue
-
-    beforeEach(() => {
-      originalValue = cds.env.agents.contentFilter
-      cds.env.agents.contentFilter = true
-    })
-
-    afterEach(() => {
-      cds.env.agents.contentFilter = originalValue
-    })
-
-    it("should use global default when no service override", () => {
-      const result = buildContentFilter()
-      expect(result.input.azure_content_safety).toBeDefined()
-      expect(result.input.azure_content_safety.prompt_shield).toBe(true)
-    })
-
-    it("should return undefined (disabled) when global is false", () => {
-      cds.env.agents.contentFilter = false
-      const result = buildContentFilter()
-      expect(result).toBeUndefined()
+    it("is a pure function — returns same structure on every call", () => {
+      expect(buildContentFilter()).toEqual(buildContentFilter())
     })
   })
 
-  // ─── Resolution through srv.send("buildModel") ────────────────────────────
+  // ─── Unit Tests: toSdkFilterFormat() conversion ──────────────────────────
 
-  describe("buildModel forwards contentFilter to OrchestrationClient", () => {
-    let originalGlobal
-    let originalLlm
+  describe("toSdkFilterFormat() - SDK format conversion", () => {
+    it("converts ALLOW_SAFE to 0", () => {
+      const result = toSdkFilterFormat({ output: { azure_content_safety: { hate: "ALLOW_SAFE" } } })
+      expect(result.output.filters[0].config.hate).toBe(0)
+    })
+
+    it("converts ALLOW_SAFE_LOW to 2", () => {
+      const result = toSdkFilterFormat({
+        input: { azure_content_safety: { hate: "ALLOW_SAFE_LOW" } },
+      })
+      expect(result.input.filters[0].config.hate).toBe(2)
+    })
+
+    it("converts ALLOW_SAFE_LOW_MEDIUM to 4", () => {
+      const result = toSdkFilterFormat({
+        output: { azure_content_safety: { violence: "ALLOW_SAFE_LOW_MEDIUM" } },
+      })
+      expect(result.output.filters[0].config.violence).toBe(4)
+    })
+
+    it("passes boolean values through unchanged (prompt_shield)", () => {
+      const result = toSdkFilterFormat({ input: { azure_content_safety: { prompt_shield: true } } })
+      expect(result.input.filters[0].config.prompt_shield).toBe(true)
+    })
+
+    it("wraps filters in { filters: [{ type, config }] } SDK format", () => {
+      const result = toSdkFilterFormat({ output: { azure_content_safety: { hate: "ALLOW_SAFE" } } })
+      expect(result.output.filters[0]).toHaveProperty("type", "azure_content_safety")
+      expect(result.output.filters[0]).toHaveProperty("config")
+    })
+
+    it("handles input and output independently", () => {
+      const result = toSdkFilterFormat({
+        input: { azure_content_safety: { hate: "ALLOW_SAFE_LOW" } },
+        output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
+      })
+      expect(result.input.filters[0].config.hate).toBe(2)
+      expect(result.output.filters[0].config.hate).toBe(0)
+    })
+  })
+
+  // ─── Integration: InstrumentedOrchestrationClient constructor ─────────────
+  // buildModel calls cds.connect.to(provider, req.data) which instantiates
+  // InstrumentedOrchestrationClient. Tests verify constructor behavior by
+  // overriding buildModel to build the client directly with known options.
+
+  describe("buildModel → InstrumentedOrchestrationClient content filter options", () => {
+    const MODEL_NAME = "test-only--filter-resolution"
     let srv
     let savedHandlers
 
     beforeAll(async () => {
       srv = await cds.connect.to("CatalogService")
-      // Bookshop does not configure cds.env.agents.llm — set a stable name so
-      // resolveModelName() does not throw during client construction.
-      originalLlm = cds.env.agents.llm
-      cds.env.agents.llm = cds.env.agents.llm || "test-only--filter-resolution"
-    })
-
-    afterAll(() => {
-      cds.env.agents.llm = originalLlm
     })
 
     beforeEach(() => {
-      originalGlobal = cds.env.agents.contentFilter
-      cds.env.agents.contentFilter = true
-      // Snapshot handler list so we can restore exactly after each test.
       savedHandlers = [...(srv.handlers?.on || [])]
     })
 
     afterEach(() => {
-      cds.env.agents.contentFilter = originalGlobal
       if (srv.handlers?.on) srv.handlers.on.length = 0
       if (srv.handlers?.on && savedHandlers) srv.handlers.on.push(...savedHandlers)
     })
 
-    // CAP runs `srv.on(event, …)` handlers in registration order; the default
-    // `buildContentFilter` was registered on `cds.on("serving")` and is
-    // already at the head of the chain. To simulate an app-side override
-    // (which apps register inside `init()`, *before* the default), we use
-    // `srv.prepend()` which unshifts our handler to the front.
-    function override(handler) {
-      srv.prepend((s) => s.on("buildContentFilter", handler))
+    // Override buildModel to construct InstrumentedOrchestrationClient directly
+    // (bypasses cds.connect.to so integration tests work without a real LLM service).
+    function overrideModel(contentFilter) {
+      srv.prepend((s) =>
+        s.on(
+          "buildModel",
+          () =>
+            new InstrumentedOrchestrationClient(MODEL_NAME, null, {
+              modelName: MODEL_NAME,
+              contentFilter,
+            }),
+        ),
+      )
     }
 
-    it("disables filtering when override returns {}", async () => {
-      override(() => ({}))
-      const model = await srv.send("buildModel", { srv })
-      expect(model.orchestrationConfig.filtering).toBeUndefined()
-    })
-
-    it("disables filtering when override returns false", async () => {
-      override(() => false)
-      const model = await srv.send("buildModel", { srv })
-      expect(model.orchestrationConfig.filtering).toBeUndefined()
-    })
-
-    it("falls through to global config when override calls next()", async () => {
-      override((req, next) => next())
-      const model = await srv.send("buildModel", { srv })
+    it("applies default output filter when no contentFilter option given", async () => {
+      overrideModel(undefined)
+      const model = await srv.send("buildModel", {})
       expect(model.orchestrationConfig.filtering).toBeDefined()
-      expect(model.orchestrationConfig.filtering.input.filters[0]).toHaveProperty(
+      expect(model.orchestrationConfig.filtering.output.filters[0]).toHaveProperty(
         "type",
         "azure_content_safety",
       )
     })
 
-    it("disables filtering when no override and global is false", async () => {
-      cds.env.agents.contentFilter = false
-      const model = await srv.send("buildModel", { srv })
-      expect(model.orchestrationConfig.filtering).toBeUndefined()
+    it("stores default input filter in options.contentFilter for middleware", async () => {
+      overrideModel(undefined)
+      const model = await srv.send("buildModel", {})
+      expect(model.options.contentFilter.input.azure_content_safety).toBeDefined()
+      expect(model.options.contentFilter.input.azure_content_safety.prompt_shield).toBe(true)
     })
 
-    it("passes a non-empty filter dictionary through to the client (converted to SDK format)", async () => {
+    it("only passes output filter to SDK — input filter stays in options for middleware", async () => {
+      overrideModel(undefined)
+      const model = await srv.send("buildModel", {})
+      // SDK receives output only
+      expect(model.orchestrationConfig.filtering.output).toBeDefined()
+      expect(model.orchestrationConfig.filtering.input).toBeUndefined()
+    })
+
+    it("applies explicit custom contentFilter object", async () => {
       const custom = {
         input: { azure_content_safety: { hate: "ALLOW_SAFE", prompt_shield: true } },
         output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
       }
-      override(() => custom)
-      const model = await srv.send("buildModel", { srv })
+      overrideModel(custom)
+      const model = await srv.send("buildModel", {})
       expect(model.orchestrationConfig.filtering).toBeDefined()
-      expect(model.orchestrationConfig.filtering.input.filters[0].type).toBe("azure_content_safety")
-      expect(model.orchestrationConfig.filtering.input.filters[0].config.hate).toBe(0) // ALLOW_SAFE → 0
-      expect(model.orchestrationConfig.filtering.input.filters[0].config.prompt_shield).toBe(true)
+      expect(model.orchestrationConfig.filtering.output.filters[0].type).toBe(
+        "azure_content_safety",
+      )
+      expect(model.orchestrationConfig.filtering.output.filters[0].config.hate).toBe(0) // ALLOW_SAFE → 0
+    })
+
+    it("stores custom input filter in options.contentFilter for middleware", async () => {
+      const custom = {
+        input: { azure_content_safety: { hate: "ALLOW_SAFE", prompt_shield: true } },
+        output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
+      }
+      overrideModel(custom)
+      const model = await srv.send("buildModel", {})
+      expect(model.options.contentFilter.input.azure_content_safety.prompt_shield).toBe(true)
+    })
+
+    it("normalises contentFilter: true to the default filter object", async () => {
+      overrideModel(true)
+      const model = await srv.send("buildModel", {})
+      expect(model.options.contentFilter).toEqual(buildContentFilter())
     })
   })
 })

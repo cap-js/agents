@@ -7,43 +7,40 @@ const { sendMessage } = createHelpers({ POST, axios })
 // Mock executor (default in CDS_ENV=test) returns a recognisable string when
 // querying the first entity in a service. Used as the negative signal: if the
 // auto-deepagent path is taken, the response will NOT match this.
-const MOCK_EXECUTOR_TEXT = /Here is a sample from|No data found\.|Could not query data/
+const MOCK_EXECUTOR_TEXT = /\[Mock LLM\]|Here is a sample from|No data found\.|Could not query data/
 
-// ── @agent.model annotation (per-service LLM override) ─────────────────────
+// ── @agent.llm annotation (per-service LLM override) ─────────────────────
 // Exercises model resolution via buildModel event — annotation wins over global config.
 
-describe("@cap-js/agents - @agent.model annotation", () => {
+describe("@cap-js/agents - @agent.llm annotation", () => {
   it("annotation overrides cds.env.agents.llm for the annotated service", async () => {
     const srv = cds.services.LlmOverrideService
     expect(srv, "LlmOverrideService should be loaded").toBeTruthy()
 
-    const annotated = srv.definition["@agent.model"]
-    expect(annotated).toBe("test-only--annotated-model")
+    const annotated = srv.definition["@agent.llm"]
+    expect(annotated).toBe("llm2")
 
     // Sanity: the global config is set to a different model in package.json
-    expect(cds.env.agents.llm).not.toBe(annotated)
+    expect(annotated).not.toBe("llm")
 
-    // Resolution via buildModel: model created with annotated name
+    // Resolution via buildModel: model connected to annotated provider name
     const model = await srv.send("buildModel", { srv })
     expect(model, "buildModel should return a model").toBeTruthy()
-    const resolvedName = model.orchestrationConfig?.promptTemplating?.model?.name
-    expect(resolvedName).toBe(annotated)
+    expect(model.name).toBe(annotated)
+    expect(model.options.message).toBe("[Mock LLM2] Override for testing")
   })
 
-  it("falls back to cds.env.agents.llm when service has no @agent.model annotation", async () => {
+  it("falls back to default llm service when service has no @agent.llm annotation", async () => {
     const srv = cds.services.ProductAgentService
     expect(srv, "ProductAgentService should be loaded").toBeTruthy()
 
-    expect(srv.definition["@agent.model"]).toBe(undefined)
-    expect(
-      cds.env.agents?.llm,
-      "cds.env.agents.llm must be set for this test to be meaningful",
-    ).toBeTruthy()
+    expect(srv.definition["@agent.llm"]).toBe(undefined)
 
     const model = await srv.send("buildModel", { srv })
     expect(model, "buildModel should return a model").toBeTruthy()
+    expect(model.name).toBe("llm")
     const resolvedName = model.orchestrationConfig?.promptTemplating?.model?.name
-    expect(resolvedName).toBe(cds.env.agents.llm)
+    expect(resolvedName).toBe(cds.requires.llm.modelName)
   })
 })
 

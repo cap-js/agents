@@ -1,6 +1,4 @@
 import cds from "@sap/cds"
-import { createModel } from "./model.js"
-import { buildContentFilter } from "./content-filter.js"
 import { generateTools, instrumentTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
@@ -12,11 +10,6 @@ import buildMiddleware from "../../lib/agents/middleware/index.js"
  * give app handlers (registered first) priority over these defaults.
  */
 export default function registerDefaultAgentHandlers(srv) {
-  // Default buildContentFilter: resolve from cds.env.agents.contentFilter
-  srv.on("buildContentFilter", () => {
-    return buildContentFilter()
-  })
-
   // Default buildTools: generate tools from CDS model + any configured MCP connections.
   // MCP connections are declared via @agent.mcps annotation on the service:
   //   @agent.mcps: [{ service: 'MyConnection' }, { service: 'AnotherConnection' }]
@@ -45,9 +38,10 @@ export default function registerDefaultAgentHandlers(srv) {
     return tools
   })
 
-  // Default buildModel: create OrchestrationClient
+  // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
-    return createModel({ srv, ...req.data })
+    const provider = srv?.options?.agent?.llm || srv?.definition?.["@agent.llm"] || "llm"
+    return cds.connect.to(provider, req.data)
   })
 
   // Default buildSystemPrompt: build from service definition
@@ -96,7 +90,7 @@ export default function registerDefaultAgentHandlers(srv) {
     let model = await srv.send("buildModel", { tools })
 
     const systemPrompt = await srv.send("buildSystemPrompt")
-    const middleware = await srv.send("buildMiddleware", { tools })
+    const middleware = await srv.send("buildMiddleware", { tools, model })
 
     const checkpointer = new CdsCheckpointSaver()
 

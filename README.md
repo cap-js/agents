@@ -94,20 +94,51 @@ You help users find and explore products in the catalog. Use ...
 
 ## Configuration
 
-The LLM model used by an agent can be configured globally or overridden per
-service. Per-service configuration takes precedence over the global default.
+The LLM used by an agent is configured via `cds.requires.llm`. You can provide a `kind` or `impl` as with [any required service](https://cap.cloud.sap/docs/node.js/core-services#required-services) and [connect](https://cap.cloud.sap/docs/node.js/core-services#consuming-services) to it via `cds.connect.to('llm')`.
 
-**Global**
+```jsonc
+"cds": {
+  "requires": {
+    "llm": {
+      "kind": "aicore",
+      "modelName": "anthropic--claude-4.6-sonnet"
+    }
+  }
+}
+```
 
-| Setting          | Description                            |
-| ---------------- | -------------------------------------- |
-| `cds.agents.llm` | Default LLM model name for all agents. |
+| Kind        | Description                                                                                                                             |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `aicore`    | The default for `production` and `hybrid`, connects to SAP AI Core                                                                      |
+| `anthropic` | Used in the `with-claude` profile, autodiscovers config based on environment variables (`ANTHROPIC_API_KEY`) or `.claude/settings.json` |
+| `mock`      | The default for `development`, provides a mocked response when called                                                                   |
 
-**Per service**
+To use multiple models for different agents, you can define additional ones and reference them via annotation.
+When defining an additional model, you need to prefix the kind with `llm-`.
 
-| Annotation     | Description                                                   |
-| -------------- | ------------------------------------------------------------- |
-| `@agent.model` | LLM model for a single service. Overrides the global default. |
+```jsonc
+{
+  "cds": {
+    "requires": {
+      "small-llm": {
+        // use any name you like
+        "kind": "llm-aicore",
+        "modelName": "mistralai--mistral-small",
+      },
+    },
+  },
+}
+```
+
+```cds
+@agent
+@agent.llm: 'small-llm'
+service CatalogService { ... }
+```
+
+| Annotation   | Description                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
 
 ---
 
@@ -162,7 +193,7 @@ service CatalogService { }
 
 Only available when agentifying existing services with `@agent` annotation.
 
-- **`development`** - Mock executor. No LLM needed.
+- **`development`** - Mock LLM.
 - **`hybrid` / `production`** - LangGraph ReAct agent with AI Core.
 
 ### File I/O
@@ -456,8 +487,8 @@ All metrics include `sap.tenantId` from `cds.context.tenant` for multi-tenant ag
 The `active_users` gauge is computed periodically (default every 24h). To trigger manually:
 
 ```js
-const executor = await cds.connect.to("agent-executor")
-await executor.emit("computeActiveUsers")
+const { computeActiveUsers } = await import("@cap-js/agents/lib/telemetry/active-users.js")
+await computeActiveUsers()
 ```
 
 Set `cds.agents.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).

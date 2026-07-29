@@ -44,6 +44,16 @@
     {
       "type": "pwa-node",
       "request": "launch",
+      "name": "watch:with-claude",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "watch:with-claude"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
       "name": "watch:deepagent-sample",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "npm",

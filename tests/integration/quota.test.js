@@ -346,24 +346,6 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(output).toMatch(/GraphBookService/)
     })
 
-    it("should be triggerable via computeActiveUsers event on agent-executor", async () => {
-      await sendMessage("graph-book", "before event")
-      captured.length = 0
-
-      // Emit the event on the executor service
-      const executor = await cds.connect.to("agent-executor")
-      await executor.emit("computeActiveUsers")
-
-      // Flush and verify gauge was updated
-      const { metrics } = await import("@opentelemetry/api")
-      const meterProvider = metrics.getMeterProvider()
-      if (typeof meterProvider.forceFlush !== "function") return // skip if no SDK MeterProvider
-      await meterProvider.forceFlush()
-
-      const output = captured.join("")
-      expect(output).toMatch(/active_users/)
-    })
-
     it("should have activeUsersInterval configured", () => {
       expect(cds.env.agents.activeUsersInterval).not.toBe(undefined)
       expect(cds.env.agents.activeUsersInterval).not.toBe(0)

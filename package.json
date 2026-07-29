@@ -10,7 +10,7 @@
     "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
     "./index.cds": "./index.cds",
-    "./srv/mock-executor-srv": "./srv/mock-executor-srv.js",
+    "./lib/models/*": "./lib/models/*.js",
     "./srv/langgraph-executor-srv": "./srv/langgraph-executor-srv.js",
     "./srv/*": "./srv/*",
     "./lib/*": "./lib/*"
@@ -23,6 +23,7 @@
     "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
+    "watch:with-claude": "cds w tests/samples/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/samples/deep-agent",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
@@ -40,6 +41,7 @@
     "@cap-js/mcp": "^1.1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
+    "@langchain/anthropic": "^1.5.1",
     "@sap-ai-sdk/langchain": "^2",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/connectivity": "^4.7.0",
@@ -157,27 +159,29 @@
         }
       },
       "kinds": {
-        "agent-executor-mock": {
-          "impl": "@cap-js/agents/srv/mock-executor-srv"
+        "llm-aicore": {
+          "impl": "@cap-js/agents/lib/models/aicore",
+          "modelName": "anthropic--claude-4.6-sonnet",
+          "contentFilter": true
         },
-        "agent-executor-langgraph": {
-          "impl": "@cap-js/agents/srv/langgraph-executor-srv"
+        "llm-anthropic": {
+          "impl": "@cap-js/agents/lib/models/anthropic"
+        },
+        "llm-mock": {
+          "impl": "@cap-js/agents/lib/models/mock"
         }
       },
       "[development]": {
-        "agent-executor": {
-          "kind": "agent-executor-mock"
-        }
+        "llm": "mock"
+      },
+      "[with-claude]": {
+        "llm": "anthropic"
       },
       "[hybrid]": {
-        "agent-executor": {
-          "kind": "agent-executor-langgraph"
-        }
+        "llm": "aicore"
       },
       "[production]": {
-        "agent-executor": {
-          "kind": "agent-executor-langgraph"
-        }
+        "llm": "aicore"
       }
     }
   },

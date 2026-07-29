@@ -18,6 +18,10 @@
   "cds": {
     "requires": {
       "audit-log": false,
+      "llm2": {
+        "kind": "llm-mock",
+        "message": "[Mock LLM2] Override for testing"
+      },
       "telemetry": {
         "tracing": false,
         "metrics": false

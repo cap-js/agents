@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { extractTextFromContentBlocks } from "../../srv/handlers/model.js"
+import { extractTextFromContentBlocks } from "../../lib/models/aicore.js"
 
 /**
  * Unit tests for extractTextFromContentBlocks (Bug 1 fix, cap/agents#120).

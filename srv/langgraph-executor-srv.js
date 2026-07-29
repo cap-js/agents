@@ -9,16 +9,13 @@ import { GraphCache, hashFeatures } from "./graph-cache.js"
  * Graphs cached per feature vector (cds.context.features) in a FIFO cache.
  * Lazy init: graph built on first request (features not available at startup).
  */
-export default class LangGraphExecutorService extends cds.Service {
-  async init() {
-    this._caches = new Map()
+export class LangGraphExecutor {
+  static _instance
+  _caches = new Map()
 
-    this.on("computeActiveUsers", async () => {
-      const { computeActiveUsers } = await import("../lib/telemetry/active-users.js")
-      await computeActiveUsers()
-    })
-
-    return super.init()
+  static for(srv) {
+    this._instance ??= new LangGraphExecutor()
+    return this._instance.for(srv)
   }
 
   for(srv) {

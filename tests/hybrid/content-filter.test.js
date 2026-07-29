@@ -19,8 +19,8 @@ describe("@cap-js/agents - Content Filter (hybrid: AI Core)", () => {
    * Clear executor cache so next request re-creates model with current config.
    */
   async function resetExecutorCache() {
-    const executorSrv = await cds.connect.to("agent-executor")
-    for (const cache of executorSrv._caches?.values() || []) {
+    const { LangGraphExecutor } = await import("../../srv/langgraph-executor-srv.js")
+    for (const cache of LangGraphExecutor._instance?._caches?.values() || []) {
       cache.clear()
     }
   }

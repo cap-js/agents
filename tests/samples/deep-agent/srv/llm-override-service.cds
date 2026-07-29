@@ -6,7 +6,7 @@
  * resolveModelName() resolution chain at the service definition level.
  */
 @agent
-@agent.model: 'test-only--annotated-model'
+@agent.llm: 'llm2'
 service LlmOverrideService {
   // Empty service body — only the annotation is under test.
 }
