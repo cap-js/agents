@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     testTimeout: 30_000,
+    hookTimeout: 30_000,
     reporters: ["verbose"],
   },
 })

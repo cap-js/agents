@@ -126,28 +126,28 @@ describe("@cap-js/agents - Quota enforcement", () => {
   })
 
   describe("quotaEnforcerMiddleware (e2e)", () => {
-    it("should fail task when maxLLMInvocationsPerTask exceeded during graph execution", async () => {
+    it("should cancel task when maxLLMInvocationsPerTask exceeded during graph execution", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 2
 
       const res = await sendMessage("looping", "trigger loop")
       expect(res.status).toBe(200)
       expect(res.data.result).not.toBe(undefined)
-      expect(res.data.result.status.state).toBe("failed")
-      expect(res.data.result.status.message.parts[0].text).toMatch(/LLM call limit exceeded/i)
+      expect(res.data.result.status.state).toBe("canceled")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
     })
 
-    it("should fail task when maxToolCallsPerTask exceeded during graph execution", async () => {
+    it("should cancel task when maxToolCallsPerTask exceeded during graph execution", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
       cds.env.agents.pool.maxToolCallsPerTask = 1
 
       const res = await sendMessage("looping", "trigger tool limit")
       expect(res.status).toBe(200)
       expect(res.data.result).not.toBe(undefined)
-      expect(res.data.result.status.state).toBe("failed")
-      expect(res.data.result.status.message.parts[0].text).toMatch(/Tool call limit exceeded/i)
+      expect(res.data.result.status.state).toBe("canceled")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
     })
 
-    it("should fail task when maxLLMTokensPerTask exceeded during graph execution", async () => {
+    it("should cancel task when maxLLMTokensPerTask exceeded during graph execution", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 100
       cds.env.agents.pool.maxToolCallsPerTask = 100
       cds.env.agents.pool.maxLLMTokensPerTask = 150 // agent adds 100 tokens per iteration → exceeds after 2nd
@@ -155,11 +155,11 @@ describe("@cap-js/agents - Quota enforcement", () => {
       const res = await sendMessage("looping", "trigger token limit")
       expect(res.status).toBe(200)
       expect(res.data.result).not.toBe(undefined)
-      expect(res.data.result.status.state).toBe("failed")
-      expect(res.data.result.status.message.parts[0].text).toMatch(/Token limit exceeded/i)
+      expect(res.data.result.status.state).toBe("canceled")
+      expect(res.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
     })
 
-    it("should complete normally when per-task limits are high", async () => {
+    it("should cancel when per-task limits are exceeded with looping model", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 3
       cds.env.agents.pool.maxToolCallsPerTask = 100
       cds.env.agents.pool.maxLLMTokensPerTask = 100000
@@ -167,8 +167,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
       const res = await sendMessage("looping", "limited loop")
       expect(res.status).toBe(200)
       expect(res.data.result).not.toBe(undefined)
-      // Will fail because the looping model always exceeds the limit
-      expect(res.data.result.status.state).toBe("failed")
+      // Looping model always exceeds invocation limit → canceled
+      expect(res.data.result.status.state).toBe("canceled")
     })
   })
 
@@ -288,7 +288,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
     it("should write usageToolCalls to task record when graph tracks it", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 3
       const res = await sendMessage("looping", "Track tools")
-      expect(res.data.result.status.state).toBe("failed")
+
+      expect(res.data.result.status.state).toBe("canceled")
 
       await new Promise((r) => setTimeout(r, 200))
 
@@ -305,7 +306,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
     it("should write usage fields even when task fails", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 2
       const res = await sendMessage("looping", "Fail and track")
-      expect(res.data.result.status.state).toBe("failed")
+
+      expect(res.data.result.status.state).toBe("canceled")
 
       await new Promise((r) => setTimeout(r, 200))
 
@@ -424,8 +426,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
       ).toBeTruthy()
       expect(pool.maxLLMTokensPerTask > 0, `expected ${pool.maxLLMTokensPerTask} > 0`).toBeTruthy()
       expect(
-        pool.maxExecutionTimeMsPerTask > 0,
-        `expected ${pool.maxExecutionTimeMsPerTask} > 0`,
+        pool.maxExecutionTimePerTask,
+        `expected maxExecutionTimePerTask to be defined`,
       ).toBeTruthy()
     })
   })

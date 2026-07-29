@@ -32,7 +32,7 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
     expect(res.data.result.status.state).toBe("completed")
   })
 
-  it("should fail task and emit QuotaExceeded when maxLLMInvocationsPerTask is exceeded", async () => {
+  it("should cancel task with summary and emit QuotaExceeded when maxLLMInvocationsPerTask is exceeded", async () => {
     cds.env.agents ??= {}
     cds.env.agents.pool ??= {}
     const orig = cds.env.agents.pool.maxLLMInvocationsPerTask
@@ -43,7 +43,7 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
         "product-agent",
         "Calculate bulk pricing for 100 units of every product, then summarize the total cost",
       )
-      expect(res.data.result.status.state).toBe("failed")
+      expect(res.data.result.status.state).toBe("canceled")
 
       // Wait for async audit emit
       await new Promise((r) => setTimeout(r, 200))
@@ -58,7 +58,7 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
     }
   })
 
-  it("should fail task and emit QuotaExceeded when maxToolCallsPerTask is exceeded", async () => {
+  it("should cancel task with summary and emit QuotaExceeded when maxToolCallsPerTask is exceeded", async () => {
     cds.env.agents ??= {}
     cds.env.agents.pool ??= {}
     const orig = cds.env.agents.pool.maxToolCallsPerTask
@@ -69,7 +69,7 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
         "product-agent",
         "Show me all products and calculate bulk pricing for Widget Pro at 50 units",
       )
-      expect(res.data.result.status.state).toBe("failed")
+      expect(res.data.result.status.state).toBe("canceled")
 
       await new Promise((r) => setTimeout(r, 200))
 
@@ -83,7 +83,7 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
     }
   })
 
-  it("should fail task and emit QuotaExceeded when maxLLMTokensPerTask is exceeded", async () => {
+  it("should cancel task with summary and emit QuotaExceeded when maxLLMTokensPerTask is exceeded", async () => {
     cds.env.agents ??= {}
     cds.env.agents.pool ??= {}
     const orig = cds.env.agents.pool.maxLLMTokensPerTask
@@ -91,7 +91,8 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
 
     try {
       const res = await sendMessage("product-agent", "Tell me about all your products in detail")
-      expect(res.data.result.status.state).toBe("failed")
+
+      expect(res.data.result.status.state).toBe("canceled")
 
       await new Promise((r) => setTimeout(r, 200))
 

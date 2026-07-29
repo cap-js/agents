@@ -7,6 +7,65 @@ import { formatFileSize, sanitizeFilename } from "./tools.js"
 
 const LOG = cds.log("agent")
 
+/** Parse time-span value to ms. Uses cds.utils.ms4 (CDS 9+) with fallback for CDS 8. */
+const ms4 =
+  cds.utils.ms4 ||
+  ((val) => {
+    if (typeof val === "number") return val
+    const m = /^(\d+)\s*(ms|s|sec|seconds?|m|min|minutes?|h|hrs|hours?|d|days?|w|weeks?)?$/i.exec(
+      String(val),
+    )
+    if (!m) return Number(val) || 0
+    const n = Number(m[1])
+    const unit = (m[2] || "ms").toLowerCase()
+    const factors = {
+      ms: 1,
+      s: 1000,
+      sec: 1000,
+      second: 1000,
+      seconds: 1000,
+      m: 60000,
+      min: 60000,
+      minute: 60000,
+      minutes: 60000,
+      h: 3600000,
+      hrs: 3600000,
+      hour: 3600000,
+      hours: 3600000,
+      d: 86400000,
+      day: 86400000,
+      days: 86400000,
+      w: 604800000,
+      week: 604800000,
+      weeks: 604800000,
+    }
+    return n * (factors[unit] || 1)
+  })
+
+/**
+ * Thrown when a task execution is aborted (client disconnect or tasks/cancel).
+ */
+class AbortError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = "AbortError"
+    this.code = "ABORT_ERR"
+  }
+}
+
+/**
+ * Thrown when graph execution exceeds the configured timeout.
+ * Carries partial state for graceful summarization.
+ */
+class TimeoutError extends Error {
+  constructor(message, { timeout } = {}) {
+    super(message)
+    this.name = "TimeoutError"
+    this.code = "TIMEOUT_ERR"
+    this.timeout = timeout
+  }
+}
+
 /**
  * Default input mapper: extracts text from A2A message parts and wraps as HumanMessage.
  *
@@ -121,6 +180,20 @@ class GraphExecutor {
     this._outputMapper = options.outputMapper || null
     this._configMapper = options.configMapper || null
     this._recursionLimit = options.recursionLimit ?? null
+    /** @type {Map<string, AbortController>} per-task abort controllers */
+    this._abortControllers = new Map()
+  }
+
+  /**
+   * Abort a running task execution. Called on client disconnect or tasks/cancel.
+   * Safe to call multiple times or for unknown taskIds.
+   */
+  abort(taskId) {
+    const controller = this._abortControllers.get(taskId)
+    if (controller && !controller.signal.aborted) {
+      LOG.info("aborting", { task: short(taskId), service: this._srv.name })
+      controller.abort()
+    }
   }
 
   async _resolveGraph() {
@@ -142,18 +215,63 @@ class GraphExecutor {
     return this._graph
   }
 
-  async _invokeWithTimeout(graph, input, config) {
-    const timeout = cds.env.agents?.pool?.maxExecutionTimeMsPerTask || 300_000
-    let timeoutHandle
-    return Promise.race([
-      graph.invoke(input, config),
-      new Promise((_, reject) => {
-        timeoutHandle = setTimeout(
-          () => reject(new Error(`Graph execution timed out after ${timeout / 1000}s`)),
-          timeout,
-        )
-      }),
-    ]).finally(() => clearTimeout(timeoutHandle))
+  /**
+   * Parse configured timeout grace period.
+   */
+  _getGrace() {
+    return ms4(cds.env.agents?.pool?.timeoutGrace ?? "15s")
+  }
+
+  async _invokeWithTimeout(graph, input, config, signal) {
+    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const grace = this._getGrace()
+    // Soft timeout fires early to allow graceful summarization
+    const softTimeout = Math.max(maxExecution - grace, 1000)
+
+    // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
+    // instead of AbortSignal.timeout() which uses an unreffed timer
+    const timeoutController = new AbortController()
+    const timer = setTimeout(() => timeoutController.abort(), softTimeout)
+
+    // Combine caller-provided abort signal with timeout
+    const combinedSignal = signal
+      ? AbortSignal.any([signal, timeoutController.signal])
+      : timeoutController.signal
+    // Pass signal to LangGraph — it checks between node executions
+    config.signal = combinedSignal
+    try {
+      return await graph.invoke(input, config)
+    } catch (err) {
+      if (combinedSignal.aborted) {
+        // Caller abort takes priority (both can be true simultaneously in a race)
+        if (signal?.aborted) {
+          throw new AbortError("Task execution aborted")
+        }
+        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
+          timeout: softTimeout,
+        })
+      }
+      throw err
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  /**
+   * Summarize partial work after forced interruption (timeout, quota, etc.).
+   */
+  async _summarizePartialWork(taskId, contextId, serviceName, reason) {
+    const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
+    const grace = this._getGrace()
+    return summarizePartialWork({
+      taskId,
+      contextId,
+      serviceName,
+      reason,
+      checkpointer: this._graph?.checkpointer,
+      getModel: () => this._srv.send("buildModel"),
+      timeout: Math.max(grace - 2000, grace * 0.8, 500),
+    })
   }
 
   async execute(requestContext, eventBus) {
@@ -162,6 +280,10 @@ class GraphExecutor {
     const isResume = requestContext.task?.status?.state === "input-required"
     const mAttrs = metrics.attrs(serviceName)
     const userText = extractText(requestContext)
+
+    // Cooperative cancellation: per-task AbortController
+    const controller = new AbortController()
+    this._abortControllers.set(taskId, controller)
 
     // A2A correlation on HTTP span + log context
     const httpSpan = metrics.getActiveSpan()
@@ -321,13 +443,18 @@ class GraphExecutor {
             },
           })
 
-          result = await this._invokeWithTimeout(graph, new Command({ resume }), config)
+          result = await this._invokeWithTimeout(
+            graph,
+            new Command({ resume }),
+            config,
+            controller.signal,
+          )
         } else {
           const inputMapper = this._inputMapper || defaultInputMapper
           const rawInput = await inputMapper(requestContext)
           const { _toolMapOverride, ...input } = rawInput
           if (_toolMapOverride) config.configurable._toolMapOverride = _toolMapOverride
-          result = await this._invokeWithTimeout(graph, input, config)
+          result = await this._invokeWithTimeout(graph, input, config, controller.signal)
         }
 
         // Capture result for usage tracking in finally block
@@ -577,6 +704,112 @@ class GraphExecutor {
           final: true,
         })
       } catch (err) {
+        // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
+        // Use name check (not instanceof) to also catch native DOMException AbortError from LangGraph
+        if (err.name === "AbortError") {
+          LOG.info("canceled", { task: short(taskId), service: serviceName })
+          if (wfSpan) wfSpan.setAttribute("agent.outcome", "canceled")
+
+          audit("AgentTaskCanceled", {
+            data: { taskId, contextId, service: serviceName },
+          })
+
+          eventBus.publish({
+            kind: "status-update",
+            taskId,
+            contextId,
+            status: {
+              state: "canceled",
+              message: agentMessage("Task canceled."),
+              timestamp: new Date().toISOString(),
+            },
+            final: true,
+          })
+          return
+        }
+
+        // Timeout — attempt graceful summary of work-in-progress before reporting
+        if (err.name === "TimeoutError") {
+          LOG.warn("timeout", { task: short(taskId), service: serviceName })
+
+          if (wfSpan) wfSpan.setAttribute("agent.outcome", "timeout")
+          metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "timeout" })
+
+          const summary = await this._summarizePartialWork(
+            taskId,
+            contextId,
+            serviceName,
+            "timed out",
+          )
+
+          audit("AgentTaskFailed", {
+            data: {
+              taskId,
+              contextId,
+              service: serviceName,
+              error: err.message,
+              errorCode: "timeout",
+              task: requestContext.task,
+            },
+          })
+
+          eventBus.publish({
+            kind: "status-update",
+            taskId,
+            contextId,
+            status: {
+              state: "canceled",
+              message: agentMessage(summary),
+              timestamp: new Date().toISOString(),
+            },
+            final: true,
+          })
+          return
+        }
+
+        // Quota exceeded — summarize partial work instead of raw error
+        if (err.quotaExceeded) {
+          LOG.warn("quota exceeded", {
+            task: short(taskId),
+            service: serviceName,
+            error: err.message,
+          })
+
+          if (wfSpan) wfSpan.setAttribute("agent.outcome", "quota_exceeded")
+          metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "quota_exceeded" })
+
+          const summary = await this._summarizePartialWork(
+            taskId,
+            contextId,
+            serviceName,
+            "quota exceeded",
+          )
+
+          audit("AgentTaskFailed", {
+            data: {
+              taskId,
+              contextId,
+              service: serviceName,
+              error: err.message,
+              errorCode: "quota_exceeded",
+              task: requestContext.task,
+            },
+          })
+
+          eventBus.publish({
+            kind: "status-update",
+            taskId,
+            contextId,
+            status: {
+              state: "canceled",
+              message: agentMessage(summary),
+              timestamp: new Date().toISOString(),
+            },
+            final: true,
+          })
+          return
+        }
+
         LOG.error("failed", { task: short(taskId), service: serviceName, error: err.message })
         LOG.debug("failed stack", { task: short(taskId), service: serviceName, stack: err.stack })
 
@@ -618,6 +851,7 @@ class GraphExecutor {
           final: true,
         })
       } finally {
+        this._abortControllers.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 
         // Update task record with usage data (non-blocking, best effort)
@@ -639,9 +873,9 @@ class GraphExecutor {
             LOG.debug("usage update failed", { task: short(taskId), error: err.message })
           }
         })
-      }
 
-      eventBus.finished()
+        eventBus.finished()
+      }
     }
 
     if (tracer) {
@@ -658,22 +892,26 @@ class GraphExecutor {
   }
 
   async cancelTask(taskId, eventBus) {
-    // Audit: task canceled
-    audit("AgentTaskCanceled", {
-      data: { taskId, service: this._srv.name },
-    })
+    const wasRunning = this._abortControllers.has(taskId)
+    this.abort(taskId)
 
-    eventBus.publish({
-      kind: "status-update",
-      taskId,
-      status: {
-        state: "canceled",
-        message: agentMessage("Task canceled."),
-        timestamp: new Date().toISOString(),
-      },
-      final: true,
-    })
-    eventBus.finished()
+    if (!wasRunning) {
+      audit("AgentTaskCanceled", {
+        data: { taskId, service: this._srv.name },
+      })
+
+      eventBus.publish({
+        kind: "status-update",
+        taskId,
+        status: {
+          state: "canceled",
+          message: agentMessage("Task canceled."),
+          timestamp: new Date().toISOString(),
+        },
+        final: true,
+      })
+      eventBus.finished()
+    }
   }
 }
 
