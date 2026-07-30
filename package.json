@@ -20,6 +20,7 @@
     "lint": "npx eslint .",
     "test": "CDS_ENV=test vitest run --config vitest.config.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
+    "test:bookshop-evals": "CDS_ENV=test,hybrid cds bind --exec -- vitest run --config vitest.config.evals.js",
     "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
@@ -55,18 +56,23 @@
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "deepagents": "^1.10.2",
+    "openevals": "^0.2.0",
     "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=8"
+    "@sap/cds": ">=8",
+    "openevals": ">=0.2"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
       "optional": true
     },
     "@cap-js/audit-logging": {
+      "optional": true
+    },
+    "openevals": {
       "optional": true
     }
   },
