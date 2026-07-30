@@ -85,6 +85,22 @@ async function defaultInputMapper(requestContext) {
 }
 
 /**
+ * Extract plain text from a LangChain message's `content`, which may be a string
+ * or an array of content blocks (`[{ type: "text", text }, ...]`). Non-text
+ * blocks (tool_call, reasoning, …) are dropped.
+ */
+function messageText(content) {
+  if (typeof content === "string") return content
+  if (Array.isArray(content)) {
+    return content
+      .filter((b) => b?.type === "text" && b.text)
+      .map((b) => b.text)
+      .join("")
+  }
+  return ""
+}
+
+/**
  * Default output mapper: extracts response text from graph result.
  * Priority: last AI message content > result.output > JSON stringified result.
  */
@@ -92,8 +108,8 @@ function defaultOutputMapper(result) {
   // 1. Messages-based: last message content (standard LangChain pattern)
   if (result.messages?.length > 0) {
     const lastMsg = result.messages[result.messages.length - 1]
-    const content = lastMsg?.content
-    if (content) return typeof content === "string" ? content : JSON.stringify(content)
+    const text = messageText(lastMsg?.content)
+    if (text) return text
   }
   // 2. Output field (e.g. travel-sample pattern)
   if (result.output) return result.output
@@ -215,6 +231,155 @@ class GraphExecutor {
     return this._graph
   }
 
+  /**
+   * Drive the graph with graph.stream() in "messages"+"updates" mode, publishing
+   * per-token artifact-update SSE events as LLM tokens arrive.
+   */
+  async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
+    const timeout = cds.env.agents?.pool?.maxExecutionTimeMsPerTask || 300_000
+    const controller = new AbortController()
+    const timeoutHandle = setTimeout(() => controller.abort(), timeout)
+    const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+
+    let tokenCount = 0
+    let finalState = null
+    // Track the current turn (langchain message id) and whether it has emitted a
+    // tool call. Anthropic-style turns can stream a text preamble BEFORE their
+    // tool_use block ("Let me first look up …"); we can't tell in advance that
+    // such a turn is planning rather than the final answer, so we stream those
+    // tokens optimistically. Once we see tool_call_chunks for the same turn, we
+    // know retrospectively that the preamble was planning — emit an authoritative
+    // event-level replace with empty text to wipe the leaked preamble, then skip
+    // all further text from this turn.
+    let currentMsgId = null
+    let turnHasToolCall = false
+
+    try {
+      if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
+        const state = await this._invokeWithTimeout(graph, input, config, signal)
+        return { state, tokenCount: 0 }
+      }
+
+      const streamConfig = {
+        ...config,
+        streamMode: ["messages", "updates"],
+        signal: combinedSignal,
+      }
+
+      // ReactAgent.stream() and compiled StateGraph.stream() both return an
+      // AsyncIterable (ReactAgent wraps in a promise — normalise both).
+      const raw = graph.stream(input, streamConfig)
+      const iterable = raw && typeof raw[Symbol.asyncIterator] === "function" ? raw : await raw
+
+      for await (const chunk of iterable) {
+        // Multi-mode stream yields [mode, payload] tuples
+        if (!Array.isArray(chunk) || chunk.length < 2) continue
+        const [mode, payload] = chunk
+
+        if (mode === "messages") {
+          // payload is [AIMessageChunk, metadata]
+          const msgChunk = Array.isArray(payload) ? payload[0] : payload
+          const meta = Array.isArray(payload) ? payload[1] : undefined
+          if (msgChunk?.type !== "ai") continue
+          // Only stream tokens from the main agent model call.
+          if (meta?.langgraph_node && meta.langgraph_node !== "model_request") continue
+
+          if (msgChunk.id && msgChunk.id !== currentMsgId) {
+            currentMsgId = msgChunk.id
+            turnHasToolCall = false
+            tokenCount = 0
+          }
+
+          // Retroactively invalidate a leaked planning preamble. In a ReAct loop
+          // the model can emit "Let me look this up …" before its tool_use block
+          if (msgChunk.tool_call_chunks?.length && !turnHasToolCall) {
+            turnHasToolCall = true
+            if (tokenCount > 0) {
+              eventBus.publish({
+                kind: "artifact-update",
+                taskId,
+                contextId,
+                append: false,
+                lastChunk: false,
+                artifact: {
+                  artifactId: "response",
+                  parts: [{ kind: "text", text: "" }],
+                },
+              })
+              tokenCount = 0
+            }
+          }
+          if (turnHasToolCall) continue
+
+          const text = messageText(msgChunk?.content)
+          if (!text) continue
+          // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
+          // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
+          // ResultManager reads event.append; nesting them leaves it undefined and
+          // forces replace-on-every-chunk instead of accumulation.
+          eventBus.publish({
+            kind: "artifact-update",
+            taskId,
+            contextId,
+            append: tokenCount > 0,
+            lastChunk: false,
+            artifact: {
+              artifactId: "response",
+              parts: [{ kind: "text", text }],
+            },
+          })
+          tokenCount++
+        } else if (mode === "updates") {
+          // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
+          // NOT the accumulated conversation. Spreading these would leave finalState
+          // with only the last node's single message, losing earlier turns (e.g. the
+          // AIMessage carrying an emit_file_part tool_call and its ToolMessage result).
+          // We therefore only lift the ephemeral __interrupt__ signal here (HITL) and
+          // recover the full, reduced message list from the checkpoint after the stream.
+          if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+            if (payload.__interrupt__ !== undefined) {
+              finalState = { ...finalState, __interrupt__: payload.__interrupt__ }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (combinedSignal.aborted) {
+        if (signal?.aborted) {
+          throw new AbortError("Task execution aborted")
+        }
+        throw new Error(`Graph execution timed out after ${timeout / 1000}s`, { cause: err })
+      }
+      throw err
+    } finally {
+      clearTimeout(timeoutHandle)
+    }
+
+    // Recover the fully-reduced state from the checkpoint. The streamed updates only
+    // carry per-node message deltas, so channel_values is the authoritative source for
+    // the complete message list (required by the file-I/O scan below and outputMapper).
+    // The __interrupt__ captured from the updates stream is preserved — it is an
+    // ephemeral signal that may already be cleared from channel_values.
+    if (this._graph?.checkpointer) {
+      try {
+        const cp = await this._graph.checkpointer.getTuple({
+          configurable: { thread_id: config.configurable?.thread_id },
+        })
+        const channelValues = cp?.checkpoint?.channel_values
+        if (channelValues) {
+          const interrupt = finalState?.__interrupt__
+          finalState = {
+            ...channelValues,
+            ...(interrupt !== undefined && { __interrupt__: interrupt }),
+          }
+        }
+      } catch {
+        /* best-effort */
+      }
+    }
+
+    return { state: finalState, tokenCount }
+  }
   /**
    * Parse configured timeout grace period.
    */
@@ -442,19 +607,31 @@ class GraphExecutor {
               userMessage: requestContext.userMessage,
             },
           })
-
-          result = await this._invokeWithTimeout(
+          const resumed = await this._streamWithPublish(
             graph,
             new Command({ resume }),
             config,
+            eventBus,
+            taskId,
+            contextId,
             controller.signal,
           )
+          result = resumed.state
         } else {
           const inputMapper = this._inputMapper || defaultInputMapper
           const rawInput = await inputMapper(requestContext)
           const { _toolMapOverride, ...input } = rawInput
           if (_toolMapOverride) config.configurable._toolMapOverride = _toolMapOverride
-          result = await this._invokeWithTimeout(graph, input, config, controller.signal)
+          const streamed = await this._streamWithPublish(
+            graph,
+            input,
+            config,
+            eventBus,
+            taskId,
+            contextId,
+            controller.signal,
+          )
+          result = streamed.state
         }
 
         // Capture result for usage tracking in finally block
@@ -523,11 +700,21 @@ class GraphExecutor {
           },
         })
 
+        // Final artifact: authoritative full response text. Emitted as an event-level
+        // replace (append:false) so it never doubles the incrementally-streamed tokens
+        // and always leaves Task.artifacts with the complete, correct text — for both
+        // the streaming path (supersedes accumulated deltas) and the blocking path
+        // (the sole emit). lastChunk:true signals the response artifact is complete.
         eventBus.publish({
           kind: "artifact-update",
           taskId,
           contextId,
-          artifact: { artifactId: "response", parts: [{ kind: "text", text: output }] },
+          append: false,
+          lastChunk: true,
+          artifact: {
+            artifactId: "response",
+            parts: [{ kind: "text", text: output }],
+          },
         })
 
         // ── File I/O: collect output files from cap.agent.Tasks.outputFiles ──────
@@ -915,4 +1102,4 @@ class GraphExecutor {
   }
 }
 
-export { GraphExecutor }
+export { GraphExecutor, messageText, defaultOutputMapper }

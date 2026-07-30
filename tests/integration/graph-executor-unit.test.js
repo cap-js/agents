@@ -1,6 +1,44 @@
-const { GraphExecutor } = await import("../../srv/handlers/graph-executor.js")
+const { GraphExecutor, messageText, defaultOutputMapper } =
+  await import("../../srv/handlers/graph-executor.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
+
+describe("messageText", () => {
+  it("returns string content unchanged", () => {
+    expect(messageText("hello")).toBe("hello")
+  })
+
+  it("joins text blocks from a content-block array, dropping non-text blocks", () => {
+    const content = [
+      { index: 0, type: "text", text: "Here are the books:" },
+      { type: "tool_call", id: "t1", name: "f", args: {} },
+      { index: 1, type: "text", text: " done." },
+    ]
+    expect(messageText(content)).toBe("Here are the books: done.")
+  })
+
+  it("returns empty string for null/undefined content", () => {
+    expect(messageText(null)).toBe("")
+    expect(messageText(undefined)).toBe("")
+  })
+})
+
+describe("defaultOutputMapper", () => {
+  it("extracts text from a last message with content-block array (no raw JSON leaks)", () => {
+    const result = {
+      messages: [{ content: [{ index: 0, type: "text", text: "The answer." }] }],
+    }
+    expect(defaultOutputMapper(result)).toBe("The answer.")
+  })
+
+  it("falls back to result.output when the last message has no text", () => {
+    const result = {
+      messages: [{ content: [{ type: "tool_call", id: "t1", name: "f", args: {} }] }],
+      output: "from output field",
+    }
+    expect(defaultOutputMapper(result)).toBe("from output field")
+  })
+})
 
 describe("GraphExecutor - configMapper", () => {
   it("calls configMapper and spreads result into config.configurable", async () => {

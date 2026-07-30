@@ -34,24 +34,38 @@ export default class CircuitBreakerService extends cds.ApplicationService {
     /**
      * Subclass that injects resilience middleware — replicates the exact pattern
      * from lib/llm.js createInstrumentedClient() without telemetry.
+     * Both _generate and _streamResponseChunks are overridden so the circuit
+     * breaker middleware is applied regardless of which path is used.
      */
     class CircuitBreakerTestModel extends OrchestrationClient {
-      async _generate(messages, opts, runManager) {
+      _withMiddleware(opts) {
         const llmTimeout = cds.env.agents?.pool?.maxLLMCallTimeoutMs || 120000
-        opts = {
+        return {
           ...opts,
           customRequestConfig: {
             ...opts?.customRequestConfig,
             middleware: [timeout(llmTimeout), circuitBreaker()],
           },
         }
-        return super._generate(messages, opts, runManager)
+      }
+
+      async _generate(messages, opts, runManager) {
+        return super._generate(messages, this._withMiddleware(opts), runManager)
+      }
+
+      async *_streamResponseChunks(messages, opts, runManager) {
+        yield* super._streamResponseChunks(messages, this._withMiddleware(opts), runManager)
       }
     }
 
     const model = new CircuitBreakerTestModel(
       { promptTemplating: { model: { name: "mock-model", params: {} } } },
       {
+        // streaming:false keeps the blocking _generate() path because the mock AI Core
+        // only serves non-streaming JSON responses (no SSE endpoint).
+        // The _streamResponseChunks override above ensures the middleware is wired
+        // correctly for both paths in production.
+        streaming: false,
         maxRetries: 1, // reduced for test speed; still validates fix (1 retry would delay without it)
         onFailedAttempt: (err) => {
           // Same fix as lib/llm.js: abort retries when circuit breaker is open
