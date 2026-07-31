@@ -1,18 +1,8 @@
 /**
  * LLM-as-judge evals for the bookshop CatalogService.
  *
- * Real agent (SAP AI Core) + real tools (no mocking) + LLM-as-judge scoring.
+ * Real agent (SAP AI Core) + real tools (unless mocked) + LLM-as-judge scoring.
  * Run with:  npm run test:bookshop-evals
- *
- * Requires an AI Core binding via `cds bind` (the `test:bookshop-evals` npm
- * script uses `cds bind --exec` — same as `test:hybrid`).
- *
- * We access `test.agents.xxx` inside `beforeAll` / `it` rather than
- * destructuring at module top-level. This is deliberate: `Test.prototype.agents`
- * is patched by this plugin's cds-plugin.js when `cds.plugins.activate()`
- * runs — which happens inside the vitest `before()` hook (via `cds.exec`),
- * i.e. AFTER top-level module code but BEFORE any `beforeAll` / `it` body.
- * So `test.agents` is guaranteed available inside test scope, not before it.
  */
 import cds from "@sap/cds"
 
@@ -20,10 +10,15 @@ const test = cds.test(import.meta.dirname + "/../samples/bookshop")
 
 const PASS = 0.7
 let judge
-let runAgent, createEvalJudge, evaluate
+let runAgent, createEvalJudge, evaluate, mockTools, clearMocks
 
 beforeAll(async () => {
-  ;({ runAgent, createEvalJudge, evaluate } = test.agents)
+  const agents = test.agents
+  runAgent = agents.runAgent
+  createEvalJudge = agents.createEvalJudge
+  evaluate = agents.evaluate
+  mockTools = agents.mockTools
+  clearMocks = agents.clearMocks
   judge = await createEvalJudge()
 })
 
@@ -77,5 +72,67 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
       label: "book detail",
     })
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
+  })
+})
+
+describe("bookshop CatalogService — tool mocking", () => {
+  it("per-invocation mock: getStock is intercepted and returns 999", async () => {
+    const { text, toolCalls, toolWasCalled } = await runAgent(
+      "catalog",
+      "Use getStock to report the stock level for Wuthering Heights.",
+      { mocks: { getStock: async () => 999 } },
+    )
+
+    expect(toolWasCalled("getStock")).toBe(true)
+    expect(toolCalls.find((c) => c.tool === "getStock")?.mocked).toBe(true)
+
+    // The final response repeats the mocked value.
+    expect(text).toContain("999")
+  })
+
+  it("per-invocation mock + LLM judge: agent surfaces the mocked stock", async () => {
+    const query = "Use getStock to report the stock level for Wuthering Heights."
+    const { text } = await runAgent("catalog", query, {
+      mocks: { getStock: async () => 999 },
+    })
+
+    const judgement = await evaluate(judge, {
+      query,
+      criteria: "Response must state 999 as the stock level for Wuthering Heights.",
+      response: text,
+      label: "mocked stock",
+    })
+    expect(judgement.score).toBeGreaterThanOrEqual(PASS)
+  })
+
+  describe("with suite-wide mocks", () => {
+    beforeAll(() => {
+      mockTools({ getStock: async () => 777 })
+    })
+    afterAll(() => {
+      clearMocks()
+    })
+
+    it("subsequent runAgent calls see the suite-wide mock without opts.mocks", async () => {
+      const { text, toolWasCalled, toolCalls } = await runAgent(
+        "catalog",
+        "Use getStock to report the stock of Wuthering Heights.",
+      )
+      expect(toolWasCalled("getStock")).toBe(true)
+      expect(toolCalls.find((c) => c.tool === "getStock")?.mocked).toBe(true)
+      expect(text).toContain("777")
+    })
+
+    it("per-invocation mocks override suite-wide mocks", async () => {
+      const { text, toolCalls } = await runAgent(
+        "catalog",
+        "Use getStock to report the stock of Wuthering Heights.",
+        { mocks: { getStock: async () => 42 } },
+      )
+      const stockCall = toolCalls.find((c) => c.tool === "getStock")
+      expect(stockCall?.mocked).toBe(true)
+      expect(stockCall?.result).toBe(42)
+      expect(text).toContain("42")
+    })
   })
 })
