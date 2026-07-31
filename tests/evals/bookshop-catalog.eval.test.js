@@ -7,22 +7,23 @@
  * Requires an AI Core binding via `cds bind` (the `test:bookshop-evals` npm
  * script uses `cds bind --exec` — same as `test:hybrid`).
  *
- * `await cds.plugins` after `cds.test(...)` forces plugin activation so that
- * this plugin's Test.prototype patch is in place before we destructure
- * `test.agents`. Otherwise `test.agents` would be undefined at top level
- * (plugins normally load lazily inside the vitest `before` hook, i.e. AFTER
- * top-level code).
+ * We access `test.agents.xxx` inside `beforeAll` / `it` rather than
+ * destructuring at module top-level. This is deliberate: `Test.prototype.agents`
+ * is patched by this plugin's cds-plugin.js when `cds.plugins.activate()`
+ * runs — which happens inside the vitest `before()` hook (via `cds.exec`),
+ * i.e. AFTER top-level module code but BEFORE any `beforeAll` / `it` body.
+ * So `test.agents` is guaranteed available inside test scope, not before it.
  */
 import cds from "@sap/cds"
 
 const test = cds.test(import.meta.dirname + "/../samples/bookshop")
-await cds.plugins
-const { runAgent, createEvalJudge, evaluate } = test.agents
 
 const PASS = 0.7
 let judge
+let runAgent, createEvalJudge, evaluate
 
 beforeAll(async () => {
+  ;({ runAgent, createEvalJudge, evaluate } = test.agents)
   judge = await createEvalJudge()
 })
 
