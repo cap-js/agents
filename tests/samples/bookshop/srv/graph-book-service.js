@@ -73,7 +73,7 @@ export default class GraphBookService extends cds.ApplicationService {
           output: "No query tool available.",
         }
       }
-      const result = await queryTool.invoke({ entity: "Books", limit: 3 }, config)
+      const result = await queryTool.invoke({ cql: "SELECT * FROM Books LIMIT 3" }, config)
       const countResult = await getBookCount.invoke({ genre_ID: 11 }, config)
       const output = `${result}\n\nBook count: ${countResult}`
       return { messages: [new AIMessage(output)], output }
