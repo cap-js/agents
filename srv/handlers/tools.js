@@ -146,10 +146,12 @@ export function generateTools(srv, options = {}) {
     tools.push(dstool)
   }
 
+  const TOOL_PREFIX = ""
+
   // Query tool — one tool for reading all entities
   const entityNames = Object.keys(entities)
   if (entityNames.length > 0) {
-    const def = createGenericReadToolDefinition(entityNames, srv.name)
+    const def = createGenericReadToolDefinition(entityNames, srv.name, TOOL_PREFIX)
     register(
       new DynamicStructuredTool({
         name: def.name,
@@ -166,7 +168,7 @@ export function generateTools(srv, options = {}) {
   // Describe tool — introspect service model
   const actionNames = Object.keys(actions)
   if (entityNames.length > 0 || actionNames.length > 0) {
-    const def = createDescribeToolDefinition(entityNames, actionNames, srv.name)
+    const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, TOOL_PREFIX)
     register(
       new DynamicStructuredTool({
         name: def.name,
@@ -185,7 +187,7 @@ export function generateTools(srv, options = {}) {
   if (actionNames.length > 0) {
     if (usePerActionTools) {
       for (const [name, action] of Object.entries(actions)) {
-        const def = createPerActionToolDefinition(name, action, srv.name)
+        const def = createPerActionToolDefinition(name, action, srv.name, srv.model, TOOL_PREFIX)
         register(
           new DynamicStructuredTool({
             name: def.name,
@@ -199,7 +201,7 @@ export function generateTools(srv, options = {}) {
         )
       }
     } else {
-      const def = createCallActionToolDefinition(actionNames, srv.name)
+      const def = createCallActionToolDefinition(actionNames, srv.name, TOOL_PREFIX)
       register(
         new DynamicStructuredTool({
           name: def.name,
