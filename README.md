@@ -786,6 +786,139 @@ For regular markdown-based agents, `@agent.hitl` will automatically trigger the 
 - **[Bookshop](./tests/samples/bookshop/)** - Agentifying an existing CAP service. `@agent` annotation, zero agent code.
 - **[Deep Agent](./tests/samples/deep-agent/)** - Markdown-based agent — convention-driven, with custom tools and skills.
 - **[Travel](./tests/samples/travel/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) and a flight data service via MCP.
+- **[Java Bookshop Sidecar](./tests/sidecar-samples/java-bookshop/)** - Agentify a Java CAP app via a Node.js sidecar. Typical for Java: sidecar used in both development and production (similar to `mtx/sidecar`). Start with `cds watch --profile java`.
+- **[Node Bookshop Sidecar](./tests/sidecar-samples/node-bookshop/)** - Agentify a Node.js CAP app via a sidecar. This is an unusual setup for Node.js — normally agents run in the same process as the main app. Use the side car option only when the agent must run as a separate process.
+
+## Sidecar Architecture
+
+The sidecar connects to the main CAP app (Java or Node.js) via HCQL. The sidecar profile determines how the connection is set up:
+
+| Profile              | Main App | HCQL path              | Run with                   |
+| -------------------- | -------- | ---------------------- | -------------------------- |
+| `agent-sidecar,java` | Java     | `/hcql/CatalogService` | `cds watch --profile java` |
+| `agent-sidecar,node` | Node.js  | `/hcql/catalog`        | `cds watch`                |
+
+The `java` profile tells the sidecar it is connecting to a Java app. It also enables `_javaHcqlCompat`, which patches action/function calls to use the HCQL envelope format `{"event":"<action>","args":[...]}` required by the Java HCQL adapter. This patch will be removed once the Java HCQL adapter accepts the standard CDS remote format.
+
+<details>
+<summary>How the sidecar connects to a Java CAP app</summary>
+
+- the sidecar sees the cds files of the actual application and the services that are annotated with `@agent`
+- these services are connected via HCQL — the sidecar acts as a protocol bridge, exposing the Java CAP service as an agent without modifying the Java app
+
+```
+Client              Node.js Sidecar                  AI Core (LLM)        Java CAP App
+  │                        │                               │                     │
+  │─ POST /agent/catalog ─▶│                               │                     │
+  │   "what books do       │                               │                     │
+  │    you have?"          │                               │                     │
+  │                        │ agentProtocolAdapter receives │                     │
+  │                        │ message/send request          │                     │
+  │                        │                               │                     │
+  │                        │── invoke LangGraph ReAct ────▶│                     │
+  │                        │   agent with user message     │                     │
+  │                        │                               │                     │
+  │                        │   ╔═══════════════════════════╧═════════════════╗   │
+  │                        │   ║  ReAct loop (repeats until LLM is done)     ║   │
+  │                        │   ║                                             ║   │
+  │                        │   ║  LLM decides to call a tool                 ║   │
+  │                        │◀──╫── tool call (e.g. query, submitOrder)  ─────╢   │
+  │                        │   ║                                             ║   │
+  │                        │── ╫── HCQL to Java app  ────────────────────────╫──▶│
+  │                        │◀──╫── result ───────────────────────────────────╫───│
+  │                        │   ║                                             ║   │
+  │                        │── ╫── tool result → LLM  ──────────────────────▶╢   │
+  │                        │   ║                                             ║   │
+  │                        │   ║  LLM decides: call another tool or respond  ║   │
+  │                        │   ╚═══════════════════════════╤═════════════════╝   │
+  │                        │                               │                     │
+  │                        │◀── final response ────────────│                     │
+  │                        │    "Here are the books..."    │                     │
+  │                        │                               │                     │
+  │◀── agent response ─────│                               │                     │
+  │    status: completed   │                               │                     │
+```
+
+- authentication:
+  - when sending a request to the agent, you need to pass the oauth token of the java application
+  - this token is given to the sidecar, which passes it on to the java application
+
+```
+Client              XSUAA               Node.js Sidecar          Java CAP App
+  │                     │                       │                       │
+  │─── 1. fetch JWT ───▶│                       │                       │
+  │◀── JWT ─────────────│                       │                       │
+  │                     │                       │                       │
+  │─── 2. POST /agent/catalog ─────────────────▶│                       │
+  │       Authorization: Bearer <jwt>           │                       │
+  │                     │                       │                       │
+  │                     │              3. run LLM + tools               │
+  │                     │                       │                       │
+  │                     │                       │─── 4. HCQL ──────────▶│
+  │                     │                       │    Bearer <jwt>       │
+  │                     │                       │◀─── response ─────────│
+  │◀── 5. Agent response ───────────────────────│                       │
+```
+
+- connecting Sidecar to Java app:
+
+```
+Java CAP App                     Node.js Sidecar
+  │                                    │
+  │  1. Java app starts                │
+  │     └─ exposes /hcql/CatalogService│
+  │        (via @hcql annotation)      │
+  │                                    │  2. Sidecar starts
+  │                                    │
+  │                                    │  3a. [production] Sidecar reads pre-compiled model
+  │                                    │      (bookshop-model.csn.json)
+  │                                    │  3b. [development] Sidecar reads model from source
+  │                                    │      (../../srv — default for Java apps)
+  │                                    │
+  │                                    │  4. cds "loaded" event fires
+  │                                    │     └─ finds @agent services in model,
+  │                                    │     └─ creates cds.requires["<service-name>"]
+  │                                    │        { kind: "hcql", credentials: {
+  │                                    │  4a.    [production] destination: "srv-api",
+  │                                    │                       path: "/<service-name>"
+  │                                    │  4b.    [development] url: "http://localhost:8080
+  │                                    │                            /hcql/<service-name>"
+  │                                    │        } }
+  │                                    │
+  │                                    │  5. cds "served" event fires, creates Agent for that service
+  │                                    │     └─ cds.connect.to("<service-name>")
+  │◀─────── HCQL connection ───────────│     └─ mounts POST /agent/<slugified(service-name)> router
+```
+
+</details>
+
+<details>
+<summary>Limitations of the Sidecar Architecture</summary>
+
+The sidecar mode is designed for applications written in Java. Compared to running the plugin natively in a Node.js CAP app, there are a few constraints to be aware of:
+
+- **HTTP overhead**: every tool call is a remote HCQL round-trip to the main app rather than an in-process call — though this is negligible compared to the LLM call latency.
+- **Only HCQL-exposed operations are available**: the sidecar can only call what the Java app exposes as CDS service operations over HCQL — it cannot reach into Java business logic that is not surfaced as a CDS action or entity. **The Java app must have HCQL enabled** (add `cds-adapter-hcql` as a runtime dependency in `pom.xml`). Without it, all agent tool calls fail with a 400 error.
+- **Custom executor code must be JavaScript**: if you want a custom LangGraph graph or custom executor logic, that code lives in the Node.js sidecar — there is no way to run custom executor code in the Java app itself. You can use the same `this.agent = { graph }` or `this.agent = { executor }` patterns described in the [Executor Profiles](#executor-profiles) section by adding a CDS service implementation file to the sidecar's `srv/` folder.
+- **Task and checkpoint persistence is not tenant-isolated**: the sidecar forwards the incoming JWT to the Java app (so the Java app correctly resolves the tenant), but the sidecar's own HANA schema for `Tasks` and `Checkpoints` is a single shared schema — all tenants' task and checkpoint data lands in the same tables. In a native Node.js CAP app, CDS automatically scopes DB operations to the current tenant; the sidecar has no MTX setup of its own to replicate this. For multi-tenant deployments, either accept this limitation (tasks from different tenants are mixed in one schema) or run a separate sidecar instance per tenant.
+
+</details>
+
+<details>
+<summary>Comparison: Native Java implementation vs. Sidecar</summary>
+
+The sidecar approach is a pragmatic bridge: it enables Java CAP applications to expose agents today, without waiting for a native Java implementation of this plugin. The goal is to gather stakeholder feedback and validate the agent programming model with real Java applications.
+
+|                            | Sidecar (now)                                     | Native Java plugin (future)                       |
+| -------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| **Deployment**             | Separate Node.js process alongside the Java app   | Runs inside the Java CAP app process              |
+| **Changes to main app**    | Annotate services with `@agent`, no other changes | Annotate services with `@agent`, no other changes |
+| **Tool call execution**    | Remote HCQL round-trip to the Java app            | In-process Java service calls                     |
+| **Custom executor/graph**  | JavaScript/TypeScript in the sidecar              | Java in the main app                              |
+| **Operational complexity** | Two deployable units                              | One deployable unit                               |
+| **Latency**                | Small HCQL overhead, negligible vs. LLM latency   | Minimal                                           |
+
+</details>
 
 ## Tooling
 

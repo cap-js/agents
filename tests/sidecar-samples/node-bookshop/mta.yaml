@@ -1,0 +1,105 @@
+_schema-version: 3.3.0
+ID: agent-node-bookshop
+version: 1.0.0
+description: "Node.js CAP bookshop with agent sidecar support via HCQL"
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci --legacy-peer-deps
+        - npx cds build --production
+modules:
+  - name: agent-node-bookshop-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: agent-node-bookshop-auth
+      - name: agent-node-bookshop-db
+
+  - name: agent-node-bookshop-sidecar
+    type: nodejs
+    path: agent/sidecar
+    parameters:
+      instances: 1
+    build-parameters:
+      builder: custom
+      commands:
+        - npm pack ../../../../../ # pack the local @cap-js/agents plugin into a tarball
+        - mkdir -p _main/srv # create _main directory structure
+        - npx --yes cds compile ../../srv ../../db -2 json -o _main/srv/csn.json # compile main app model into _main
+        - rm -f package-lock.json
+        - npm install --omit=dev --no-package-lock --no-bin-links --legacy-peer-deps
+        - npx --yes cds build --for hana # build agent db entities (Tasks, Checkpoints) for HANA
+      build-result: .
+    properties:
+      NODE_ENV: production
+      CDS_ENV: production,agent-sidecar,node
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api
+          url: ~{srv-url}/hcql
+          forwardAuthToken: true
+      - name: agent-node-bookshop-auth
+      - name: agent-java-bookshop-aicore
+      - name: agent-node-bookshop-db
+
+  - name: agent-node-bookshop-sidecar-db-deployer
+    type: hdb
+    path: agent/sidecar
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: custom
+      commands: []
+      build-result: gen/db
+      requires:
+        - name: agent-node-bookshop-sidecar
+    requires:
+      - name: agent-node-bookshop-db
+
+  - name: agent-node-bookshop-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: agent-node-bookshop-db
+
+resources:
+  - name: agent-node-bookshop-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: agent-node-bookshop-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          credential-types:
+            - "binding-secret"
+            - "x509"
+
+  - name: agent-java-bookshop-aicore
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: test-aicore-client
+
+  - name: agent-node-bookshop-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared

@@ -1,0 +1,19 @@
+{
+  "name": "agent-sidecar-java-bookshop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Java CAP bookshop with agent sidecar support via HCQL",
+  "devDependencies": {
+    "@sap/cds-dk": "^9.5.0"
+  },
+  "scripts": {
+    "build:java": "cd srv && mvn clean package -DskipTests",
+    "start:java": "cd srv && mvn spring-boot:run",
+    "start:sidecar": "cd agent/sidecar && npm install && npx cds serve --port 4005",
+    "install:sidecar": "cd agent/sidecar && npm install"
+  },
+  "dependencies": {
+    "@cap-js/hana": "*",
+    "@cap-js/sqlite": "*"
+  }
+}

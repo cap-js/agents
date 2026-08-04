@@ -182,6 +182,16 @@
       "[production]": {
         "llm": "aicore"
       }
+    },
+    "[agent-sidecar]": {
+      "server": {
+        "port": 4006
+      },
+      "[java]": {
+        "agent": {
+          "_javaHcqlCompat": true
+        }
+      }
     }
   },
   "workspaces": [
@@ -192,6 +202,10 @@
     "tests/samples/telemetry-v1/",
     "tests/samples/travel/travel-agent/",
     "tests/samples/travel/xflights/",
-    "tests/samples/travel/leisure-services/"
+    "tests/samples/travel/leisure-services/",
+    "tests/sidecar-samples/java-bookshop/agent/sidecar",
+    "tests/sidecar-samples/java-bookshop",
+    "tests/sidecar-samples/node-bookshop/agent/sidecar",
+    "tests/sidecar-samples/node-bookshop"
   ]
 }
