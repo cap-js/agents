@@ -18,9 +18,9 @@
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "test": "CDS_ENV=test vitest run --config vitest.config.js",
+    "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
-    "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
+    "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
     "watch:with-claude": "cds w tests/samples/bookshop --profile with-claude",
@@ -54,8 +54,7 @@
     "@cap-js/sqlite": "^3",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
-    "deepagents": "^1.10.2",
-    "vitest": "^4.1.10"
+    "deepagents": "^1.10.2"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",

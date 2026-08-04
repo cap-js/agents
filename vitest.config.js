@@ -1,6 +1,4 @@
-import { defineConfig } from "vitest/config"
-
-export default defineConfig({
+export default {
   test: {
     include: ["tests/integration/*.test.js"],
     globals: true,
@@ -9,4 +7,4 @@ export default defineConfig({
     hookTimeout: 30_000,
     reporters: ["verbose"],
   },
-})
+}

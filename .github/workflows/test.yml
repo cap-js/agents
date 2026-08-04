@@ -43,6 +43,7 @@ jobs:
           npm pkg set "overrides.@sap/cds-mtxs=^2"
           npm pkg set "overrides.express=^4"
           npm pkg set "devDependencies.@cap-js/cds-test=>0"
+          npm pkg set "peerDependencies.@sap/cds=^8"
           npm pkg delete "devDependencies.@cap-js/hana"
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
