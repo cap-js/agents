@@ -2,6 +2,7 @@ import cds from "@sap/cds"
 import { generateTools, instrumentTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
+import { partsToText } from "../../lib/utils/message-handling.js"
 
 /**
  * Register default event handlers for agent graph building on an @agent service.
@@ -114,11 +115,7 @@ export default function registerDefaultAgentHandlers(srv) {
       recursionLimit: cds.env.agents?.recursionLimit ?? 100,
       inputMapper: async (requestContext) => {
         const { HumanMessage } = await import("@langchain/core/messages")
-        const text =
-          requestContext.userMessage?.parts
-            ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
-            .map((p) => p.text)
-            .join(" ") || ""
+        const text = partsToText(requestContext.userMessage?.parts)
 
         // Append file manifest injected by GraphExecutor.execute() (fileIO path)
         const fullText = requestContext._fileManifest

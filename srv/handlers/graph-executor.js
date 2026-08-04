@@ -1,5 +1,10 @@
 import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
+import {
+  partsToText,
+  partsToMessageContent,
+  buildChatMessages,
+} from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
@@ -40,11 +45,7 @@ class TimeoutError extends Error {
  */
 async function defaultInputMapper(requestContext) {
   const { HumanMessage } = await import("@langchain/core/messages")
-  const text =
-    requestContext.userMessage?.parts
-      ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
-      .map((p) => p.text)
-      .join(" ") || ""
+  const text = partsToText(requestContext.userMessage?.parts)
   const fullText = requestContext._fileManifest ? `${text}\n${requestContext._fileManifest}` : text
   return { messages: [new HumanMessage(fullText)] }
 }
@@ -98,12 +99,7 @@ function agentMessage(text) {
  * Extract user text from A2A message parts.
  */
 function extractText(requestContext) {
-  return (
-    requestContext.userMessage?.parts
-      ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
-      .map((p) => p.text)
-      .join(" ") || ""
-  )
+  return partsToText(requestContext.userMessage?.parts)
 }
 
 /**
@@ -518,7 +514,15 @@ class GraphExecutor {
         wfSpan.setAttribute("agent.context.id", contextId)
         wfSpan.setAttribute("agent.service", serviceName)
         // MLflow Databricks: root workflow span carries AGENT type + trace tags
-        setSpanAttrs(wfSpan, mlflowAttrs("AGENT", { inputs: userText, functionName: serviceName }))
+        // Inputs structured as chat messages so MLflow UI renders as conversation
+        wfSpan.setAttribute("mlflow.message.format", "langchain-js")
+        setSpanAttrs(
+          wfSpan,
+          mlflowAttrs("AGENT", {
+            inputs: { messages: buildChatMessages(requestContext) },
+            functionName: serviceName,
+          }),
+        )
         setSpanAttrs(wfSpan, mlflowTraceAttrs())
       }
 
@@ -645,7 +649,10 @@ class GraphExecutor {
           wfSpan.setAttribute("agent.outcome", "completed")
           setSpanAttrs(
             wfSpan,
-            mlflowAttrs("AGENT", { outputs: output?.slice(0, 1000), functionName: serviceName }),
+            mlflowAttrs("AGENT", {
+              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              functionName: serviceName,
+            }),
           )
         }
 

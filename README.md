@@ -526,6 +526,21 @@ The `@Core.SchemaVersion` annotation takes precedence over credentials. Since it
 
 The plugin reads credentials from `cds.env.requires["databricks-mlflow"].credentials` and adds a `BatchSpanProcessor` with an OTLP exporter pointed at the Databricks endpoint.
 
+**Credential reference:**
+
+| Key                    | Required | Description                                                                                  |
+| ---------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `DATABRICKS_HOST`      | yes¹     | Databricks workspace URL (e.g. `https://adb-123.azuredatabricks.net`)                        |
+| `DATABRICKS_TOKEN`     | yes      | Databricks personal access token                                                             |
+| `MLFLOW_EXPERIMENT_ID` | no       | Default MLflow experiment ID (overridden per service by `@Core.SchemaVersion`)               |
+| `MLFLOW_OTLP_ENDPOINT` | no       | Full OTLP traces URL — overrides the endpoint derived from `DATABRICKS_HOST`                 |
+| `UC_CATALOG`           | no²      | Unity Catalog catalog name for Azure Databricks UC trace storage (e.g. `main`)               |
+| `UC_SCHEMA`            | no²      | Unity Catalog schema name (e.g. `mlflow_traces`)                                             |
+| `UC_TABLE_PREFIX`      | no²      | Table prefix — traces are written to `<UC_CATALOG>.<UC_SCHEMA>.<UC_TABLE_PREFIX>_otel_spans` |
+
+¹ Required unless `MLFLOW_OTLP_ENDPOINT` is set directly.  
+² All three UC keys must be set together to enable Unity Catalog trace storage. When set, the `X-Databricks-UC-Table-Name` header is added to every OTLP export request. See the [Azure Databricks UC trace storage docs](https://learn.microsoft.com/en-us/azure/databricks/mlflow3/genai/tracing/trace-unity-catalog#third-party-otel-client) for setup prerequisites.
+
 **Span attributes added** (only when `cds.agents.mlflow` is truthy):
 
 | Attribute                | Source                                                                                                |
@@ -546,10 +561,10 @@ Start an [MLflow OSS](https://mlflow.org/docs/latest/getting-started/quickstart.
 podman run -p 5678:5000 ghcr.io/mlflow/mlflow mlflow server --host 0.0.0.0
 ```
 
-The plugin ships with default credentials for `localhost:5678` in the bookshop's `telemetry` profile — no env variables needed. Just enable mlflow:
+The bookshop ships with default credentials for `localhost:5678` in the `tracing` profile — no env variables needed. Just enable mlflow:
 
 ```bash
-cds w tests/samples/bookshop --profile hybrid,telemetry
+cds w tests/samples/bookshop --profile hybrid,tracing
 ```
 
 Traces appear at http://localhost:5678/#/experiments/0.
