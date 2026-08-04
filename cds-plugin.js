@@ -1,7 +1,6 @@
 import cds from "@sap/cds"
 
 const LOG = cds.log("agent")
-import agentAdapter from "./lib/index.js"
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
@@ -31,16 +30,6 @@ cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
-
-// Register A2A as a CDS protocol adapter
-// Cant switch to package.json yet due to CAP not correctly reading ESM default export
-const protocols = (cds.env.protocols ??= {})
-if (!protocols.agent) {
-  protocols.agent = {
-    path: "/a2a",
-    impl: agentAdapter,
-  }
-}
 
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return

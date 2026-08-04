@@ -183,6 +183,12 @@
         "llm": "aicore"
       }
     },
+    "protocols": {
+      "agent": {
+        "path": "/a2a",
+        "impl": "@cap-js/agents/lib/index.cjs"
+      }
+    },
     "[agent-sidecar]": {
       "server": {
         "port": 4006
