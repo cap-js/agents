@@ -1,6 +1,5 @@
 import cds from "@sap/cds"
 import {
-  captured,
   setup,
   teardown,
   resetCapture,

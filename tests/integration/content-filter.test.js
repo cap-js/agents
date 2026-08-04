@@ -117,8 +117,8 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
         s.on(
           "buildModel",
           () =>
-            new InstrumentedOrchestrationClient(MODEL_NAME, null, {
-              modelName: MODEL_NAME,
+            new InstrumentedOrchestrationClient(MODEL_NAME, {
+              model: MODEL_NAME,
               contentFilter,
             }),
         ),

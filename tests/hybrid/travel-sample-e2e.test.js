@@ -282,8 +282,8 @@ describe("@cap-js/agents - Travel Sample E2E", () => {
       `expected 'activityservice' tool call (leisure-services A2A). Recorded tools: ${[...toolNames].sort().join(", ")}`,
     ).toBeTruthy()
 
-    const mcpToolUsed = ["describe", "query", "bookFlight", "cancelFlight", "call_action"].some(
-      (n) => toolNames.has(n),
+    const mcpToolUsed = ["describe", "query", "bookFlight", "cancelFlight", "call"].some((n) =>
+      toolNames.has(n),
     )
     expect(
       mcpToolUsed,

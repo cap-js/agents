@@ -39,13 +39,11 @@ describe("GraphExecutor - abort/cancellation", () => {
 
   it("abort(taskId) causes execute to publish canceled status", async () => {
     const publishedEvents = []
-    let resolveInvoke
     const fakeGraph = {
       checkpointer: {},
       invoke: async (_input, config) => {
         // Simulate long-running graph that respects abort signal
         return new Promise((resolve, reject) => {
-          resolveInvoke = resolve
           config.signal.addEventListener("abort", () => {
             reject(abortError())
           })
@@ -93,12 +91,10 @@ describe("GraphExecutor - abort/cancellation", () => {
   })
 
   it("abort(taskId) is idempotent — calling twice does not throw", async () => {
-    let resolveInvoke
     const fakeGraph = {
       checkpointer: {},
       invoke: async (_input, config) => {
         return new Promise((resolve, reject) => {
-          resolveInvoke = resolve
           config.signal.addEventListener("abort", () => {
             reject(abortError())
           })
@@ -196,11 +192,9 @@ describe("GraphExecutor - abort/cancellation", () => {
   })
 
   it("signal is already aborted if abort() called before graph.invoke starts", async () => {
-    let capturedSignal
     const fakeGraph = {
       checkpointer: {},
       invoke: async (_input, config) => {
-        capturedSignal = config.signal
         if (config.signal.aborted) {
           throw abortError()
         }
@@ -265,8 +259,6 @@ describe("GraphExecutor - graceful timeout", () => {
       }
 
       // Use very short timeout for test speed
-      const origTimeout = process.env.__TEST_TIMEOUT
-      const origGrace = process.env.__TEST_GRACE
       cds.env.agents = cds.env.agents || {}
       cds.env.agents.pool = cds.env.agents.pool || {}
       cds.env.agents.pool.maxExecutionTimePerTask = 200

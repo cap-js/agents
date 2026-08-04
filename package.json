@@ -160,7 +160,7 @@
       "kinds": {
         "llm-aicore": {
           "impl": "@cap-js/agents/lib/models/aicore",
-          "modelName": "anthropic--claude-4.6-sonnet",
+          "model": "anthropic--claude-4.6-sonnet",
           "contentFilter": true
         },
         "llm-anthropic": {

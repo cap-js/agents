@@ -101,7 +101,7 @@ The LLM used by an agent is configured via `cds.requires.llm`. You can provide a
   "requires": {
     "llm": {
       "kind": "aicore",
-      "modelName": "anthropic--claude-4.6-sonnet"
+      "model": "anthropic--claude-4.6-sonnet"
     }
   }
 }
@@ -123,7 +123,7 @@ When defining an additional model, you need to prefix the kind with `llm-`.
       "small-llm": {
         // use any name you like
         "kind": "llm-aicore",
-        "modelName": "mistralai--mistral-small",
+        "model": "mistralai--mistral-small",
       },
     },
   },
@@ -157,7 +157,7 @@ service CatalogService { ... }
 | `cds.agents.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off)   | `true`                   |
 | `cds.agents.pushNotifications`   | Push notifications (`true` = enabled, `false` = disabled, object = config) | `true`                   |
 | `cds.agents.mlflow`              | MLflow Databricks tracing (`true` or `false`)                              | `false`                  |
-| `cds.agents.per_action_tool`     | One tool per action (vs combined `call_action`)                            | `true`                   |
+| `cds.agents.per_action_tool`     | One tool per action (vs combined `call`)                                   | `true`                   |
 | `cds.agents.trace_langchain`     | Monkey-patch LangChain for tracing                                         | `true`                   |
 | `cds.agents.activeUsersInterval` | Schedule for `active_users` metric computation                             | `"24h"` (`0` to disable) |
 | `cds.agents.fileIO.enabled`      | Enable A2A file uploads + emissions (see below)                            | `false`                  |

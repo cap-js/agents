@@ -5,18 +5,11 @@
     <meta charset="utf-8" />
     <meta name="color-scheme" content="dark light" />
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-
       body {
         font-family:
           Avenir Next,
           sans-serif;
+        margin: 0;
         background: #f8fbff;
         color: #2a3d52;
         display: flex;
@@ -36,6 +29,7 @@
       header h1 {
         font-size: 1rem;
         font-weight: 500;
+        margin: 0;
       }
       header .back {
         color: #c8def0;
@@ -79,6 +73,14 @@
         background: #e53935;
       }
 
+      table thead {
+        text-align: left;
+      }
+      table {
+        border-spacing: 1em 0.2em;
+        margin: 1em 0;
+      }
+
       #messages {
         flex: 1;
         overflow-y: auto;
@@ -93,7 +95,7 @@
         padding: 10px 14px;
         border-radius: 12px;
         line-height: 1.5;
-        font-size: 0.9rem;
+        font-size: 90%;
         word-break: break-word;
       }
       .msg.user {

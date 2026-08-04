@@ -46,10 +46,10 @@ export default class GraphBookService extends cds.ApplicationService {
     })
 
     // Mock LLM node: simulates an LLM call with token usage metrics
-    async function llmNode(state) {
-      const modelName = "mock-model-for-testing"
+    async function llmNode() {
+      const model = "mock-model-for-testing"
       const node = "llm"
-      const mAttrs = { "sap.tenantId": cds.context?.tenant || "anonymous", model: modelName, node }
+      const mAttrs = { "sap.tenantId": cds.context?.tenant || "anonymous", model, node }
 
       const usage = { input_tokens: 42, output_tokens: 18, total_tokens: 60 }
       metrics.llmInvocations.add(1, { ...mAttrs, outcome: "success" })

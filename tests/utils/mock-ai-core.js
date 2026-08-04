@@ -11,7 +11,7 @@ export function createMockAICore() {
   let callCount = 0
   let finishReason = "stop"
   let responseContent = "Mock LLM response from AI Core."
-  let modelName = "mock-gpt-4"
+  let model = "mock-gpt-4"
   let reasoningTokens = null
 
   function buildSuccessBody() {
@@ -22,7 +22,7 @@ export function createMockAICore() {
     return JSON.stringify({
       request_id: "mock-req-001",
       final_result: {
-        model: modelName,
+        model,
         usage,
         choices: [
           {
@@ -56,24 +56,12 @@ export function createMockAICore() {
     server,
     start: () => new Promise((resolve) => server.listen(0, () => resolve(server.address().port))),
     stop: () => new Promise((resolve) => server.close(resolve)),
-    setStatus: (status) => {
-      responseStatus = status
-    },
+    setModel: (m) => (model = m),
+    setStatus: (status) => (responseStatus = status),
     getCallCount: () => callCount,
-    resetCallCount: () => {
-      callCount = 0
-    },
-    setFinishReason: (reason) => {
-      finishReason = reason
-    },
-    setResponseContent: (content) => {
-      responseContent = content
-    },
-    setModel: (name) => {
-      modelName = name
-    },
-    setReasoningTokens: (n) => {
-      reasoningTokens = n
-    },
+    resetCallCount: () => (callCount = 0),
+    setFinishReason: (reason) => (finishReason = reason),
+    setResponseContent: (content) => (responseContent = content),
+    setReasoningTokens: (n) => (reasoningTokens = n),
   }
 }

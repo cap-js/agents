@@ -1,7 +1,6 @@
 import cds from "@sap/cds"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import {
-  captured,
   setup,
   teardown,
   resetCapture,
@@ -103,7 +102,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
       _llmType() {
         return "mock"
       }
-      async _generate(messages) {
+      async _generate() {
         const msg = new AIMessage({
           content: "",
           tool_calls: [
