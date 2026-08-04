@@ -16,6 +16,11 @@
     "zod": "^4"
   },
   "cds": {
+    "agents": {
+      "[tracing]": {
+        "mlflow": true
+      }
+    },
     "requires": {
       "audit-log": false,
       "llm2": {
@@ -48,11 +53,24 @@
         },
         "telemetry": {
           "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
           "metrics": {
             "exporter": {
               "module": "@cap-js/telemetry",
               "class": "ConsoleMetricExporter"
             }
+          }
+        },
+        "databricks-mlflow": {
+          "credentials": {
+            "DATABRICKS_HOST": "http://localhost:5678",
+            "DATABRICKS_TOKEN": "unused",
+            "MLFLOW_EXPERIMENT_ID": "0"
           }
         }
       }
