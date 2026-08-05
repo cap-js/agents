@@ -663,41 +663,69 @@ export default class MyAgent extends cds.ApplicationService {
 }
 ```
 
-## MCP Server Connections
+## Downstream MCP and Agent Connections
 
-Connect an agent to one or more [MCP](https://modelcontextprotocol.io) servers declaratively via the `@agent.mcps` annotation — no manual wiring needed.
+> Experimental API. Config may change, please provide feedback.
 
-Declare the remote service in `cds.requires` (supports direct URLs and BTP destinations):
+Connect to other services marked with `@mcp` or `@agent`. Connected services may live in the same app or be connected via [MCP](https://modelcontextprotocol.io) or [A2A](https://a2a-protocol.org/).
+
+Specify the services to connect with `@agent.connect`:
+
+```cds
+@agent.connect: [ 'FlightsService', 'HotelsService' ]
+@agent service TravelAgent {}
+```
+
+Alternatively, connect to every available `@mcp` and `@agent` service:
+
+```cds
+@agent.connect: 'auto'
+@agent service TravelAgent {}
+```
+
+You can also configure it globally for all agents or per service in the cds config:
 
 ```json
 "cds": {
+  "agents": {
+    "connect": "none"  // global base configuration for all agents
+  },
   "requires": {
-    "MCP1": {
-      "kind": "rest",
-      "credentials": {
-        "url": "http://localhost:4004/my-mcp"
-      }
-    },
-    "MCP2": {
-      "kind": "rest",
-      "credentials": {
-        "destination": "sapit-mcp"
+    "TravelAgent": {
+      "agent": {
+        "connect": "auto"  // per service, similar to the annotation
       }
     }
   }
 }
 ```
 
-Then annotate the agent service with the service keys to connect:
+Options for `agent.connect`:
 
-```cds
-@agent
-@agent.mcps: [{ service: 'MCP1' }, { service: 'MCP2' }]
-@path: '/my-agent'
-service MyAgent {}
+| Value                       | Description                                           |
+| --------------------------- | ----------------------------------------------------- |
+| `none` (default)            | No downstream connections to other services           |
+| `auto`                      | Connect to all available `@mcp` and `@agent` services |
+| `mcp`                       | Connect to all available `@mcp` services              |
+| `agent`                     | Connect to all available `@agent` services            |
+| `[ 'FlightsService', ... ]` | Connect to listed services                            |
+
+If the connected services are served remotely, configure the `cds.requires` entry as usual:
+
+```json
+"cds": {
+  "requires": {
+    "FlightsService": true,
+    "HotelsService": "agent",
+    "EventsService": {
+      "kind": "mcp",
+      "credentials": { "url": "..." } // or destinations...
+    }
+  }
+}
 ```
 
-The plugin resolves the URL and authentication headers at startup using the SAP Cloud SDK (`getDestination`), passing the user's JWT for OAuth2UserTokenExchange destinations. All destination authentication types supported by the Cloud SDK are supported. CAP profiles and connectivity mechanisms work as usual.
+→ See [Travel Sample](./tests/samples/travel/) for a complete multi-agent orchestration example.
 
 ## API
 

@@ -4,6 +4,8 @@ import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
 
+const LOG = cds.log("agent")
+
 /**
  * Register default event handlers for agent graph building on an @agent service.
  *
@@ -18,17 +20,69 @@ export default function registerDefaultAgentHandlers(srv) {
   srv.on("buildTools", async () => {
     const cdsTools = generateTools(srv)
 
-    const def = cds.context?.model?.definitions?.[srv.name] || srv.definition
-    const mcpEntries = def?.["@agent.mcps"] ?? []
+    // ── MCP servers and subagents ────────────────────────────────────────────────────────
+    // Connect to other @mcp services and @agent services
+    function canConnect(s) {
+      return (
+        s.name !== srv.name && (s.protocols?.mcp || s["@mcp"] || s.protocols?.agent || s["@agent"])
+      )
+    }
 
-    if (mcpEntries.length === 0) return cdsTools
+    const connect =
+      srv.options?.agent?.connect ?? srv.definition["@agent.connect"] ?? cds.env.agents?.connect
 
-    const { buildMcpToolsFromConnection } = await import("./mcp-tools.js")
-    const mcpTools = (
-      await Promise.all(mcpEntries.map((entry) => buildMcpToolsFromConnection(entry.service)))
-    ).flat()
+    // Allow for providing an mcp or a2a connection with cds.requires only -> no cds.model.services entry
+    // REVISIT: better method?
+    const additionalServices = Object.entries(cds.env.requires).map(([name, s]) => ({
+      name,
+      kind: s?.kind,
+      protocols: { [s?.kind]: true },
+    }))
 
-    return [...cdsTools, ...mcpTools]
+    const serviceMap = Object.fromEntries(
+      [...additionalServices, ...(cds.model?.services ?? [])].map((s) => [s.name, s]),
+    )
+    const services = Object.values(serviceMap)
+    const selected =
+      connect === "none"
+        ? []
+        : connect === "auto"
+          ? services?.filter(canConnect)
+          : connect === "mcp"
+            ? services?.filter((s) => s.name !== srv.name && (s.protocols?.mcp || s["@mcp"]))
+            : connect === "agent"
+              ? services?.filter((s) => s.name !== srv.name && (s.protocols?.agent || s["@agent"]))
+              : connect?.map((name) => serviceMap[name]).filter(Boolean) || []
+
+    if (selected.length === 0) return cdsTools
+
+    const mcpEntries = []
+    const agentEntries = []
+    for (const s of selected) {
+      if (s.protocols?.agent || s["@agent"]) agentEntries.push(s.name)
+      else if (s.protocols?.mcp || s["@mcp"]) mcpEntries.push(s.name)
+      else LOG.warn(`Agent ${srv.name} could not connect to ${s.name}, missing @mcp or @agent`)
+    }
+
+    const { buildMcpTools } = await import("./mcp-tools.js")
+    const { buildSubAgentTool } = await import("./sub-agent-tools.js")
+
+    const results = await Promise.allSettled([
+      ...mcpEntries.map((e) => buildMcpTools(e.service ?? e)),
+      ...agentEntries.map((e) => buildSubAgentTool(e.service ?? e)),
+    ])
+
+    const extraTools = []
+    for (const r of results) {
+      // MCP connections yield an array of tools; sub-agent connections yield a
+      // single tool. Normalize both so instrumentTools sees a flat tool list.
+      if (r.status === "fulfilled") {
+        if (Array.isArray(r.value)) extraTools.push(...r.value.filter(Boolean))
+        else if (r.value) extraTools.push(r.value)
+      } else LOG.warn("Failed to build external tools:", r.reason?.message ?? r.reason)
+    }
+
+    return [...cdsTools, ...extraTools]
   })
 
   // Auto-instrument all tools returned by buildTools (tracing, audit, metrics)

@@ -1,10 +1,6 @@
 import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
-import {
-  partsToText,
-  partsToMessageContent,
-  buildChatMessages,
-} from "../../lib/utils/message-handling.js"
+import { partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
@@ -323,9 +319,16 @@ class GraphExecutor {
     // ephemeral signal that may already be cleared from channel_values.
     if (this._graph?.checkpointer) {
       try {
-        const cp = await this._graph.checkpointer.getTuple({
-          configurable: { thread_id: config.configurable?.thread_id },
-        })
+        const thread_id = config.configurable?.thread_id
+        let cp = await this._graph.checkpointer.getTuple({ configurable: { thread_id } })
+        if (!cp?.checkpoint?.channel_values && this._graph.checkpointer.latestNamespace) {
+          const ns = await this._graph.checkpointer.latestNamespace(thread_id)
+          if (ns) {
+            cp = await this._graph.checkpointer.getTuple({
+              configurable: { thread_id, checkpoint_ns: ns },
+            })
+          }
+        }
         const channelValues = cp?.checkpoint?.channel_values
         if (channelValues) {
           const interrupt = finalState?.__interrupt__
@@ -405,7 +408,6 @@ class GraphExecutor {
     const serviceName = this._srv.name
     const isResume = requestContext.task?.status?.state === "input-required"
     const mAttrs = metrics.attrs(serviceName)
-    const userText = extractText(requestContext)
 
     // Cooperative cancellation: per-task AbortController
     const controller = new AbortController()
@@ -609,7 +611,8 @@ class GraphExecutor {
         if (result?.__interrupt__?.length > 0) {
           const description = extractInterruptDescription(result)
 
-          LOG.info("input-required", { task: short(taskId), service: serviceName })
+          const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
+          LOG.info("input-required", { task: short(taskId), service: serviceName, duration })
 
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "input-required")
 

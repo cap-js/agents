@@ -1,5 +1,6 @@
 using { travel.leisure as db } from '../db/schema';
 
+@agent.connect: 'auto'
 @agent
 @odata
 /** Hotel search and booking service — find hotels by city, price, or star rating and make reservations */

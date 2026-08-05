@@ -1,5 +1,7 @@
 import cds from "@sap/cds"
 import { MultiServerMCPClient } from "@langchain/mcp-adapters"
+import { generateTools } from "./tools.js"
+import { toolName } from "../../lib/utils/utils.js"
 
 const LOG = cds.log("agent:mcp")
 
@@ -63,6 +65,18 @@ function wrapToolsWithErrorHandling(tools, serviceName) {
   })
 }
 
+export async function buildMcpToolsLocally(serviceName) {
+  const srv = cds.services[serviceName]
+  const tools = generateTools(srv)
+  const prefix = toolName(`${serviceName}_`)
+  for (const tool of tools) tool.name = `${prefix}${tool.name}`
+
+  LOG.info(
+    `Got ${tools.length} MCP tools from ${serviceName}: ${tools.map((t) => t.name).join(", ")}`,
+  )
+  return tools
+}
+
 /**
  * Build LangChain tools from a CAP MCP connection.
  * Resolves the destination URL and auth headers, connects to the MCP server,
@@ -72,12 +86,23 @@ function wrapToolsWithErrorHandling(tools, serviceName) {
  * @returns {Promise<import("@langchain/core/tools").StructuredTool[]>}
  */
 export async function buildMcpToolsFromConnection(serviceName) {
-  const svc = await cds.connect.to(serviceName)
-  const dest = svc.destination
+  let endpoints = cds.service.endpoints4({
+    name: serviceName,
+    definition: cds.model.services[serviceName],
+  })
+  endpoints = Object.fromEntries(endpoints.map((o) => [o.kind, o.path]))
+  const { credentials, kind } = cds.requires[serviceName]
 
   // dest is either a string (BTP destination name) or an object { name, url, ... }
-  const destinationName = typeof dest === "string" ? dest : dest?.name
-  const localUrl = typeof dest === "string" ? null : dest?.url
+  const destinationName = typeof credentials === "string" ? credentials : credentials?.name
+  const localUrl =
+    typeof credentials === "string"
+      ? null
+      : kind === undefined
+        ? credentials?.url?.replace("undefined", endpoints?.mcp)
+        : kind !== "mcp" && endpoints?.[kind]
+          ? credentials?.url.replace(endpoints[kind], endpoints.mcp)
+          : credentials?.url
 
   if (!localUrl && !destinationName) {
     throw new Error(
@@ -85,21 +110,10 @@ export async function buildMcpToolsFromConnection(serviceName) {
     )
   }
 
-  const { url, headers } = destinationName
-    ? await resolveDestination(destinationName, dest, localUrl)
-    : {
-        url: localUrl,
-        headers: dest?.authTokens?.[0]?.value
-          ? { Authorization: `Bearer ${dest.authTokens[0].value}` }
-          : {},
-      }
-
-  if (destinationName) {
-    LOG.debug(`Resolved destination "${destinationName}"`, {
-      url,
-      headerKeys: Object.keys(headers),
-    })
-  }
+  // REVISIT: url resolution at runtime, potentially using RemoteService?
+  const { url } = destinationName
+    ? await resolveDestination(destinationName, credentials, localUrl)
+    : { url: localUrl }
 
   if (!url) {
     throw new Error(
@@ -110,19 +124,36 @@ export async function buildMcpToolsFromConnection(serviceName) {
   const mcpUrl = url.replace(/\/$/, "")
   LOG.info(`Connecting to MCP server at ${mcpUrl}`)
 
+  const resolveHeaders = async () => {
+    if (destinationName) {
+      const { headers } = await resolveDestination(destinationName, credentials, url)
+      LOG.debug(`Resolved destination "${destinationName}"`, { headerKeys: Object.keys(headers) })
+      return headers
+    }
+    const token = credentials?.authTokens?.[0]?.value
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
+
   const client = new MultiServerMCPClient({
     mcpServers: {
-      [serviceName]: {
-        url: mcpUrl,
-        ...(Object.keys(headers).length ? { headers } : {}),
-      },
+      [serviceName]: { url: mcpUrl },
     },
+    beforeToolCall: async () => ({ headers: await resolveHeaders() }),
   })
 
   const tools = await client.getTools()
+  const prefix = toolName(`${serviceName}_`)
+  for (const tool of tools) tool.name = `${prefix}${tool.name}`
+
   LOG.info(
     `Got ${tools.length} MCP tools from ${serviceName}: ${tools.map((t) => t.name).join(", ")}`,
   )
 
   return wrapToolsWithErrorHandling(tools, serviceName)
+}
+
+export async function buildMcpTools(serviceName) {
+  return cds.requires[serviceName]?.credentials
+    ? buildMcpToolsFromConnection(serviceName)
+    : buildMcpToolsLocally(serviceName)
 }

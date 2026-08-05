@@ -12,7 +12,6 @@
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
     "@sap/cds": ">=8",
-    "deepagents": "^1.9.0",
     "zod": "^4"
   },
   "cds": {

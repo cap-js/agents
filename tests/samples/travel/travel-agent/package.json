@@ -4,15 +4,9 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@a2a-js/sdk": "^0.3.12",
     "@cap-js/agents": "file:../../../..",
     "@cap-js/sqlite": "*",
-    "@langchain/core": "^1",
-    "@langchain/langgraph": "^1",
-    "@langchain/mcp-adapters": "*",
-    "@sap/cds": ">=8",
-    "deepagents": "^1.9.0",
-    "zod": "^4"
+    "@sap/cds": ">=8"
   },
   "cds": {
     "agents": {
@@ -34,7 +28,25 @@
       "port": 4004
     },
     "requires": {
-      "audit-log": false
+      "audit-log": false,
+      "FlightsService": {
+        "kind": "mcp",
+        "credentials": {
+          "url": "http://localhost:4005/mcp/data"
+        }
+      },
+      "hotel": {
+        "kind": "agent",
+        "credentials": {
+          "url": "http://localhost:4006/a2a/hotel"
+        }
+      },
+      "activity": {
+        "kind": "agent",
+        "credentials": {
+          "url": "http://localhost:4006/a2a/activity"
+        }
+      }
     }
   }
 }
