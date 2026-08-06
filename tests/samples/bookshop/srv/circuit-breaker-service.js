@@ -66,7 +66,7 @@ export default class CircuitBreakerService extends cds.ApplicationService {
         // The _streamResponseChunks override above ensures the middleware is wired
         // correctly for both paths in production.
         streaming: false,
-        maxRetries: 1, // reduced for test speed; still validates fix (1 retry would delay without it)
+        maxRetries: 0, // no retries — each 502 fails immediately with no backoff delay
         onFailedAttempt: (err) => {
           // Same fix as lib/llm.js: abort retries when circuit breaker is open
           if (err.code === "EOPENBREAKER" || err.message === "Breaker is open") {
