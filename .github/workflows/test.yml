@@ -72,7 +72,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Setup CF CLI and authenticate
-        uses: cap-js/cf-setup@bc0b5e5f4ddbe8c546d4d15e6700e2e4a397e2fd # v2
+        uses: cap-js/cf-setup@d9f989795c045b8ba9f80103ae4979de71131844 # v2
         with:
           api: ${{ secrets.CF_API }}
           org: ${{ secrets.CF_ORG }}
