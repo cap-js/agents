@@ -176,15 +176,15 @@ describe("@cap-js/agents - Travel Sample E2E", () => {
     ).toBeTruthy()
 
     const mcpToolUsed = [
-      "flights_describe",
-      "flights_query",
-      "flights_bookFlight",
-      "flights_cancelFlight",
-      "flights_call",
+      "flightsservice_describe",
+      "flightsservice_query",
+      "flightsservice_bookFlight",
+      "flightsservice_cancelFlight",
+      "flightsservice_call",
     ].some((n) => toolNames.has(n))
     expect(
       mcpToolUsed,
-      `expected at least one xflights MCP tool call (describe/query/bookFlight/cancelFlight). Recorded tools: ${[...toolNames].sort().join(", ")}`,
+      `expected at least one xflights MCP tool call (flightsservice_describe/query/bookFlight/cancelFlight). Recorded tools: ${[...toolNames].sort().join(", ")}`,
     ).toBeTruthy()
   })
 })
