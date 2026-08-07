@@ -80,7 +80,7 @@
       "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
-      "connect": "none",
+      "connect": "auto",
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [

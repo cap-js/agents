@@ -704,8 +704,8 @@ Options for `agent.connect`:
 
 | Value                       | Description                                           |
 | --------------------------- | ----------------------------------------------------- |
-| `none` (default)            | No downstream connections to other services           |
-| `auto`                      | Connect to all available `@mcp` and `@agent` services |
+| `none`                      | No downstream connections to other services           |
+| `auto` (default)            | Connect to all available `@mcp` and `@agent` services |
 | `mcp`                       | Connect to all available `@mcp` services              |
 | `agent`                     | Connect to all available `@agent` services            |
 | `[ 'FlightsService', ... ]` | Connect to listed services                            |
