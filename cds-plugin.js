@@ -31,6 +31,39 @@ const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
 
+// cds.on('bootstrap', () => {
+  const llm = cds.env.requires.llm
+  if (typeof llm === 'string') {
+    // const [type, value] = llm.split(':')
+    // if (type === 'llm') {
+      // const [ provider, model ] = value.split('/')
+      const [ provider, model ] = llm.split('/')
+      const providers = {
+        mock: {},
+        anthropic: {
+          opus: 'claude-opus-latest',
+          sonnet: 'claude-sonnet-latest',
+          haiku: 'claude-haiku-latest',
+        },
+        aicore: {
+          opus: 'anthropic--claude-4.8-opus',
+          sonnet: 'anthropic--claude-4.8-sonnet',
+          haiku: 'anthropic--claude-4.6-haiku',
+        }
+      }
+      if (providers[provider]) {
+        const kinds = cds.env.requires.kinds
+        const newConfig = {
+          kind: provider,
+          impl: kinds[provider]?.impl ?? kinds['llm-' + provider]?.impl
+        }
+        if (model) newConfig.model = providers[provider][model] ?? model
+        cds.env.requires.llm = newConfig
+      }
+    }
+  // }
+// })
+
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.["@agent"]) return
