@@ -21,7 +21,7 @@
     "test": "CDS_ENV=test vitest run --config vitest.config.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
     "test:bookshop-evals": "CDS_ENV=test,hybrid cds bind --exec -- vitest run --config vitest.config.evals.js",
-    "test:goallab-evals": "cd samples/goallab-prediction-agent && CDS_ENV=test,hybrid cds bind --exec -- vitest run --config vitest.config.js",
+    "test:goallab-evals": "npm test --workspace=goallab-prediction-agent",
     "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
@@ -202,6 +202,6 @@
     "tests/samples/travel/travel-agent/",
     "tests/samples/travel/xflights/",
     "tests/samples/travel/leisure-services/",
-    "samples/goallab-prediction-agent/"
+    "goallab-prediction-agent/"
   ]
 }
