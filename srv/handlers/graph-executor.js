@@ -166,7 +166,9 @@ function extractInterruptDescription(resultOrErr) {
 function extractInterruptData(resultOrErr) {
   const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
   const payload = interrupt?.value
-  if (!payload || typeof payload !== "object") return undefined
+  // Plain objects only. Arrays (typeof [] === "object") and strings stay text-only
+  // so the wire shape matches the doc-comment and never surprises text-only clients.
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined
   return payload
 }
 
@@ -605,6 +607,9 @@ class GraphExecutor {
           const { Command } = await import("@langchain/langgraph")
           // DataPart present → carry its opaque .data as the resume value, bypassing
           // the text-regex parser. Otherwise fall back to the text path (backward-compatible).
+          // When BOTH a DataPart and text are sent, the DataPart wins unconditionally and
+          // the text is intentionally ignored — a structured resume is self-describing, so
+          // any accompanying text is treated as incidental (e.g. a human-readable echo).
           const resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
           const decision = decisionTypeOf(resume)
 

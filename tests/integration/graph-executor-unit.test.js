@@ -245,6 +245,13 @@ describe("firstDataPart", () => {
     expect(firstDataPart()).toBeUndefined()
   })
 
+  it("returns undefined for a nullish DataPart value (both wire shapes)", () => {
+    // A null payload is not a valid DataPart; must fall through to the text parser
+    // rather than being treated as a falsy-but-present resume value.
+    expect(firstDataPart([{ kind: "data", data: null }])).toBeUndefined()
+    expect(firstDataPart([{ content: { $case: "data", value: null } }])).toBeUndefined()
+  })
+
   it("returns the FIRST DataPart when several are present", () => {
     const parts = [
       { kind: "text", text: "hi" },
@@ -288,6 +295,12 @@ describe("extractInterruptData", () => {
 
   it("returns undefined for a string interrupt value", () => {
     expect(extractInterruptData({ __interrupt__: [{ value: "approve?" }] })).toBeUndefined()
+  })
+
+  it("returns undefined for an array interrupt value (arrays are not a plain object)", () => {
+    // typeof [] === "object", but an array payload must stay text-only to match the
+    // doc-comment contract and avoid silently changing the wire shape.
+    expect(extractInterruptData({ __interrupt__: [{ value: ["step1", "step2"] }] })).toBeUndefined()
   })
 
   it("returns undefined when no interrupt is present", () => {
@@ -351,7 +364,9 @@ describe("GraphExecutor - HITL DataPart resume", () => {
       fakeEventBus,
     )
 
-    // Command instances carry the resume value on `.resume`
+    // `Command` is passed as the graph INPUT (not config). `.resume` is a documented
+    // public field on the Command class (@langchain/langgraph constants.d.ts, serialized
+    // by toJSON), so asserting against it is stable — not a private-property gamble.
     expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
   })
 
@@ -373,6 +388,38 @@ describe("GraphExecutor - HITL DataPart resume", () => {
         taskId: "task-hitl-2",
         contextId: "ctx-hitl-2",
         userMessage: { parts: [{ kind: "text", text: "approve" }] },
+        task: { status: { state: "input-required" } },
+      },
+      fakeEventBus,
+    )
+
+    expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
+  })
+
+  it("prefers the DataPart and ignores accompanying text when both are present", async () => {
+    let capturedInput
+
+    const fakeGraph = {
+      checkpointer: {},
+      invoke: async (input) => {
+        capturedInput = input
+        return { messages: [{ content: "done" }] }
+      },
+    }
+
+    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+    await executor.execute(
+      {
+        taskId: "task-hitl-mixed",
+        contextId: "ctx-hitl-mixed",
+        // DataPart + text together — DataPart wins, text ("reject me") is intentionally dropped.
+        userMessage: {
+          parts: [
+            { kind: "text", text: "reject me" },
+            { kind: "data", data: { decisions: [{ type: "approve" }] } },
+          ],
+        },
         task: { status: { state: "input-required" } },
       },
       fakeEventBus,
