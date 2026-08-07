@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
-import { partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
+import { partsToText, buildChatMessages, firstDataPart } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
@@ -81,13 +81,17 @@ function defaultOutputMapper(result) {
 
 /**
  * Construct a spec-compliant A2A Message object.
+ * When `data` is a plain object, append an opaque DataPart alongside the TextPart
+ * so structured HITL clients receive the raw payload while plain clients keep the text.
  */
-function agentMessage(text) {
+function agentMessage(text, data) {
+  const parts = [{ kind: "text", text }]
+  if (data && typeof data === "object") parts.push({ kind: "data", data })
   return {
     kind: "message",
     messageId: cds.utils.uuid(),
     role: "agent",
-    parts: [{ kind: "text", text }],
+    parts,
   }
 }
 
@@ -99,14 +103,35 @@ function extractText(requestContext) {
 }
 
 /**
+ * Extract the first inbound DataPart's opaque `data` object, or undefined if none.
+ */
+function extractData(requestContext) {
+  return firstDataPart(requestContext.userMessage?.parts)
+}
+
+/**
  * Parse user's resume text into a HITL decision.
  * Maps to the format expected by deepagents' humanInTheLoopMiddleware.
  */
 function parseResumeDecision(userText) {
-  if (/^(approve|yes|confirm|ok)$/i.test(userText.trim())) {
+  const t = userText.trim()
+  if (/^(approve|yes|confirm|ok)$/i.test(t)) {
     return { decisions: [{ type: "approve" }] }
   }
+  if (/^edit$/i.test(t)) {
+    // Plain text cannot supply edited tool args; emit a bare edit decision.
+    // Structured edits (with args) realistically arrive via the DataPart path.
+    return { decisions: [{ type: "edit" }] }
+  }
   return { decisions: [{ type: "reject", message: userText }] }
+}
+
+/**
+ * Best-effort label of a resume value for logging/audit. The text path yields
+ * { decisions: [{ type }] }; an opaque DataPart resume is app-defined and may not.
+ */
+function decisionTypeOf(resume) {
+  return resume?.decisions?.[0]?.type ?? "data"
 }
 
 /**
@@ -129,6 +154,20 @@ function extractInterruptDescription(resultOrErr) {
   // Raw interrupt(value) - value is a string or object
   if (typeof payload === "string") return payload
   return JSON.stringify(payload)
+}
+
+/**
+ * Extract the raw structured interrupt payload for opaque carry on a DataPart.
+ * Returns the payload ONLY when it is a plain object (e.g. deepagents'
+ * { actionRequests, reviewConfigs }); returns undefined for string or absent
+ * payloads, which are carried by the TextPart alone. The plugin never
+ * interprets or validates the payload — it is app-defined.
+ */
+function extractInterruptData(resultOrErr) {
+  const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
+  const payload = interrupt?.value
+  if (!payload || typeof payload !== "object") return undefined
+  return payload
 }
 
 /**
@@ -555,17 +594,24 @@ class GraphExecutor {
         const t0 = Date.now()
 
         if (isResume) {
+          const dataPart = extractData(requestContext)
           const userText = extractText(requestContext)
-          if (!userText.trim()) {
-            throw new Error("Resume message must contain text (e.g. 'approve' or 'reject').")
+          // Relaxed guard: accept a DataPart-only resume OR non-empty text.
+          if (dataPart === undefined && !userText.trim()) {
+            throw new Error(
+              "Resume message must contain text (e.g. 'approve' or 'reject') or a data part.",
+            )
           }
           const { Command } = await import("@langchain/langgraph")
-          const resume = parseResumeDecision(userText)
+          // DataPart present → carry its opaque .data as the resume value, bypassing
+          // the text-regex parser. Otherwise fall back to the text path (backward-compatible).
+          const resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
+          const decision = decisionTypeOf(resume)
 
           LOG.debug("resuming", {
             task: short(taskId),
             service: serviceName,
-            decision: resume.decisions[0].type,
+            decision,
           })
 
           // Audit: task resumed with HITL decision
@@ -574,7 +620,7 @@ class GraphExecutor {
               taskId,
               contextId,
               service: serviceName,
-              decision: resume.decisions[0].type,
+              decision,
               userMessage: requestContext.userMessage,
             },
           })
@@ -610,6 +656,7 @@ class GraphExecutor {
 
         if (result?.__interrupt__?.length > 0) {
           const description = extractInterruptDescription(result)
+          const interruptData = extractInterruptData(result)
 
           const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
           LOG.info("input-required", { task: short(taskId), service: serviceName, duration })
@@ -633,7 +680,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "input-required",
-              message: agentMessage(description),
+              message: agentMessage(description, interruptData),
               timestamp: new Date().toISOString(),
             },
             final: true,
@@ -1077,4 +1124,12 @@ class GraphExecutor {
   }
 }
 
-export { GraphExecutor, messageText, defaultOutputMapper }
+export {
+  GraphExecutor,
+  messageText,
+  defaultOutputMapper,
+  agentMessage,
+  parseResumeDecision,
+  decisionTypeOf,
+  extractInterruptData,
+}
