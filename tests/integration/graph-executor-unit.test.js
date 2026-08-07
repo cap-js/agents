@@ -1,3 +1,5 @@
+import cds from "@sap/cds"
+
 const { GraphExecutor, messageText, defaultOutputMapper } =
   await import("../../srv/handlers/graph-executor.js")
 
@@ -41,180 +43,197 @@ describe("defaultOutputMapper", () => {
 })
 
 describe("GraphExecutor - configMapper", () => {
-  it("calls configMapper and spreads result into config.configurable", async () => {
-    let capturedConfig
+  const withCtx = (fn) => () => cds._with({}, fn)
 
-    const fakeGraph = {
-      checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+  it(
+    "calls configMapper and spreads result into config.configurable",
+    withCtx(async () => {
+      let capturedConfig
 
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: () => ({ myKey: "injected-value" }),
-      },
-    )
+      const fakeGraph = {
+        checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    await executor.execute(
-      {
-        taskId: "task-1",
-        contextId: "ctx-1",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: () => ({ myKey: "injected-value" }),
+        },
+      )
 
-    expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
-    expect(
-      capturedConfig.configurable.myKey,
-      "configMapper return value must appear in config.configurable",
-    ).toBe("injected-value")
-  })
+      await executor.execute(
+        {
+          taskId: "task-1",
+          contextId: "ctx-1",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-  it("reserved keys (thread_id, _taskId, _service) take precedence over configMapper", async () => {
-    let capturedConfig
+      expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
+      expect(
+        capturedConfig.configurable.myKey,
+        "configMapper return value must appear in config.configurable",
+      ).toBe("injected-value")
+    }),
+  )
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+  it(
+    "reserved keys (thread_id, _taskId, _service) take precedence over configMapper",
+    withCtx(async () => {
+      let capturedConfig
 
-    // configMapper must not be able to overwrite reserved keys — they must always be spread last
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: () => ({
-          thread_id: "HACKER",
-          _taskId: "HACKER",
-          _service: "HACKER",
-          safe: "allowed",
-        }),
-      },
-    )
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    await executor.execute(
-      {
-        taskId: "task-2",
-        contextId: "ctx-2",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      // configMapper must not be able to overwrite reserved keys — they must always be spread last
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: () => ({
+            thread_id: "HACKER",
+            _taskId: "HACKER",
+            _service: "HACKER",
+            safe: "allowed",
+          }),
+        },
+      )
 
-    expect(capturedConfig.configurable.thread_id).not.toBe("HACKER")
-    expect(capturedConfig.configurable._taskId).not.toBe("HACKER")
-    expect(capturedConfig.configurable._service).not.toBe("HACKER")
-    expect(capturedConfig.configurable.safe).toBe("allowed")
-  })
+      await executor.execute(
+        {
+          taskId: "task-2",
+          contextId: "ctx-2",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-  it("works without configMapper (no regression)", async () => {
-    let capturedConfig
+      expect(capturedConfig.configurable.thread_id).not.toBe("HACKER")
+      expect(capturedConfig.configurable._taskId).not.toBe("HACKER")
+      expect(capturedConfig.configurable._service).not.toBe("HACKER")
+      expect(capturedConfig.configurable.safe).toBe("allowed")
+    }),
+  )
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+  it(
+    "works without configMapper (no regression)",
+    withCtx(async () => {
+      let capturedConfig
 
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    await executor.execute(
-      {
-        taskId: "task-3",
-        contextId: "ctx-3",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
-    expect(capturedConfig?.configurable?.thread_id, "thread_id must be set").toBeTruthy()
-    expect(capturedConfig?.configurable?._taskId, "_taskId must be set").toBeTruthy()
-  })
+      await executor.execute(
+        {
+          taskId: "task-3",
+          contextId: "ctx-3",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-  it("async configMapper is awaited — its resolved values reach config.configurable", async () => {
-    let capturedConfig
+      expect(capturedConfig?.configurable?.thread_id, "thread_id must be set").toBeTruthy()
+      expect(capturedConfig?.configurable?._taskId, "_taskId must be set").toBeTruthy()
+    }),
+  )
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+  it(
+    "async configMapper is awaited — its resolved values reach config.configurable",
+    withCtx(async () => {
+      let capturedConfig
 
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: async () => ({ asyncKey: "async-value" }),
-      },
-    )
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    await executor.execute(
-      {
-        taskId: "task-4",
-        contextId: "ctx-4",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: async () => ({ asyncKey: "async-value" }),
+        },
+      )
 
-    expect(
-      capturedConfig.configurable.asyncKey,
-      "async configMapper value must be awaited and present in config.configurable",
-    ).toBe("async-value")
-  })
+      await executor.execute(
+        {
+          taskId: "task-4",
+          contextId: "ctx-4",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-  it("non-object return from configMapper fails the task with TypeError", async () => {
-    let publishedEvents = []
+      expect(
+        capturedConfig.configurable.asyncKey,
+        "async configMapper value must be awaited and present in config.configurable",
+      ).toBe("async-value")
+    }),
+  )
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async () => ({ messages: [{ content: "ok" }] }),
-    }
+  it(
+    "non-object return from configMapper fails the task with TypeError",
+    withCtx(async () => {
+      let publishedEvents = []
 
-    const capturingEventBus = {
-      publish: (e) => publishedEvents.push(e),
-      finished: () => {},
-    }
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => ({ messages: [{ content: "ok" }] }),
+      }
 
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: () => "not-an-object",
-      },
-    )
+      const capturingEventBus = {
+        publish: (e) => publishedEvents.push(e),
+        finished: () => {},
+      }
 
-    await executor.execute(
-      {
-        taskId: "task-5",
-        contextId: "ctx-5",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      capturingEventBus,
-    )
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: () => "not-an-object",
+        },
+      )
 
-    const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
-    expect(failedEvent, "a failed status event must have been published").toBeTruthy()
-    expect(failedEvent.status.message.parts[0].text).toMatch(
-      /configMapper must return a plain object/,
-    )
-  })
+      await executor.execute(
+        {
+          taskId: "task-5",
+          contextId: "ctx-5",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        capturingEventBus,
+      )
+
+      const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
+      expect(failedEvent, "a failed status event must have been published").toBeTruthy()
+      expect(failedEvent.status.message.parts[0].text).toMatch(
+        /configMapper must return a plain object/,
+      )
+    }),
+  )
 })

@@ -156,7 +156,7 @@ service CatalogService { ... }
 | -------------------------------- | -------------------------------------------------------------------------- | ------------------------ |
 | `cds.agents.contentFilter`       | Content filter (`true` = Azure defaults, object = custom, `false` = off)   | `true`                   |
 | `cds.agents.pushNotifications`   | Push notifications (`true` = enabled, `false` = disabled, object = config) | `true`                   |
-| `cds.agents.mlflow`              | MLflow Databricks tracing (`true` or `false`)                              | `false`                  |
+| `cds.agents.mlflow`              | MLflow tracing (`true` or `false`)                                         | `false`                  |
 | `cds.agents.per_action_tool`     | One tool per action (vs combined `call`)                                   | `true`                   |
 | `cds.agents.trace_langchain`     | Monkey-patch LangChain for tracing                                         | `true`                   |
 | `cds.agents.activeUsersInterval` | Schedule for `active_users` metric computation                             | `"24h"` (`0` to disable) |
@@ -496,9 +496,9 @@ Set `cds.agents.activeUsersInterval: 0` to disable automatic scheduling (manual 
 </details>
 
 <details>
-<summary>MLflow Databricks</summary>
+<summary>MLflow</summary>
 
-Export traces to [MLflow on Databricks](https://docs.databricks.com/en/mlflow3/genai/tracing/) for GenAI observability. The plugin adds `mlflow.*` span attributes to existing OTel spans so the MLflow OTLP ingestion endpoint assembles them into proper MLflow traces — no additional SDK required.
+Export traces to [MLflow](https://mlflow.org/docs/latest/llms/tracing/) for GenAI observability. The plugin adds `mlflow.*` span attributes to existing OTel spans so the MLflow OTLP ingestion endpoint assembles them into proper MLflow traces — no additional SDK required.
 
 The MLflow exporter is added as a **second span processor** alongside any existing exporter (Dynatrace, Cloud Logging, Grafana, etc.). Existing telemetry pipelines are not affected.
 
@@ -516,30 +516,42 @@ The MLflow exporter is added as a **second span processor** alongside any existi
 service CatalogService { ... }
 ```
 
-**Provide credentials** via a BTP user-provided service named `databricks-mlflow`:
+**Provide credentials** via a BTP user-provided service named `mlflow`:
 
 ```bash
-cf cups databricks-mlflow -p '{"DATABRICKS_HOST":"https://adb-xxx.azuredatabricks.net","DATABRICKS_TOKEN":"dapi...","MLFLOW_EXPERIMENT_ID":"123456789"}'
+cf cups mlflow -p '{"MLFLOW_HOST":"https://mlflow.example.com","MLFLOW_TOKEN":"...","MLFLOW_EXPERIMENT_ID":"123456789"}'
 ```
+
+Or, for **OAuth client credentials** authentication (recommended for production):
+
+```bash
+cf cups mlflow -p '{"url":"https://auth.example.com","clientid":"my-client","clientsecret":"...","MLFLOW_OTLP_ENDPOINT":"https://mlflow.example.com/v1/traces","MLFLOW_EXPERIMENT_ID":"123456789"}'
+```
+
+When `clientid`, `clientsecret`, and `url` are present, the plugin uses `@sap-cloud-sdk/connectivity` to fetch and cache OAuth tokens automatically — no manual token rotation required. Falls back to static `MLFLOW_TOKEN` when OAuth credentials are absent.
 
 The `@Core.SchemaVersion` annotation takes precedence over credentials. Since it's a CDS annotation, it can be overridden per feature toggle.
 
-The plugin reads credentials from `cds.env.requires["databricks-mlflow"].credentials` and adds a `BatchSpanProcessor` with an OTLP exporter pointed at the Databricks endpoint.
+The plugin reads credentials from `cds.env.requires["mlflow"].credentials` and adds a `BatchSpanProcessor` with an OTLP exporter pointed at the MLflow endpoint.
 
 **Credential reference:**
 
 | Key                    | Required | Description                                                                                  |
 | ---------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| `DATABRICKS_HOST`      | yes¹     | Databricks workspace URL (e.g. `https://adb-123.azuredatabricks.net`)                        |
-| `DATABRICKS_TOKEN`     | yes      | Databricks personal access token                                                             |
+| `MLFLOW_HOST`          | yes¹     | MLflow server URL (e.g. `https://mlflow.example.com`)                                        |
+| `MLFLOW_TOKEN`         | yes³     | Static bearer token / personal access token                                                  |
+| `clientid`             | yes³     | OAuth client ID                                                                              |
+| `clientsecret`         | yes³     | OAuth client secret                                                                          |
+| `url`                  | yes³     | OAuth token endpoint base URL                                                                |
 | `MLFLOW_EXPERIMENT_ID` | no       | Default MLflow experiment ID (overridden per service by `@Core.SchemaVersion`)               |
-| `MLFLOW_OTLP_ENDPOINT` | no       | Full OTLP traces URL — overrides the endpoint derived from `DATABRICKS_HOST`                 |
-| `UC_CATALOG`           | no²      | Unity Catalog catalog name for Azure Databricks UC trace storage (e.g. `main`)               |
+| `MLFLOW_OTLP_ENDPOINT` | no       | Full OTLP traces URL — overrides the endpoint derived from `MLFLOW_HOST`                     |
+| `UC_CATALOG`           | no²      | Unity Catalog catalog name for UC trace storage (e.g. `main`)                                |
 | `UC_SCHEMA`            | no²      | Unity Catalog schema name (e.g. `mlflow_traces`)                                             |
 | `UC_TABLE_PREFIX`      | no²      | Table prefix — traces are written to `<UC_CATALOG>.<UC_SCHEMA>.<UC_TABLE_PREFIX>_otel_spans` |
 
 ¹ Required unless `MLFLOW_OTLP_ENDPOINT` is set directly.  
-² All three UC keys must be set together to enable Unity Catalog trace storage. When set, the `X-Databricks-UC-Table-Name` header is added to every OTLP export request. See the [Azure Databricks UC trace storage docs](https://learn.microsoft.com/en-us/azure/databricks/mlflow3/genai/tracing/trace-unity-catalog#third-party-otel-client) for setup prerequisites.
+² All three UC keys must be set together to enable Unity Catalog trace storage. When set, the `X-Databricks-UC-Table-Name` header is added to every OTLP export request.  
+³ Either `MLFLOW_TOKEN` (static token) or `clientid` + `clientsecret` + `url` (OAuth) must be provided. OAuth takes precedence when both are present.
 
 **Span attributes added** (only when `cds.agents.mlflow` is truthy):
 

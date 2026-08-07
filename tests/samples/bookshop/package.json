@@ -32,7 +32,7 @@
       "[tracing]": {
         "mlflow": true
       },
-      "[databricks]": {
+      "[mlflow]": {
         "mlflow": true
       },
       "[hybrid]": {
@@ -93,10 +93,9 @@
             }
           }
         },
-        "databricks-mlflow": {
+        "mlflow": {
           "credentials": {
-            "DATABRICKS_HOST": "http://localhost:5678",
-            "DATABRICKS_TOKEN": "unused",
+            "MLFLOW_HOST": "http://localhost:5678",
             "MLFLOW_EXPERIMENT_ID": "0"
           }
         }
@@ -104,7 +103,7 @@
       "[production]": {
         "auth": "xsuaa"
       },
-      "[databricks]": {
+      "[mlflow]": {
         "audit-log": false,
         "telemetry": {
           "kind": "telemetry-to-console",

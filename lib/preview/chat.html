@@ -708,10 +708,12 @@
         const text = prompt.value.trim()
         if (!text || busy) return
 
-        // Save to input history
-        inputHistory.push(text)
-        if (inputHistory.length > 100) inputHistory.shift()
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(inputHistory))
+        // Save to input history (skip if same as last entry)
+        if (inputHistory[inputHistory.length - 1] !== text) {
+          inputHistory.push(text)
+          if (inputHistory.length > 100) inputHistory.shift()
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(inputHistory))
+        }
         historyIndex = -1
         currentDraft = ""
 
