@@ -12,10 +12,8 @@ import {
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
-import { getFilteredEntities, getFilteredActions, audit } from "../../lib/utils/utils.js"
+import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
-import * as metrics from "../../lib/telemetry/metrics.js"
-import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 
 const LOG = cds.log("agent")
 

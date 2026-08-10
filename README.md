@@ -7,12 +7,48 @@ CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) prot
 
 ## Prerequisites
 
-Access to an SAP AI Core instance:
+Access to an SAP AI Core instance via one of:
 
 - `AICORE_SERVICE_KEY` environment variable, or
-- Bound via `cds bind -2 <instance>`
+- Bound via `cds bind -2 <instance>`, or
+- Via a BTP Destination (see [Destination-Based Connectivity](#destination-based-connectivity) below)
 
 See [SAP Cloud SDK for AI](https://sap.github.io/ai-sdk/docs/js/connecting-to-ai-core) for details.
+
+### Destination-Based Connectivity
+
+When AI Core is not bound as a service instance but accessible through a BTP Destination (e.g., a central AI Core instance shared across subaccounts), configure `destinationName` in your CDS config:
+
+```jsonc
+// package.json or .cdsrc.json
+{
+  "cds": {
+    "requires": {
+      "[production]": {
+        "llm": {
+          "kind": "llm-aicore",
+          "destinationName": "my-aicore-destination",
+          "resourceGroup": "default",
+        },
+      },
+    },
+  },
+}
+```
+
+| Property          | Description                                      | Default                                   |
+| ----------------- | ------------------------------------------------ | ----------------------------------------- |
+| `destinationName` | Name of the BTP destination pointing to AI Core  | — (uses service binding)                  |
+| `resourceGroup`   | AI Core resource group for deployment resolution | `"default"` (when destinationName is set) |
+
+**BTP Destination setup:**
+
+- Type: HTTP
+- URL: `https://<aicore-host>.ml.hana.ondemand.com`
+- Authentication: OAuth2ClientCredentials (pointing to AI Core's XSUAA)
+- Additional property: `URL.headers.AI-Resource-Group` = `default`
+
+When `destinationName` is omitted, the plugin falls back to the standard service binding resolution (VCAP_SERVICES / `AICORE_SERVICE_KEY`).
 
 ## Getting Started
 
@@ -252,6 +288,20 @@ Push notifications are enabled by default. To disable:
 
 When configured, the agent rejects push notification registrations whose callback URL does not match an allowed domain. Subdomains are accepted (e.g. `api.mycompany.com` matches `mycompany.com`). If you need to accept additional domains beyond `cloud.sap`, add them to the `allowedDomains` array.
 
+**IAS authentication** — to attach an IAS bearer token to push notification requests, set `pushNotifications.ias.resource` to the target app name. Requires an SAP Identity service binding; falls back to unauthenticated delivery when unavailable.
+
+```jsonc
+{
+  "cds": {
+    "agents": {
+      "pushNotifications": {
+        "ias": { "resource": "my-target-app" },
+      },
+    },
+  },
+}
+```
+
 </details>
 
 ## Quota Enforcement
@@ -271,17 +321,18 @@ All limits are configured via `cds.env.agents.pool` (defaults provided by the pl
   "cds": {
     "agent": {
       "pool": {
-        "maxConcurrentTasks": 5,
-        "maxConcurrentTasksPerUser": 2,
+        "maxConcurrentTasks": 10,
+        "maxConcurrentTasksPerUser": 4,
         "maxTasksPerHour": 100,
         "maxTasksPerHourPerUser": 20,
         "maxLLMTokensPerDay": 5000000,
         "maxToolCallsPerHour": 1000,
         "maxToolCallsPerTask": 50,
-        "maxLLMInvocationsPerTask": 15,
+        "maxLLMInvocationsPerTask": 50,
         "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeoutMs": 120000,
-        "maxExecutionTimeMsPerTask": 300000,
+        "maxLLMCallTimeout": "120s",
+        "maxExecutionTimePerTask": "5min",
+        "timeoutGrace": "15s",
         "maxIncomingMessageLength": 5000
       }
     }
@@ -324,7 +375,7 @@ Content-Type: application/json
 | `maxLLMInvocationsPerTask`  | After each LLM call | Graph throws → task `failed` |
 | `maxLLMTokensPerTask`       | After each LLM call | Same                         |
 | `maxToolCallsPerTask`       | After each LLM call | Same                         |
-| `maxLLMCallTimeoutMs`       | Per LLM HTTP call   | Request aborted → error      |
+| `maxLLMCallTimeout`         | Per LLM HTTP call   | Request aborted → error      |
 | `maxExecutionTimeMsPerTask` | Timeout wrapper     | Graph throws → task `failed` |
 
 </details>
@@ -332,14 +383,14 @@ Content-Type: application/json
 <details>
 <summary>LLM Circuit Breaker</summary>
 
-Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](https://sap.github.io/cloud-sdk/docs/js/guides/resilience#circuit-breaker)) and a per-call timeout (`maxLLMCallTimeoutMs`, default 30s). This prevents cascading failures when the LLM backend is degraded.
+Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](https://sap.github.io/cloud-sdk/docs/js/guides/resilience#circuit-breaker)) and a per-call timeout (`maxLLMCallTimeout`, default 120s). This prevents cascading failures when the LLM backend is degraded.
 
-| Parameter        | Value                               | Description                                   |
-| ---------------- | ----------------------------------- | --------------------------------------------- |
-| Timeout          | `maxLLMCallTimeoutMs` (30s default) | Individual HTTP call timeout                  |
-| Error threshold  | 50%                                 | Opens breaker if ≥50% of calls fail in window |
-| Volume threshold | 10                                  | Minimum calls in window before evaluating     |
-| Reset timeout    | 30s                                 | Time before half-open test request            |
+| Parameter        | Value                              | Description                                   |
+| ---------------- | ---------------------------------- | --------------------------------------------- |
+| Timeout          | `maxLLMCallTimeout` (120s default) | Individual HTTP call timeout                  |
+| Error threshold  | 50%                                | Opens breaker if ≥50% of calls fail in window |
+| Volume threshold | 10                                 | Minimum calls in window before evaluating     |
+| Reset timeout    | 30s                                | Time before half-open test request            |
 
 **Behavior:**
 
@@ -431,9 +482,9 @@ The plugin provides its own OpenTelemetry instrumentation — no external tracin
 ```
 POST /a2a/CatalogService/
   └─ workflow CompiledStateGraph CatalogService
-       ├─ chat anthropic--claude-4.5-sonnet
+       ├─ chat anthropic--claude-4.6-sonnet
        ├─ execute_tool DynamicStructuredTool query
-       ├─ chat anthropic--claude-4.5-sonnet
+       ├─ chat anthropic--claude-4.6-sonnet
        └─ execute_tool DynamicStructuredTool submitOrder
 ```
 

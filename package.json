@@ -2,8 +2,13 @@
   "name": "@cap-js/agents",
   "version": "0.1.0",
   "description": "CDS plugin for building agents",
+  "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
   "homepage": "https://cap.cloud.sap/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cap-js/agents.git"
+  },
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -36,7 +41,8 @@
     "index.cds",
     "lib",
     "srv",
-    "cds-plugin.js"
+    "cds-plugin.js",
+    "_i18n"
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
@@ -52,6 +58,7 @@
     "@sap-cloud-sdk/resilience": "^4.7.0",
     "deepagents": "^1.10.0",
     "langchain": "^1.5.0",
+    "marked": "^18",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -144,7 +151,7 @@
         "maxToolCallsPerTask": 50,
         "maxLLMInvocationsPerTask": 50,
         "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeoutMs": 120000,
+        "maxLLMCallTimeout": "120s",
         "maxExecutionTimePerTask": "5min",
         "timeoutGrace": "15s",
         "maxIncomingMessageLength": 5000

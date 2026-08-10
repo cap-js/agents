@@ -5,7 +5,7 @@ import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
-import { convertUsageData, setTokenUsage } from "../../lib/telemetry/chat-tracing.js"
+import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 
 const LOG = cds.log("agent")
 
@@ -194,9 +194,12 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const timeout = cds.env.agents?.pool?.maxExecutionTimeMsPerTask || 300_000
+    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const grace = this._getGrace()
+    const softTimeout = Math.max(maxExecution - grace, 1000)
+
     const controller = new AbortController()
-    const timeoutHandle = setTimeout(() => controller.abort(), timeout)
+    const timeoutHandle = setTimeout(() => controller.abort(), softTimeout)
     const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
 
     let tokenCount = 0
@@ -306,7 +309,9 @@ class GraphExecutor {
         if (signal?.aborted) {
           throw new AbortError("Task execution aborted")
         }
-        throw new Error(`Graph execution timed out after ${timeout / 1000}s`, { cause: err })
+        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
+          timeout: softTimeout,
+        })
       }
       throw err
     } finally {
@@ -573,7 +578,7 @@ class GraphExecutor {
         if (isResume) {
           const userText = extractText(requestContext)
           if (!userText.trim()) {
-            throw new Error("Resume message must contain text (e.g. 'approve' or 'reject').")
+            throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
           }
           const { Command } = await import("@langchain/langgraph")
           const resume = parseResumeDecision(userText)

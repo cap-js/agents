@@ -23,7 +23,7 @@
 - OpenTelemetry metrics for LLM token consumption, tool invocations, agent requests, request duration, errors, concurrent executions and completed workflows as well as agent_actions (per agent node invocation / LLM call) & active_users
 - Quota enforcement via `cds.agents.pool` to restrict the amount of tokens consumed, tasks run, Tool calls, max message length send by the client and LLM calls being made via middleware (`afterModel` hook). Shared between react agents and deep agents via `buildMiddleware` event.
 - Immutable audit trail via `@cap-js/audit-logging` recording agent decisions, tool invocations, task lifecycle events, and quota breaches as SecurityEvents for forensic analysis and replay
-- Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agents.pool.maxLLMCallTimeoutMs` (default 30s).
+- Circuit breaker and per-call timeout for LLM requests via `@sap-cloud-sdk/resilience`. Configurable timeout via `cds.agents.pool.maxLLMCallTimeout` (default 120s).
 - Content filtering with Azure Content Safety prompt injection shield via `cds.agents.contentFilter` (default: `true`) via middleware. Per-service override via `buildContentFilter` event handler. Works for MD and react agents.
 - Support export to MLFlow via `cds.agents.mlflow`. By default disabled. Exporter credentials are read from `cds.env.requires["mlflow"]`.
 - Agent Tasks and Checkpoints can only be accessed by the user who created it
