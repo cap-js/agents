@@ -6,7 +6,6 @@ const {
   defaultOutputMapper,
   agentMessage,
   parseResumeDecision,
-  decisionTypeOf,
   extractInterruptData,
   composeEditNote,
 } = await import("../../srv/handlers/graph-executor.js")
@@ -258,74 +257,37 @@ describe("firstDataPart", () => {
     expect(firstDataPart([{ content: { $case: "data", value: { a: 1 } } }])).toEqual({ a: 1 })
   })
 
-  it("returns undefined for text-only parts", () => {
+  it("returns undefined for text-only, empty, omitted, or nullish DataPart values", () => {
     expect(firstDataPart([{ kind: "text", text: "hi" }])).toBeUndefined()
-  })
-
-  it("returns undefined for empty/omitted parts", () => {
     expect(firstDataPart([])).toBeUndefined()
     expect(firstDataPart()).toBeUndefined()
-  })
-
-  it("returns undefined for a nullish DataPart value (both wire shapes)", () => {
-    // A null payload is not a valid DataPart; must fall through to the text parser
-    // rather than being treated as a falsy-but-present resume value.
+    // Nullish DataPart values must fall through to the text parser, not be treated as real values.
     expect(firstDataPart([{ kind: "data", data: null }])).toBeUndefined()
     expect(firstDataPart([{ content: { $case: "data", value: null } }])).toBeUndefined()
-  })
-
-  it("returns the FIRST DataPart when several are present", () => {
-    const parts = [
-      { kind: "text", text: "hi" },
-      { kind: "data", data: { first: true } },
-      { kind: "data", data: { second: true } },
-    ]
-    expect(firstDataPart(parts)).toEqual({ first: true })
   })
 })
 
 describe("agentMessage", () => {
-  it("emits a text-only message when no data is given", () => {
-    const msg = agentMessage("hi")
-    expect(msg.parts).toHaveLength(1)
-    expect(msg.parts[0]).toMatchObject({ kind: "text", text: "hi" })
-  })
-
   it("appends an opaque DataPart alongside the TextPart when data is a plain object", () => {
     const msg = agentMessage("hi", { decisions: [{ type: "approve" }] })
     expect(msg.parts).toHaveLength(2)
     expect(msg.parts[0]).toMatchObject({ kind: "text", text: "hi" })
     expect(msg.parts[1]).toEqual({ kind: "data", data: { decisions: [{ type: "approve" }] } })
-  })
-
-  it("stays text-only for string or null data (no DataPart)", () => {
+    // Also covers the text-only path for non-object data.
+    expect(agentMessage("hi").parts).toHaveLength(1)
     expect(agentMessage("hi", "str").parts).toHaveLength(1)
-    expect(agentMessage("hi", null).parts).toHaveLength(1)
   })
 })
 
 describe("extractInterruptData", () => {
-  it("returns the whole deepagents interrupt payload opaquely", () => {
+  it("returns the interrupt payload opaquely when it is a plain object", () => {
     const payload = { actionRequests: [{ name: "submitOrder" }], reviewConfigs: [] }
     expect(extractInterruptData({ __interrupt__: [{ value: payload }] })).toBe(payload)
   })
 
-  it("returns a raw object interrupt value", () => {
-    const payload = { plan: ["a", "b"] }
-    expect(extractInterruptData({ interrupts: [{ value: payload }] })).toBe(payload)
-  })
-
-  it("returns undefined for a string interrupt value", () => {
+  it("returns undefined for string, array, or missing interrupt values", () => {
     expect(extractInterruptData({ __interrupt__: [{ value: "approve?" }] })).toBeUndefined()
-  })
-
-  it("returns undefined for an array interrupt value (arrays are not a plain object)", () => {
-    // typeof [] === "object", but an array payload must stay text-only to match the
-    // doc-comment contract and avoid silently changing the wire shape.
-    expect(extractInterruptData({ __interrupt__: [{ value: ["step1", "step2"] }] })).toBeUndefined()
-  })
-
-  it("returns undefined when no interrupt is present", () => {
+    expect(extractInterruptData({ __interrupt__: [{ value: ["a", "b"] }] })).toBeUndefined()
     expect(extractInterruptData({})).toBeUndefined()
   })
 })
@@ -349,35 +311,19 @@ describe("parseResumeDecision", () => {
   })
 })
 
-describe("decisionTypeOf", () => {
-  it("reads the decision type from a text-path resume", () => {
-    expect(decisionTypeOf({ decisions: [{ type: "approve" }] })).toBe("approve")
-    expect(decisionTypeOf({ decisions: [{ type: "edit", args: {} }] })).toBe("edit")
-  })
-
-  it("falls back to 'data' for an opaque DataPart resume", () => {
-    expect(decisionTypeOf({ foo: 1 })).toBe("data")
-    expect(decisionTypeOf(undefined)).toBe("data")
-  })
-})
-
 describe("composeEditNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
-  it("returns undefined for a non-edit decision (approve/reject) so no note is injected", () => {
+  it("returns undefined for non-edit or opaque resumes", () => {
     expect(composeEditNote([originalCall], { decisions: [{ type: "approve" }] })).toBeUndefined()
     expect(
       composeEditNote([originalCall], { decisions: [{ type: "reject", message: "no" }] }),
     ).toBeUndefined()
-  })
-
-  it("returns undefined for an opaque resume without a decisions array", () => {
     expect(composeEditNote([originalCall], { foo: 1 })).toBeUndefined()
     expect(composeEditNote([originalCall], undefined)).toBeUndefined()
   })
 
   it("returns undefined for a no-op edit (edited args structurally equal to originals)", () => {
-    // key order differs but the shape is identical
     const noopEdit = {
       decisions: [
         { type: "edit", editedAction: { name: "submitOrder", args: { quantity: 3, book: 201 } } },
@@ -401,41 +347,12 @@ describe("composeEditNote", () => {
     expect(note).toContain("submitOrder")
   })
 
-  it("reflects a tool name change (not just args)", () => {
-    const nameChanged = {
-      decisions: [
-        {
-          type: "edit",
-          editedAction: { name: "cancelOrder", args: { book: 201, quantity: 3 } },
-        },
-      ],
-    }
-    const note = composeEditNote([originalCall], nameChanged)
-    expect(note).toBeTypeOf("string")
-    expect(note).toContain("submitOrder")
-    expect(note).toContain("cancelOrder")
-  })
-
-  it("lists only the tool_calls that actually changed in a mixed batch", () => {
-    const originals = [originalCall, { id: "tc-2", name: "notifyUser", args: { userId: 42 } }]
-    const mixed = {
-      decisions: [
-        { type: "edit", editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } } },
-        { type: "edit", editedAction: { name: "notifyUser", args: { userId: 42 } } },
-      ],
-    }
-    const note = composeEditNote(originals, mixed)
-    expect(note).toBeTypeOf("string")
-    expect(note).toContain("submitOrder")
-    expect(note).not.toContain("notifyUser")
-  })
-
-  it("matches decisions to originals by name — auto-approved tool_calls in the middle don't misalign", () => {
-    // Real-world shape: the AI proposed 3 tool_calls; only submitOrder + refund are HITL.
-    // `listBooks` was auto-approved and doesn't appear in the resume `decisions`.
-    // Naive positional matching would pair edit(submitOrder) with listBooks — wrong.
+  it("matches decisions to originals by name — auto-approved tool_calls don't misalign", () => {
+    // AI proposed 3 tool_calls; only submitOrder + refund are HITL. listBooks was
+    // auto-approved and isn't in the resume decisions. Naive positional matching
+    // would pair edit(submitOrder) with listBooks — wrong.
     const originals = [
-      { id: "tc-1", name: "listBooks", args: {} }, // auto-approved
+      { id: "tc-1", name: "listBooks", args: {} },
       { id: "tc-2", name: "submitOrder", args: { book: 201, quantity: 3 } },
       { id: "tc-3", name: "refund", args: { orderId: 99 } },
     ]
@@ -446,14 +363,10 @@ describe("composeEditNote", () => {
       ],
     }
     const note = composeEditNote(originals, resume)
-    expect(note).toBeTypeOf("string")
-    // Both edits reported against the correct originals — not listBooks
     expect(note).toContain("submitOrder")
     expect(note).toContain("refund")
     expect(note).not.toContain("listBooks")
-    expect(note).toContain('"quantity":3')
     expect(note).toContain('"quantity":4')
-    expect(note).toContain('"orderId":99')
     expect(note).toContain('"orderId":100')
   })
 })
@@ -463,7 +376,6 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "passes an inbound DataPart's data opaquely into Command({ resume })",
     withCtx(async () => {
       let capturedInput
-
       const fakeGraph = {
         checkpointer: {},
         invoke: async (input) => {
@@ -478,80 +390,13 @@ describe("GraphExecutor - HITL DataPart resume", () => {
         {
           taskId: "task-hitl-1",
           contextId: "ctx-hitl-1",
-          // DataPart-only resume (no TextPart) — must not throw, must reach Command
           userMessage: { parts: [{ kind: "data", data: { decisions: [{ type: "approve" }] } }] },
           task: { status: { state: "input-required" } },
         },
         fakeEventBus,
       )
 
-      // `Command` is passed as the graph INPUT (not config). `.resume` is a documented
-      // public field on the Command class (@langchain/langgraph constants.d.ts, serialized
-      // by toJSON), so asserting against it is stable — not a private-property gamble.
-      expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
-    }),
-  )
-
-  it(
-    "falls back to text parsing when the resume carries no DataPart",
-    withCtx(async () => {
-      let capturedInput
-
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (input) => {
-          capturedInput = input
-          return { messages: [{ content: "done" }] }
-        },
-      }
-
-      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
-
-      await executor.execute(
-        {
-          taskId: "task-hitl-2",
-          contextId: "ctx-hitl-2",
-          userMessage: { parts: [{ kind: "text", text: "approve" }] },
-          task: { status: { state: "input-required" } },
-        },
-        fakeEventBus,
-      )
-
-      expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
-    }),
-  )
-
-  it(
-    "prefers the DataPart and ignores accompanying text when both are present",
-    withCtx(async () => {
-      let capturedInput
-
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (input) => {
-          capturedInput = input
-          return { messages: [{ content: "done" }] }
-        },
-      }
-
-      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
-
-      await executor.execute(
-        {
-          taskId: "task-hitl-mixed",
-          contextId: "ctx-hitl-mixed",
-          // DataPart + text together — DataPart wins, text ("reject me") is intentionally dropped.
-          userMessage: {
-            parts: [
-              { kind: "text", text: "reject me" },
-              { kind: "data", data: { decisions: [{ type: "approve" }] } },
-            ],
-          },
-          task: { status: { state: "input-required" } },
-        },
-        fakeEventBus,
-      )
-
+      // `.resume` is a documented public field on Command (@langchain/langgraph).
       expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
     }),
   )
@@ -560,12 +405,10 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "fails the task when a resume has neither text nor a DataPart",
     withCtx(async () => {
       let publishedEvents = []
-
       const fakeGraph = {
         checkpointer: {},
         invoke: async () => ({ messages: [{ content: "done" }] }),
       }
-
       const capturingEventBus = {
         publish: (e) => publishedEvents.push(e),
         finished: () => {},

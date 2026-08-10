@@ -80,11 +80,7 @@ function defaultOutputMapper(result) {
   return JSON.stringify(result)
 }
 
-/**
- * Construct a spec-compliant A2A Message object.
- * When `data` is a plain object, append an opaque DataPart alongside the TextPart
- * so structured HITL clients receive the raw payload while plain clients keep the text.
- */
+// Construct a spec-compliant A2A Message; when `data` is a plain object, append it as a DataPart.
 function agentMessage(text, data) {
   const parts = [{ kind: "text", text }]
   if (data && typeof data === "object") parts.push({ kind: "data", data })
@@ -103,9 +99,7 @@ function extractText(requestContext) {
   return partsToText(requestContext.userMessage?.parts)
 }
 
-/**
- * Extract the first inbound DataPart's opaque `data` object, or undefined if none.
- */
+// Extract the first inbound DataPart's opaque `data` object, or undefined if none.
 function extractData(requestContext) {
   return firstDataPart(requestContext.userMessage?.parts)
 }
@@ -120,17 +114,13 @@ function parseResumeDecision(userText) {
     return { decisions: [{ type: "approve" }] }
   }
   if (/^edit$/i.test(t)) {
-    // Plain text cannot supply edited tool args; emit a bare edit decision.
-    // Structured edits (with args) realistically arrive via the DataPart path.
+    // Bare edit — structured edits (with args) arrive via the DataPart path.
     return { decisions: [{ type: "edit" }] }
   }
   return { decisions: [{ type: "reject", message: userText }] }
 }
 
-/**
- * Best-effort label of a resume value for logging/audit. The text path yields
- * { decisions: [{ type }] }; an opaque DataPart resume is app-defined and may not.
- */
+// Best-effort decision label for logging/audit; opaque DataPart resumes fall back to "data".
 function decisionTypeOf(resume) {
   return resume?.decisions?.[0]?.type ?? "data"
 }
@@ -159,16 +149,13 @@ function extractInterruptDescription(resultOrErr) {
 
 /**
  * Extract the raw structured interrupt payload for opaque carry on a DataPart.
- * Returns the payload ONLY when it is a plain object (e.g. deepagents'
- * { actionRequests, reviewConfigs }); returns undefined for string or absent
- * payloads, which are carried by the TextPart alone. The plugin never
- * interprets or validates the payload — it is app-defined.
+ * Returns the payload ONLY when it is a plain object; arrays and strings are
+ * carried by the TextPart alone. Payload is app-defined; the plugin never
+ * interprets it.
  */
 function extractInterruptData(resultOrErr) {
   const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
   const payload = interrupt?.value
-  // Plain objects only. Arrays (typeof [] === "object") and strings stay text-only
-  // so the wire shape matches the doc-comment and never surprises text-only clients.
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined
   return payload
 }
@@ -704,11 +691,8 @@ class GraphExecutor {
             throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
           }
           const { Command } = await import("@langchain/langgraph")
-          // DataPart present → carry its opaque .data as the resume value, bypassing
-          // the text-regex parser. Otherwise fall back to the text path (backward-compatible).
-          // When BOTH a DataPart and text are sent, the DataPart wins unconditionally and
-          // the text is intentionally ignored — a structured resume is self-describing, so
-          // any accompanying text is treated as incidental (e.g. a human-readable echo).
+          // DataPart wins over text — a structured resume is self-describing and any
+          // accompanying text is treated as incidental (e.g. a human-readable echo).
           const resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
           const decision = decisionTypeOf(resume)
 

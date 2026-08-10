@@ -1,10 +1,4 @@
-// Hybrid smoke test: HITL DataPart carry (issue #199)
-//
-// Exercises the full suspend → DataPart resume round-trip against a real LLM:
-//   1. Trigger a message that causes the agent to call `submitOrder` (annotated @agent.hitl)
-//   2. Assert the input-required response carries BOTH a TextPart and a DataPart
-//   3. Resume with a structured DataPart ({ decisions: [{ type: "approve" }] })
-//   4. Assert the task completes (rather than misrouting to reject)
+// Hybrid smoke test: HITL DataPart carry (issue #199) — full suspend → resume round-trip vs. real LLM.
 
 import path from "node:path"
 import cds from "@sap/cds"
