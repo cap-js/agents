@@ -1,0 +1,37 @@
+{
+  "name": "agent-mtx-app",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@cap-js/agents": "file:../../../.",
+    "@cap-js/sqlite": ">=1",
+    "@sap/cds": ">=8",
+    "@sap/cds-mtxs": ">=2"
+  },
+  "cds": {
+    "agents": {
+      "activeUsersInterval": "1s"
+    },
+    "requires": {
+      "toggles": true,
+      "extensibility": false,
+      "[with-mtx]": {
+        "multitenancy": true
+      },
+      "auth": {
+        "kind": "mocked",
+        "users": {
+          "alice": {
+            "features": [
+              "experimental"
+            ]
+          },
+          "bob": {
+            "features": []
+          }
+        }
+      }
+    },
+    "profile": "with-mtx-sidecar"
+  }
+}

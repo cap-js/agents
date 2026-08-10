@@ -1,0 +1,997 @@
+<!doctype html>
+<html>
+  <head>
+    <title>{{agentName}}</title>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark light" />
+    <style>
+      body {
+        font-family:
+          Avenir Next,
+          sans-serif;
+        margin: 0;
+        background: #f8fbff;
+        color: #2a3d52;
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+      }
+
+      header {
+        background: #537492;
+        color: #fff;
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+      header h1 {
+        font-size: 1rem;
+        font-weight: 500;
+        margin: 0;
+      }
+      header .back {
+        color: #c8def0;
+        text-decoration: none;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      header .back:hover {
+        color: #fff;
+      }
+      .header-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        color: #c8def0;
+        cursor: pointer;
+        user-select: none;
+        flex-shrink: 0;
+      }
+      .header-toggle input[type="checkbox"] {
+        accent-color: #7fbce8;
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+      }
+
+      header .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4caf50;
+        margin-left: auto;
+        flex-shrink: 0;
+        transition: background 0.3s;
+      }
+      header .status-dot.busy {
+        background: #f9a825;
+      }
+      header .status-dot.error {
+        background: #e53935;
+      }
+
+      table thead {
+        text-align: left;
+      }
+      table {
+        border-spacing: 1em 0.2em;
+        margin: 1em 0;
+      }
+
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .msg {
+        max-width: 75%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        line-height: 1.5;
+        font-size: 90%;
+        word-break: break-word;
+      }
+      .msg.user {
+        align-self: flex-end;
+        background: #537492;
+        color: #fff;
+        border-bottom-right-radius: 3px;
+        white-space: pre-wrap;
+      }
+      .msg.agent {
+        align-self: flex-start;
+        background: #d0e9ff;
+        color: #1d3e5a;
+        border-bottom-left-radius: 3px;
+      }
+      .msg.error {
+        align-self: flex-start;
+        background: #fde8e8;
+        color: #b71c1c;
+        border-bottom-left-radius: 3px;
+        white-space: pre-wrap;
+      }
+      .msg.approval {
+        align-self: flex-start;
+        background: #d0e9ff;
+        color: #1d3e5a;
+        border-bottom-left-radius: 3px;
+        border-left: 3px solid #537492;
+      }
+      .msg.approval::before {
+        content: "Action Required";
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #537492;
+        margin-bottom: 6px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .msg.agent p {
+        margin: 0 0 6px;
+      }
+      .msg.agent p:last-child {
+        margin-bottom: 0;
+      }
+      .msg.agent h1,
+      .msg.agent h2,
+      .msg.agent h3 {
+        font-weight: 600;
+        margin: 8px 0 4px;
+      }
+      .msg.agent h1 {
+        font-size: 1.1em;
+      }
+      .msg.agent h2 {
+        font-size: 1em;
+      }
+      .msg.agent h3 {
+        font-size: 0.95em;
+      }
+      .msg.agent ul,
+      .msg.agent ol {
+        margin: 4px 0 6px 18px;
+        padding: 0;
+      }
+      .msg.agent li {
+        margin-bottom: 2px;
+      }
+      .msg.agent pre {
+        background: rgba(0, 0, 0, 0.08);
+        border-radius: 6px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        margin: 6px 0;
+        white-space: pre;
+      }
+      .msg.agent code {
+        font-family: ui-monospace, "Cascadia Code", monospace;
+        font-size: 0.85em;
+        background: rgba(0, 0, 0, 0.08);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+      .msg.agent pre code {
+        background: none;
+        padding: 0;
+        font-size: 0.82em;
+      }
+      .msg.agent a {
+        color: inherit;
+        text-decoration: underline;
+      }
+      .msg.agent hr {
+        border: none;
+        border-top: 1px solid rgba(0, 0, 0, 0.15);
+        margin: 8px 0;
+      }
+
+      .typing {
+        align-self: flex-start;
+        padding: 10px 16px;
+        background: #d0e9ff;
+        border-radius: 12px;
+        border-bottom-left-radius: 3px;
+        display: none;
+      }
+      .typing span {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        background: #537492;
+        border-radius: 50%;
+        animation: bounce 1.2s infinite;
+      }
+      .typing span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .typing span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: translateY(0);
+        }
+        40% {
+          transform: translateY(-6px);
+        }
+      }
+
+      .status-text {
+        font-size: 0.78rem;
+        color: #6a8fa8;
+        padding: 2px 12px;
+        font-style: italic;
+      }
+
+      #input-row {
+        display: flex;
+        gap: 10px;
+        padding: 14px 20px;
+        border-top: 1px solid #c8d9e8;
+        background: #f8fbff;
+        flex-shrink: 0;
+      }
+
+      #prompt {
+        flex: 1;
+        padding: 10px 14px;
+        border: 1px solid #91adc5;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        resize: none;
+        outline: none;
+        background: #fff;
+        color: inherit;
+        line-height: 1.4;
+        max-height: 140px;
+        overflow-y: auto;
+      }
+      #prompt:focus {
+        border-color: #537492;
+      }
+
+      #send {
+        align-self: flex-end;
+        padding: 10px 20px;
+        background: #537492;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.9rem;
+        transition: background 0.15s;
+      }
+      #send:hover:not(:disabled) {
+        background: #3e5a73;
+      }
+      #send:disabled {
+        background: #91adc5;
+        cursor: not-allowed;
+      }
+      #send.cancel {
+        background: #e53935;
+      }
+      #send.cancel:hover {
+        background: #c62828;
+      }
+
+      .approval-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .approval-actions button {
+        padding: 7px 18px;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: background 0.15s;
+      }
+      .btn-approve {
+        background: #537492;
+        color: #fff;
+      }
+      .btn-approve:hover {
+        background: #3e5a73;
+      }
+      .btn-reject {
+        background: transparent;
+        color: #537492;
+        border: 1px solid #91adc5;
+      }
+      .btn-reject:hover {
+        background: #c8d9e8;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #0a2138;
+          color: #c8dff0;
+        }
+        header {
+          background: #304c65;
+        }
+        #input-row {
+          background: #0a2138;
+          border-color: #2a4a63;
+        }
+        #prompt {
+          background: #0f2d45;
+          border-color: #2a4a63;
+          color: #c8dff0;
+        }
+        #prompt:focus {
+          border-color: #537492;
+        }
+        .msg.agent {
+          background: #1a3d58;
+          color: #c8dff0;
+        }
+        .msg.user {
+          background: #537492;
+        }
+        .msg.error {
+          background: #3b1818;
+          color: #ff8a80;
+        }
+        .typing {
+          background: #1a3d58;
+        }
+        .typing span {
+          background: #91adc5;
+        }
+        #send {
+          background: #537492;
+        }
+        #send:hover:not(:disabled) {
+          background: #6a8fa8;
+        }
+        #send:disabled {
+          background: #304c65;
+        }
+        #send.cancel {
+          background: #e53935;
+        }
+        #send.cancel:hover {
+          background: #ef5350;
+        }
+        .msg.approval {
+          background: #1a3d58;
+          color: #c8dff0;
+          border-left-color: #91adc5;
+        }
+        .msg.approval::before {
+          color: #91adc5;
+        }
+        .btn-approve {
+          background: #537492;
+        }
+        .btn-approve:hover {
+          background: #6a8fa8;
+        }
+        .btn-reject {
+          color: #c8dff0;
+          border-color: #2a4a63;
+        }
+        .btn-reject:hover {
+          background: #0f2d45;
+        }
+      }
+    </style>
+    <script src="marked.min.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="back" id="back" title="Back to index">&#8592;</a>
+      <h1>{{agentName}}</h1>
+      <label class="header-toggle" title="Stream tokens as they arrive">
+        <input type="checkbox" id="streamToggle" checked />
+        Token Streaming
+      </label>
+      <label class="header-toggle" title="Deliver results via push notifications">
+        <input type="checkbox" id="push-mode" checked />
+        Push notifications
+      </label>
+      <div class="status-dot" id="dot"></div>
+    </header>
+
+    <div id="messages">
+      <div class="typing" id="typing"><span></span><span></span><span></span></div>
+      <div class="status-text" id="status-text"></div>
+    </div>
+
+    <div id="input-row">
+      <textarea id="prompt" rows="1" placeholder="Message {{agentName}}…" autofocus></textarea>
+      <button id="send">Send</button>
+    </div>
+
+    <script>
+      const AGENT_URL = window.location.pathname.replace(/\/preview\/?$/, "") + "/"
+      document.getElementById("back").addEventListener("click", () => history.back())
+      const messages = document.getElementById("messages")
+      const typing = document.getElementById("typing")
+      const statusText = document.getElementById("status-text")
+      const prompt = document.getElementById("prompt")
+      const sendBtn = document.getElementById("send")
+      const dot = document.getElementById("dot")
+      const streamToggle = document.getElementById("streamToggle")
+
+      let busy = false
+      let contextId = null
+      let pendingTaskId = null
+      let activeTaskId = null
+      let activeAbort = null
+      // Live streaming bubble: created on first token, updated incrementally
+      let streamingBubble = null
+      let streamingText = ""
+
+      let pushMode = false
+      let pushSessionId = null
+      let pushEventSource = null
+
+      const HISTORY_KEY = "chatHistory_" + AGENT_URL
+      let inputHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]")
+      let historyIndex = -1
+      let currentDraft = ""
+
+      const md = (text) => marked.parse(text, { breaks: true, gfm: true })
+
+      const partsToText = (parts) =>
+        (parts ?? [])
+          .filter((p) => p.kind === "text" || p.text)
+          .map((p) => p.text)
+          .join("")
+
+      // Push notification mode toggle
+      const pushModeCheckbox = document.getElementById("push-mode")
+      pushModeCheckbox.addEventListener("change", (e) => {
+        pushMode = e.target.checked
+        if (pushMode) {
+          pushSessionId = crypto.randomUUID()
+          const baseUrl =
+            window.location.origin + window.location.pathname.replace(/\/preview\/?$/, "")
+          const bridgeUrl = baseUrl + "/preview/push/" + pushSessionId
+          pushEventSource = new EventSource(bridgeUrl)
+          pushEventSource.onmessage = (e) => {
+            const task = JSON.parse(e.data)
+            handlePushNotification(task)
+          }
+        } else {
+          pushEventSource?.close()
+          pushEventSource = null
+          pushSessionId = null
+        }
+      })
+      pushModeCheckbox.dispatchEvent(new Event("change"))
+      window.addEventListener("beforeunload", () => {
+        pushEventSource?.close()
+      })
+
+      prompt.addEventListener("input", () => {
+        prompt.style.height = "auto"
+        prompt.style.height = Math.min(prompt.scrollHeight, 140) + "px"
+      })
+      prompt.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault()
+          if (busy) cancel()
+          else send()
+        } else if (e.key === "ArrowUp" && prompt.selectionStart === 0) {
+          e.preventDefault()
+          if (historyIndex === -1) currentDraft = prompt.value
+          if (historyIndex < inputHistory.length - 1) {
+            historyIndex++
+            prompt.value = inputHistory[inputHistory.length - 1 - historyIndex]
+            prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+          }
+        } else if (e.key === "ArrowDown" && prompt.selectionEnd === prompt.value.length) {
+          e.preventDefault()
+          if (historyIndex > 0) {
+            historyIndex--
+            prompt.value = inputHistory[inputHistory.length - 1 - historyIndex]
+            prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+          } else if (historyIndex === 0) {
+            historyIndex = -1
+            prompt.value = currentDraft
+            prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+          }
+        }
+      })
+      sendBtn.addEventListener("click", () => {
+        if (busy) cancel()
+        else send()
+      })
+
+      function addMessage(role, text) {
+        const el = document.createElement("div")
+        el.className = "msg " + role
+        if (role === "agent") el.innerHTML = md(text, { sanitize: true })
+        else el.textContent = text
+        messages.insertBefore(el, typing)
+        messages.scrollTop = messages.scrollHeight
+        return el
+      }
+
+      function addApprovalPrompt(description) {
+        const el = document.createElement("div")
+        el.className = "msg approval"
+        el.innerHTML = md(description || "The agent requires your approval to continue.")
+        const actions = document.createElement("div")
+        actions.className = "approval-actions"
+
+        const approveBtn = document.createElement("button")
+        approveBtn.className = "btn-approve"
+        approveBtn.textContent = "Approve"
+        approveBtn.addEventListener("click", () => {
+          removeApprovalPrompt(el)
+          resume("approve")
+        })
+
+        const rejectBtn = document.createElement("button")
+        rejectBtn.className = "btn-reject"
+        rejectBtn.textContent = "Reject"
+        rejectBtn.addEventListener("click", () => {
+          removeApprovalPrompt(el)
+          resume("reject")
+        })
+
+        actions.appendChild(approveBtn)
+        actions.appendChild(rejectBtn)
+        el.appendChild(actions)
+        messages.insertBefore(el, typing)
+        messages.scrollTop = messages.scrollHeight
+        return el
+      }
+
+      function removeApprovalPrompt(el) {
+        el.remove()
+      }
+
+      function setBusy(val) {
+        busy = val
+        prompt.disabled = val
+        typing.style.display = val ? "block" : "none"
+        dot.className = "status-dot" + (val ? " busy" : "")
+        if (val) {
+          sendBtn.textContent = "Cancel"
+          sendBtn.classList.add("cancel")
+          sendBtn.disabled = false
+        } else {
+          sendBtn.textContent = "Send"
+          sendBtn.classList.remove("cancel")
+          sendBtn.disabled = false
+          activeTaskId = null
+          activeAbort = null
+          statusText.textContent = ""
+          // Reset streaming state on any transition to idle
+          streamingBubble = null
+          streamingText = ""
+        }
+        messages.scrollTop = messages.scrollHeight
+      }
+
+      async function resume(decision) {
+        const taskId = pendingTaskId
+        pendingTaskId = null
+
+        activeTaskId = taskId
+        setBusy(true)
+
+        const abort = new AbortController()
+        activeAbort = abort
+        streamingBubble = null
+        streamingText = ""
+
+        try {
+          const resp = await fetch(AGENT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: abort.signal,
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: streamToggle.checked || pushMode ? "message/stream" : "message/send",
+              id: crypto.randomUUID(),
+              params: {
+                message: {
+                  role: "user",
+                  messageId: crypto.randomUUID(),
+                  taskId,
+                  contextId,
+                  parts: [{ kind: "text", text: decision }],
+                },
+                ...(pushMode && pushSessionId
+                  ? {
+                      configuration: {
+                        pushNotificationConfig: {
+                          url:
+                            window.location.origin +
+                            window.location.pathname.replace(/\/preview\/?$/, "") +
+                            "/preview/push/" +
+                            pushSessionId,
+                          token: pushSessionId,
+                        },
+                      },
+                    }
+                  : {}),
+              },
+            }),
+          })
+
+          if (streamToggle.checked || pushMode) {
+            await handleSSEResponse(resp)
+          } else {
+            const envelope = await resp.json()
+            if (envelope.error) throw new Error(envelope.error.message || "Request failed")
+            await handleResult(envelope.result)
+          }
+
+          if (pushMode) statusText.textContent = "Waiting for push notification…"
+        } catch (err) {
+          if (err.name === "AbortError") return
+          dot.className = "status-dot error"
+          addMessage("error", "⚠ " + (err.message || String(err)))
+          setTimeout(() => (dot.className = "status-dot"), 3000)
+        } finally {
+          setBusy(false)
+          prompt.focus()
+        }
+      }
+
+      async function handleResult(result) {
+        const state = result?.status?.state ?? result?.state
+        const taskId = result?.id ?? result?.taskId
+
+        if (state === "input-required") {
+          pendingTaskId = taskId
+          const msgParts = result?.status?.message?.parts ?? []
+          const description = partsToText(msgParts)
+          addApprovalPrompt(description)
+          return
+        }
+
+        // If streaming was active and already rendered the final text via lastChunk, skip.
+        if (streamToggle.checked && streamingText !== "") {
+          streamingText = ""
+          return
+        }
+
+        // Clean up any open bubble (streaming was interrupted before lastChunk)
+        if (streamingBubble) {
+          if (streamingText) streamingBubble.innerHTML = md(streamingText)
+          streamingBubble = null
+          streamingText = ""
+          return
+        }
+
+        const parts =
+          result?.parts ?? result?.status?.message?.parts ?? result?.artifacts?.[0]?.parts ?? []
+        const reply = partsToText(parts)
+        addMessage("agent", reply || "(no response)")
+      }
+
+      function handlePushNotification(task) {
+        const state = task.status?.state
+        if (state === "working" || state === "submitted") {
+          // Only show working status updates when push notifications are active and agent is running
+          if (!pushMode || !busy) return
+          const text = partsToText(task.status?.message?.parts)
+          if (text) {
+            statusText.textContent = text
+            messages.scrollTop = messages.scrollHeight
+          }
+          return
+        }
+        // Terminal state: if streaming is on it already rendered the result — skip
+        if (streamToggle.checked) return
+        setBusy(false)
+        handleResult(task)
+      }
+
+      async function send() {
+        const text = prompt.value.trim()
+        if (!text || busy) return
+
+        // Save to input history (skip if same as last entry)
+        if (inputHistory[inputHistory.length - 1] !== text) {
+          inputHistory.push(text)
+          if (inputHistory.length > 100) inputHistory.shift()
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(inputHistory))
+        }
+        historyIndex = -1
+        currentDraft = ""
+
+        addMessage("user", text)
+        prompt.value = ""
+        prompt.style.height = "auto"
+        setBusy(true)
+
+        const abort = new AbortController()
+        activeAbort = abort
+        streamingBubble = null
+        streamingText = ""
+
+        const useStream = streamToggle.checked || pushMode
+        try {
+          const resp = await fetch(AGENT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: abort.signal,
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: useStream ? "message/stream" : "message/send",
+              id: crypto.randomUUID(),
+              params: {
+                message: {
+                  role: "user",
+                  messageId: crypto.randomUUID(),
+                  ...(contextId ? { contextId } : {}),
+                  parts: [{ kind: "text", text }],
+                },
+                ...(pushMode && pushSessionId
+                  ? {
+                      configuration: {
+                        pushNotificationConfig: {
+                          url:
+                            window.location.origin +
+                            window.location.pathname.replace(/\/preview\/?$/, "") +
+                            "/preview/push/" +
+                            pushSessionId,
+                          token: pushSessionId,
+                        },
+                      },
+                    }
+                  : {}),
+              },
+            }),
+          })
+
+          if (useStream) {
+            await handleSSEResponse(resp)
+          } else {
+            const envelope = await resp.json()
+            if (envelope.error) throw new Error(envelope.error.message || "Request failed")
+            await handleResult(envelope.result)
+          }
+        } catch (err) {
+          if (err.name === "AbortError") return
+          dot.className = "status-dot error"
+          addMessage("error", "⚠ " + (err.message || String(err)))
+          setTimeout(() => {
+            dot.className = "status-dot"
+          }, 3000)
+        } finally {
+          setBusy(false)
+          prompt.focus()
+        }
+      }
+
+      async function sendPushMode(text) {
+        const baseUrl =
+          window.location.origin + window.location.pathname.replace(/\/preview\/?$/, "")
+        const webhookUrl = baseUrl + "/preview/push/" + pushSessionId
+
+        try {
+          const resp = await fetch(AGENT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "message/send",
+              id: crypto.randomUUID(),
+              params: {
+                message: {
+                  role: "user",
+                  messageId: crypto.randomUUID(),
+                  ...(contextId ? { contextId } : {}),
+                  parts: [{ kind: "text", text }],
+                },
+                configuration: {
+                  pushNotificationConfig: {
+                    url: webhookUrl,
+                    token: pushSessionId,
+                  },
+                },
+              },
+            }),
+          })
+
+          const envelope = await resp.json()
+          if (envelope.error) throw new Error(envelope.error.message || "Request failed")
+
+          const task = envelope.result
+          if (task?.id) activeTaskId = task.id
+          if (task?.contextId) contextId = task.contextId
+
+          statusText.textContent = "Waiting for push notification…"
+        } catch (err) {
+          dot.className = "status-dot error"
+          addMessage("error", "⚠ " + (err.message || String(err)))
+          setBusy(false)
+          setTimeout(() => (dot.className = "status-dot"), 3000)
+        }
+      }
+
+      async function handleSSEResponse(resp) {
+        if (!resp.ok) {
+          const body = await resp.text()
+          let parsed
+          try {
+            parsed = JSON.parse(body)
+          } catch (e) {
+            /* not JSON */
+          }
+          throw new Error(parsed?.error?.message || `HTTP ${resp.status}: ${body.slice(0, 200)}`)
+        }
+
+        const reader = resp.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let lastResult = null
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          let lineEnd
+          while ((lineEnd = buffer.indexOf("\n")) !== -1) {
+            const line = buffer.slice(0, lineEnd).trim()
+            buffer = buffer.slice(lineEnd + 1)
+
+            if (line.startsWith("data: ")) {
+              try {
+                const frame = JSON.parse(line.slice(6))
+                // SSE frames are JSON-RPC envelopes: {jsonrpc, id, result} or {jsonrpc, id, error}
+                if (frame.error) throw new Error(frame.error.message || "Stream error")
+                if (frame.result) {
+                  lastResult = processSSEEvent(frame.result) || lastResult
+                }
+              } catch (e) {
+                if (e instanceof SyntaxError) continue
+                throw e
+              }
+            } else if (line.startsWith("event: error")) {
+              // Next data line will have the error
+            }
+          }
+        }
+
+        if (lastResult) await handleResult(lastResult)
+      }
+
+      function processSSEEvent(event) {
+        // Extract taskId from first task event
+        if (event.kind === "task" && event.id) {
+          activeTaskId = event.id
+          contextId = event.contextId ?? contextId
+        }
+
+        // Track contextId from status-updates
+        if (event.contextId) contextId = event.contextId
+
+        // Non-final status-update with message → show as progress text only when push is on and streaming is off
+        if (
+          event.kind === "status-update" &&
+          !event.final &&
+          event.status?.message &&
+          pushMode &&
+          !streamToggle.checked
+        ) {
+          const text = partsToText(event.status.message.parts)
+          if (text) {
+            statusText.textContent = text
+            messages.scrollTop = messages.scrollHeight
+          }
+          return null
+        }
+
+        // Incremental artifact-update: render tokens as they arrive
+        if (event.kind === "artifact-update" && streamToggle.checked) {
+          const parts = event.artifact?.parts ?? []
+          const text = partsToText(parts)
+          // A2A spec: append/lastChunk are event-level fields (siblings of `artifact`).
+          const append = event.append ?? false
+          const lastChunk = event.lastChunk ?? false
+
+          if (lastChunk) {
+            // lastChunk carries the authoritative full text — replace accumulated content.
+            if (text) {
+              if (streamingBubble) {
+                streamingBubble.innerHTML = md(text)
+                messages.scrollTop = messages.scrollHeight
+              } else {
+                typing.style.display = "none"
+                addMessage("agent", text)
+              }
+            }
+            streamingBubble = null
+            streamingText = text // keep so handleResult skips duplicate render
+            return null
+          }
+
+          if (text) {
+            if (!append || !streamingBubble) {
+              // First token — create a live bubble, hide typing indicator
+              typing.style.display = "none"
+              streamingBubble = addMessage("agent", text)
+              streamingText = text
+            } else {
+              // Subsequent token — accumulate and re-render markdown
+              streamingText += text
+              streamingBubble.innerHTML = md(streamingText)
+              messages.scrollTop = messages.scrollHeight
+            }
+          }
+
+          return null
+        }
+
+        // Status update with final=true means terminal state
+        if (event.kind === "status-update" && event.final) {
+          // When push-only (no streaming): push notification handles the final render
+          if (pushMode && !streamToggle.checked) return null
+          return {
+            id: event.taskId || activeTaskId,
+            contextId: event.contextId || contextId,
+            status: event.status,
+            artifacts: event.artifacts,
+          }
+        }
+
+        // Artifact event
+        if (event.kind === "artifact") {
+          return {
+            id: event.taskId || activeTaskId,
+            contextId: event.contextId || contextId,
+            status: event.status || { state: "completed" },
+            artifacts: [event.artifact || event],
+          }
+        }
+
+        return null
+      }
+
+      async function cancel() {
+        const taskId = activeTaskId
+
+        // Abort ongoing fetch
+        if (activeAbort) activeAbort.abort()
+
+        // Send tasks/cancel if we have a taskId
+        if (taskId) {
+          fetch(AGENT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "tasks/cancel",
+              id: crypto.randomUUID(),
+              params: { id: taskId },
+            }),
+          }).catch(() => {})
+        }
+
+        addMessage("agent", "⊘ Task canceled.")
+        setBusy(false)
+        prompt.focus()
+      }
+    </script>
+  </body>
+</html>

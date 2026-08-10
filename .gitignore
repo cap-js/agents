@@ -5,3 +5,16 @@ package-lock.json
 .env
 .cdsrc-private.json
 resources/*
+proposal.md
+.claude/
+**/target/*
+**/resources/edmx
+**/resources/*sql
+**/.classpath
+**/.flattened-pom.xml
+**/.project
+**/.settings
+**/mta_archives
+**/*csn.json
+**/*.hdiconfig
+**/undeploy.json

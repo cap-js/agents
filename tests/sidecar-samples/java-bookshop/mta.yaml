@@ -1,0 +1,116 @@
+_schema-version: 3.3.0
+ID: agent-java-bookshop
+version: 1.0.0-SNAPSHOT
+description: "Java CAP bookshop with agent sidecar support via HCQL"
+parameters:
+  enable-parallel-deployments: true
+modules:
+  - name: agent-java-bookshop-srv
+    type: java
+    path: srv
+    parameters:
+      instances: 1
+      buildpack: sap_java_buildpack_jakarta
+    properties:
+      SPRING_PROFILES_ACTIVE: cloud,sandbox
+      JBP_CONFIG_COMPONENTS: "jres: ['com.sap.xs.java.buildpack.jre.SAPMachineJRE']"
+      JBP_CONFIG_SAP_MACHINE_JRE: "{ version: 21.+ }"
+    build-parameters:
+      builder: custom
+      commands:
+        - mvn clean package -DskipTests=true --batch-mode
+      build-result: target/*-exec.jar
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: agent-java-bookshop-auth
+      - name: agent-java-bookshop-db
+
+  - name: agent-java-bookshop-sidecar
+    type: nodejs
+    path: agent/sidecar
+    parameters:
+      instances: 1
+    build-parameters:
+      builder: custom
+      commands:
+        - npm pack ../../../../../ # pack the local @cap-js/agents plugin into a tarball
+        - mkdir -p _main/srv # create _main directory structure
+        - npx --yes cds compile ../../srv ../../db -2 json -o _main/srv/csn.json # compile main app model into _main
+        - rm -f package-lock.json # make sure there is no package-lock.json
+        - npm install --omit=dev --ignore-scripts --no-package-lock --no-bin-links # npm install for the sidecar, with several flags to avoid npm errors
+        - npx --yes cds build --for hana # build agent db entities — outputs to db/src/gen/
+        - rm -rf gen
+        - mkdir gen
+        - cp db/package.json gen/ # hdi-deploy needs package.json alongside artifacts
+        - mv db/src gen/
+      build-result: .
+    properties:
+      NODE_ENV: production
+      CDS_ENV: production,agent-sidecar,java
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api # The destination name used in CAP
+          url: ~{srv-url}/hcql # The URL provided by the main app
+      - name: agent-java-bookshop-auth
+      - name: agent-java-bookshop-aicore
+      - name: agent-java-bookshop-db
+
+  - name: agent-java-bookshop-sidecar-db-deployer
+    type: hdb
+    path: agent/sidecar
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: custom
+      commands: []
+      build-result: gen/
+      requires:
+        - name: agent-java-bookshop-sidecar
+    requires:
+      - name: agent-java-bookshop-db
+
+  - name: agent-java-bookshop-db-deployer
+    type: hdb
+    path: db
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: custom
+      commands:
+        - npm install --prefix ..
+        - ../node_modules/.bin/cds build --project .. --for hana --production
+        - npm install --omit=dev
+      build-result: .
+    requires:
+      - name: agent-java-bookshop-db
+
+resources:
+  - name: agent-java-bookshop-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: agent-java-bookshop-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          credential-types:
+            - "binding-secret"
+            - "x509"
+
+  - name: agent-java-bookshop-aicore
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: test-aicore-client
+
+  - name: agent-java-bookshop-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared

@@ -1,0 +1,30 @@
+{
+  "name": "node-bookshop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node.js CAP bookshop — main app for sidecar test",
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "dependencies": {
+    "@sap/cds": ">=9",
+    "@sap/xssec": "^4",
+    "@cap-js/hana": ">=1"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": ">=1",
+    "@sap/cds-dk": ">=9"
+  },
+  "cds": {
+    "protocols": {
+      "hcql": {
+        "path": "/hcql"
+      }
+    },
+    "requires": {
+      "[production]": {
+        "auth": "xsuaa"
+      }
+    }
+  }
+}
