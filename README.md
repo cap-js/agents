@@ -1,4 +1,7 @@
 > [!WARNING]
+> Repository has been moved to https://github.com/cap-js/agents
+
+> [!WARNING]
 > This plugin is in an early experimental state and not recommended for production use.
 
 # @cap-js/agents
