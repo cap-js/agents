@@ -55,6 +55,21 @@ describe("@cap-js/agents - Access Control", () => {
       const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: bobTaskId }, ALICE)
       expect(aliceGet.data.error).not.toBe(undefined)
     })
+
+    it("bob cannot update alice's task via message/send with her taskId", async () => {
+      // Alice creates a task
+      const aliceRes = await sendMessageAs("catalog", "List books", ALICE)
+      expect(aliceRes.data.result.status.state).toBe("completed")
+      const aliceTaskId = aliceRes.data.result.id
+
+      // Bob tries to send a message targeting alice's taskId
+      const bobRes = await sendMessageAs("catalog", "Override!", BOB, { taskId: aliceTaskId })
+
+      // Alice's task must remain unchanged (bob's update should not affect it)
+      const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, ALICE)
+      expect(aliceGet.data.result).not.toBe(undefined)
+      expect(aliceGet.data.result.status.message.parts[0].text).not.toMatch(/Override/)
+    })
   })
 
   // ─── @requires enforcement on A2A endpoint ───────────────────────────

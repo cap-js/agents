@@ -96,8 +96,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
     expect(data.model).toBe("mock-streaming-model")
     expect(typeof data.taskId).toBe("string")
     expect(typeof data.duration).toBe("number")
-    expect(data.inputTokens).toBe(10) // from mock AI Core
-    expect(data.outputTokens).toBe(5)
+    expect(data.tokenUsage.input_tokens).toBe(10) // from mock AI Core
+    expect(data.tokenUsage.output_tokens).toBe(5)
   })
 
   // ─── Spans ──────────────────────────────────────────────────────────

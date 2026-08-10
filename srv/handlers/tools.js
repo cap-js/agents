@@ -12,11 +12,8 @@ import {
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
-import { getFilteredEntities, getFilteredActions, audit } from "../../lib/utils/utils.js"
+import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
-import * as metrics from "../../lib/telemetry/metrics.js"
-import { INSTRUMENTED } from "../../lib/telemetry/tracing.js"
-import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 
 const LOG = cds.log("agent")
 
@@ -43,116 +40,13 @@ export function generateTools(srv, options = {}) {
 
   const tools = []
 
-  function register(dstool) {
-    // Wrap invoke to catch errors (become normal tool results the LLM can learn from)
-    // and to create OTel spans + record metrics for each tool invocation.
-    const originalInvoke = dstool.invoke.bind(dstool)
-    dstool.invoke = async (args, config) => {
-      const tracer = metrics.getTracer()
-      const toolAttrs = {
-        "sap.tenantId": cds.context?.tenant || "anonymous",
-        "agent.service": cds.context?.["agent.service"],
-        tool: dstool.name,
-      }
-
-      const invoke = async (span) => {
-        if (span) {
-          span.setAttribute("gen_ai.operation.name", "execute_tool")
-          span.setAttribute("gen_ai.provider.name", "langchain")
-          span.setAttribute("gen_ai.tool.call.id", dstool.name)
-          if (LOG._debug) {
-            const input = JSON.stringify(args)
-            span.setAttribute("gen_ai.tool.call.arguments", input)
-          }
-        }
-        const t0 = Date.now()
-        try {
-          const result = await originalInvoke(args, config)
-          const duration = Date.now() - t0
-          metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "success" })
-          if (span) {
-            span.setAttribute("gen_ai.tool.call.outcome", "success")
-            if (LOG._debug) {
-              const output = typeof result === "string" ? result : JSON.stringify(result)
-              span.setAttribute("gen_ai.tool.call.result", output)
-            }
-            setSpanAttrs(
-              span,
-              mlflowAttrs("TOOL", { inputs: args, outputs: result, functionName: dstool.name }),
-            )
-          }
-
-          // Audit: record tool invocation
-          const taskId = config?.configurable?._taskId || cds.context?.["agent.task.id"]
-          if (taskId) {
-            const resultStr = typeof result === "string" ? result : JSON.stringify(result)
-            audit("ToolInvocation", {
-              data: {
-                taskId,
-                service: config?.configurable?._service || cds.context?.["agent.service"],
-                tool: dstool.name,
-                args,
-                outcome: "success",
-                result: resultStr?.slice(0, 2000),
-                duration,
-              },
-            })
-          }
-
-          return result
-        } catch (err) {
-          const duration = Date.now() - t0
-          metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "error" })
-          if (span) {
-            span.setAttribute("gen_ai.tool.call.outcome", "error")
-            span.setStatus({ code: 2, message: err.message })
-          }
-
-          // Audit: record failed tool invocation
-          const taskId = config?.configurable?._taskId || cds.context?.["agent.task.id"]
-          if (taskId) {
-            audit("ToolInvocation", {
-              data: {
-                taskId,
-                service: config?.configurable?._service || cds.context?.["agent.service"],
-                tool: dstool.name,
-                args,
-                outcome: "error",
-                error: err.message,
-                duration,
-              },
-            })
-          }
-
-          return `Error: ${err.message}`
-        }
-      }
-
-      if (tracer) {
-        return tracer.startActiveSpan(
-          `execute_tool DynamicStructuredTool ${dstool.name}`,
-          async (span) => {
-            try {
-              return await invoke(span)
-            } finally {
-              span.end()
-            }
-          },
-        )
-      }
-      return invoke(null)
-    }
-    dstool[INSTRUMENTED] = true
-    tools.push(dstool)
-  }
-
   const TOOL_PREFIX = ""
 
   // Query tool — one tool for reading all entities
   const entityNames = Object.keys(entities)
   if (entityNames.length > 0) {
     const def = createGenericReadToolDefinition(entityNames, srv.name, TOOL_PREFIX)
-    register(
+    tools.push(
       new DynamicStructuredTool({
         name: def.name,
         description: def.description,
@@ -169,7 +63,7 @@ export function generateTools(srv, options = {}) {
   const actionNames = Object.keys(actions)
   if (entityNames.length > 0 || actionNames.length > 0) {
     const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, TOOL_PREFIX)
-    register(
+    tools.push(
       new DynamicStructuredTool({
         name: def.name,
         description: def.description,
@@ -188,7 +82,7 @@ export function generateTools(srv, options = {}) {
     if (usePerActionTools) {
       for (const [name, action] of Object.entries(actions)) {
         const def = createPerActionToolDefinition(name, action, srv.name, srv.model, TOOL_PREFIX)
-        register(
+        tools.push(
           new DynamicStructuredTool({
             name: def.name,
             description: def.description,
@@ -202,7 +96,7 @@ export function generateTools(srv, options = {}) {
       }
     } else {
       const def = createCallActionToolDefinition(actionNames, srv.name, TOOL_PREFIX)
-      register(
+      tools.push(
         new DynamicStructuredTool({
           name: def.name,
           description: def.description,
@@ -217,153 +111,14 @@ export function generateTools(srv, options = {}) {
   }
 
   // File tools — only when fileIO is enabled
-  // emit_file_part: stateless protocol emitter; safe to register once at startup.
+  // emit_file_part: stateless protocol emitter; safe to tools.push once at startup.
   // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
   if (cds.env.agents?.fileIO?.enabled) {
-    register(createEmitFilePartTool())
+    tools.push(createEmitFilePartTool())
   }
 
   return tools
 }
-
-/**
- * Instrument a single tool instance for tracing, audit logging, and metrics.
- *
- * Use this for custom tools (created via `tool()`) or MCP tools whose `.invoke`
- * is overridden on the instance — cases where the prototype-level patch alone
- * cannot intercept the call.
- *
- * Unlike CDS tools (which swallow errors so the LLM can retry), this re-throws
- * errors after recording them. Wrap with a try/catch if you need error swallowing.
- *
- * @param {import("@langchain/core/tools").StructuredTool} t - Tool to instrument
- * @returns {import("@langchain/core/tools").StructuredTool} The same tool (mutated)
- */
-function _instrumentTool(t) {
-  if (t[INSTRUMENTED]) return t
-  const originalInvoke = t.invoke.bind(t)
-
-  t.invoke = async (args, config) => {
-    const tracer = metrics.getTracer()
-    const toolAttrs = {
-      "sap.tenantId": cds.context?.tenant || "anonymous",
-      "agent.service": config?.configurable?._service || cds.context?.["agent.service"],
-      tool: t.name,
-    }
-
-    const invoke = async (span) => {
-      if (span) {
-        span.setAttribute("gen_ai.operation.name", "execute_tool")
-        span.setAttribute("gen_ai.provider.name", "langchain")
-        span.setAttribute("gen_ai.tool.call.id", t.name)
-        if (LOG._debug) span.setAttribute("gen_ai.tool.call.arguments", JSON.stringify(args))
-      }
-      const t0 = Date.now()
-      try {
-        const result = await originalInvoke(args, config)
-        const duration = Date.now() - t0
-        metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "success" })
-        if (span) {
-          span.setAttribute("gen_ai.tool.call.outcome", "success")
-          if (LOG._debug) {
-            const output = typeof result === "string" ? result : JSON.stringify(result)
-            span.setAttribute("gen_ai.tool.call.result", output)
-          }
-        }
-
-        // Audit: record tool invocation
-        const taskId = config?.configurable?._taskId || cds.context?.["agent.task.id"]
-        if (taskId) {
-          const resultStr = typeof result === "string" ? result : JSON.stringify(result)
-          audit("ToolInvocation", {
-            data: {
-              taskId,
-              service: toolAttrs["agent.service"],
-              tool: t.name,
-              args,
-              outcome: "success",
-              result: resultStr?.slice(0, 2000),
-              duration,
-            },
-          })
-        }
-
-        return result
-      } catch (err) {
-        const duration = Date.now() - t0
-        metrics.toolInvocations.add(1, { ...toolAttrs, outcome: "error" })
-        if (span) {
-          span.setAttribute("gen_ai.tool.call.outcome", "error")
-          span.setStatus({ code: 2, message: err.message })
-        }
-
-        // Audit: record failed tool invocation
-        const taskId = config?.configurable?._taskId || cds.context?.["agent.task.id"]
-        if (taskId) {
-          audit("ToolInvocation", {
-            data: {
-              taskId,
-              service: toolAttrs["agent.service"],
-              tool: t.name,
-              args,
-              outcome: "error",
-              error: err.message,
-              duration,
-            },
-          })
-        }
-
-        throw err
-      }
-    }
-
-    if (tracer) {
-      return tracer.startActiveSpan(
-        `execute_tool DynamicStructuredTool ${t.name}`,
-        async (span) => {
-          try {
-            return await invoke(span)
-          } finally {
-            span.end()
-          }
-        },
-      )
-    }
-    return invoke(null)
-  }
-
-  t[INSTRUMENTED] = true
-  return t
-}
-
-/**
- * Instrument tool instances for tracing, audit logging, and metrics.
- *
- * Use this for custom tools (created via `tool()`) or MCP tools whose `.invoke`
- * is overridden on the instance — cases where the prototype-level patch alone
- * cannot intercept the call.
- *
- * Idempotent: tools already instrumented by `@cap-js/agents` are returned untouched.
- *
- * Unlike CDS tools (which swallow errors so the LLM can retry), this re-throws
- * errors after recording them. Wrap with a try/catch if you need error swallowing.
- *
- * @param {import("@langchain/core/tools").StructuredTool[]} tools - Tools to instrument
- * @returns {import("@langchain/core/tools").StructuredTool[]} The same tools (mutated)
- */
-export function instrumentTools(tools) {
-  tools.forEach(_instrumentTool)
-  return tools
-}
-/**
- * Instrument a single tool. Re-exported as a thin alias over the internal
- * `_instrumentTool` so prior consumers of `instrumentTool` (singular) keep
- * working — destructured ES imports of an undefined export fail silently.
- *
- * @param {import("@langchain/core/tools").StructuredTool} t
- * @returns {import("@langchain/core/tools").StructuredTool}
- */
-export const instrumentTool = _instrumentTool
 
 // ── File tools ────────────────────────────────────────────────────────
 
@@ -434,7 +189,7 @@ export function createEmitFilePartTool() {
 
 /**
  * Create a read_file tool scoped to the current conversation.
- * For the default LangGraph path only — deepagents registers its own read_file
+ * For the default LangGraph path only — deepagents tools.pushs its own read_file
  * tool via FilesystemMiddleware, which routes through UploadsBackend.
  *
  * When contextId is omitted, the tool resolves it from cds.context at invocation

@@ -22,7 +22,7 @@ export function hashFeatures(features) {
  */
 export class GraphCache {
   constructor() {
-    this._maxSize = cds.env.a2a?.graphCacheSize || 20
+    this._maxSize = cds.env.agents?.graphCacheSize || 20
     this._cache = new Map()
     this._building = new Map()
   }

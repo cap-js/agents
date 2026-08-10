@@ -1,3 +1,5 @@
+import cds from "@sap/cds"
+
 const {
   GraphExecutor,
   messageText,
@@ -10,6 +12,10 @@ const {
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
+
+// Wrap a test body so it runs inside a fresh CDS context (needed by graph-executor
+// paths that read cds.context / call audit()).
+const withCtx = (fn) => () => cds._with({}, fn)
 
 describe("messageText", () => {
   it("returns string content unchanged", () => {
@@ -49,182 +55,197 @@ describe("defaultOutputMapper", () => {
 })
 
 describe("GraphExecutor - configMapper", () => {
-  it("calls configMapper and spreads result into config.configurable", async () => {
-    let capturedConfig
+  it(
+    "calls configMapper and spreads result into config.configurable",
+    withCtx(async () => {
+      let capturedConfig
 
-    const fakeGraph = {
-      checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+      const fakeGraph = {
+        checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: () => ({ myKey: "injected-value" }),
-      },
-    )
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: () => ({ myKey: "injected-value" }),
+        },
+      )
 
-    await executor.execute(
-      {
-        taskId: "task-1",
-        contextId: "ctx-1",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      await executor.execute(
+        {
+          taskId: "task-1",
+          contextId: "ctx-1",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-    expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
-    expect(
-      capturedConfig.configurable.myKey,
-      "configMapper return value must appear in config.configurable",
-    ).toBe("injected-value")
-  })
+      expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
+      expect(
+        capturedConfig.configurable.myKey,
+        "configMapper return value must appear in config.configurable",
+      ).toBe("injected-value")
+    }),
+  )
 
-  it("reserved keys (thread_id, _taskId, _service) take precedence over configMapper", async () => {
-    let capturedConfig
+  it(
+    "reserved keys (thread_id, _taskId, _service) take precedence over configMapper",
+    withCtx(async () => {
+      let capturedConfig
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    // configMapper must not be able to overwrite reserved keys — they must always be spread last
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: () => ({
-          thread_id: "HACKER",
-          _taskId: "HACKER",
-          _service: "HACKER",
-          safe: "allowed",
-        }),
-      },
-    )
+      // configMapper must not be able to overwrite reserved keys — they must always be spread last
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: () => ({
+            thread_id: "HACKER",
+            _taskId: "HACKER",
+            _service: "HACKER",
+            safe: "allowed",
+          }),
+        },
+      )
 
-    await executor.execute(
-      {
-        taskId: "task-2",
-        contextId: "ctx-2",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      await executor.execute(
+        {
+          taskId: "task-2",
+          contextId: "ctx-2",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-    expect(capturedConfig.configurable.thread_id).not.toBe("HACKER")
-    expect(capturedConfig.configurable._taskId).not.toBe("HACKER")
-    expect(capturedConfig.configurable._service).not.toBe("HACKER")
-    expect(capturedConfig.configurable.safe).toBe("allowed")
-  })
+      expect(capturedConfig.configurable.thread_id).not.toBe("HACKER")
+      expect(capturedConfig.configurable._taskId).not.toBe("HACKER")
+      expect(capturedConfig.configurable._service).not.toBe("HACKER")
+      expect(capturedConfig.configurable.safe).toBe("allowed")
+    }),
+  )
 
-  it("works without configMapper (no regression)", async () => {
-    let capturedConfig
+  it(
+    "works without configMapper (no regression)",
+    withCtx(async () => {
+      let capturedConfig
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
-    await executor.execute(
-      {
-        taskId: "task-3",
-        contextId: "ctx-3",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      await executor.execute(
+        {
+          taskId: "task-3",
+          contextId: "ctx-3",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-    expect(capturedConfig?.configurable?.thread_id, "thread_id must be set").toBeTruthy()
-    expect(capturedConfig?.configurable?._taskId, "_taskId must be set").toBeTruthy()
-  })
+      expect(capturedConfig?.configurable?.thread_id, "thread_id must be set").toBeTruthy()
+      expect(capturedConfig?.configurable?._taskId, "_taskId must be set").toBeTruthy()
+    }),
+  )
 
-  it("async configMapper is awaited — its resolved values reach config.configurable", async () => {
-    let capturedConfig
+  it(
+    "async configMapper is awaited — its resolved values reach config.configurable",
+    withCtx(async () => {
+      let capturedConfig
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (_input, config) => {
-        capturedConfig = config
-        return { messages: [{ content: "ok" }] }
-      },
-    }
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (_input, config) => {
+          capturedConfig = config
+          return { messages: [{ content: "ok" }] }
+        },
+      }
 
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: async () => ({ asyncKey: "async-value" }),
-      },
-    )
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: async () => ({ asyncKey: "async-value" }),
+        },
+      )
 
-    await executor.execute(
-      {
-        taskId: "task-4",
-        contextId: "ctx-4",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      fakeEventBus,
-    )
+      await executor.execute(
+        {
+          taskId: "task-4",
+          contextId: "ctx-4",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        fakeEventBus,
+      )
 
-    expect(
-      capturedConfig.configurable.asyncKey,
-      "async configMapper value must be awaited and present in config.configurable",
-    ).toBe("async-value")
-  })
+      expect(
+        capturedConfig.configurable.asyncKey,
+        "async configMapper value must be awaited and present in config.configurable",
+      ).toBe("async-value")
+    }),
+  )
 
-  it("non-object return from configMapper fails the task with TypeError", async () => {
-    let publishedEvents = []
+  it(
+    "non-object return from configMapper fails the task with TypeError",
+    withCtx(async () => {
+      let publishedEvents = []
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async () => ({ messages: [{ content: "ok" }] }),
-    }
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => ({ messages: [{ content: "ok" }] }),
+      }
 
-    const capturingEventBus = {
-      publish: (e) => publishedEvents.push(e),
-      finished: () => {},
-    }
+      const capturingEventBus = {
+        publish: (e) => publishedEvents.push(e),
+        finished: () => {},
+      }
 
-    const executor = new GraphExecutor(
-      Promise.resolve(fakeGraph),
-      { name: "TestService" },
-      {
-        configMapper: () => "not-an-object",
-      },
-    )
+      const executor = new GraphExecutor(
+        Promise.resolve(fakeGraph),
+        { name: "TestService" },
+        {
+          configMapper: () => "not-an-object",
+        },
+      )
 
-    await executor.execute(
-      {
-        taskId: "task-5",
-        contextId: "ctx-5",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-        task: { status: { state: "working" } },
-      },
-      capturingEventBus,
-    )
+      await executor.execute(
+        {
+          taskId: "task-5",
+          contextId: "ctx-5",
+          userMessage: { parts: [{ kind: "text", text: "hello" }] },
+          task: { status: { state: "working" } },
+        },
+        capturingEventBus,
+      )
 
-    const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
-    expect(failedEvent, "a failed status event must have been published").toBeTruthy()
-    expect(failedEvent.status.message.parts[0].text).toMatch(
-      /configMapper must return a plain object/,
-    )
-  })
+      const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
+      expect(failedEvent, "a failed status event must have been published").toBeTruthy()
+      expect(failedEvent.status.message.parts[0].text).toMatch(
+        /configMapper must return a plain object/,
+      )
+    }),
+  )
 })
 
 describe("firstDataPart", () => {
@@ -340,156 +361,173 @@ describe("decisionTypeOf", () => {
 })
 
 describe("GraphExecutor - HITL DataPart resume", () => {
-  it("passes an inbound DataPart's data opaquely into Command({ resume })", async () => {
-    let capturedInput
+  it(
+    "passes an inbound DataPart's data opaquely into Command({ resume })",
+    withCtx(async () => {
+      let capturedInput
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (input) => {
-        capturedInput = input
-        return { messages: [{ content: "done" }] }
-      },
-    }
-
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
-
-    await executor.execute(
-      {
-        taskId: "task-hitl-1",
-        contextId: "ctx-hitl-1",
-        // DataPart-only resume (no TextPart) — must not throw, must reach Command
-        userMessage: { parts: [{ kind: "data", data: { decisions: [{ type: "approve" }] } }] },
-        task: { status: { state: "input-required" } },
-      },
-      fakeEventBus,
-    )
-
-    // `Command` is passed as the graph INPUT (not config). `.resume` is a documented
-    // public field on the Command class (@langchain/langgraph constants.d.ts, serialized
-    // by toJSON), so asserting against it is stable — not a private-property gamble.
-    expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
-  })
-
-  it("falls back to text parsing when the resume carries no DataPart", async () => {
-    let capturedInput
-
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (input) => {
-        capturedInput = input
-        return { messages: [{ content: "done" }] }
-      },
-    }
-
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
-
-    await executor.execute(
-      {
-        taskId: "task-hitl-2",
-        contextId: "ctx-hitl-2",
-        userMessage: { parts: [{ kind: "text", text: "approve" }] },
-        task: { status: { state: "input-required" } },
-      },
-      fakeEventBus,
-    )
-
-    expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
-  })
-
-  it("prefers the DataPart and ignores accompanying text when both are present", async () => {
-    let capturedInput
-
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async (input) => {
-        capturedInput = input
-        return { messages: [{ content: "done" }] }
-      },
-    }
-
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
-
-    await executor.execute(
-      {
-        taskId: "task-hitl-mixed",
-        contextId: "ctx-hitl-mixed",
-        // DataPart + text together — DataPart wins, text ("reject me") is intentionally dropped.
-        userMessage: {
-          parts: [
-            { kind: "text", text: "reject me" },
-            { kind: "data", data: { decisions: [{ type: "approve" }] } },
-          ],
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
         },
-        task: { status: { state: "input-required" } },
-      },
-      fakeEventBus,
-    )
+      }
 
-    expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
-  })
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
-  it("fails the task when a resume has neither text nor a DataPart", async () => {
-    let publishedEvents = []
+      await executor.execute(
+        {
+          taskId: "task-hitl-1",
+          contextId: "ctx-hitl-1",
+          // DataPart-only resume (no TextPart) — must not throw, must reach Command
+          userMessage: { parts: [{ kind: "data", data: { decisions: [{ type: "approve" }] } }] },
+          task: { status: { state: "input-required" } },
+        },
+        fakeEventBus,
+      )
 
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async () => ({ messages: [{ content: "done" }] }),
-    }
+      // `Command` is passed as the graph INPUT (not config). `.resume` is a documented
+      // public field on the Command class (@langchain/langgraph constants.d.ts, serialized
+      // by toJSON), so asserting against it is stable — not a private-property gamble.
+      expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
+    }),
+  )
 
-    const capturingEventBus = {
-      publish: (e) => publishedEvents.push(e),
-      finished: () => {},
-    }
+  it(
+    "falls back to text parsing when the resume carries no DataPart",
+    withCtx(async () => {
+      let capturedInput
 
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
 
-    await executor.execute(
-      {
-        taskId: "task-hitl-3",
-        contextId: "ctx-hitl-3",
-        userMessage: { parts: [] },
-        task: { status: { state: "input-required" } },
-      },
-      capturingEventBus,
-    )
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
-    const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
-    expect(failedEvent, "a failed status event must have been published").toBeTruthy()
-    expect(failedEvent.status.message.parts[0].text).toMatch(/must contain text .* or a data part/)
-  })
+      await executor.execute(
+        {
+          taskId: "task-hitl-2",
+          contextId: "ctx-hitl-2",
+          userMessage: { parts: [{ kind: "text", text: "approve" }] },
+          task: { status: { state: "input-required" } },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
+    }),
+  )
+
+  it(
+    "prefers the DataPart and ignores accompanying text when both are present",
+    withCtx(async () => {
+      let capturedInput
+
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
+
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-hitl-mixed",
+          contextId: "ctx-hitl-mixed",
+          // DataPart + text together — DataPart wins, text ("reject me") is intentionally dropped.
+          userMessage: {
+            parts: [
+              { kind: "text", text: "reject me" },
+              { kind: "data", data: { decisions: [{ type: "approve" }] } },
+            ],
+          },
+          task: { status: { state: "input-required" } },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
+    }),
+  )
+
+  it(
+    "fails the task when a resume has neither text nor a DataPart",
+    withCtx(async () => {
+      let publishedEvents = []
+
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => ({ messages: [{ content: "done" }] }),
+      }
+
+      const capturingEventBus = {
+        publish: (e) => publishedEvents.push(e),
+        finished: () => {},
+      }
+
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-hitl-3",
+          contextId: "ctx-hitl-3",
+          userMessage: { parts: [] },
+          task: { status: { state: "input-required" } },
+        },
+        capturingEventBus,
+      )
+
+      const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
+      expect(failedEvent, "a failed status event must have been published").toBeTruthy()
+      expect(failedEvent.status.message.parts[0].text).toMatch(
+        /must contain text .* or a data part/,
+      )
+    }),
+  )
 })
 
 describe("GraphExecutor - HITL suspend carries a DataPart", () => {
-  it("attaches the structured interrupt payload as a DataPart beside the TextPart", async () => {
-    let publishedEvents = []
+  it(
+    "attaches the structured interrupt payload as a DataPart beside the TextPart",
+    withCtx(async () => {
+      let publishedEvents = []
 
-    const payload = { actionRequests: [{ name: "submitOrder", description: "Approve order?" }] }
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async () => ({ __interrupt__: [{ value: payload }] }),
-    }
+      const payload = { actionRequests: [{ name: "submitOrder", description: "Approve order?" }] }
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => ({ __interrupt__: [{ value: payload }] }),
+      }
 
-    const capturingEventBus = {
-      publish: (e) => publishedEvents.push(e),
-      finished: () => {},
-    }
+      const capturingEventBus = {
+        publish: (e) => publishedEvents.push(e),
+        finished: () => {},
+      }
 
-    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
-    await executor.execute(
-      {
-        taskId: "task-suspend-1",
-        contextId: "ctx-suspend-1",
-        userMessage: { parts: [{ kind: "text", text: "buy the book" }] },
-        task: { status: { state: "working" } },
-      },
-      capturingEventBus,
-    )
+      await executor.execute(
+        {
+          taskId: "task-suspend-1",
+          contextId: "ctx-suspend-1",
+          userMessage: { parts: [{ kind: "text", text: "buy the book" }] },
+          task: { status: { state: "working" } },
+        },
+        capturingEventBus,
+      )
 
-    const inputRequired = publishedEvents.find((e) => e.status?.state === "input-required")
-    expect(inputRequired, "an input-required event must have been published").toBeTruthy()
-    const parts = inputRequired.status.message.parts
-    expect(parts.find((p) => p.kind === "text")?.text).toBe("Approve order?")
-    expect(parts.find((p) => p.kind === "data")?.data).toEqual(payload)
-  })
+      const inputRequired = publishedEvents.find((e) => e.status?.state === "input-required")
+      expect(inputRequired, "an input-required event must have been published").toBeTruthy()
+      const parts = inputRequired.status.message.parts
+      expect(parts.find((p) => p.kind === "text")?.text).toBe("Approve order?")
+      expect(parts.find((p) => p.kind === "data")?.data).toEqual(payload)
+    }),
+  )
 })

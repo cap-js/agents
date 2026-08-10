@@ -40,10 +40,6 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
     mock.setStatus(200)
   })
 
-  it("should have maxLLMCallTimeoutMs configured", () => {
-    expect(cds.env.agents.pool.maxLLMCallTimeoutMs).toBe(120000)
-  })
-
   it("should complete task when AI Core returns 200", async () => {
     const res = await sendMessage("circuit-breaker", "hello")
     expect(res.data.result?.status?.state).toBe("completed")

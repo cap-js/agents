@@ -18,6 +18,9 @@
     "agents": {
       "[tracing]": {
         "mlflow": true
+      },
+      "[mlflow]": {
+        "mlflow": true
       }
     },
     "requires": {
@@ -65,11 +68,29 @@
             }
           }
         },
-        "databricks-mlflow": {
+        "mlflow": {
           "credentials": {
-            "DATABRICKS_HOST": "http://localhost:5678",
-            "DATABRICKS_TOKEN": "unused",
+            "MLFLOW_HOST": "http://localhost:5678",
+            "MLFLOW_TOKEN": "unused",
             "MLFLOW_EXPERIMENT_ID": "0"
+          }
+        }
+      },
+      "[mlflow]": {
+        "audit-log": false,
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
           }
         }
       }

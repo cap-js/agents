@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { generateTools, instrumentTools, createReadFileTool } from "./tools.js"
+import { generateTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
@@ -85,13 +85,7 @@ export default function registerDefaultAgentHandlers(srv) {
     return [...cdsTools, ...extraTools]
   })
 
-  // Auto-instrument all tools returned by buildTools (tracing, audit, metrics)
-  srv.after("buildTools", (tools) => {
-    if (Array.isArray(tools) && tools.length > 0) {
-      instrumentTools(tools)
-    }
-    return tools
-  })
+  srv.after("buildTools", (tools) => tools)
 
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
@@ -132,10 +126,6 @@ export default function registerDefaultAgentHandlers(srv) {
     const { GraphExecutor } = await import("./graph-executor.js")
 
     const tools = await srv.send("buildTools")
-
-    // Ensure all tools are instrumented (idempotent — after handler covers event path,
-    // this covers tools added by custom buildGraph handlers outside the event)
-    if (tools?.length > 0) instrumentTools(tools)
 
     // File-IO: add a read_file tool that resolves context at invocation time.
     // cds.context["agent.context.id"] and user.id are set by GraphExecutor before invoke.
