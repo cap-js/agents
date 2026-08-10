@@ -41,8 +41,8 @@ cds.on('bootstrap', () => {
     },
     aicore: {
       opus: 'anthropic--claude-4.8-opus',
-      sonnet: 'anthropic--claude-4.8-sonnet',
-      haiku: 'anthropic--claude-4.6-haiku',
+      sonnet: 'anthropic--claude-4.6-sonnet',
+      haiku: 'anthropic--claude-4.5-haiku',
     }
   }
 
