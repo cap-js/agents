@@ -34,12 +34,12 @@ if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id"
 cds.on('bootstrap', () => {
   const providers = {
     ['llm-mock']: {},
-    ['llm-anthropic']: {
+    anthropic: {
       opus: 'claude-opus-latest',
       sonnet: 'claude-sonnet-latest',
       haiku: 'claude-haiku-latest',
     },
-    ['llm-aicore']: {
+    aicore: {
       opus: 'anthropic--claude-4.8-opus',
       sonnet: 'anthropic--claude-4.8-sonnet',
       haiku: 'anthropic--claude-4.6-haiku',

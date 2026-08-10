@@ -161,12 +161,12 @@
         }
       },
       "kinds": {
-        "llm-aicore": {
+        "aicore": {
           "impl": "@cap-js/agents/lib/models/aicore",
           "model": "anthropic--claude-4.6-sonnet",
           "contentFilter": true
         },
-        "llm-anthropic": {
+        "anthropic": {
           "impl": "@cap-js/agents/lib/models/anthropic"
         },
         "llm-mock": {
