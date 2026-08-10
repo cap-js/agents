@@ -143,11 +143,15 @@ The LLM used by an agent is configured via `cds.requires.llm`. You can provide a
 }
 ```
 
+```yaml
+cds.requires.llm: anthropic/haiku
+```
+
 | Kind        | Description                                                                                                                             |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+|-------------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | `aicore`    | The default for `production` and `hybrid`, connects to SAP AI Core                                                                      |
 | `anthropic` | Used in the `with-claude` profile, autodiscovers config based on environment variables (`ANTHROPIC_API_KEY`) or `.claude/settings.json` |
-| `mock`      | The default for `development`, provides a mocked response when called                                                                   |
+| `llm-mock`  | The default for `development`, provides a mocked response when called                                                                   |
 
 To use multiple models for different agents, you can define additional ones and reference them via annotation.
 When defining an additional model, you need to prefix the kind with `llm-`.
@@ -156,9 +160,8 @@ When defining an additional model, you need to prefix the kind with `llm-`.
 {
   "cds": {
     "requires": {
-      "small-llm": {
-        // use any name you like
-        "kind": "llm-aicore",
+      "small-llm": { // use any name you like
+        "kind": "aicore",
         "model": "mistralai--mistral-small",
       },
     },
