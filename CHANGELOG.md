@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.1 - TBD
+
+### Added
+
+- `<provider>/<model>` convenience for known llm providers, for example `cds.requires.llm: anthropic/haiku`
+
 ## Version 0.9.0 - 2026-08-10
 
 ### Added
