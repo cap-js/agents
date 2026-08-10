@@ -173,6 +173,67 @@ function extractInterruptData(resultOrErr) {
   return payload
 }
 
+// Order-invariant JSON serializer for structural arg comparison.
+function canonicalJSON(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value)
+  if (Array.isArray(value)) return "[" + value.map(canonicalJSON).join(",") + "]"
+  const keys = Object.keys(value).sort()
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJSON(value[k])).join(",") + "}"
+}
+
+// Firm note describing HITL edits so the model doesn't apologize on the next turn.
+function composeEditNote(originals, resume) {
+  const decisions = resume?.decisions
+  if (!Array.isArray(decisions) || decisions.length === 0) return undefined
+
+  const changes = []
+  for (let i = 0; i < decisions.length; i++) {
+    const d = decisions[i]
+    if (d?.type !== "edit" || !d.editedAction) continue
+    const orig = originals[i]
+    if (!orig) continue
+    const editedName = d.editedAction.name
+    const editedArgs = d.editedAction.args
+    if (orig.name === editedName && canonicalJSON(orig.args) === canonicalJSON(editedArgs)) continue
+    changes.push({
+      from: { name: orig.name, args: orig.args },
+      to: { name: editedName, args: editedArgs },
+    })
+  }
+  if (changes.length === 0) return undefined
+
+  const lines = changes.map(
+    (c) =>
+      `- \`${c.from.name}(${JSON.stringify(c.from.args)})\` → \`${c.to.name}(${JSON.stringify(c.to.args)})\``,
+  )
+  return [
+    "The user reviewed your proposed tool call(s) in the human-in-the-loop approval flow and edited them before execution. This is intentional user action, NOT a mistake on your part. Do NOT apologize or say you made an error.",
+    "",
+    "Edits applied:",
+    ...lines,
+    "",
+    "Proceed as if the edited values are what the user actually wants. Describe the outcome of the executed call accurately.",
+  ].join("\n")
+}
+
+// Reads the pre-interrupt AI's tool_calls from the checkpointer (still un-mutated at resume time).
+async function getPreInterruptToolCalls(graph, config) {
+  try {
+    if (typeof graph.getState !== "function") return []
+    const state = await graph.getState(config)
+    const messages = state?.values?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m?.tool_calls?.length) {
+        return m.tool_calls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args }))
+      }
+    }
+    return []
+  } catch {
+    return []
+  }
+}
+
 /**
  * GraphExecutor wraps a compiled LangGraph graph as an A2A AgentExecutor.
  *
@@ -650,9 +711,16 @@ class GraphExecutor {
               userMessage: requestContext.userMessage,
             },
           })
+          // On edit, stash a diff note in state; the injector middleware prepends it next turn.
+          const commandArgs = { resume }
+          if (decision === "edit") {
+            const originals = await getPreInterruptToolCalls(graph, config)
+            const editNote = composeEditNote(originals, resume)
+            if (editNote) commandArgs.update = { _hitlEditNote: editNote }
+          }
           const resumed = await this._streamWithPublish(
             graph,
-            new Command({ resume }),
+            new Command(commandArgs),
             config,
             eventBus,
             taskId,
@@ -1210,6 +1278,7 @@ export {
   parseResumeDecision,
   decisionTypeOf,
   extractInterruptData,
+  composeEditNote,
 }
 
 /**

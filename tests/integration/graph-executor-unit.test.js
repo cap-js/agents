@@ -8,6 +8,7 @@ const {
   parseResumeDecision,
   decisionTypeOf,
   extractInterruptData,
+  composeEditNote,
 } = await import("../../srv/handlers/graph-executor.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
 
@@ -357,6 +358,76 @@ describe("decisionTypeOf", () => {
   it("falls back to 'data' for an opaque DataPart resume", () => {
     expect(decisionTypeOf({ foo: 1 })).toBe("data")
     expect(decisionTypeOf(undefined)).toBe("data")
+  })
+})
+
+describe("composeEditNote", () => {
+  const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
+
+  it("returns undefined for a non-edit decision (approve/reject) so no note is injected", () => {
+    expect(composeEditNote([originalCall], { decisions: [{ type: "approve" }] })).toBeUndefined()
+    expect(
+      composeEditNote([originalCall], { decisions: [{ type: "reject", message: "no" }] }),
+    ).toBeUndefined()
+  })
+
+  it("returns undefined for an opaque resume without a decisions array", () => {
+    expect(composeEditNote([originalCall], { foo: 1 })).toBeUndefined()
+    expect(composeEditNote([originalCall], undefined)).toBeUndefined()
+  })
+
+  it("returns undefined for a no-op edit (edited args structurally equal to originals)", () => {
+    // key order differs but the shape is identical
+    const noopEdit = {
+      decisions: [
+        { type: "edit", editedAction: { name: "submitOrder", args: { quantity: 3, book: 201 } } },
+      ],
+    }
+    expect(composeEditNote([originalCall], noopEdit)).toBeUndefined()
+  })
+
+  it("produces a firm, prescriptive note when args changed", () => {
+    const edit = {
+      decisions: [
+        { type: "edit", editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } } },
+      ],
+    }
+    const note = composeEditNote([originalCall], edit)
+    expect(note).toBeTypeOf("string")
+    expect(note).toMatch(/intentional user action/i)
+    expect(note).toMatch(/do not apologize/i)
+    expect(note).toContain('"quantity":3')
+    expect(note).toContain('"quantity":4')
+    expect(note).toContain("submitOrder")
+  })
+
+  it("reflects a tool name change (not just args)", () => {
+    const nameChanged = {
+      decisions: [
+        {
+          type: "edit",
+          editedAction: { name: "cancelOrder", args: { book: 201, quantity: 3 } },
+        },
+      ],
+    }
+    const note = composeEditNote([originalCall], nameChanged)
+    expect(note).toBeTypeOf("string")
+    expect(note).toContain("submitOrder")
+    expect(note).toContain("cancelOrder")
+  })
+
+  it("lists only the tool_calls that actually changed in a mixed batch", () => {
+    const originals = [originalCall, { id: "tc-2", name: "notifyUser", args: { userId: 42 } }]
+    const mixed = {
+      decisions: [
+        { type: "edit", editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } } },
+        { type: "edit", editedAction: { name: "notifyUser", args: { userId: 42 } } },
+      ],
+    }
+    const note = composeEditNote(originals, mixed)
+    expect(note).toBeTypeOf("string")
+    expect(note).toContain("submitOrder")
+    expect(note).not.toContain("notifyUser")
   })
 })
 

@@ -156,4 +156,68 @@ describe("@cap-js/agents - HITL DataPart carry (issue #199)", () => {
     // Reject should complete the task (graph continues, action skipped), not error it
     expect(resumeRes.data.result?.status.state).toBe("completed")
   })
+
+  it("resume side: edit decision injects an awareness note so the agent doesn't apologize", async () => {
+    const contextId = cds.utils.uuid()
+
+    // Trigger HITL asking for 3 copies.
+    const triggerRes = await sendMessage(
+      "catalog",
+      [
+        {
+          kind: "text",
+          text: "Please submit an order for 3 copies of book with ID 201. Go ahead and call submitOrder directly.",
+        },
+      ],
+      { contextId },
+    )
+
+    expect(triggerRes.data.result?.status.state).toBe("input-required")
+    const taskId = triggerRes.data.result.id
+
+    // Ground "edited" args in what the model actually proposed (book id may vary).
+    const parts = triggerRes.data.result.status.message?.parts || []
+    const dataPart = parts.find((p) => p.kind === "data" && p.data !== undefined)
+    expect(dataPart, "expected the interrupt to carry a DataPart").toBeTruthy()
+    const original = dataPart.data.actionRequests?.[0]
+    expect(original, "expected at least one actionRequest").toBeTruthy()
+    expect(original.name).toBe("submitOrder")
+
+    // Edit: bump quantity 3 → 4.
+    const editedArgs = { ...original.args, quantity: 4 }
+    const resumeRes = await sendMessage(
+      "catalog",
+      [
+        {
+          kind: "data",
+          data: {
+            decisions: [
+              {
+                type: "edit",
+                editedAction: { name: "submitOrder", args: editedArgs },
+              },
+            ],
+          },
+        },
+      ],
+      { contextId, taskId },
+    )
+
+    expect(resumeRes.status).toBe(200)
+    const result = resumeRes.data.result
+    expect(result?.status.state).toBe("completed")
+
+    // Final message must reflect the edited quantity and not apologize.
+    const finalText = (result.status.message?.parts ?? [])
+      .filter((p) => p.kind === "text" || p.text)
+      .map((p) => p.text)
+      .join(" ")
+
+    expect(finalText, "expected a final agent message").toBeTruthy()
+    expect(finalText).toMatch(/\b4\b/)
+    expect(
+      finalText,
+      `agent should not apologize when the user edited a tool call — got: ${finalText}`,
+    ).not.toMatch(/sorry|apolog|mistake|error on my/i)
+  })
 })
