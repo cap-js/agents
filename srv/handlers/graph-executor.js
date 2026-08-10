@@ -186,14 +186,33 @@ function composeEditNote(originals, resume) {
   const decisions = resume?.decisions
   if (!Array.isArray(decisions) || decisions.length === 0) return undefined
 
+  const consumed = new Set()
+  const takeByName = (name) => {
+    for (let j = 0; j < originals.length; j++) {
+      if (!consumed.has(j) && originals[j]?.name === name) {
+        consumed.add(j)
+        return originals[j]
+      }
+    }
+    return undefined
+  }
+  const takeNextUnconsumed = () => {
+    for (let j = 0; j < originals.length; j++) {
+      if (!consumed.has(j)) {
+        consumed.add(j)
+        return originals[j]
+      }
+    }
+    return undefined
+  }
+
   const changes = []
-  for (let i = 0; i < decisions.length; i++) {
-    const d = decisions[i]
+  for (const d of decisions) {
     if (d?.type !== "edit" || !d.editedAction) continue
-    const orig = originals[i]
-    if (!orig) continue
     const editedName = d.editedAction.name
     const editedArgs = d.editedAction.args
+    const orig = takeByName(editedName) ?? takeNextUnconsumed()
+    if (!orig) continue
     if (orig.name === editedName && canonicalJSON(orig.args) === canonicalJSON(editedArgs)) continue
     changes.push({
       from: { name: orig.name, args: orig.args },
@@ -282,8 +301,9 @@ class GraphExecutor {
     }
     // Auto-inject CdsCheckpointSaver if graph has no checkpointer (enables multi-turn + HITL)
     if (!resolved.checkpointer && this._options?.checkpointer !== false) {
-      const { CdsCheckpointSaver } =
-        await import("../../lib/protocol/persistence/checkpoint-saver.js")
+      const { CdsCheckpointSaver } = await import(
+        "../../lib/protocol/persistence/checkpoint-saver.js"
+      )
       resolved.checkpointer = new CdsCheckpointSaver()
       LOG.debug("Auto-injected CdsCheckpointSaver", { service: this._srv.name })
     }
@@ -682,9 +702,7 @@ class GraphExecutor {
           const userText = extractText(requestContext)
           // Relaxed guard: accept a DataPart-only resume OR non-empty text.
           if (dataPart === undefined && !userText.trim()) {
-            throw new Error(
-              "Resume message must contain text (e.g. 'approve' or 'reject') or a data part.",
-            )
+            throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
           }
           const { Command } = await import("@langchain/langgraph")
           // DataPart present → carry its opaque .data as the resume value, bypassing

@@ -429,6 +429,33 @@ describe("composeEditNote", () => {
     expect(note).toContain("submitOrder")
     expect(note).not.toContain("notifyUser")
   })
+
+  it("matches decisions to originals by name — auto-approved tool_calls in the middle don't misalign", () => {
+    // Real-world shape: the AI proposed 3 tool_calls; only submitOrder + refund are HITL.
+    // `listBooks` was auto-approved and doesn't appear in the resume `decisions`.
+    // Naive positional matching would pair edit(submitOrder) with listBooks — wrong.
+    const originals = [
+      { id: "tc-1", name: "listBooks", args: {} }, // auto-approved
+      { id: "tc-2", name: "submitOrder", args: { book: 201, quantity: 3 } },
+      { id: "tc-3", name: "refund", args: { orderId: 99 } },
+    ]
+    const resume = {
+      decisions: [
+        { type: "edit", editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } } },
+        { type: "edit", editedAction: { name: "refund", args: { orderId: 100 } } },
+      ],
+    }
+    const note = composeEditNote(originals, resume)
+    expect(note).toBeTypeOf("string")
+    // Both edits reported against the correct originals — not listBooks
+    expect(note).toContain("submitOrder")
+    expect(note).toContain("refund")
+    expect(note).not.toContain("listBooks")
+    expect(note).toContain('"quantity":3')
+    expect(note).toContain('"quantity":4')
+    expect(note).toContain('"orderId":99')
+    expect(note).toContain('"orderId":100')
+  })
 })
 
 describe("GraphExecutor - HITL DataPart resume", () => {
