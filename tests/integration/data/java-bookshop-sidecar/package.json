@@ -1,0 +1,21 @@
+{
+  "name": "java-bookshop-sidecar-fixture",
+  "private": true,
+  "cds": {
+    "profile": "agent-sidecar",
+    "agent": {
+      "pool": null
+    },
+    "requires": {
+      "db": {
+        "kind": "sqlite",
+        "credentials": {
+          "url": ":memory:"
+        }
+      },
+      "agent-executor": {
+        "kind": "agent-executor-mock"
+      }
+    }
+  }
+}

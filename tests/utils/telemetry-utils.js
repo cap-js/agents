@@ -98,6 +98,29 @@ export function findSpans(spans, namePattern) {
 }
 
 /**
+ * Create a sendMessageWithParts helper bound to a POST function.
+ * @param {Function} POST - from cds.test()
+ * @returns {Function} sendMessageWithParts(service, parts)
+ */
+export function createSendMessageWithParts(POST) {
+  return function sendMessageWithParts(service, parts) {
+    return POST(`/a2a/${service}/`, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "message/send",
+      params: {
+        message: {
+          kind: "message",
+          messageId: cds.utils.uuid(),
+          role: "user",
+          parts,
+        },
+      },
+    })
+  }
+}
+
+/**
  * Create a sendMessage helper bound to a POST function.
  * @param {Function} POST - from cds.test()
  * @returns {Function} sendMessage(service, text)

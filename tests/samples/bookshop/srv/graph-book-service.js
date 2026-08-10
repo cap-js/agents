@@ -46,10 +46,10 @@ export default class GraphBookService extends cds.ApplicationService {
     })
 
     // Mock LLM node: simulates an LLM call with token usage metrics
-    async function llmNode(state) {
-      const modelName = "mock-model-for-testing"
+    async function llmNode() {
+      const model = "mock-model-for-testing"
       const node = "llm"
-      const mAttrs = { "sap.tenantId": cds.context?.tenant || "anonymous", model: modelName, node }
+      const mAttrs = { "sap.tenantId": cds.context?.tenant || "anonymous", model, node }
 
       const usage = { input_tokens: 42, output_tokens: 18, total_tokens: 60 }
       metrics.llmInvocations.add(1, { ...mAttrs, outcome: "success" })
@@ -73,7 +73,7 @@ export default class GraphBookService extends cds.ApplicationService {
           output: "No query tool available.",
         }
       }
-      const result = await queryTool.invoke({ entity: "Books", limit: 3 }, config)
+      const result = await queryTool.invoke({ cql: "SELECT * FROM Books LIMIT 3" }, config)
       const countResult = await getBookCount.invoke({ genre_ID: 11 }, config)
       const output = `${result}\n\nBook count: ${countResult}`
       return { messages: [new AIMessage(output)], output }

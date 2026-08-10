@@ -2,8 +2,13 @@
   "name": "@cap-js/agents",
   "version": "0.1.0",
   "description": "CDS plugin for building agents",
+  "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
   "homepage": "https://cap.cloud.sap/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cap-js/agents.git"
+  },
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -18,15 +23,18 @@
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "test": "CDS_ENV=test vitest run --config vitest.config.js",
-    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
-    "test:bookshop-evals": "CDS_ENV=test,hybrid cds bind --exec -- vitest run --config vitest.config.evals.js",
+    "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
+    "test:cds8": "CDS_ENV=test npx vitest run --config vitest.config.js",
+    "pretest:cds8": "npm pkg set 'overrides.@sap/cds=^8' 'overrides.@cap-js/sqlite=^1' 'overrides.@cap-js/hana=^1' 'overrides.@sap/cds-mtxs=^2' 'overrides.express=^4' && npm pkg set 'devDependencies.@sap/cds=^8' 'devDependencies.@cap-js/sqlite=^1' 'devDependencies.@cap-js/cds-test=>0' 'peerDependencies.@sap/cds=^8' && npm pkg delete 'devDependencies.@cap-js/hana' 'devDependencies.@sap/cds-mtxs' && rm -rf node_modules && npm i --legacy-peer-deps",
+    "posttest:cds8": "git checkout package.json && rm -rf node_modules && npm i --legacy-peer-deps",
+    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
+    "test:bookshop-evals": "CDS_ENV=test,hybrid cds bind --exec -- npx vitest run --config vitest.config.evals.js",
     "test:goallab-evals": "npm test --workspace=goallab-prediction-agent",
-    "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
+    "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
     "watch:with-claude": "cds w tests/samples/bookshop --profile with-claude",
-    "watch:deep-agent": "cds w tests/samples/deep-agent",
+    "watch:deep-agent": "cds w tests/samples/deep-agent --profile hybrid",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
   },
@@ -35,21 +43,24 @@
     "index.cds",
     "lib",
     "srv",
-    "cds-plugin.js"
+    "cds-plugin.js",
+    "_i18n"
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
-    "@cap-js/attachments": "^3.12.2",
-    "@cap-js/mcp": "^1.1",
+    "@cap-js/attachments": "^4",
+    "@cap-js/mcp": "^1.4",
+    "@langchain/anthropic": "^1.5.1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
-    "@langchain/anthropic": "^1.5.1",
     "@langchain/mcp-adapters": "^1.1.3",
-    "@sap-ai-sdk/langchain": "^2",
+    "@sap-ai-sdk/langchain": "^2.13.0",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/connectivity": "^4.7.0",
     "@sap-cloud-sdk/resilience": "^4.7.0",
-    "langchain": "^1",
+    "deepagents": "^1.10.0",
+    "langchain": "^1.5.0",
+    "marked": "^18",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -79,14 +90,14 @@
     }
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "cds": {
     "agents": {
-      "llm": "anthropic--claude-4.6-sonnet",
       "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
+      "connect": "auto",
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [
@@ -147,7 +158,7 @@
         "maxToolCallsPerTask": 50,
         "maxLLMInvocationsPerTask": 50,
         "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeoutMs": 120000,
+        "maxLLMCallTimeout": "120s",
         "maxExecutionTimePerTask": "5min",
         "timeoutGrace": "15s",
         "maxIncomingMessageLength": 5000
@@ -160,16 +171,16 @@
       "agent-push-notifications": {
         "impl": "@cap-js/agents/srv/push-notification-srv.js"
       },
-      "databricks-mlflow": {
+      "mlflow": {
         "vcap": {
           "label": "user-provided",
-          "name": "databricks-mlflow"
+          "name": "mlflow"
         }
       },
       "kinds": {
         "llm-aicore": {
           "impl": "@cap-js/agents/lib/models/aicore",
-          "modelName": "anthropic--claude-4.6-sonnet",
+          "model": "anthropic--claude-4.6-sonnet",
           "contentFilter": true
         },
         "llm-anthropic": {
@@ -191,6 +202,22 @@
       "[production]": {
         "llm": "aicore"
       }
+    },
+    "protocols": {
+      "agent": {
+        "path": "/a2a",
+        "impl": "@cap-js/agents/lib/index.cjs"
+      }
+    },
+    "[agent-sidecar]": {
+      "server": {
+        "port": 4006
+      },
+      "[java]": {
+        "agent": {
+          "_javaHcqlCompat": true
+        }
+      }
     }
   },
   "workspaces": [
@@ -202,6 +229,10 @@
     "tests/samples/travel/travel-agent/",
     "tests/samples/travel/xflights/",
     "tests/samples/travel/leisure-services/",
-    "goallab-prediction-agent/"
+    "goallab-prediction-agent/",
+    "tests/sidecar-samples/java-bookshop/agent/sidecar",
+    "tests/sidecar-samples/java-bookshop",
+    "tests/sidecar-samples/node-bookshop/agent/sidecar",
+    "tests/sidecar-samples/node-bookshop"
   ]
 }

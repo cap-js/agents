@@ -1,46 +1,13 @@
 import cds from "@sap/cds"
-import { short, audit } from "../../lib/utils/utils.js"
+import { short, audit, ms4 } from "../../lib/utils/utils.js"
+import { partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
+import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 
 const LOG = cds.log("agent")
-
-/** Parse time-span value to ms. Uses cds.utils.ms4 (CDS 9+) with fallback for CDS 8. */
-const ms4 =
-  cds.utils.ms4 ||
-  ((val) => {
-    if (typeof val === "number") return val
-    const m = /^(\d+)\s*(ms|s|sec|seconds?|m|min|minutes?|h|hrs|hours?|d|days?|w|weeks?)?$/i.exec(
-      String(val),
-    )
-    if (!m) return Number(val) || 0
-    const n = Number(m[1])
-    const unit = (m[2] || "ms").toLowerCase()
-    const factors = {
-      ms: 1,
-      s: 1000,
-      sec: 1000,
-      second: 1000,
-      seconds: 1000,
-      m: 60000,
-      min: 60000,
-      minute: 60000,
-      minutes: 60000,
-      h: 3600000,
-      hrs: 3600000,
-      hour: 3600000,
-      hours: 3600000,
-      d: 86400000,
-      day: 86400000,
-      days: 86400000,
-      w: 604800000,
-      week: 604800000,
-      weeks: 604800000,
-    }
-    return n * (factors[unit] || 1)
-  })
 
 /**
  * Thrown when a task execution is aborted (client disconnect or tasks/cancel).
@@ -75,11 +42,7 @@ class TimeoutError extends Error {
  */
 async function defaultInputMapper(requestContext) {
   const { HumanMessage } = await import("@langchain/core/messages")
-  const text =
-    requestContext.userMessage?.parts
-      ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
-      .map((p) => p.text)
-      .join(" ") || ""
+  const text = partsToText(requestContext.userMessage?.parts)
   const fullText = requestContext._fileManifest ? `${text}\n${requestContext._fileManifest}` : text
   return { messages: [new HumanMessage(fullText)] }
 }
@@ -133,12 +96,7 @@ function agentMessage(text) {
  * Extract user text from A2A message parts.
  */
 function extractText(requestContext) {
-  return (
-    requestContext.userMessage?.parts
-      ?.filter((p) => p.kind === "text" || (!p.kind && p.text))
-      .map((p) => p.text)
-      .join(" ") || ""
-  )
+  return partsToText(requestContext.userMessage?.parts)
 }
 
 /**
@@ -236,9 +194,12 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const timeout = cds.env.agents?.pool?.maxExecutionTimeMsPerTask || 300_000
+    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const grace = this._getGrace()
+    const softTimeout = Math.max(maxExecution - grace, 1000)
+
     const controller = new AbortController()
-    const timeoutHandle = setTimeout(() => controller.abort(), timeout)
+    const timeoutHandle = setTimeout(() => controller.abort(), softTimeout)
     const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
 
     let tokenCount = 0
@@ -348,7 +309,9 @@ class GraphExecutor {
         if (signal?.aborted) {
           throw new AbortError("Task execution aborted")
         }
-        throw new Error(`Graph execution timed out after ${timeout / 1000}s`, { cause: err })
+        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
+          timeout: softTimeout,
+        })
       }
       throw err
     } finally {
@@ -362,9 +325,16 @@ class GraphExecutor {
     // ephemeral signal that may already be cleared from channel_values.
     if (this._graph?.checkpointer) {
       try {
-        const cp = await this._graph.checkpointer.getTuple({
-          configurable: { thread_id: config.configurable?.thread_id },
-        })
+        const thread_id = config.configurable?.thread_id
+        let cp = await this._graph.checkpointer.getTuple({ configurable: { thread_id } })
+        if (!cp?.checkpoint?.channel_values && this._graph.checkpointer.latestNamespace) {
+          const ns = await this._graph.checkpointer.latestNamespace(thread_id)
+          if (ns) {
+            cp = await this._graph.checkpointer.getTuple({
+              configurable: { thread_id, checkpoint_ns: ns },
+            })
+          }
+        }
         const channelValues = cp?.checkpoint?.channel_values
         if (channelValues) {
           const interrupt = finalState?.__interrupt__
@@ -444,25 +414,19 @@ class GraphExecutor {
     const serviceName = this._srv.name
     const isResume = requestContext.task?.status?.state === "input-required"
     const mAttrs = metrics.attrs(serviceName)
-    const userText = extractText(requestContext)
 
     // Cooperative cancellation: per-task AbortController
     const controller = new AbortController()
     this._abortControllers.set(taskId, controller)
 
-    // A2A correlation on HTTP span + log context
-    const httpSpan = metrics.getActiveSpan()
-    if (httpSpan) {
-      httpSpan.setAttribute("agent.task.id", taskId)
-      httpSpan.setAttribute("agent.context.id", contextId)
-      httpSpan.setAttribute("agent.service", serviceName)
+    // A2A context for tracing
+    if (!cds.context) {
+      throw Error(`Agent ${serviceName} must be called with cds.context in place!`)
     }
-    if (cds.context) {
-      cds.context["agent.task.id"] = taskId
-      cds.context["agent.context.id"] = contextId
-      cds.context["agent.service"] = serviceName
-      cds.context["agent.eventBus"] = eventBus
-    }
+    cds.context["agent.task.id"] = taskId
+    cds.context["agent.context.id"] = contextId
+    cds.context["agent.service"] = serviceName
+    cds.context["agent.eventBus"] = eventBus
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
@@ -513,7 +477,7 @@ class GraphExecutor {
               const buf = Buffer.from(file.bytes, "base64")
               await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
               LOG.info("file uploaded", {
-                task: short(taskId),
+                conversation: short(contextId),
                 service: serviceName,
                 name: safeName,
                 mimeType: safeMime,
@@ -552,12 +516,41 @@ class GraphExecutor {
         wfSpan.setAttribute("agent.task.id", taskId)
         wfSpan.setAttribute("agent.context.id", contextId)
         wfSpan.setAttribute("agent.service", serviceName)
-        // MLflow Databricks: root workflow span carries AGENT type + trace tags
-        setSpanAttrs(wfSpan, mlflowAttrs("AGENT", { inputs: userText, functionName: serviceName }))
-        setSpanAttrs(wfSpan, mlflowTraceAttrs())
+        // MLflow: workflow span carries AGENT type + inputs for the
+        // span-detail view
+        wfSpan.setAttribute("mlflow.message.format", "langchain-js")
+        setSpanAttrs(
+          wfSpan,
+          mlflowAttrs("AGENT", {
+            inputs: { messages: buildChatMessages(requestContext) },
+            functionName: serviceName,
+          }),
+        )
+        const rootSpan = cds.context["_mlflow.rootSpan"]
+        rootSpan.setAttribute("agent.task.id", cds.context["agent.task.id"])
+        rootSpan.setAttribute("agent.context.id", cds.context["agent.context.id"])
+        rootSpan.setAttribute("agent.service", cds.context["agent.service"])
+        // MLflow: trace correlation on the OTel root span.
+        // - mlflow.spanInputs → Request column in the trace list
+        // - session.id / user.id / mlflow.traceTag.* (via mlflowTraceAttrs) → session
+        //   and tag columns in the trace list.
+        const userText = extractText(requestContext)
+        setSpanAttrs(
+          rootSpan,
+          mlflowAttrs("CHAIN", {
+            // In case rootSpan is HTTP keep its name, if no name yet given fallback to service
+            functionName: rootSpan.name ?? serviceName,
+            inputs:
+              userText !== undefined
+                ? { messages: [{ role: "user", content: userText }] }
+                : undefined,
+          }),
+        )
+        setSpanAttrs(rootSpan, mlflowTraceAttrs())
       }
 
-      let lastResult
+      let usageData
+      let result
       try {
         const graph = await this._resolveGraph()
 
@@ -580,19 +573,18 @@ class GraphExecutor {
           },
         }
 
-        let result
         const t0 = Date.now()
 
         if (isResume) {
           const userText = extractText(requestContext)
           if (!userText.trim()) {
-            throw new Error("Resume message must contain text (e.g. 'approve' or 'reject').")
+            throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
           }
           const { Command } = await import("@langchain/langgraph")
           const resume = parseResumeDecision(userText)
 
           LOG.debug("resuming", {
-            task: short(taskId),
+            conversation: short(contextId),
             service: serviceName,
             decision: resume.decisions[0].type,
           })
@@ -633,16 +625,30 @@ class GraphExecutor {
           )
           result = streamed.state
         }
-
         // Capture result for usage tracking in finally block
-        lastResult = result
+        usageData = aggregateUsageData(result.messages)
 
         if (result?.__interrupt__?.length > 0) {
           const description = extractInterruptDescription(result)
 
-          LOG.info("input-required", { task: short(taskId), service: serviceName })
+          const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
+          LOG.info("input-required", {
+            conversation: short(contextId),
+            service: serviceName,
+            duration,
+          })
 
-          if (wfSpan) wfSpan.setAttribute("agent.outcome", "input-required")
+          if (wfSpan) {
+            wfSpan.setAttribute("agent.outcome", "input-required")
+            const outputs = {
+              choices: [{ message: { role: "assistant", content: description } }],
+            }
+            setSpanAttrs(wfSpan, mlflowAttrs("AGENT", { outputs }))
+            const rootSpan = cds.context?.["_mlflow.rootSpan"]
+            if (rootSpan) {
+              setSpanAttrs(rootSpan, mlflowAttrs("CHAIN", { outputs }))
+            }
+          }
 
           // Audit: agent requires human input
           audit("AgentInputRequired", {
@@ -674,13 +680,25 @@ class GraphExecutor {
         const outputMapper = this._outputMapper || defaultOutputMapper
         const output = outputMapper(result) || "I could not generate a response."
 
-        LOG.info("completed", { task: short(taskId), service: serviceName, duration })
+        LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "completed")
           setSpanAttrs(
             wfSpan,
-            mlflowAttrs("AGENT", { outputs: output?.slice(0, 1000), functionName: serviceName }),
+            mlflowAttrs("AGENT", {
+              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              functionName: serviceName,
+            }),
+          )
+        }
+        const rootSpan = cds.context?.["_mlflow.rootSpan"]
+        if (rootSpan) {
+          setSpanAttrs(
+            rootSpan,
+            mlflowAttrs("CHAIN", {
+              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+            }),
           )
         }
 
@@ -693,8 +711,8 @@ class GraphExecutor {
             contextId,
             service: serviceName,
             duration,
-            tokens: lastResult?.runTokenCount,
-            toolCalls: lastResult?.runToolCallCount,
+            tokenUsage: usageData,
+            toolCalls: totalToolCalls(result.messages),
             output: output?.slice(0, 2000),
             task: requestContext.task,
           },
@@ -784,7 +802,7 @@ class GraphExecutor {
                   : 0
               if (declaredBytes > maxFileBytes) {
                 LOG.warn("emit_file_part artifact exceeds cap; skipping", {
-                  task: short(taskId),
+                  conversation: short(contextId),
                   service: serviceName,
                   name: artifact.file?.name,
                   size: declaredBytes,
@@ -811,7 +829,7 @@ class GraphExecutor {
           for (const meta of outputMeta) {
             if (meta.size > maxFileBytes) {
               LOG.warn("output file exceeds cap; skipping", {
-                task: short(taskId),
+                conversation: short(contextId),
                 service: serviceName,
                 name: meta.name,
                 size: meta.size,
@@ -847,7 +865,7 @@ class GraphExecutor {
         for (const filePart of fileArtifacts) {
           if (!filePart.file?.name) {
             LOG.warn("skipping malformed file artifact", {
-              task: short(taskId),
+              conversation: short(contextId),
               service: serviceName,
             })
             continue
@@ -860,7 +878,7 @@ class GraphExecutor {
               ? Buffer.byteLength(filePart.file.bytes, "base64")
               : 0
           LOG.info("file emitted", {
-            task: short(taskId),
+            conversation: short(contextId),
             service: serviceName,
             name: safeName,
             mimeType: filePart.file?.mimeType,
@@ -894,7 +912,7 @@ class GraphExecutor {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
         // Use name check (not instanceof) to also catch native DOMException AbortError from LangGraph
         if (err.name === "AbortError") {
-          LOG.info("canceled", { task: short(taskId), service: serviceName })
+          LOG.info("canceled", { conversation: short(contextId), service: serviceName })
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "canceled")
 
           audit("AgentTaskCanceled", {
@@ -917,7 +935,7 @@ class GraphExecutor {
 
         // Timeout — attempt graceful summary of work-in-progress before reporting
         if (err.name === "TimeoutError") {
-          LOG.warn("timeout", { task: short(taskId), service: serviceName })
+          LOG.warn("timeout", { conversation: short(contextId), service: serviceName })
 
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "timeout")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "timeout" })
@@ -957,7 +975,7 @@ class GraphExecutor {
         // Quota exceeded — summarize partial work instead of raw error
         if (err.quotaExceeded) {
           LOG.warn("quota exceeded", {
-            task: short(taskId),
+            conversation: short(contextId),
             service: serviceName,
             error: err.message,
           })
@@ -997,8 +1015,16 @@ class GraphExecutor {
           return
         }
 
-        LOG.error("failed", { task: short(taskId), service: serviceName, error: err.message })
-        LOG.debug("failed stack", { task: short(taskId), service: serviceName, stack: err.stack })
+        LOG.error("failed", {
+          conversation: short(contextId),
+          service: serviceName,
+          error: err.message,
+        })
+        LOG.debug("failed stack", {
+          conversation: short(contextId),
+          service: serviceName,
+          stack: err.stack,
+        })
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")
@@ -1042,22 +1068,40 @@ class GraphExecutor {
         metrics.concurrentExecutions.add(-1, mAttrs)
 
         // Update task record with usage data (non-blocking, best effort)
+        // When result is undefined (quota exceeded, timeout, abort), recover
+        // messages from the checkpoint for usage tracking.
+        const graph = this._graph
         cds.spawn(async () => {
           try {
-            const updates = { agentService: serviceName }
-            let usageState = lastResult
-            if (!usageState && this._graph?.checkpointer) {
-              const cp = await this._graph.checkpointer.getTuple({
-                configurable: { thread_id: `${serviceName}:${contextId}` },
-              })
-              usageState = cp?.checkpoint?.channel_values
+            let messages = result?.messages
+            if (!messages && graph?.checkpointer) {
+              try {
+                const thread_id = `${serviceName}:${contextId}`
+                let cp = await graph.checkpointer.getTuple({ configurable: { thread_id } })
+                if (!cp?.checkpoint?.channel_values && graph.checkpointer.latestNamespace) {
+                  const ns = await graph.checkpointer.latestNamespace(thread_id)
+                  if (ns) {
+                    cp = await graph.checkpointer.getTuple({
+                      configurable: { thread_id, checkpoint_ns: ns },
+                    })
+                  }
+                }
+                messages = cp?.checkpoint?.channel_values?.messages
+              } catch {
+                /* best-effort */
+              }
             }
-            if (usageState?.runTokenCount != null) updates.usageLlmTokens = usageState.runTokenCount
-            if (usageState?.runToolCallCount != null)
-              updates.usageToolCalls = usageState.runToolCallCount
+            const updates = { agentService: serviceName }
+            if (usageData?.total_tokens != null) {
+              updates.usageLlmTokens = usageData.total_tokens
+            } else if (messages) {
+              const recovered = aggregateUsageData(messages)
+              if (recovered?.total_tokens) updates.usageLlmTokens = recovered.total_tokens
+            }
+            if (messages) updates.usageToolCalls = totalToolCalls(messages)
             await UPDATE("cap.agent.Tasks").where({ taskId }).with(updates)
           } catch (err) {
-            LOG.debug("usage update failed", { task: short(taskId), error: err.message })
+            LOG.debug("usage update failed", { conversation: short(contextId), error: err.message })
           }
         })
 
@@ -1067,6 +1111,9 @@ class GraphExecutor {
 
     if (tracer) {
       await tracer.startActiveSpan(`workflow CompiledStateGraph ${serviceName}`, async (wfSpan) => {
+        if (!cds.context["_mlflow.rootSpan"]) {
+          cds.context["_mlflow.rootSpan"] = wfSpan
+        }
         try {
           await runWorkflow(wfSpan)
         } finally {
@@ -1103,3 +1150,35 @@ class GraphExecutor {
 }
 
 export { GraphExecutor, messageText, defaultOutputMapper }
+
+/**
+ * @param {[import('@langchain/core/messages').Message]} messages
+ */
+function aggregateUsageData(messages) {
+  const result = {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+    reasoning_tokens: 0,
+  }
+  for (let i = 0; i < messages.length; i++) {
+    if (!messages[i].usage_metadata) continue
+    const innerRes = convertUsageData(messages[i].usage_metadata)
+    Object.keys(innerRes).forEach((k) => {
+      if (innerRes[k] != null) result[k] += innerRes[k]
+    })
+  }
+  return result
+}
+
+/**
+ * @param {[import('@langchain/core/messages').Message]} messages
+ */
+function totalToolCalls(messages) {
+  return messages.reduce((acc, val) => {
+    if (val.type === "tool") acc++
+    return acc
+  }, 0)
+}

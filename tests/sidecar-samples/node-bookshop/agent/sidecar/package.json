@@ -1,0 +1,84 @@
+{
+  "name": "node-bookshop-sidecar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agent sidecar for Node.js CAP bookshop — connects via HCQL",
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "dependencies": {
+    "@cap-js/agents": "*",
+    "@sap/cds": ">=9",
+    "@cap-js/sqlite": ">=1",
+    "@cap-js/hana": ">=1"
+  },
+  "cds": {
+    "build": {
+      "tasks": [
+        {
+          "for": "hana",
+          "src": "db",
+          "options": {
+            "model": [
+              "db"
+            ]
+          }
+        }
+      ]
+    },
+    "server": {
+      "port": 4006
+    },
+    "profiles": [
+      "agent-sidecar",
+      "node"
+    ],
+    "agents": {
+      "pool": null
+    },
+    "requires": {
+      "db": {
+        "pool": {
+          "acquireTimeoutMillis": 30000
+        }
+      },
+      "agent-executor": {
+        "kind": "agent-executor-langgraph"
+      }
+    },
+    "[development]": {
+      "requires": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "url": ":memory:"
+          }
+        },
+        "agent": {
+          "url": "http://localhost:4004/hcql",
+          "model": [
+            "../../srv",
+            "../../db"
+          ],
+          "credentials": {
+            "headers": {
+              "Authorization": "Basic YWRtaW46YWRtaW4="
+            }
+          }
+        }
+      }
+    },
+    "[production]": {
+      "requires": {
+        "agent": {
+          "model": [
+            "_main/srv/csn.json"
+          ],
+          "credentials": {
+            "destination": "srv-api"
+          }
+        }
+      }
+    }
+  }
+}

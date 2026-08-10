@@ -23,7 +23,7 @@ export default class OtelV1Service extends cds.ApplicationService {
       output: Annotation({ reducer: (_, v) => v }),
     })
 
-    async function agentNode(state) {
+    async function agentNode() {
       const queryTool = tools.find((t) => t.name === "query")
       if (!queryTool) {
         return { messages: [new AIMessage("No query tool.")], output: "No query tool." }

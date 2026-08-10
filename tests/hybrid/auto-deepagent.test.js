@@ -40,7 +40,7 @@ describe("@cap-js/agents - @agent.llm annotation", () => {
     expect(model, "buildModel should return a model").toBeTruthy()
     expect(model.name).toBe("llm")
     const resolvedName = model.orchestrationConfig?.promptTemplating?.model?.name
-    expect(resolvedName).toBe(cds.requires.llm.modelName)
+    expect(resolvedName).toBe(cds.requires.llm.model)
   })
 })
 

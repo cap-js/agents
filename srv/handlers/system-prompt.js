@@ -13,7 +13,7 @@ export function buildSystemPrompt(srv) {
     "Use the `query` tool to read data from entities.",
     cds.env.agents?.per_action_tool !== false
       ? "Call action and function tools directly by name."
-      : "Use the `call_action` tool to invoke actions and functions.",
+      : "Use the `call` tool to invoke actions and functions.",
     ...(cds.env.agents?.fileIO?.enabled
       ? [
           "When the user's message contains '[Uploaded files: ...]', use the `read_file` tool to read each listed file before answering.",

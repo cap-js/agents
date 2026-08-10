@@ -27,9 +27,6 @@ describe("@cap-js/agents - Multi-tenancy (active_users)", () => {
       },
       { auth: { username: "carol", password: "" } },
     )
-    if (res.data.result?.status?.state !== "completed") {
-      console.error("DEBUG response:", res.status, JSON.stringify(res.data).slice(0, 400))
-    }
     expect(res.data.result?.status?.state).toBe("completed")
 
     // 2. Stub cds.connect.to and cds.spawn so:

@@ -6,6 +6,7 @@ import {
   resetCapture,
   createSendMessage,
 } from "../utils/telemetry-utils.js"
+import { ms4 } from "../../lib/utils/utils.js"
 
 process.env.CDS_TEST_SILENT = "false"
 setup()
@@ -375,13 +376,34 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should parse interval strings correctly", async () => {
-      const { parseInterval } = await import("../../lib/telemetry/active-users.js")
+      const parseInterval = ms4
       expect(parseInterval("24h")).toBe(24 * 3600000)
       expect(parseInterval("30m")).toBe(30 * 60000)
       expect(parseInterval("60s")).toBe(60000)
       expect(parseInterval("5000ms")).toBe(5000)
       expect(parseInterval(10000)).toBe(10000)
       expect(parseInterval("1d")).toBe(86400000)
+      expect(parseInterval("1h")).toBe(3600000)
+      expect(parseInterval("1 hour")).toBe(3600000)
+      expect(parseInterval("24 hours")).toBe(24 * 3600000)
+      expect(parseInterval("24h")).toBe(24 * 3600000)
+      expect(parseInterval("1m")).toBe(60000)
+      expect(parseInterval("1 minute")).toBe(60000)
+      expect(parseInterval("30 minutes")).toBe(30 * 60000)
+      expect(parseInterval("30 min")).toBe(30 * 60000)
+      expect(parseInterval("60s")).toBe(60000)
+      expect(parseInterval("60 seconds")).toBe(60000)
+      expect(parseInterval("1 second")).toBe(1000)
+      expect(parseInterval("1 sec")).toBe(1000)
+      expect(parseInterval("1s")).toBe(1000)
+      expect(parseInterval("5000ms")).toBe(5000)
+      expect(parseInterval("5000 ms")).toBe(5000)
+      expect(parseInterval(10000)).toBe(10000)
+      expect(parseInterval("1d")).toBe(86400000)
+      expect(parseInterval("1 day")).toBe(86400000)
+      expect(parseInterval("2 days")).toBe(2 * 86400000)
+      expect(parseInterval("1 week")).toBe(7 * 86400000)
+      expect(parseInterval("2 weeks")).toBe(2 * 7 * 86400000)
     })
   })
 

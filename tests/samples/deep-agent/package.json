@@ -12,10 +12,17 @@
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
     "@sap/cds": ">=8",
-    "deepagents": "^1.9.0",
     "zod": "^4"
   },
   "cds": {
+    "agents": {
+      "[tracing]": {
+        "mlflow": true
+      },
+      "[mlflow]": {
+        "mlflow": true
+      }
+    },
     "requires": {
       "audit-log": false,
       "llm2": {
@@ -48,6 +55,37 @@
         },
         "telemetry": {
           "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        },
+        "mlflow": {
+          "credentials": {
+            "MLFLOW_HOST": "http://localhost:5678",
+            "MLFLOW_TOKEN": "unused",
+            "MLFLOW_EXPERIMENT_ID": "0"
+          }
+        }
+      },
+      "[mlflow]": {
+        "audit-log": false,
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
           "metrics": {
             "exporter": {
               "module": "@cap-js/telemetry",

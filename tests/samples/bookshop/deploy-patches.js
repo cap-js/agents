@@ -3,7 +3,7 @@ import path from "path"
 
 const mode = process.argv[2]
 if (!mode || !["apply", "revert"].includes(mode)) {
-  console.error("Usage: node deploy-patches.js <apply|revert>")
+  console.error("Usage: node deploy-patches.js <apply|revert>") // eslint-disable-line no-console
   process.exit(1)
 }
 

@@ -1,11 +1,11 @@
 import cds from "@sap/cds"
 
 const LOG = cds.log("agent")
-import agentAdapter from "./lib/index.js"
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
 import { buildAgentsHelpers } from "./lib/testing/index.js"
+import { slugified } from "./lib/utils/markdown.js"
 
 cds.compile.to.a2a = cds_compile_to_a2a
 
@@ -80,16 +80,6 @@ const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
 
-// Register A2A as a CDS protocol adapter
-// Cant switch to package.json yet due to CAP not correctly reading ESM default export
-const protocols = (cds.env.protocols ??= {})
-if (!protocols.agent) {
-  protocols.agent = {
-    path: "/a2a",
-    impl: agentAdapter,
-  }
-}
-
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.["@agent"]) return
@@ -113,3 +103,41 @@ cds.on("served", async () => {
     setupMlflowExporter()
   }
 })
+
+// Bootstrap sidecar mode when the agent-sidecar profile is active
+if (cds.env.profiles?.includes("agent-sidecar")) {
+  // Auto-mark @agent services as external so CDS does not serve them locally.
+  // Auto-mark them as hcql services served externally, they are served from the main app.
+  // This runs after model load but before cds.serve() filters definitions,
+  // so users don't need to add these things manually.
+  cds.on("loaded", (csn) => {
+    const hcql = cds.requires.kinds["hcql"]
+    const agentSidecar = cds.requires.agent || {}
+    const hcqlBase = agentSidecar.url // For local development the base URL is given in the package.json
+    const agentCredentials = agentSidecar.credentials || {}
+    for (const [name, def] of Object.entries(csn.definitions || {})) {
+      if (def.kind !== "service") continue
+      if (!def["@agent"]) continue
+      // Mark as external so CDS does not serve it locally — it will be served via HCQL from the main app.
+      def["@cds.external"] = true
+      // Java main apps use the CDS service name in the HCQL path (/hcql/CatalogService),
+      // Node.js main apps use the slugified path (/hcql/catalog).
+      const isJava = !cds.env.profiles?.includes("node")
+      let n = isJava ? name : slugified(name)
+      if (cds.requires[name]) continue // skip if user provided service-specific config for this service
+      if (cds.requires[n]) continue // skip if user provided service-specific config for possibly the slugified version
+      const newRequiresEntry = { ...hcql, kind: "hcql" }
+      newRequiresEntry.credentials = {
+        ...agentCredentials,
+        ...(hcqlBase && { url: `${hcqlBase}/${n.split(".").pop()}` }),
+        ...(agentCredentials.destination && { path: `/${n.split(".").pop()}` }),
+      }
+      cds.requires[n] = newRequiresEntry
+    }
+  })
+
+  cds.on("served", async () => {
+    const { bootstrapSidecar } = await import("./lib/sidecar.js")
+    await bootstrapSidecar()
+  })
+}

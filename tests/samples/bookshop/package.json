@@ -11,7 +11,8 @@
     "@cap-js/telemetry": "^2",
     "@sap/cds": ">=8",
     "@sap/xssec": "^4",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.221"
   },
   "scripts": {
     "start": "cds-serve"
@@ -29,6 +30,9 @@
       "contentFilter": false,
       "activeUsersInterval": "1s",
       "[tracing]": {
+        "mlflow": true
+      },
+      "[mlflow]": {
         "mlflow": true
       },
       "[hybrid]": {
@@ -89,16 +93,33 @@
             }
           }
         },
-        "databricks-mlflow": {
+        "mlflow": {
           "credentials": {
-            "DATABRICKS_HOST": "http://localhost:5678",
-            "DATABRICKS_TOKEN": "unused",
+            "MLFLOW_HOST": "http://localhost:5678",
             "MLFLOW_EXPERIMENT_ID": "0"
           }
         }
       },
       "[production]": {
         "auth": "xsuaa"
+      },
+      "[mlflow]": {
+        "audit-log": false,
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        }
       }
     }
   }
