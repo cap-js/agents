@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.1 - TBD
+
+### Fixed
+
+- Authentication in preview
+
 ## Version 0.9.0 - 2026-08-10
 
 ### Added
