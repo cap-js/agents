@@ -46,7 +46,7 @@
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
-    "@cap-js/attachments": "^3.12.2",
+    "@cap-js/attachments": "^4",
     "@cap-js/mcp": "^1.4",
     "@langchain/anthropic": "^1.5.1",
     "@langchain/core": "^1",
@@ -82,11 +82,10 @@
     }
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "cds": {
     "agents": {
-      "llm": "anthropic--claude-4.6-sonnet",
       "streaming": true,
       "trace_langchain": true,
       "mlflow": false,

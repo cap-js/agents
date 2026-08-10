@@ -477,7 +477,7 @@ class GraphExecutor {
               const buf = Buffer.from(file.bytes, "base64")
               await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
               LOG.info("file uploaded", {
-                task: short(taskId),
+                conversation: short(contextId),
                 service: serviceName,
                 name: safeName,
                 mimeType: safeMime,
@@ -584,7 +584,7 @@ class GraphExecutor {
           const resume = parseResumeDecision(userText)
 
           LOG.debug("resuming", {
-            task: short(taskId),
+            conversation: short(contextId),
             service: serviceName,
             decision: resume.decisions[0].type,
           })
@@ -632,7 +632,11 @@ class GraphExecutor {
           const description = extractInterruptDescription(result)
 
           const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
-          LOG.info("input-required", { task: short(taskId), service: serviceName, duration })
+          LOG.info("input-required", {
+            conversation: short(contextId),
+            service: serviceName,
+            duration,
+          })
 
           if (wfSpan) {
             wfSpan.setAttribute("agent.outcome", "input-required")
@@ -676,7 +680,7 @@ class GraphExecutor {
         const outputMapper = this._outputMapper || defaultOutputMapper
         const output = outputMapper(result) || "I could not generate a response."
 
-        LOG.info("completed", { task: short(taskId), service: serviceName, duration })
+        LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "completed")
@@ -798,7 +802,7 @@ class GraphExecutor {
                   : 0
               if (declaredBytes > maxFileBytes) {
                 LOG.warn("emit_file_part artifact exceeds cap; skipping", {
-                  task: short(taskId),
+                  conversation: short(contextId),
                   service: serviceName,
                   name: artifact.file?.name,
                   size: declaredBytes,
@@ -825,7 +829,7 @@ class GraphExecutor {
           for (const meta of outputMeta) {
             if (meta.size > maxFileBytes) {
               LOG.warn("output file exceeds cap; skipping", {
-                task: short(taskId),
+                conversation: short(contextId),
                 service: serviceName,
                 name: meta.name,
                 size: meta.size,
@@ -861,7 +865,7 @@ class GraphExecutor {
         for (const filePart of fileArtifacts) {
           if (!filePart.file?.name) {
             LOG.warn("skipping malformed file artifact", {
-              task: short(taskId),
+              conversation: short(contextId),
               service: serviceName,
             })
             continue
@@ -874,7 +878,7 @@ class GraphExecutor {
               ? Buffer.byteLength(filePart.file.bytes, "base64")
               : 0
           LOG.info("file emitted", {
-            task: short(taskId),
+            conversation: short(contextId),
             service: serviceName,
             name: safeName,
             mimeType: filePart.file?.mimeType,
@@ -908,7 +912,7 @@ class GraphExecutor {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
         // Use name check (not instanceof) to also catch native DOMException AbortError from LangGraph
         if (err.name === "AbortError") {
-          LOG.info("canceled", { task: short(taskId), service: serviceName })
+          LOG.info("canceled", { conversation: short(contextId), service: serviceName })
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "canceled")
 
           audit("AgentTaskCanceled", {
@@ -931,7 +935,7 @@ class GraphExecutor {
 
         // Timeout — attempt graceful summary of work-in-progress before reporting
         if (err.name === "TimeoutError") {
-          LOG.warn("timeout", { task: short(taskId), service: serviceName })
+          LOG.warn("timeout", { conversation: short(contextId), service: serviceName })
 
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "timeout")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "timeout" })
@@ -971,7 +975,7 @@ class GraphExecutor {
         // Quota exceeded — summarize partial work instead of raw error
         if (err.quotaExceeded) {
           LOG.warn("quota exceeded", {
-            task: short(taskId),
+            conversation: short(contextId),
             service: serviceName,
             error: err.message,
           })
@@ -1011,8 +1015,16 @@ class GraphExecutor {
           return
         }
 
-        LOG.error("failed", { task: short(taskId), service: serviceName, error: err.message })
-        LOG.debug("failed stack", { task: short(taskId), service: serviceName, stack: err.stack })
+        LOG.error("failed", {
+          conversation: short(contextId),
+          service: serviceName,
+          error: err.message,
+        })
+        LOG.debug("failed stack", {
+          conversation: short(contextId),
+          service: serviceName,
+          stack: err.stack,
+        })
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")
@@ -1089,7 +1101,7 @@ class GraphExecutor {
             if (messages) updates.usageToolCalls = totalToolCalls(messages)
             await UPDATE("cap.agent.Tasks").where({ taskId }).with(updates)
           } catch (err) {
-            LOG.debug("usage update failed", { task: short(taskId), error: err.message })
+            LOG.debug("usage update failed", { conversation: short(contextId), error: err.message })
           }
         })
 
