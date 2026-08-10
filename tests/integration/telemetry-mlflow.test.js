@@ -25,7 +25,7 @@ before(() => {
   cds.env.agents.mlflow = true
 })
 
-describe("@cap-js/agents - MLflow Databricks span attributes", () => {
+describe("@cap-js/agents - MLflow span attributes", () => {
   axios.defaults.validateStatus = () => true
   after(teardown)
   beforeEach(resetCapture)
@@ -96,8 +96,6 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     it("should return trace tag attributes when enabled", async () => {
       const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
       const attrs = mlflowTraceAttrs()
-      expect(Object.keys(attrs).includes("mlflow.traceTag.session")).toBeTruthy()
-      expect(Object.keys(attrs).includes("mlflow.traceTag.user")).toBeTruthy()
       expect(Object.keys(attrs).includes("mlflow.traceTag.tenant")).toBeTruthy()
       expect(Object.keys(attrs).includes("session.id")).toBeTruthy()
       expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
@@ -119,12 +117,49 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     expect(span.attributes["mlflow.experimentId"]).toBe("2")
   })
 
-  it("should set mlflow trace tags on workflow span", async () => {
+  it("should set mlflow trace tags on the HTTP root span", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow trace tags"))
-    const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
-    expect(span).not.toBe(undefined)
-    expect(span.attributes["mlflow.traceTag.session"]).not.toBe(undefined)
-    expect(span.attributes["mlflow.traceTag.tenant"]).not.toBe(undefined)
+    const httpSpan = findSpan(spans, "POST /a2a/")
+    expect(httpSpan).not.toBe(undefined)
+    expect(httpSpan.attributes["session.id"]).not.toBe(undefined)
+    expect(httpSpan.attributes["mlflow.traceTag.tenant"]).not.toBe(undefined)
+  })
+
+  // ─── Trace list Request / Response columns (mlflow.spanInputs/spanOutputs
+  // on the OTel root span) ─────────────────────────────────────────────
+
+  it("should set mlflow.spanInputs on the HTTP root span from the user message", async () => {
+    // Renders in the trace list Request column via MLflow's server-side
+    // trace_metadata derivation from the root span's mlflow.spanInputs.
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "regression input"))
+    const httpSpan = findSpan(spans, "POST /a2a/")
+    expect(httpSpan).not.toBe(undefined)
+    expect(httpSpan.attributes["mlflow.spanInputs"]).not.toBe(undefined)
+    const inputs = JSON.parse(httpSpan.attributes["mlflow.spanInputs"])
+    expect(inputs.messages[0].role).toBe("user")
+    expect(inputs.messages[0].content).toBe("regression input")
+  })
+
+  it("should set mlflow.spanOutputs on the HTTP root span after workflow completes", async () => {
+    // Renders in the trace list Response column.
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "regression output"))
+    const httpSpan = findSpan(spans, "POST /a2a/")
+    expect(httpSpan).not.toBe(undefined)
+    expect(httpSpan.attributes["mlflow.spanOutputs"]).not.toBe(undefined)
+    const outputs = JSON.parse(httpSpan.attributes["mlflow.spanOutputs"])
+    expect(outputs.choices[0].message.role).toBe("assistant")
+    expect(typeof outputs.choices[0].message.content).toBe("string")
+  })
+
+  it("should set mlflow.spanOutputs on the workflow span after workflow completes", async () => {
+    const spans = await getSpansAfterRequest(() =>
+      sendMessage("graph-book", "regression wf output"),
+    )
+    const wfSpan = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
+    expect(wfSpan).not.toBe(undefined)
+    expect(wfSpan.attributes["mlflow.spanOutputs"]).not.toBe(undefined)
+    const outputs = JSON.parse(wfSpan.attributes["mlflow.spanOutputs"])
+    expect(outputs.choices[0].message.role).toBe("assistant")
   })
 
   // ─── Tool spans ────────────────────────────────────────────────────
@@ -135,6 +170,28 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     expect(span).not.toBe(undefined)
     expect(span.attributes["mlflow.spanType"]).toBe("TOOL")
     expect(span.attributes["mlflow.spanInputs"]).not.toBe(undefined)
+  })
+
+  it("should set clean tool inputs/outputs without LangChain metadata", async () => {
+    const spans = await getSpansAfterRequest(() => sendMessage("graph-book", "mlflow tool io test"))
+    const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
+    expect(span).not.toBe(undefined)
+
+    // Inputs: just tool arguments, no tool_call envelope
+    const inputs = JSON.parse(span.attributes["mlflow.spanInputs"])
+    expect(inputs.lc).toBe(undefined)
+    expect(inputs.type).not.toBe("tool_call")
+    expect(inputs.id).toBe(undefined)
+    expect(inputs.name).toBe(undefined)
+    expect(inputs.cql || inputs.entity).not.toBe(undefined)
+
+    // Outputs: raw result, no ToolMessage serialization
+    const outputs = span.attributes["mlflow.spanOutputs"]
+    expect(outputs).not.toBe(undefined)
+    expect(outputs).not.toContain('"lc":')
+    expect(outputs).not.toContain('"type":"constructor"')
+    expect(outputs).not.toContain('"langchain_core"')
+    expect(outputs).not.toContain('"kwargs"')
   })
 
   // ─── LLM / Chat spans ──────────────────────────────────────────────
@@ -324,12 +381,12 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
   })
 
   it("ucTableName composed correctly from UC_CATALOG + UC_SCHEMA + UC_TABLE_PREFIX credentials", async () => {
-    const savedCreds = cds.env.requires?.["databricks-mlflow"]?.credentials
+    const savedCreds = cds.env.requires?.mlflow?.credentials
     cds.env.requires ??= {}
-    cds.env.requires["databricks-mlflow"] ??= {}
-    cds.env.requires["databricks-mlflow"].credentials = {
-      DATABRICKS_HOST: "https://adb-123.azuredatabricks.net",
-      DATABRICKS_TOKEN: "dapi-test",
+    cds.env.requires.mlflow ??= {}
+    cds.env.requires.mlflow.credentials = {
+      MLFLOW_HOST: "https://mlflow.example.com",
+      MLFLOW_TOKEN: "test-token",
       UC_CATALOG: "main",
       UC_SCHEMA: "traces",
       UC_TABLE_PREFIX: "myapp",
@@ -338,7 +395,7 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow.js")
     await setupMlflowExporter()
 
-    cds.env.requires["databricks-mlflow"].credentials = savedCreds
+    cds.env.requires.mlflow.credentials = savedCreds
 
     // setupMlflowExporter logs the ucTableName — verify it was composed correctly
     const logLine = captured.find((l) => l.includes("ucTableName"))
@@ -346,7 +403,7 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     expect(logLine).toContain("main.traces.myapp_otel_spans")
   })
 
-  it("should not add OTLP exporter without databricks-mlflow credentials", async () => {
+  it("should not add OTLP exporter without mlflow credentials", async () => {
     const { trace } = await import("@opentelemetry/api")
     const provider = trace.getTracerProvider()
     const delegate = provider.getDelegate?.() || provider
@@ -358,17 +415,17 @@ describe("@cap-js/agents - MLflow Databricks span attributes", () => {
     const processorsBefore = getCount()
 
     // Temporarily remove credentials to test the guard path
-    const savedCreds = cds.env.requires?.["databricks-mlflow"]?.credentials
-    if (cds.env.requires?.["databricks-mlflow"]) {
-      cds.env.requires["databricks-mlflow"].credentials = undefined
+    const savedCreds = cds.env.requires?.mlflow?.credentials
+    if (cds.env.requires?.mlflow) {
+      cds.env.requires.mlflow.credentials = undefined
     }
 
     const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow.js")
     await setupMlflowExporter()
 
     // Restore credentials
-    if (cds.env.requires?.["databricks-mlflow"]) {
-      cds.env.requires["databricks-mlflow"].credentials = savedCreds
+    if (cds.env.requires?.mlflow) {
+      cds.env.requires.mlflow.credentials = savedCreds
     }
 
     const processorsAfter = getCount()

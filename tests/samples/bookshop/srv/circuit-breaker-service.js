@@ -1,6 +1,7 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { circuitBreaker, timeout } from "@sap-cloud-sdk/resilience"
+import { ms4 } from "../../../../lib/utils/utils.js"
 
 const LOG = cds.log("agent")
 
@@ -39,7 +40,7 @@ export default class CircuitBreakerService extends cds.ApplicationService {
      */
     class CircuitBreakerTestModel extends OrchestrationClient {
       _withMiddleware(opts) {
-        const llmTimeout = cds.env.agents?.pool?.maxLLMCallTimeoutMs || 120000
+        const llmTimeout = ms4(cds.env.agents?.pool?.maxLLMCallTimeout || "120s")
         return {
           ...opts,
           customRequestConfig: {

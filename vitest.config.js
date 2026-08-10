@@ -1,6 +1,7 @@
 export default {
   test: {
     include: ["tests/integration/*.test.js"],
+    setupFiles: ["tests/utils/setup.js"],
     globals: true,
     environment: "node",
     testTimeout: 30_000,

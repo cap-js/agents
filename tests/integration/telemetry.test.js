@@ -73,6 +73,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(span.attributes["gen_ai.operation.name"]).toBe("execute_tool")
     expect(span.attributes["gen_ai.tool.call.id"]).toBe("query")
     expect(span.attributes["gen_ai.tool.call.outcome"]).toBe("success")
+    expect(span.status.code).toBe(1) // OTEL OK
   })
 
   it("should create tool span for custom (non-CDS) tools via prototype patch", async () => {
@@ -82,6 +83,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(span.attributes["gen_ai.operation.name"]).toBe("execute_tool")
     expect(span.attributes["gen_ai.tool.call.id"]).toBe("getBookCount")
     expect(span.attributes["gen_ai.tool.call.outcome"]).toBe("success")
+    expect(span.status.code).toBe(1) // OTEL OK
   })
 
   it("should create RunnableSequence spans for graph nodes", async () => {
