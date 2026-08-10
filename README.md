@@ -1,4 +1,3 @@
-
 # SAP Cloud Application Programming Model, agent development plugin for Node.js
 
 ## About this project
