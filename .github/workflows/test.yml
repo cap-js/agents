@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, solinas]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     name: Tests with Node.js ${{ matrix.node-version }} (CDS ${{ matrix.cds-version }})
     strategy:
@@ -55,9 +55,7 @@ jobs:
       - run: npm run test
 
   test-hybrid:
-    runs-on: [self-hosted, solinas-medium]
-    container:
-      image: public.int.repositories.cloud.sap/ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+    runs-on: ubuntu-latest
     name: Hybrid Tests with Node.js ${{ matrix.node-version }}
     strategy:
       fail-fast: false
