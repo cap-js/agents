@@ -11,9 +11,9 @@ import {
   executeCallActionTool,
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
-import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
+import { checkAuthorization } from '@cap-js/mcp/lib/auth.js'
 
 const LOG = cds.log("agent")
 
@@ -23,61 +23,139 @@ const unwrap = (result) => {
   return text
 }
 
-/**
- * Reuses tool definitions and execution logic from @cap-js/mcp
- *
- * @param {object} srv - CDS ApplicationService
- * @param {object} [options] - Options
- * @param {boolean} [options.skipAuth] - Skip authorization check (e.g. when generating tools at startup for custom graphs)
- */
-export function generateTools(srv, options = {}) {
-  let entities, actions
 
-  // TODO: needs to be done differently
-  if (options.skipAuth) {
-    entities = getFilteredEntities(srv)
-    actions = getFilteredActions(srv)
-  } else {
-    const authResult = checkAuthorization(srv)
-    if (authResult.error) return []
-    entities = authResult.entities
-    actions = authResult.actions
+class GenericReadTool extends DynamicStructuredTool {
+  _cache = {}
+  constructor(srv, entities) {
+    const entityNames = Object.keys(entities)
+    const def = createGenericReadToolDefinition(entityNames, srv.name, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      func: async (args) => {
+        return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
+      },
+    })
+    this.srv = srv
+    this.entities = entities
   }
 
-  const tools = []
+  filtered() {
+    const { entities, error } = checkAuthorization(this.srv)
+    if (error) return false
+    if (Object.keys(entities).length === Object.keys(this.entities).length) return this
+    const key = Object.keys(entities).join(';')
+    if (this._cache[key]) return this._cache[key]
+    return this._cache[key] = new GenericReadTool(this.srv, entities)
+  }
+}
 
-  const TOOL_PREFIX = ""
+class DescribeTool extends DynamicStructuredTool {
+  _cache = {}
+  constructor(srv, entities, actions) {
+    const entityNames = Object.keys(entities)
+    const actionNames = Object.keys(actions)
+    const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      func: async (args) => {
+        return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
+      },
+    })
+    this.srv = srv
+    this.entities = entities
+    this.actions = actions
+  }
+
+  filtered() {
+    const { entities, actions, error } = checkAuthorization(this.srv)
+    if (error) return false
+    if (
+      Object.keys(entities).length === Object.keys(this.entities).length &&
+      Object.keys(actions).length === Object.keys(this.actions).length
+    ) return this
+    const key = Object.keys(entities).join(';') + '|' + Object.keys(actions).join(';')
+    if (this._cache[key]) return this._cache[key]
+    return this._cache[key] = new DescribeTool(this.srv, entities, actions)
+  }
+}
+
+
+class PerActionTool extends DynamicStructuredTool {
+  constructor(srv, actionName, action) {
+    const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      func: async (args) => {
+        return unwrap(await executePerActionTool(srv, actionName, action, args, { log: LOG }))
+      },
+    })
+    this.srv = srv
+    this.actionName = actionName
+    this.action = action
+  }
+
+  filtered() {
+    const { actions, error } = checkAuthorization(this.srv)
+    if (error) return false
+    return Object.prototype.hasOwnProperty.call(actions, this.actionName) ? this : null
+  }
+}
+
+
+class CallActionTool extends DynamicStructuredTool {
+  _cache = {}
+  constructor(srv, actions) {
+    const actionNames = Object.keys(actions)
+    const def = createCallActionToolDefinition(actionNames, srv.name, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      func: async (args) => {
+        return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
+      },
+    })
+    this.srv = srv
+    this.actions = actions
+  }
+
+  filtered() {
+    const { actions, error } = checkAuthorization(this.srv)
+    if (error) return false
+    if (Object.keys(actions).length === Object.keys(this.actions).length) return this
+    const key = Object.keys(actions).join(';')
+    if (this._cache[key]) return this._cache[key]
+    return this._cache[key] = new CallActionTool(this.srv, actions)
+  }
+}
+
+/**
+ * Reuses tool definitions and execution logic from @cap-js/mcp.
+ *
+ * @param {object} srv - CDS ApplicationService
+ */
+export function generateTools(srv) {
+  const entities = getFilteredEntities(srv)
+  const actions = getFilteredActions(srv)
+
+  const tools = []
 
   // Query tool — one tool for reading all entities
   const entityNames = Object.keys(entities)
   if (entityNames.length > 0) {
-    const def = createGenericReadToolDefinition(entityNames, srv.name, TOOL_PREFIX)
-    tools.push(
-      new DynamicStructuredTool({
-        name: def.name,
-        description: def.description,
-        schema: def.inputSchema,
-        func: async (args) => {
-          return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
-        },
-      }),
-    )
+    tools.push(new GenericReadTool(srv, entities))
   }
 
   // Describe tool — introspect service model
   const actionNames = Object.keys(actions)
   if (entityNames.length > 0 || actionNames.length > 0) {
-    const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, TOOL_PREFIX)
-    tools.push(
-      new DynamicStructuredTool({
-        name: def.name,
-        description: def.description,
-        schema: def.inputSchema,
-        func: async (args) => {
-          return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
-        },
-      }),
-    )
+    tools.push(new DescribeTool(srv, entities, actions))
   }
 
   // Action/function tools — per-action (default) or combined call action
@@ -85,30 +163,10 @@ export function generateTools(srv, options = {}) {
   if (actionNames.length > 0) {
     if (usePerActionTools) {
       for (const [name, action] of Object.entries(actions)) {
-        const def = createPerActionToolDefinition(name, action, srv.name, srv.model, TOOL_PREFIX)
-        tools.push(
-          new DynamicStructuredTool({
-            name: def.name,
-            description: def.description,
-            schema: def.inputSchema,
-            func: async (args) => {
-              return unwrap(await executePerActionTool(srv, name, action, args, { log: LOG }))
-            },
-          }),
-        )
+        tools.push(new PerActionTool(srv, name, action))
       }
     } else {
-      const def = createCallActionToolDefinition(actionNames, srv.name, TOOL_PREFIX)
-      tools.push(
-        new DynamicStructuredTool({
-          name: def.name,
-          description: def.description,
-          schema: def.inputSchema,
-          func: async (args) => {
-            return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
-          },
-        }),
-      )
+      tools.push(new CallActionTool(srv, actions))
     }
   }
 
