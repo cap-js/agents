@@ -31,6 +31,34 @@ const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
 
+cds.on("bootstrap", () => {
+  const providers = {
+    ["llm-mock"]: {},
+    anthropic: {
+      opus: "claude-opus-latest",
+      sonnet: "claude-sonnet-latest",
+      haiku: "claude-haiku-latest",
+    },
+    aicore: {
+      opus: "anthropic--claude-4.8-opus",
+      sonnet: "anthropic--claude-4.6-sonnet",
+      haiku: "anthropic--claude-4.5-haiku",
+    },
+  }
+
+  for (const [name, s] of Object.entries(cds.env.requires)) {
+    const kind = s?.kind ?? s
+    if (typeof kind !== "string") continue
+    let [provider, model] = kind.split("/")
+    if (name.startsWith("llm") && !providers[provider] && providers["llm-" + provider])
+      provider = "llm-" + provider
+    if (providers[provider] && model) {
+      s.kind = provider
+      s.model = providers[provider][model] ?? model
+    }
+  }
+})
+
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.["@agent"]) return

@@ -4,6 +4,7 @@
     <title>{{agentName}}</title>
     <meta charset="utf-8" />
     <meta name="color-scheme" content="dark light" />
+    <meta name="a2a-auth" content="{{authHeader}}" />
     <style>
       body {
         font-family:
@@ -424,6 +425,8 @@
 
     <script>
       const AGENT_URL = window.location.pathname.replace(/\/preview\/?$/, "") + "/"
+      const AUTH_HEADER = document.querySelector('meta[name="a2a-auth"]')?.content || ""
+      const authHeaders = () => (AUTH_HEADER ? { Authorization: AUTH_HEADER } : {})
       document.getElementById("back").addEventListener("click", () => history.back())
       const messages = document.getElementById("messages")
       const typing = document.getElementById("typing")
@@ -602,7 +605,7 @@
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authHeaders() },
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
@@ -731,7 +734,7 @@
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authHeaders() },
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
@@ -790,7 +793,7 @@
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authHeaders() },
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: "message/send",
@@ -978,7 +981,7 @@
         if (taskId) {
           fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...authHeaders() },
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: "tasks/cancel",
