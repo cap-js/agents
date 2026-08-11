@@ -4,10 +4,10 @@ import path from "node:path"
 import fs from "node:fs"
 import cds from "@sap/cds"
 
-const CSV_PATH = path.join(import.meta.dirname, "../samples/bookshop/db/data/reading-list.csv")
+const CSV_PATH = path.join(import.meta.dirname, "../projects/bookshop/db/data/reading-list.csv")
 const csvBase64 = fs.readFileSync(CSV_PATH).toString("base64")
 
-const { POST } = cds.test(path.join(import.meta.dirname, "../samples/bookshop"))
+const { POST } = cds.test(path.join(import.meta.dirname, "../projects/bookshop"))
 
 function sendWithFile(service, text, filename, mimeType, base64, contextId) {
   return POST(`/a2a/${service}/`, {

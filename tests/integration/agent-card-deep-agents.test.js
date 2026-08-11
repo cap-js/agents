@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const { GET } = cds.test(import.meta.dirname + "/../samples/deep-agent")
+const { GET } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 
 describe("@cap-js/agents - Agent Card (deep agent modes)", () => {
   // ── skills/ directory scan ──────────────────────────────────────────

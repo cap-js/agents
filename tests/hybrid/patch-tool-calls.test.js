@@ -11,7 +11,7 @@ import assert from "node:assert/strict"
 import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const { sendMessage } = createHelpers({ POST, axios })
 
 describe("@cap-js/agents - patch-tool-calls middleware (hybrid)", () => {

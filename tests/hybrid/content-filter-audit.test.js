@@ -4,7 +4,7 @@
  */
 import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 import createHelpers from "../utils/helpers.js"
 
 describe("@cap-js/agents - ContentFilterBlocked audit event (deep agent)", () => {

@@ -15,7 +15,7 @@ Markdown-based agent using `deepagents` with `@cap-js/agents` as runtime. Define
 Requires AI Core credentials:
 
 ```bash
-cds watch tests/samples/deep-agent
+cds watch tests/projects/deep-agent
 ```
 
 Agent endpoint: `http://localhost:4004/a2a/product-agent/`

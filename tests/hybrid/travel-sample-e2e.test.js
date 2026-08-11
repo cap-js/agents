@@ -7,7 +7,7 @@ import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 import { isPortOpen, startServer, stopServer, registerCleanupHandlers } from "../utils/servers.js"
 
-const SAMPLE_DIR = path.resolve(import.meta.dirname, "../samples/travel")
+const SAMPLE_DIR = path.resolve(import.meta.dirname, "../projects/travel")
 const TRAVEL_AGENT_DIR = path.join(SAMPLE_DIR, "travel-agent")
 const XFLIGHTS_DIR = path.join(SAMPLE_DIR, "xflights")
 const LEISURE_DIR = path.join(SAMPLE_DIR, "leisure-services")

@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 
 describe("@cap-js/agents - HITL (CatalogService)", () => {
   const BOOK_ID = 201

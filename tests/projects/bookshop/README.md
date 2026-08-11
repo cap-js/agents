@@ -11,7 +11,7 @@ Zero-code agent. Annotate with `@agent` - the plugin generates tools, agent card
 ## Running
 
 ```bash
-cds w tests/samples/bookshop --profile hybrid
+cds w tests/projects/bookshop --profile hybrid
 ```
 
 Agent endpoint: `http://localhost:4004/a2a/catalog/`

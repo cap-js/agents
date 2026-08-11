@@ -5,7 +5,7 @@ import fs from "node:fs"
 import cds from "@sap/cds"
 
 // Boot the bookshop test app
-cds.test(import.meta.dirname + "/../samples/bookshop")
+cds.test(import.meta.dirname + "/../projects/bookshop")
 
 describe("@cap-js/agent - Sidecar Support", () => {
   describe("createAgent programmatic API", () => {
