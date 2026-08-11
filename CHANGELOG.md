@@ -6,6 +6,10 @@
 
 ## Version 0.9.1 - TBD
 
+### Added
+
+- `<provider>/<model>` convenience for known llm providers, for example `cds.requires.llm: anthropic/haiku`
+
 ### Fixed
 
 - Authentication in preview
