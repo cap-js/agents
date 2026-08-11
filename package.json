@@ -45,7 +45,7 @@
     "_i18n"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "^0.3.12",
+    "@a2a-js/sdk": "^1.0.1",
     "@cap-js/attachments": "^4",
     "@cap-js/mcp": "^1.4",
     "@langchain/anthropic": "^1.5.1",
