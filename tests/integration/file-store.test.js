@@ -10,7 +10,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // side-effect: registers in-memory CDS bootstrap for the integration tests
-cds.test(path.join(__dirname, "../samples/bookshop"))
+cds.test(path.join(__dirname, "../projects/bookshop"))
 
 describe("@cap-js/agent - composition cascade delete", () => {
   it("deleting a Tasks row removes its inputFiles children", async () => {

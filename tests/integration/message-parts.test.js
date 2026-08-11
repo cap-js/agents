@@ -4,7 +4,7 @@ import { setup, teardown, resetCapture, captured } from "../utils/telemetry-util
 // Patch console.info before cds.test() so CDS log is captured
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 axios.defaults.validateStatus = () => true
 
 after(teardown)

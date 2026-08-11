@@ -25,7 +25,7 @@ if (mode === "apply") {
 
 if (mode === "revert") {
   const pkg = JSON.parse(fs.readFileSync(rootPkg, "utf8"))
-  pkg.workspaces = ["tests/samples/bookshop/"]
+  pkg.workspaces = ["tests/projects/bookshop/"]
   fs.writeFileSync(rootPkg, JSON.stringify(pkg, null, 2) + "\n")
 
   let cds = fs.readFileSync(cdsFile, "utf8")

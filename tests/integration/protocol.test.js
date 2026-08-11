@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { jsonrpc, sendMessage, streamMessage, parseSSEFrames, setupErrorDetection } = createHelpers({
   POST,

@@ -60,7 +60,7 @@ cd agent && npm i
 Run the bookshop (zero-code agent):
 
 ```bash
-cds w tests/samples/bookshop --profile hybrid
+cds w tests/projects/bookshop --profile hybrid
 ```
 
 Send a message:
@@ -85,7 +85,7 @@ service CatalogService {
 }
 ```
 
-→ See [Bookshop Sample](./tests/samples/bookshop/)
+→ See [Bookshop Sample](./tests/projects/bookshop/)
 
 ### Markdown-Based Agents
 
@@ -126,7 +126,7 @@ description: Read-only product catalog assistant.
 You help users find and explore products in the catalog. Use ...
 ```
 
-→ See [Deep Agent Sample](./tests/samples/deep-agent/)
+→ See [Deep Agent Sample](./tests/projects/deep-agent/)
 
 ## Configuration
 
@@ -507,7 +507,7 @@ podman run -d --name lgtm \
 Start the app with OTLP export:
 
 ```bash
-cds w tests/samples/bookshop --profile hybrid,telemetry
+cds w tests/projects/bookshop --profile hybrid,telemetry
 ```
 
 The bookshop's `telemetry` profile is preconfigured with OTLP export to `localhost:4318`. Open http://localhost:3000 to browse traces (Tempo) and metrics (Prometheus) in Grafana.
@@ -627,7 +627,7 @@ podman run -p 5678:5000 ghcr.io/mlflow/mlflow mlflow server --host 0.0.0.0
 The bookshop ships with default credentials for `localhost:5678` in the `tracing` profile — no env variables needed. Just enable mlflow:
 
 ```bash
-cds w tests/samples/bookshop --profile hybrid,tracing
+cds w tests/projects/bookshop --profile hybrid,tracing
 ```
 
 Traces appear at http://localhost:5678/#/experiments/0.
@@ -788,7 +788,7 @@ If the connected services are served remotely, configure the `cds.requires` entr
 }
 ```
 
-→ See [Travel Sample](./tests/samples/travel/) for a complete multi-agent orchestration example.
+→ See [Travel Sample](./tests/projects/travel/) for a complete multi-agent orchestration example.
 
 ## API
 
@@ -889,11 +889,11 @@ For regular markdown-based agents, `@agent.hitl` will automatically trigger the 
 
 ## Samples
 
-- **[Bookshop](./tests/samples/bookshop/)** - Agentifying an existing CAP service. `@agent` annotation, zero agent code.
-- **[Deep Agent](./tests/samples/deep-agent/)** - Markdown-based agent — convention-driven, with custom tools and skills.
-- **[Travel](./tests/samples/travel/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) and a flight data service via MCP.
-- **[Java Bookshop Sidecar](./tests/sidecar-samples/java-bookshop/)** - Agentify a Java CAP app via a Node.js sidecar. Typical for Java: sidecar used in both development and production (similar to `mtx/sidecar`). Start with `cds watch --profile java`.
-- **[Node Bookshop Sidecar](./tests/sidecar-samples/node-bookshop/)** - Agentify a Node.js CAP app via a sidecar. This is an unusual setup for Node.js — normally agents run in the same process as the main app. Use the side car option only when the agent must run as a separate process.
+- **[Bookshop](./tests/projects/bookshop/)** - Agentifying an existing CAP service. `@agent` annotation, zero agent code.
+- **[Deep Agent](./tests/projects/deep-agent/)** - Markdown-based agent — convention-driven, with custom tools and skills.
+- **[Travel](./tests/projects/travel/)** - Multi-agent system combining both patterns. The orchestrator is a markdown-based deep agent that delegates to agentified CAP services (hotel, activity) and a flight data service via MCP.
+- **[Java Bookshop Sidecar](./tests/sidecar-projects/java-bookshop/)** - Agentify a Java CAP app via a Node.js sidecar. Typical for Java: sidecar used in both development and production (similar to `mtx/sidecar`). Start with `cds watch --profile java`.
+- **[Node Bookshop Sidecar](./tests/sidecar-projects/node-bookshop/)** - Agentify a Node.js CAP app via a sidecar. This is an unusual setup for Node.js — normally agents run in the same process as the main app. Use the side car option only when the agent must run as a separate process.
 
 ## Sidecar Architecture
 

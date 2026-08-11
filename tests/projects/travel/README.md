@@ -20,13 +20,13 @@ Start all three services in separate terminals:
 
 ```bash
 # Terminal 1 - Flight data (MCP)
-cds watch tests/samples/travel/xflights
+cds watch tests/projects/travel/xflights
 
 # Terminal 2 - Hotel + Activity agents
-cds watch tests/samples/travel/leisure-services --profile hybrid
+cds watch tests/projects/travel/leisure-services --profile hybrid
 
 # Terminal 3 - Travel agent orchestrator
-cds watch tests/samples/travel/travel-agent
+cds watch tests/projects/travel/travel-agent
 ```
 
 The leisure-services can be started in hybrid mode if an AI Core binding is available or the `$AICORE_SERVICE_KEY` environment variable is set. If it is started in development mode, the agents will return a mock response instead of calling an LLM. Xflights does not need an LLM to start MCP servers, so the profile does not matter.

@@ -20,7 +20,7 @@ process.env.CDS_TEST_SILENT = "false"
 
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const { sendMessage } = createHelpers({ POST, axios })
 
 const isHybrid = cds.env.profiles?.includes("hybrid")
