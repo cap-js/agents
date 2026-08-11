@@ -25,12 +25,10 @@ const unwrap = (result) => {
 
 
 class GenericReadTool extends DynamicStructuredTool {
-  _cache = {}
-  constructor(srv, entities, prefix = "") {
-    const entityNames = Object.keys(entities)
-    const def = createGenericReadToolDefinition(entityNames, srv.name, "")
+  constructor(srv, entities) {
+    const def = createGenericReadToolDefinition(Object.keys(entities), srv.name, "")
     super({
-      name: prefix + def.name,
+      name: def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -38,27 +36,34 @@ class GenericReadTool extends DynamicStructuredTool {
       },
     })
     this.srv = srv
-    this.entities = entities
+    this._allEntities = entities
+    delete this.description
+    delete this.schema
   }
 
-  filtered() {
+  get description() {
     const { entities, error } = checkAuthorization(this.srv)
-    if (error) return false
-    if (Object.keys(entities).length === Object.keys(this.entities).length) return this
-    const key = Object.keys(entities).join(';')
-    if (this._cache[key]) return this._cache[key]
-    return this._cache[key] = new GenericReadTool(this.srv, entities, "mod_")
+    if (error) return ""
+    return createGenericReadToolDefinition(Object.keys(entities), this.srv.name, "").description
+  }
+
+  get schema() {
+    const { entities, error } = checkAuthorization(this.srv)
+    const ents = error ? this._allEntities : entities
+    return createGenericReadToolDefinition(Object.keys(ents), this.srv.name, "").inputSchema
+  }
+
+  isAllowed() {
+    const { entities, error } = checkAuthorization(this.srv)
+    return !error && Object.keys(entities).length > 0
   }
 }
 
 class DescribeTool extends DynamicStructuredTool {
-  _cache = {}
-  constructor(srv, entities, actions, prefix = "") {
-    const entityNames = Object.keys(entities)
-    const actionNames = Object.keys(actions)
-    const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, "")
+  constructor(srv, entities, actions) {
+    const def = createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), srv.name, "")
     super({
-      name: prefix + def.name,
+      name: def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -66,29 +71,37 @@ class DescribeTool extends DynamicStructuredTool {
       },
     })
     this.srv = srv
-    this.entities = entities
-    this.actions = actions
+    this._allEntities = entities
+    this._allActions = actions
+    delete this.description
+    delete this.schema
   }
 
-  filtered() {
+  get description() {
     const { entities, actions, error } = checkAuthorization(this.srv)
-    if (error) return false
-    if (
-      Object.keys(entities).length === Object.keys(this.entities).length &&
-      Object.keys(actions).length === Object.keys(this.actions).length
-    ) return this
-    const key = Object.keys(entities).join(';') + '|' + Object.keys(actions).join(';')
-    if (this._cache[key]) return this._cache[key]
-    return this._cache[key] = new DescribeTool(this.srv, entities, actions, "mod_")
+    if (error) return ""
+    return createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), this.srv.name, "").description
+  }
+
+  get schema() {
+    const { entities, actions, error } = checkAuthorization(this.srv)
+    const ents = error ? this._allEntities : entities
+    const acts = error ? this._allActions : actions
+    return createDescribeToolDefinition(Object.keys(ents), Object.keys(acts), this.srv.name, "").inputSchema
+  }
+
+  isAllowed() {
+    const { entities, actions, error } = checkAuthorization(this.srv)
+    return !error && (Object.keys(entities).length > 0 || Object.keys(actions).length > 0)
   }
 }
 
 
 class PerActionTool extends DynamicStructuredTool {
-  constructor(srv, actionName, action, prefix = "") {
+  constructor(srv, actionName, action) {
     const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
     super({
-      name: prefix + def.name,
+      name: def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -100,21 +113,18 @@ class PerActionTool extends DynamicStructuredTool {
     this.action = action
   }
 
-  filtered() {
+  isAllowed() {
     const { actions, error } = checkAuthorization(this.srv)
-    if (error) return false
-    return Object.prototype.hasOwnProperty.call(actions, this.actionName, "mod_") ? this : null
+    return !error && Object.prototype.hasOwnProperty.call(actions, this.actionName)
   }
 }
 
 
 class CallActionTool extends DynamicStructuredTool {
-  _cache = {}
-  constructor(srv, actions, prefix = "") {
-    const actionNames = Object.keys(actions)
-    const def = createCallActionToolDefinition(actionNames, srv.name, "")
+  constructor(srv, actions) {
+    const def = createCallActionToolDefinition(Object.keys(actions), srv.name, "")
     super({
-      name: prefix + def.name,
+      name: def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -122,16 +132,26 @@ class CallActionTool extends DynamicStructuredTool {
       },
     })
     this.srv = srv
-    this.actions = actions
+    this._allActions = actions
+    delete this.description
+    delete this.schema
   }
 
-  filtered() {
+  get description() {
     const { actions, error } = checkAuthorization(this.srv)
-    if (error) return false
-    if (Object.keys(actions).length === Object.keys(this.actions).length) return this
-    const key = Object.keys(actions).join(';')
-    if (this._cache[key]) return this._cache[key]
-    return this._cache[key] = new CallActionTool(this.srv, actions, "mod_")
+    if (error) return ""
+    return createCallActionToolDefinition(Object.keys(actions), this.srv.name, "").description
+  }
+
+  get schema() {
+    const { actions, error } = checkAuthorization(this.srv)
+    const acts = error ? this._allActions : actions
+    return createCallActionToolDefinition(Object.keys(acts), this.srv.name, "").inputSchema
+  }
+
+  isAllowed() {
+    const { actions, error } = checkAuthorization(this.srv)
+    return !error && Object.keys(actions).length > 0
   }
 }
 
