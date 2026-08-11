@@ -51,7 +51,6 @@ jobs:
       #     npm pkg delete "devDependencies.@sap/cds-mtxs"
 
       - run: npm ci
-      - run: cds v -i
       - run: npm run test
 
   test-hybrid:
@@ -78,6 +77,5 @@ jobs:
           password: ${{ secrets.CF_PASSWORD }}
 
       - run: npm ci
-      - run: cds v -i
-      - run: cds bind -2 joule-cap-proxy -o package.json
+      - run: npx cds bind -2 joule-cap-proxy -o package.json
       - run: npm run test:hybrid
