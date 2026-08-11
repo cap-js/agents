@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Ensure npm12
+        if: matrix.node-version == '22'
+        run: npm i npm@12 -g
+
       - run: npm set min-release-age=3
       - run: npm set ignore-scripts=true
       - name: Pin CDS 9 compatible stack
