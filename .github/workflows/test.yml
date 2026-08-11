@@ -32,7 +32,7 @@ jobs:
         run: |
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
-          npm pkg set "overrides.@sap/cds=^9.9.3" "overrides.@cap-js/sqlite=^2.4.0" "overrides.@cap-js/hana=^2.8.0" "overrides.@sap/cds-mtxs=^3.9.6"
+          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
           npm pkg set "dependencies.@sap/cds=^9" --ws
           npm pkg set "peerDependencies.@sap/cds=^9"
           npm pkg set "devDependencies.@cap-js/sqlite=^2"

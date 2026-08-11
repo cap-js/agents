@@ -24,7 +24,6 @@
   "scripts": {
     "lint": "eslint .",
     "test": "CDS_ENV=test vitest run --config vitest.config.js",
-    "test:cds9": "CDS_ENV=test vitest run --config vitest.config.cds9.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
@@ -215,7 +214,6 @@
     }
   },
   "workspaces": [
-    "tests/cds9",
     "tests/samples/bookshop/",
     "tests/samples/deep-agent/",
     "tests/samples/mtx/mtx/sidecar/",
