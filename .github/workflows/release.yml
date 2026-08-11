@@ -50,6 +50,7 @@ jobs:
         body: "${{ steps.parse-changelog.outputs.body }}"
   publish-npm:
     permissions:
+      contents: read
       id-token: write
     needs: gh-release
     runs-on: ubuntu-latest
