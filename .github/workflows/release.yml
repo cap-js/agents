@@ -7,24 +7,24 @@ permissions:
   contents: read
 
 jobs:
-  # test:
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       node-version: [22.x, 24.x]
-  #       cds-version: [latest, 9]
-  #   steps:
-  #     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-  #     - name: Use Node.js ${{ matrix.node-version }}
-  #       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-  #       with:
-  #         node-version: ${{ matrix.node-version }}
-  #     - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
-  #     - run: npm i
-  #     - run: npm run lint
-  #     - run: cd tests/bookshop && npm i
-  #     - run: npm run test
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22.x, 24.x]
+        cds-version: [latest, 9]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
+      - run: npm i
+      - run: npm run lint
+      - run: cd tests/bookshop && npm i
+      - run: npm run test
   publish-npm:
     permissions:
       contents: write
@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org/
-      - run: npm ci
+      - run: npm i
       - name: get-version
         id: package-version
         uses: martinbeentjes/npm-get-version-action@v1.2.3
