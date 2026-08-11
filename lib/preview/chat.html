@@ -401,9 +401,9 @@
     <header>
       <a class="back" id="back" title="Back to index">&#8592;</a>
       <h1>{{agentName}}</h1>
-      <label class="header-toggle" title="Stream tokens as they arrive" style="margin-left:auto">
+      <label class="header-toggle" title="Stream tokens as they arrive" style="margin-left: auto">
         <input type="checkbox" id="streamToggle" checked />
-        Token Streaming
+        Streaming
       </label>
       <div class="status-dot" id="dot"></div>
     </header>
@@ -762,11 +762,7 @@
         if (event.contextId) contextId = event.contextId
 
         // Non-final status-update with message → show as progress text from streaming
-        if (
-          event.kind === "status-update" &&
-          !event.final &&
-          event.status?.message
-        ) {
+        if (event.kind === "status-update" && !event.final && event.status?.message) {
           const text = partsToText(event.status.message.parts)
           if (text) {
             statusText.textContent = text
