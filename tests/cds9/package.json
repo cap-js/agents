@@ -1,0 +1,33 @@
+{
+  "name": "cds9",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "wrapper for running cds9 tests",
+  "dependencies": {
+    "@cap-js/agents": "file:../../../.",
+    "@sap/cds": "^9",
+    "@sap/cds-mtxs": "^3"
+
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2"
+  },
+  "cds": {
+    "agents": {
+      "trace_langchain": false
+    },
+    "log": {
+      "levels": {
+        "agent": "debug"
+      }
+    },
+    "mcp": {
+      "toon_format": false
+    },
+    "requires": {
+      "telemetry": {
+        "kind": "telemetry-to-console"
+      }
+    }
+  }
+}

@@ -17,23 +17,13 @@ jobs:
       matrix:
         node-version: [22, 24]
         # cds-version: [8, 9, latest]
-        cds-version: [latest]
+        cds-version: [9, latest]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
-
-      # - name: Pin CDS 9 compatible stack
-      #   if: matrix.cds-version == '9'
-      #   run: |
-      #     npm pkg delete "devDependencies.@cap-js/sqlite"
-      #     npm pkg delete "devDependencies.@sap/cds-mtxs"
-      #     npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
-      #     npm pkg set "dependencies.@sap/cds=^9" --ws
-      #     npm pkg set "peerDependencies.@sap/cds=^9"
-      #     npm pkg set "devDependencies.@cap-js/sqlite=^2"
 
       # - name: Pin CDS 8 compatible stack
       #   if: matrix.cds-version == '8'
@@ -51,7 +41,8 @@ jobs:
       #     npm pkg delete "devDependencies.@sap/cds-mtxs"
 
       - run: npm ci
-      - run: npm run test
+      - name: Run tests
+        run: ${{ matrix.cds-version == '9' && 'npm run test:cds9' || 'npm test' }}
 
   test-hybrid:
     runs-on: ubuntu-latest
