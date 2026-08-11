@@ -5,7 +5,7 @@
   "description": "Test project for @cap-js/telemetry v1 (OTEL SDK v1) backward compatibility",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
-    "@cap-js/telemetry": "^1",
+    "@cap-js/telemetry": "^2",
     "@opentelemetry/exporter-trace-otlp-proto": "<0.200.0",
     "@sap/cds": ">=8"
   },
