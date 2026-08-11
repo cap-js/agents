@@ -350,6 +350,8 @@ class GraphExecutor {
           const msgChunk = Array.isArray(payload) ? payload[0] : payload
           const meta = Array.isArray(payload) ? payload[1] : undefined
           if (msgChunk?.type !== "ai") continue
+          // Skip tokens from NESTED model calls (pipe is used as separator by langchain)
+          if (meta?.langgraph_checkpoint_ns?.includes("|")) continue
           // Only stream tokens from the main agent model call.
           if (meta?.langgraph_node && meta.langgraph_node !== "model_request") continue
 
