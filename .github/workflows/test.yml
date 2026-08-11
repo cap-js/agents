@@ -82,3 +82,12 @@ jobs:
       - run: cds v -i
       - run: cds bind -2 joule-cap-proxy -o package.json
       - run: npm run test:hybrid
+
+  summary:
+    if: always()
+    runs-on: ubuntu-latest
+    name: Summary
+    needs: [test, test-hybrid]
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
