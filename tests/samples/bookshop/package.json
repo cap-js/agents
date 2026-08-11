@@ -56,21 +56,6 @@
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"
-        },
-        "telemetry": {
-          "kind": "telemetry-to-console",
-          "tracing": {
-            "exporter": {
-              "module": "@cap-js/telemetry",
-              "class": "ConsoleSpanExporter"
-            }
-          },
-          "metrics": {
-            "exporter": {
-              "module": "@cap-js/telemetry",
-              "class": "ConsoleMetricExporter"
-            }
-          }
         }
       },
       "[tracing]": {
