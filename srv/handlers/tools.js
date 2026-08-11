@@ -26,11 +26,11 @@ const unwrap = (result) => {
 
 class GenericReadTool extends DynamicStructuredTool {
   _cache = {}
-  constructor(srv, entities) {
+  constructor(srv, entities, prefix = "") {
     const entityNames = Object.keys(entities)
     const def = createGenericReadToolDefinition(entityNames, srv.name, "")
     super({
-      name: def.name,
+      name: prefix + def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -47,18 +47,18 @@ class GenericReadTool extends DynamicStructuredTool {
     if (Object.keys(entities).length === Object.keys(this.entities).length) return this
     const key = Object.keys(entities).join(';')
     if (this._cache[key]) return this._cache[key]
-    return this._cache[key] = new GenericReadTool(this.srv, entities)
+    return this._cache[key] = new GenericReadTool(this.srv, entities, "mod_")
   }
 }
 
 class DescribeTool extends DynamicStructuredTool {
   _cache = {}
-  constructor(srv, entities, actions) {
+  constructor(srv, entities, actions, prefix = "") {
     const entityNames = Object.keys(entities)
     const actionNames = Object.keys(actions)
     const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, "")
     super({
-      name: def.name,
+      name: prefix + def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -79,16 +79,16 @@ class DescribeTool extends DynamicStructuredTool {
     ) return this
     const key = Object.keys(entities).join(';') + '|' + Object.keys(actions).join(';')
     if (this._cache[key]) return this._cache[key]
-    return this._cache[key] = new DescribeTool(this.srv, entities, actions)
+    return this._cache[key] = new DescribeTool(this.srv, entities, actions, "mod_")
   }
 }
 
 
 class PerActionTool extends DynamicStructuredTool {
-  constructor(srv, actionName, action) {
+  constructor(srv, actionName, action, prefix = "") {
     const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
     super({
-      name: def.name,
+      name: prefix + def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -103,18 +103,18 @@ class PerActionTool extends DynamicStructuredTool {
   filtered() {
     const { actions, error } = checkAuthorization(this.srv)
     if (error) return false
-    return Object.prototype.hasOwnProperty.call(actions, this.actionName) ? this : null
+    return Object.prototype.hasOwnProperty.call(actions, this.actionName, "mod_") ? this : null
   }
 }
 
 
 class CallActionTool extends DynamicStructuredTool {
   _cache = {}
-  constructor(srv, actions) {
+  constructor(srv, actions, prefix = "") {
     const actionNames = Object.keys(actions)
     const def = createCallActionToolDefinition(actionNames, srv.name, "")
     super({
-      name: def.name,
+      name: prefix + def.name,
       description: def.description,
       schema: def.inputSchema,
       func: async (args) => {
@@ -131,7 +131,7 @@ class CallActionTool extends DynamicStructuredTool {
     if (Object.keys(actions).length === Object.keys(this.actions).length) return this
     const key = Object.keys(actions).join(';')
     if (this._cache[key]) return this._cache[key]
-    return this._cache[key] = new CallActionTool(this.srv, actions)
+    return this._cache[key] = new CallActionTool(this.srv, actions, "mod_")
   }
 }
 
