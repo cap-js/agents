@@ -9,6 +9,7 @@
 ### Fixed
 
 - Authentication in preview
+- Failing `query`-tool executions shown as success in traces
 
 ## Version 0.9.0 - 2026-08-10
 
