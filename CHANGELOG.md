@@ -14,6 +14,7 @@
 
 - Authentication in preview
 - Failing `query`-tool executions shown as success in traces
+- HITL-resumes can now be sent as opaque DataPart
 
 ## Version 0.9.0 - 2026-08-10
 
