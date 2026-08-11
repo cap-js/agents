@@ -54,7 +54,7 @@ jobs:
       - run: cds v -i
       - run: npm run test
         env:
-          DEBUG: ${{ runner.debug == '1' && 'agent' || '' }}
+          CDS_ENV: ${{ runner.debug == '1' && 'tracing' || '' }}
 
   test-hybrid:
     runs-on: ubuntu-latest
@@ -85,4 +85,4 @@ jobs:
       - run: cds bind -2 joule-cap-proxy -o package.json
       - run: npm run test:hybrid
         env:
-          DEBUG: ${{ runner.debug == '1' && 'agent' || '' }}
+          CDS_ENV: ${{ runner.debug == '1' && 'tracing' || '' }}

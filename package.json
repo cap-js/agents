@@ -27,7 +27,7 @@
     "test:cds8": "CDS_ENV=test npx vitest run --config vitest.config.js",
     "pretest:cds8": "npm pkg set 'overrides.@sap/cds=^8' 'overrides.@cap-js/sqlite=^1' 'overrides.@cap-js/hana=^1' 'overrides.@sap/cds-mtxs=^2' 'overrides.express=^4' && npm pkg set 'devDependencies.@sap/cds=^8' 'devDependencies.@cap-js/sqlite=^1' 'devDependencies.@cap-js/cds-test=>0' 'peerDependencies.@sap/cds=^8' && npm pkg delete 'devDependencies.@cap-js/hana' 'devDependencies.@sap/cds-mtxs' && rm -rf node_modules && npm i --legacy-peer-deps",
     "posttest:cds8": "git checkout package.json && rm -rf node_modules && npm i --legacy-peer-deps",
-    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
+    "test:hybrid": "cds bind --profile test,hybrid --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
