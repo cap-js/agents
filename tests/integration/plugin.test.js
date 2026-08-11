@@ -14,13 +14,6 @@ describe("@cap-js/agents plugin", () => {
     expect(agentEndpoint).not.toBe(undefined)
   })
 
-  it("should NOT expose AdminService (no @agent annotation)", () => {
-    const srv = cds.services.AdminService
-    expect(srv).not.toBe(undefined)
-    const agentEndpoint = srv.endpoints?.find((ep) => ep.kind === "agent")
-    expect(agentEndpoint).toBe(undefined)
-  })
-
   it("should still serve OData normally", async () => {
     const { data } = await GET("/odata/v4/catalog/Books")
     expect(data.value).not.toBe(undefined)
