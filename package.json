@@ -22,19 +22,19 @@
   },
   "main": "index.js",
   "scripts": {
-    "lint": "npx eslint .",
-    "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
-    "test:cds8": "CDS_ENV=test npx vitest run --config vitest.config.js",
+    "lint": "eslint .",
+    "test": "CDS_ENV=test vitest run --config vitest.config.js",
+    "test:cds8": "CDS_ENV=test vitest run --config vitest.config.js",
     "pretest:cds8": "npm pkg set 'overrides.@sap/cds=^8' 'overrides.@cap-js/sqlite=^1' 'overrides.@cap-js/hana=^1' 'overrides.@sap/cds-mtxs=^2' 'overrides.express=^4' && npm pkg set 'devDependencies.@sap/cds=^8' 'devDependencies.@cap-js/sqlite=^1' 'devDependencies.@cap-js/cds-test=>0' 'peerDependencies.@sap/cds=^8' && npm pkg delete 'devDependencies.@cap-js/hana' 'devDependencies.@sap/cds-mtxs' && rm -rf node_modules && npm i --legacy-peer-deps",
     "posttest:cds8": "git checkout package.json && rm -rf node_modules && npm i --legacy-peer-deps",
-    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
-    "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
+    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
+    "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/samples/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
     "watch:with-claude": "cds w tests/samples/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/samples/deep-agent --profile hybrid",
-    "prettier": "npx -y prettier@3 --write .",
-    "prettier:check": "npx -y prettier@3 --check ."
+    "prettier": "prettier --write .",
+    "prettier:check": "prettier --check ."
   },
   "files": [
     "index.js",
@@ -65,8 +65,12 @@
     "@cap-js/cds-test": "^1",
     "@cap-js/sqlite": "^3",
     "@sap/cds-mtxs": "^4",
+    "@sap/cds-dk": "^10",
     "@toon-format/toon": ">=2.3",
-    "deepagents": "^1.10.2"
+    "deepagents": "^1.10.2",
+    "eslint": "^10",
+    "prettier": "^3",
+    "vitest": "^4.1.7"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",

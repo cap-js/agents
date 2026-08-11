@@ -16,7 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22, 24]
-        cds-version: [8, 9, latest]
+        # cds-version: [8, 9, latest]
+        cds-version: [latest]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Use Node.js ${{ matrix.node-version }}
@@ -24,33 +25,32 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Pin CDS 9 compatible stack
-        if: matrix.cds-version == '9'
-        run: |
-          npm pkg delete "devDependencies.@cap-js/sqlite"
-          npm pkg delete "devDependencies.@sap/cds-mtxs"
-          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
-          npm pkg set "dependencies.@sap/cds=^9" --ws
-          npm pkg set "peerDependencies.@sap/cds=^9"
-          npm pkg set "devDependencies.@cap-js/sqlite=^2"
+      # - name: Pin CDS 9 compatible stack
+      #   if: matrix.cds-version == '9'
+      #   run: |
+      #     npm pkg delete "devDependencies.@cap-js/sqlite"
+      #     npm pkg delete "devDependencies.@sap/cds-mtxs"
+      #     npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
+      #     npm pkg set "dependencies.@sap/cds=^9" --ws
+      #     npm pkg set "peerDependencies.@sap/cds=^9"
+      #     npm pkg set "devDependencies.@cap-js/sqlite=^2"
 
-      - name: Pin CDS 8 compatible stack
-        if: matrix.cds-version == '8'
-        run: |
-          npm pkg set "overrides.@sap/cds=^8"
-          npm pkg set "overrides.@cap-js/sqlite=^1"
-          npm pkg set "overrides.@cap-js/hana=^1"
-          npm pkg set "overrides.@sap/cds-mtxs=^2"
-          npm pkg set "overrides.express=^4"
-          npm pkg set "overrides.better-sqlite3=^12"
-          npm pkg set "devDependencies.@cap-js/cds-test=>0"
-          npm pkg set "peerDependencies.@sap/cds=^8"
-          npm pkg delete "devDependencies.@cap-js/hana"
-          npm pkg delete "devDependencies.@cap-js/sqlite"
-          npm pkg delete "devDependencies.@sap/cds-mtxs"
+      # - name: Pin CDS 8 compatible stack
+      #   if: matrix.cds-version == '8'
+      #   run: |
+      #     npm pkg set "overrides.@sap/cds=^8"
+      #     npm pkg set "overrides.@cap-js/sqlite=^1"
+      #     npm pkg set "overrides.@cap-js/hana=^1"
+      #     npm pkg set "overrides.@sap/cds-mtxs=^2"
+      #     npm pkg set "overrides.express=^4"
+      #     npm pkg set "overrides.better-sqlite3=^12"
+      #     npm pkg set "devDependencies.@cap-js/cds-test=>0"
+      #     npm pkg set "peerDependencies.@sap/cds=^8"
+      #     npm pkg delete "devDependencies.@cap-js/hana"
+      #     npm pkg delete "devDependencies.@cap-js/sqlite"
+      #     npm pkg delete "devDependencies.@sap/cds-mtxs"
 
-      - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
-      - run: npm i --legacy-peer-deps
+      - run: npm ci
       - run: cds v -i
       - run: npm run test
 
@@ -77,8 +77,7 @@ jobs:
           username: ${{ secrets.CF_USERNAME }}
           password: ${{ secrets.CF_PASSWORD }}
 
-      - run: npm i -g @sap/cds-dk@latest
-      - run: npm i
+      - run: npm ci
       - run: cds v -i
       - run: cds bind -2 joule-cap-proxy -o package.json
       - run: npm run test:hybrid
