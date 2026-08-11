@@ -10,6 +10,10 @@
 
 - `<provider>/<model>` convenience for known llm providers, for example `cds.requires.llm: anthropic/haiku`
 
+### Fixed
+
+- Failing `query`-tool executions shown as success in traces
+
 ## Version 0.9.0 - 2026-08-10
 
 ### Added
