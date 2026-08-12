@@ -2,23 +2,49 @@
 
 ## About this project
 
-This is a CDS plugin for building agents in CAP.
+CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
 ## Requirements and Setup
 
-We use the @capire/bookshop as a running sample hereinafter. Clone it and open it in VSCode as follows:
+We use the [@capire/bookshop](https://github.com/capire/bookshop) as a running sample hereinafter. Clone it and open it in VSCode as follows:
 
 ```bash
 git clone https://github.com/capire/bookshop
 code bookshop
 ```
 
-Annotate the CatalogService with `@agent`:
+Within your project root run this to add the plugin:
+
+```bash
+npm add @cap-js/agents
+```
+
+Annotate the `CatalogService` with `@agent`:
 
 ```cds
-@agent @odata
-service CatalogService { ... }
+// srv/cat-service.cds
+[...]
+annotate CatalogService with @agent;
 ```
+
+Start your server with `cds watch` and note that the A2A protocol gets served:
+
+```bash
+[cds] - serving CatalogService {
+  at: [ ..., '/a2a/browse' ],
+  ...
+}
+```
+
+For local development, the plugin serves a chat preview at `http://localhost:4004/a2a/browse/preview/` and features a mock LLM.
+To use a real LLM, simply bind your app to an existing instance of SAP AI Core and start your server in `hybrid` profile:
+
+```bash
+cds bind -2 <instance>
+cds w --profile hybrid
+```
+
+See [SAP AI Core -> Create a Service Instance](https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/create-service-instance) for how to create an instance.
 
 ## Support, Feedback, Contributing
 
