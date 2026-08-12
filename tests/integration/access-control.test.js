@@ -179,10 +179,53 @@ describe("@cap-js/agents - Access Control", () => {
       })
     }
 
-    // ── @restrict without `to` — must default to authenticated-user ───
+    // ── @restrict without `to` — profile-conditional env fallback ─────
+    //   dev  → public   (env fallback inactive; annotation extracts no roles)
+    //   prod → 401 for anonymous  (restrict_all_services fallback fires)
 
     describe("@restrict without `to`", () => {
-      it("should return 401 for anonymous POST", async () => {
+      it("should allow anonymous POST in dev (falls through to env fallback, which is inactive)", async () => {
+        const res = await anonSend("restrict-no-to")
+        expect(res.status).toBe(200)
+        expect(res.data.result).not.toBe(undefined)
+        expect(res.data.result.status.state).toBe("completed")
+        expect(res.data.result.status.message.parts[0].text).toMatch(/NoTo echo/)
+      })
+
+      it("should allow any authenticated user to POST message (no role required)", async () => {
+        const res = await sendMessageAs("restrict-no-to", "hello", BOB)
+        expect(res.status).toBe(200)
+        expect(res.data.result).not.toBe(undefined)
+        expect(res.data.result.status.state).toBe("completed")
+        expect(res.data.result.status.message.parts[0].text).toMatch(/NoTo echo/)
+      })
+    })
+
+    // ── @restrict without `to` in prod mode ───────────────────────────
+
+    describe("@restrict without `to` — prod-mode env fallback", () => {
+      let savedNodeEnv
+      let savedRestrictAll
+      let restrictAllWasSet
+
+      beforeAll(() => {
+        savedNodeEnv = process.env.NODE_ENV
+        process.env.NODE_ENV = "production"
+        cds.env.requires ??= {}
+        cds.env.requires.auth ??= {}
+        restrictAllWasSet = "restrict_all_services" in cds.env.requires.auth
+        savedRestrictAll = cds.env.requires.auth.restrict_all_services
+        cds.env.requires.auth.restrict_all_services = true
+      })
+
+      afterAll(() => {
+        if (savedNodeEnv === undefined) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = savedNodeEnv
+        if (restrictAllWasSet) cds.env.requires.auth.restrict_all_services = savedRestrictAll
+        else delete cds.env.requires.auth.restrict_all_services
+      })
+
+      it("should return 401 for anonymous POST in prod mode", async () => {
         const res = await anonSend("restrict-no-to")
         expect(res.status).toBe(401)
         expect(res.data.jsonrpc).toBe("2.0")
@@ -190,10 +233,9 @@ describe("@cap-js/agents - Access Control", () => {
         expect(res.data.error.message).toMatch(/Unauthorized/)
       })
 
-      it("should allow any authenticated user to POST message (no role required)", async () => {
+      it("should still allow authenticated user (BOB) in prod mode", async () => {
         const res = await sendMessageAs("restrict-no-to", "hello", BOB)
         expect(res.status).toBe(200)
-        expect(res.data.result).not.toBe(undefined)
         expect(res.data.result.status.state).toBe("completed")
         expect(res.data.result.status.message.parts[0].text).toMatch(/NoTo echo/)
       })

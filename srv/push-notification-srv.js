@@ -114,7 +114,6 @@ async function fetchWithRedirects(url, options, allowedDomains, maxRedirects = M
   }
 }
 
-
 async function fetchIasToken(resource) {
   let getIasToken
   try {
