@@ -25,7 +25,7 @@ const unwrap = (result) => {
 // we need the checkAuthorization result many times in the same cds context
 function cachedAuth(srv) {
   const cache = cds.context.__agentAuth ??= {}
-  return cache[srv] ??= checkAuthorization(srv)
+  return cache[srv.name] ??= checkAuthorization(srv)
 }
 
 class GenericReadTool extends DynamicStructuredTool {
