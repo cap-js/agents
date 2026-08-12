@@ -4,6 +4,8 @@
 
 CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
+
+
 ## Requirements and Setup
 
 We use the [@capire/bookshop](https://github.com/capire/bookshop) as a running sample hereinafter. Clone it and open it in VSCode as follows:
@@ -44,7 +46,117 @@ cds bind -2 <instance>
 cds w --profile hybrid
 ```
 
-See [SAP AI Core -> Create a Service Instance](https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/create-service-instance) for how to create an instance.
+See [SAP AI Core → Create a Service Instance](https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/create-service-instance) for how to create an instance.
+
+
+
+## Ways to Build Agents
+
+### Agentify Existing CAP Services
+
+Add `@agent` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the service as a remote agent with zero code required. The agent has access to the tools generated from the service model.
+
+```cds
+@agent
+service CatalogService {
+  entity Books as projection on my.Books;
+  action submitOrder(book: Books:ID, quantity: Integer) returns { stock: Integer };
+}
+```
+
+### Markdown-Based Agents
+
+Define an agent's identity, behaviour, and skills entirely in markdown — no JavaScript handler required. Annotate the CDS service with `@agent` and create a sibling directory matching the slugified service name. The plugin auto-builds the agent at startup.
+
+```cds
+// srv/cat-service.cds
+[...]
+
+// @agent.hitl > Action is considered for Human-in-the-loop
+annotate CatalogService.submitOrder with @agent.hitl;
+```
+
+```
+srv/
+├─ cat-service.cds
+└─ catalog-agent/                ← matches the slugified service name
+   ├─ AGENTS.md                  ← agent identity + behaviour
+   └─ skills/
+      └─ book-purchase/
+         └─ SKILL.md             ← workflow + examples
+```
+
+`AGENTS.md` defines who the agent is. The frontmatter populates the agent card;
+the body is the agent's system prompt:
+
+```md
+---
+name: catalog-agent
+version: "1.0.0"
+description: >
+  Bookshop assistant for placing book orders on behalf of the user.
+---
+
+# Catalog Agent
+
+## Identity
+
+You are the **Catalog Agent**, a helpful assistant for the capire bookshop.
+...
+```
+
+
+
+## Configuration
+
+The LLM used by an agent is configured via `cds.requires.llm`. You can provide a `kind` as with [any required service](https://cap.cloud.sap/docs/node.js/core-services#required-services).
+
+```jsonc
+"cds": {
+  "requires": {
+    "llm": {
+      "kind": "aicore",
+      "model": "anthropic--claude-4.6-sonnet"
+    }
+  }
+}
+```
+
+| Kind        | Description                                                                                                                             |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `aicore`    | The default for `production` and `hybrid`, connects to SAP AI Core                                                                      |
+| `mock`      | The default for `development`, provides a mocked response when called                                                                   |
+
+#### Using Multiple Models (Experimental!)
+
+To use multiple models for different agents, you can define additional ones and reference them via annotation.
+When defining an additional model, you need to prefix the kind with `llm-`.
+
+```jsonc
+{
+  "cds": {
+    "requires": {
+      "small-llm": {
+        // use any name you like
+        "kind": "llm-aicore",
+        "model": "mistralai--mistral-small",
+      },
+    },
+  },
+}
+```
+
+```cds
+@agent
+@agent.llm: 'small-llm'
+service CatalogService { ... }
+```
+
+| Annotation   | Description                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
+
+
 
 ## Support, Feedback, Contributing
 
