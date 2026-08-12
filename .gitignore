@@ -17,3 +17,6 @@ proposal.md
 **/*csn.json
 **/*.hdiconfig
 **/undeploy.json
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
