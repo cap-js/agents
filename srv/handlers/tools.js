@@ -24,6 +24,7 @@ const unwrap = (result) => {
 
 // we need the checkAuthorization result many times in the same cds context
 function cachedAuth(srv) {
+  if (!cds.context) return checkAuthorization(srv)
   const cache = (cds.context.__agentAuth ??= {})
   return (cache[srv.name] ??= checkAuthorization(srv))
 }
