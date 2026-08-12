@@ -59,7 +59,7 @@ jobs:
           npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "allowScripts.better-sqlite3=true"
 
-      - run: npm i -g @sap/cds-dk@latest
+      - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
       - run: npm i --omit=peer
       - run: npm test
 
