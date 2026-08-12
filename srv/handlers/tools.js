@@ -13,7 +13,7 @@ import {
 } from "@cap-js/mcp/lib/tools.js"
 import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
-import { checkAuthorization } from '@cap-js/mcp/lib/auth.js'
+import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 
 const LOG = cds.log("agent")
 
@@ -24,8 +24,8 @@ const unwrap = (result) => {
 
 // we need the checkAuthorization result many times in the same cds context
 function cachedAuth(srv) {
-  const cache = cds.context.__agentAuth ??= {}
-  return cache[srv.name] ??= checkAuthorization(srv)
+  const cache = (cds.context.__agentAuth ??= {})
+  return (cache[srv.name] ??= checkAuthorization(srv))
 }
 
 class GenericReadTool extends DynamicStructuredTool {
@@ -54,7 +54,7 @@ class GenericReadTool extends DynamicStructuredTool {
 
   get schema() {
     const { entities, error } = cachedAuth(this.srv)
-    if (error) return
+    if (error) return z.undefined
     return createGenericReadToolDefinition(Object.keys(entities), this.srv.name, "").inputSchema
   }
 
@@ -66,7 +66,12 @@ class GenericReadTool extends DynamicStructuredTool {
 
 class DescribeTool extends DynamicStructuredTool {
   constructor(srv, entities, actions) {
-    const def = createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), srv.name, "")
+    const def = createDescribeToolDefinition(
+      Object.keys(entities),
+      Object.keys(actions),
+      srv.name,
+      "",
+    )
     super({
       name: def.name,
       description: def.description,
@@ -86,13 +91,23 @@ class DescribeTool extends DynamicStructuredTool {
   get description() {
     const { entities, actions, error } = cachedAuth(this.srv)
     if (error) return "Not available due to " + error?.reason
-    return createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), this.srv.name, "").description
+    return createDescribeToolDefinition(
+      Object.keys(entities),
+      Object.keys(actions),
+      this.srv.name,
+      "",
+    ).description
   }
 
   get schema() {
     const { entities, actions, error } = cachedAuth(this.srv)
-    if (error) return
-    return createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), this.srv.name, "").inputSchema
+    if (error) return z.undefined
+    return createDescribeToolDefinition(
+      Object.keys(entities),
+      Object.keys(actions),
+      this.srv.name,
+      "",
+    ).inputSchema
   }
 
   isAllowed() {
@@ -100,7 +115,6 @@ class DescribeTool extends DynamicStructuredTool {
     return !error && (Object.keys(entities).length > 0 || Object.keys(actions).length > 0)
   }
 }
-
 
 class PerActionTool extends DynamicStructuredTool {
   constructor(srv, actionName, action) {
@@ -124,7 +138,6 @@ class PerActionTool extends DynamicStructuredTool {
     return !error && Object.prototype.hasOwnProperty.call(actions, this.actionName)
   }
 }
-
 
 class CallActionTool extends DynamicStructuredTool {
   constructor(srv, actions) {
@@ -152,7 +165,7 @@ class CallActionTool extends DynamicStructuredTool {
 
   get schema() {
     const { actions, error } = cachedAuth(this.srv)
-    if (error) return
+    if (error) return z.undefined
     return createCallActionToolDefinition(Object.keys(actions), this.srv.name, "").inputSchema
   }
 
