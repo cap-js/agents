@@ -23,6 +23,11 @@ const unwrap = (result) => {
   return text
 }
 
+// we need the checkAuthorization result many times in the same cds context
+function cachedAuth(srv) {
+  const cache = cds.context.__agentAuth ??= {}
+  return cache[srv] ??= checkAuthorization(srv)
+}
 
 class GenericReadTool extends DynamicStructuredTool {
   constructor(srv, entities) {
@@ -42,19 +47,19 @@ class GenericReadTool extends DynamicStructuredTool {
   }
 
   get description() {
-    const { entities, error } = checkAuthorization(this.srv)
-    if (error) return ""
+    const { entities, error } = cachedAuth(this.srv)
+    if (error) return "Not available due to " + error?.reason
     return createGenericReadToolDefinition(Object.keys(entities), this.srv.name, "").description
   }
 
   get schema() {
-    const { entities, error } = checkAuthorization(this.srv)
-    const ents = error ? this._allEntities : entities
-    return createGenericReadToolDefinition(Object.keys(ents), this.srv.name, "").inputSchema
+    const { entities, error } = cachedAuth(this.srv)
+    if (error) return
+    return createGenericReadToolDefinition(Object.keys(entities), this.srv.name, "").inputSchema
   }
 
   isAllowed() {
-    const { entities, error } = checkAuthorization(this.srv)
+    const { entities, error } = cachedAuth(this.srv)
     return !error && Object.keys(entities).length > 0
   }
 }
@@ -78,20 +83,19 @@ class DescribeTool extends DynamicStructuredTool {
   }
 
   get description() {
-    const { entities, actions, error } = checkAuthorization(this.srv)
-    if (error) return ""
+    const { entities, actions, error } = cachedAuth(this.srv)
+    if (error) return "Not available due to " + error?.reason
     return createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), this.srv.name, "").description
   }
 
   get schema() {
-    const { entities, actions, error } = checkAuthorization(this.srv)
-    const ents = error ? this._allEntities : entities
-    const acts = error ? this._allActions : actions
-    return createDescribeToolDefinition(Object.keys(ents), Object.keys(acts), this.srv.name, "").inputSchema
+    const { entities, actions, error } = cachedAuth(this.srv)
+    if (error) return
+    return createDescribeToolDefinition(Object.keys(entities), Object.keys(actions), this.srv.name, "").inputSchema
   }
 
   isAllowed() {
-    const { entities, actions, error } = checkAuthorization(this.srv)
+    const { entities, actions, error } = cachedAuth(this.srv)
     return !error && (Object.keys(entities).length > 0 || Object.keys(actions).length > 0)
   }
 }
@@ -114,7 +118,7 @@ class PerActionTool extends DynamicStructuredTool {
   }
 
   isAllowed() {
-    const { actions, error } = checkAuthorization(this.srv)
+    const { actions, error } = cachedAuth(this.srv)
     return !error && Object.prototype.hasOwnProperty.call(actions, this.actionName)
   }
 }
@@ -138,19 +142,19 @@ class CallActionTool extends DynamicStructuredTool {
   }
 
   get description() {
-    const { actions, error } = checkAuthorization(this.srv)
-    if (error) return ""
+    const { actions, error } = cachedAuth(this.srv)
+    if (error) return "Not available due to " + error?.reason
     return createCallActionToolDefinition(Object.keys(actions), this.srv.name, "").description
   }
 
   get schema() {
-    const { actions, error } = checkAuthorization(this.srv)
-    const acts = error ? this._allActions : actions
-    return createCallActionToolDefinition(Object.keys(acts), this.srv.name, "").inputSchema
+    const { actions, error } = cachedAuth(this.srv)
+    if (error) return
+    return createCallActionToolDefinition(Object.keys(actions), this.srv.name, "").inputSchema
   }
 
   isAllowed() {
-    const { actions, error } = checkAuthorization(this.srv)
+    const { actions, error } = cachedAuth(this.srv)
     return !error && Object.keys(actions).length > 0
   }
 }
