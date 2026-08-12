@@ -33,6 +33,7 @@ jobs:
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
         run: |
+          rm -f package-lock.json
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
@@ -44,6 +45,7 @@ jobs:
       - name: Pin CDS 8 compatible stack
         if: matrix.cds-version == '8'
         run: |
+          rm -f package-lock.json
           npm pkg set "overrides.@sap/cds=^8"
           npm pkg set "overrides.@cap-js/sqlite=^1"
           npm pkg set "overrides.@cap-js/hana=^1"
