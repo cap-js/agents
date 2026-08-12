@@ -397,6 +397,46 @@
           background: #0f2d45;
         }
       }
+
+      /* Thinking summary: per-turn reasoning text superseded by the final
+         answer. Rendered as a collapsible <details> strip above the current
+         streaming bubble. Auto-collapses at task completion. */
+      .thinking-summary {
+        margin: 4px 0 8px 0;
+        font-size: 0.88em;
+        color: #666;
+        border-left: 2px solid #ccc;
+        padding-left: 10px;
+      }
+      .thinking-summary summary {
+        cursor: pointer;
+        user-select: none;
+        color: #888;
+        list-style: none;
+      }
+      .thinking-summary summary::before {
+        content: "▶ ";
+        font-size: 0.8em;
+      }
+      .thinking-summary[open] summary::before {
+        content: "▼ ";
+      }
+      .thinking-step {
+        padding: 4px 0;
+        font-style: italic;
+      }
+      .thinking-step + .thinking-step {
+        border-top: 1px dashed #e0e0e0;
+        margin-top: 4px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .thinking-summary {
+          color: #999;
+          border-left-color: #444;
+        }
+        .thinking-summary summary { color: #aaa; }
+        .thinking-step + .thinking-step { border-top-color: #333; }
+      }
     </style>
     <script src="marked.min.js"></script>
   </head>
@@ -406,12 +446,11 @@
       <h1>{{agentName}}</h1>
       <label
         class="header-toggle"
-        title="Stream tokens as they arrive"
+        title="Stream the agent's reasoning steps while it runs (experimental)"
         style="margin-left: auto"
-        hidden
       >
-        <input type="checkbox" id="streamToggle" hidden />
-        Streaming
+        <input type="checkbox" id="streamToggle" />
+        Show thinking (experimental)
       </label>
       <div class="status-dot" id="dot"></div>
     </header>
@@ -444,9 +483,10 @@
       let pendingTaskId = null
       let activeTaskId = null
       let activeAbort = null
-      // Live streaming bubble: created on first token, updated incrementally
       let streamingBubble = null
       let streamingText = ""
+      let thinkingSummaryEl = null
+      let thinkingStepCount = 0
 
       const HISTORY_KEY = "chatHistory_" + AGENT_URL
       let inputHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]")
@@ -506,6 +546,26 @@
         return el
       }
 
+      function addThinkingStep(text) {
+        if (!thinkingSummaryEl) {
+          thinkingSummaryEl = document.createElement("details")
+          thinkingSummaryEl.className = "thinking-summary"
+          thinkingSummaryEl.open = true
+          const summary = document.createElement("summary")
+          summary.textContent = "Thinking (0 steps)"
+          thinkingSummaryEl.appendChild(summary)
+          messages.insertBefore(thinkingSummaryEl, typing)
+        }
+        thinkingStepCount++
+        const step = document.createElement("div")
+        step.className = "thinking-step"
+        step.innerHTML = md(text)
+        thinkingSummaryEl.appendChild(step)
+        thinkingSummaryEl.querySelector("summary").textContent =
+          `Thinking (${thinkingStepCount} step${thinkingStepCount === 1 ? "" : "s"})`
+        messages.scrollTop = messages.scrollHeight
+      }
+
       function addApprovalPrompt(description) {
         const el = document.createElement("div")
         el.className = "msg approval"
@@ -557,9 +617,6 @@
           activeTaskId = null
           activeAbort = null
           statusText.textContent = ""
-          // Reset streaming state on any transition to idle
-          streamingBubble = null
-          streamingText = ""
         }
         messages.scrollTop = messages.scrollHeight
       }
@@ -573,8 +630,6 @@
 
         const abort = new AbortController()
         activeAbort = abort
-        streamingBubble = null
-        streamingText = ""
 
         try {
           const resp = await fetch(AGENT_URL, {
@@ -623,6 +678,12 @@
           pendingTaskId = taskId
           const msgParts = result?.status?.message?.parts ?? []
           const description = partsToText(msgParts)
+          if (streamingBubble && streamingText) {
+            addThinkingStep(streamingText)
+            streamingBubble.remove()
+            streamingBubble = null
+            streamingText = ""
+          }
           addApprovalPrompt(description)
           return
         }
@@ -669,6 +730,8 @@
         activeAbort = abort
         streamingBubble = null
         streamingText = ""
+        thinkingSummaryEl = null
+        thinkingStepCount = 0
 
         const useStream = streamToggle.checked
         try {
@@ -779,7 +842,6 @@
           return null
         }
 
-        // Incremental artifact-update: render tokens as they arrive
         if (event.kind === "artifact-update" && streamToggle.checked) {
           const parts = event.artifact?.parts ?? []
           const text = partsToText(parts)
@@ -788,35 +850,46 @@
           const lastChunk = event.lastChunk ?? false
 
           if (lastChunk) {
-            // lastChunk carries the authoritative full text — replace accumulated content.
+            // Terminal: current bubble = final answer. Replace with authoritative text.
             if (text) {
               if (streamingBubble) {
                 streamingBubble.innerHTML = md(text)
                 messages.scrollTop = messages.scrollHeight
               } else {
                 typing.style.display = "none"
-                addMessage("agent", text)
+                streamingBubble = addMessage("agent", text)
               }
             }
+            if (thinkingSummaryEl) thinkingSummaryEl.open = false
             streamingBubble = null
-            streamingText = text // keep so handleResult skips duplicate render
+            streamingText = text // dedupe with handleResult
             return null
           }
 
-          if (text) {
-            if (!append || !streamingBubble) {
-              // First token — create a live bubble, hide typing indicator
-              typing.style.display = "none"
-              streamingBubble = addMessage("agent", text)
-              streamingText = text
-            } else {
-              // Subsequent token — accumulate and re-render markdown
-              streamingText += text
-              streamingBubble.innerHTML = md(streamingText)
-              messages.scrollTop = messages.scrollHeight
-            }
-          }
+          if (!text) return null
 
+          if (!append) {
+            // New turn boundary — move the previous turn's text (if any) into
+            // the thinking summary and drop its bubble from the DOM. Open a
+            // fresh bubble for the new turn.
+            if (streamingBubble && streamingText) {
+              addThinkingStep(streamingText)
+              streamingBubble.remove()
+            }
+            typing.style.display = "none"
+            streamingBubble = addMessage("agent", text)
+            streamingText = text
+          } else if (streamingBubble) {
+            // Subsequent token — accumulate into the current turn's bubble.
+            streamingText += text
+            streamingBubble.innerHTML = md(streamingText)
+          } else {
+            // Defensive: append:true with no bubble yet (unexpected). Open one.
+            typing.style.display = "none"
+            streamingBubble = addMessage("agent", text)
+            streamingText = text
+          }
+          messages.scrollTop = messages.scrollHeight
           return null
         }
 
