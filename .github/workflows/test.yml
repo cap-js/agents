@@ -39,7 +39,7 @@ jobs:
           npm pkg set "dependencies.@sap/cds=^9" --ws
           npm pkg set "peerDependencies.@sap/cds=^9"
           npm pkg set "devDependencies.@cap-js/sqlite=^2"
-          npm approve-scripts better-sqlite3
+          npm pkg set "allowScripts.better-sqlite3=true"
 
       - name: Pin CDS 8 compatible stack
         if: matrix.cds-version == '8'
