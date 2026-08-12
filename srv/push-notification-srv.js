@@ -85,6 +85,8 @@ async function fetchWithRedirects(url, options, allowedDomains, maxRedirects = M
     }
 
     // Never let fetch follow silently - we validate each hop explicitly.
+    // Sequential await is required
+    // eslint-disable-next-line no-await-in-loop
     const res = await fetch(currentUrl, { ...options, redirect: "manual" })
 
     if (res.status < 300 || res.status >= 400) {
