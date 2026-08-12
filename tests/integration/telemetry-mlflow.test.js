@@ -14,7 +14,7 @@ import {
 
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const sendMessage = createSendMessage(POST)
 const sendMessageWithParts = createSendMessageWithParts(POST)
 

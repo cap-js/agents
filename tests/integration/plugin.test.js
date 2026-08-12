@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { GET } = cds.test(import.meta.dirname + "/../projects/bookshop")
 
 describe("@cap-js/agents plugin", () => {
   it("should register agent protocol adapter", () => {

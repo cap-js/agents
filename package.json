@@ -29,10 +29,10 @@
     "posttest:cds8": "git checkout package.json && rm -rf node_modules && npm i --legacy-peer-deps",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
-    "watch:sample": "cds w tests/samples/bookshop",
-    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/samples/bookshop",
-    "watch:with-claude": "cds w tests/samples/bookshop --profile with-claude",
-    "watch:deep-agent": "cds w tests/samples/deep-agent --profile hybrid",
+    "watch:sample": "cds w tests/projects/bookshop",
+    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/projects/bookshop",
+    "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
+    "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
   },
@@ -213,17 +213,17 @@
     }
   },
   "workspaces": [
-    "tests/samples/bookshop/",
-    "tests/samples/deep-agent/",
-    "tests/samples/mtx/mtx/sidecar/",
-    "tests/samples/telemetry-debug/",
-    "tests/samples/telemetry-v1/",
-    "tests/samples/travel/travel-agent/",
-    "tests/samples/travel/xflights/",
-    "tests/samples/travel/leisure-services/",
-    "tests/sidecar-samples/java-bookshop/agent/sidecar",
-    "tests/sidecar-samples/java-bookshop",
-    "tests/sidecar-samples/node-bookshop/agent/sidecar",
-    "tests/sidecar-samples/node-bookshop"
+    "tests/projects/bookshop/",
+    "tests/projects/deep-agent/",
+    "tests/projects/mtx/mtx/sidecar/",
+    "tests/projects/telemetry-debug/",
+    "tests/projects/telemetry-v1/",
+    "tests/projects/travel/travel-agent/",
+    "tests/projects/travel/xflights/",
+    "tests/projects/travel/leisure-services/",
+    "tests/sidecar-projects/java-bookshop/agent/sidecar",
+    "tests/sidecar-projects/java-bookshop",
+    "tests/sidecar-projects/node-bookshop/agent/sidecar",
+    "tests/sidecar-projects/node-bookshop"
   ]
 }

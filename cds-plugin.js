@@ -31,7 +31,7 @@ const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
 
-cds.on("bootstrap", () => {
+cds.on("bootstrap", (app) => {
   const providers = {
     ["llm-mock"]: {},
     anthropic: {
@@ -57,6 +57,24 @@ cds.on("bootstrap", () => {
       s.model = providers[provider][model] ?? model
     }
   }
+
+  const profiles = cds.env.profiles || []
+  const isDev = profiles.includes("development") && !profiles.includes("production")
+  if (!isDev) return
+  if (cds.env.server?.index === false) return
+
+  const AGENT_BLOCK = /(<div id="[^"]+-agent">[\s\S]*?<\/h3>)[\s\S]*?<\/ul>\s*<\/div>/g
+
+  app.get("/", (_req, res, next) => {
+    const origSend = res.send.bind(res)
+    res.send = (body) => {
+      if (typeof body === "string") {
+        body = body.replace(AGENT_BLOCK, (_m, head) => `${head}\n      </div>`)
+      }
+      return origSend(body)
+    }
+    next()
+  })
 })
 
 cds.on("serving", (srv) => {

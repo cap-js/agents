@@ -11,7 +11,7 @@ import createHelpers from "../utils/helpers.js"
 process.env.CDS_TEST_SILENT = "false"
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 
 describe("@cap-js/agents - agent_actions metric (deep agent, per LLM call)", () => {
   let sendMessage

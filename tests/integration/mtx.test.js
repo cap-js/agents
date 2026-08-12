@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 axios.defaults.validateStatus = () => true
 
 describe("@cap-js/agents - Multi-tenancy (active_users)", () => {

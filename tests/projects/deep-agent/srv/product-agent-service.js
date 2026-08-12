@@ -11,7 +11,7 @@
  *  - No `createDeepAgent`, `StateBackend`, `buildModel` event, or
  *    `agentDir` boilerplate — all auto-derived by the plugin.
  *
- * Run with: cds watch tests/samples/deep-agent
+ * Run with: cds watch tests/projects/deep-agent
  */
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"

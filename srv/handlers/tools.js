@@ -19,8 +19,7 @@ const LOG = cds.log("agent")
 
 const unwrap = (result) => {
   const text = result.content?.[0]?.text ?? ""
-  if (result.isError) throw new Error(text)
-  return text
+  return [text, { isError: result.isError === true }]
 }
 
 // we need the checkAuthorization result many times in the same cds context
@@ -36,6 +35,7 @@ class GenericReadTool extends DynamicStructuredTool {
       name: def.name,
       description: def.description,
       schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
       func: async (args) => {
         return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
       },
@@ -71,6 +71,7 @@ class DescribeTool extends DynamicStructuredTool {
       name: def.name,
       description: def.description,
       schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
       func: async (args) => {
         return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
       },
@@ -108,6 +109,7 @@ class PerActionTool extends DynamicStructuredTool {
       name: def.name,
       description: def.description,
       schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
       func: async (args) => {
         return unwrap(await executePerActionTool(srv, actionName, action, args, { log: LOG }))
       },
@@ -131,6 +133,7 @@ class CallActionTool extends DynamicStructuredTool {
       name: def.name,
       description: def.description,
       schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
       func: async (args) => {
         return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
       },

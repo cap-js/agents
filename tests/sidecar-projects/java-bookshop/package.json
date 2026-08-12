@@ -4,7 +4,7 @@
   "private": true,
   "description": "Java CAP bookshop with agent sidecar support via HCQL",
   "devDependencies": {
-    "@sap/cds-dk": "^9.5.0"
+    "@sap/cds-dk": "^10.0.6"
   },
   "scripts": {
     "build:java": "cd srv && mvn clean package -DskipTests",

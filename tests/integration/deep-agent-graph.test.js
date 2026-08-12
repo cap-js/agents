@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const { POST } = cds.test(import.meta.dirname + "/../samples/deep-agent")
+const { POST } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 
 describe("@cap-js/agents - deep agent graph construction events", () => {
   it("dispatches buildSystemPrompt when constructing the deep-agent graph", async () => {

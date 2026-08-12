@@ -7,7 +7,7 @@
  * and that cds.env.agents.streaming=false falls back to the blocking invoke() path.
  */
 import cds from "@sap/cds"
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 import createHelpers from "../utils/helpers.js"
 const { streamMessage, parseSSEFrames, setupErrorDetection } = createHelpers({ POST, axios })
 
