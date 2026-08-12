@@ -75,7 +75,7 @@ describe("@cap-js/agent - Sidecar Support", () => {
     it("tools are properly generated for service via sidecar API", async () => {
       const { generateTools } = await import("../../srv/handlers/tools.js")
       const srv = cds.services["CatalogService"]
-      const tools = generateTools(srv, { skipAuth: true })
+      const tools = generateTools(srv)
       const toolMap = Object.fromEntries(tools.map((t) => [t.name, t]))
 
       assert.ok(tools.length > 0)
