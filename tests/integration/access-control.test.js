@@ -158,4 +158,28 @@ describe("@cap-js/agents - Access Control", () => {
       expect(res.data.result.status.state).toBe("completed")
     })
   })
+
+  // ─── @restrict enforcement on entity level ───────────────────────────────
+
+  describe("@restrict enforcement on entity level", () => {
+    it("alice (admin) can read @restrict-protected entity via tool call", async () => {
+      const res = await sendMessageAs("entity-restrict", "list books", ALICE)
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("completed")
+      // Mock LLM queries the only entity in the service; SecretBooks is in alice's schema
+      // so the tool result — echoed back in the response — contains the sentinel value
+      const text = res.data.result.status.message.parts[0].text
+      expect(text, `expected sentinel in response, got: ${text}`).toMatch(/ADMIN_ONLY_SENTINEL/)
+    })
+
+    it("bob (no admin role) cannot read @restrict-protected entity via tool call", async () => {
+      const res = await sendMessageAs("entity-restrict", "list books", BOB)
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("completed")
+      // SecretBooks is filtered from bob's tool schema — no tool call is made,
+      // so the sentinel value must never appear in the response
+      const text = res.data.result.status.message.parts[0].text
+      expect(text, `sentinel must not leak to bob, got: ${text}`).not.toMatch(/ADMIN_ONLY_SENTINEL/)
+    })
+  })
 })
