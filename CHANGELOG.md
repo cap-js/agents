@@ -9,6 +9,7 @@
 ### Added
 
 - `<provider>/<model>` convenience for known llm providers, for example `cds.requires.llm: anthropic/haiku`
+- Experimental Thinking steps in the preview
 
 ### Fixed
 
