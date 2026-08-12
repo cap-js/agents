@@ -29,7 +29,7 @@ jobs:
         run: npm i npm@12 -g
 
       - run: npm set min-release-age=3
-      - run: npm set ignore-scripts=true
+      # - run: npm set ignore-scripts=true
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
         run: |
