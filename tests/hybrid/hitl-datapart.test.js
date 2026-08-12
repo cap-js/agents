@@ -3,7 +3,7 @@
 import path from "node:path"
 import cds from "@sap/cds"
 
-const { POST } = cds.test(path.join(import.meta.dirname, "../samples/bookshop"))
+const { POST } = cds.test(path.join(import.meta.dirname, "../projects/bookshop"))
 
 function sendMessage(service, parts, { contextId, taskId } = {}) {
   return POST(`/a2a/${service}/`, {

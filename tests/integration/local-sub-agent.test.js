@@ -16,7 +16,7 @@
 import path from "node:path"
 import cds from "@sap/cds"
 
-const LEISURE_DIR = path.resolve(import.meta.dirname, "../samples/travel/leisure-services")
+const LEISURE_DIR = path.resolve(import.meta.dirname, "../projects/travel/leisure-services")
 
 cds.test(LEISURE_DIR)
 

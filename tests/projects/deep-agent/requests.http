@@ -1,5 +1,5 @@
 ### Deep Agent Sample — HITL Test
-### Requires: cds bind --exec -- cds watch tests/samples/deep-agent
+### Requires: cds bind --exec -- cds watch tests/projects/deep-agent
 ### Note: orderProduct must have interruptOn configured in the agent for HITL to trigger
 
 ### 1. Send a message (normal flow)

@@ -16,7 +16,7 @@
  *      "Cannot read properties of null (reading 'messages')".
  */
 import cds from "@sap/cds"
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { streamMessage, parseSSEFrames } = createHelpers({ POST, axios })
 

@@ -8,7 +8,7 @@
 import cds from "@sap/cds"
 import InstrumentedOrchestrationClient from "../../lib/models/aicore.js"
 
-cds.test(import.meta.dirname + "/../samples/bookshop")
+cds.test(import.meta.dirname + "/../projects/bookshop")
 
 const MODEL_NAME = "anthropic--claude-4.6-sonnet"
 
