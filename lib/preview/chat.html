@@ -616,6 +616,9 @@
       }
 
       async function handleResult(result) {
+        if (result?.contextId) contextId = result.contextId
+        if (result?.id) activeTaskId = result.id
+
         const state = result?.status?.state ?? result?.state
         const taskId = result?.id ?? result?.taskId
 
