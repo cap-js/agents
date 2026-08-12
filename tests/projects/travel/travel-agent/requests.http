@@ -1,9 +1,9 @@
 # A2A Protocol — Travel Agent Sample Requests
 #
 # Start the 3 services:
-#   Terminal 1: cds w tests/samples/travel/xflights              (port 4005)
-#   Terminal 2: cds w tests/samples/travel/leisure-services       (port 4006)
-#   Terminal 3: cds w tests/samples/travel/travel-agent           (port 4004)
+#   Terminal 1: cds w tests/projects/travel/xflights              (port 4005)
+#   Terminal 2: cds w tests/projects/travel/leisure-services       (port 4006)
+#   Terminal 3: cds w tests/projects/travel/travel-agent           (port 4004)
 
 ###
 # Agent Card — skills derived from AGENTS.md + skills/ scan

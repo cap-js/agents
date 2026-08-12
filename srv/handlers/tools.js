@@ -17,6 +17,11 @@ import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 
 const LOG = cds.log("agent")
 
+const unwrap = (result) => {
+  const text = result.content?.[0]?.text ?? ""
+  return [text, { isError: result.isError === true }]
+}
+
 /**
  * Reuses tool definitions and execution logic from @cap-js/mcp
  *
@@ -51,9 +56,9 @@ export function generateTools(srv, options = {}) {
         name: def.name,
         description: def.description,
         schema: def.inputSchema,
+        responseFormat: "content_and_artifact",
         func: async (args) => {
-          const result = await executeGenericReadTool(srv, entities, args, { log: LOG })
-          return result.content[0].text
+          return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
         },
       }),
     )
@@ -68,9 +73,9 @@ export function generateTools(srv, options = {}) {
         name: def.name,
         description: def.description,
         schema: def.inputSchema,
+        responseFormat: "content_and_artifact",
         func: async (args) => {
-          const result = await executeDescribe(srv, entities, actions, args, { log: LOG })
-          return result.content[0].text
+          return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
         },
       }),
     )
@@ -87,9 +92,9 @@ export function generateTools(srv, options = {}) {
             name: def.name,
             description: def.description,
             schema: def.inputSchema,
+            responseFormat: "content_and_artifact",
             func: async (args) => {
-              const result = await executePerActionTool(srv, name, action, args, { log: LOG })
-              return result.content[0].text
+              return unwrap(await executePerActionTool(srv, name, action, args, { log: LOG }))
             },
           }),
         )
@@ -101,9 +106,9 @@ export function generateTools(srv, options = {}) {
           name: def.name,
           description: def.description,
           schema: def.inputSchema,
+          responseFormat: "content_and_artifact",
           func: async (args) => {
-            const result = await executeCallActionTool(srv, actions, args, { log: LOG })
-            return result.content[0].text
+            return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
           },
         }),
       )

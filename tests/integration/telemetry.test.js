@@ -28,7 +28,7 @@ process.env.CDS_TEST_SILENT = "false"
 // Must be called BEFORE cds.test()
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const sendMessage = createSendMessage(POST)
 const { sendMessage: sendMsgHelper } = createHelpers({ POST, axios })
 

@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
-import { partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
+import { partsToText, buildChatMessages, firstDataPart } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
@@ -80,15 +80,15 @@ function defaultOutputMapper(result) {
   return JSON.stringify(result)
 }
 
-/**
- * Construct a spec-compliant A2A Message object.
- */
-function agentMessage(text) {
+// Construct a spec-compliant A2A Message; when `data` is a plain object, append it as a DataPart.
+function agentMessage(text, data) {
+  const parts = [{ kind: "text", text }]
+  if (data && typeof data === "object") parts.push({ kind: "data", data })
   return {
     kind: "message",
     messageId: cds.utils.uuid(),
     role: "agent",
-    parts: [{ kind: "text", text }],
+    parts,
   }
 }
 
@@ -99,15 +99,30 @@ function extractText(requestContext) {
   return partsToText(requestContext.userMessage?.parts)
 }
 
+// Extract the first inbound DataPart's opaque `data` object, or undefined if none.
+function extractData(requestContext) {
+  return firstDataPart(requestContext.userMessage?.parts)
+}
+
 /**
  * Parse user's resume text into a HITL decision.
  * Maps to the format expected by deepagents' humanInTheLoopMiddleware.
  */
 function parseResumeDecision(userText) {
-  if (/^(approve|yes|confirm|ok)$/i.test(userText.trim())) {
+  const t = userText.trim()
+  if (/^(approve|yes|confirm|ok)$/i.test(t)) {
     return { decisions: [{ type: "approve" }] }
   }
+  if (/^edit$/i.test(t)) {
+    // Bare edit — structured edits (with args) arrive via the DataPart path.
+    return { decisions: [{ type: "edit" }] }
+  }
   return { decisions: [{ type: "reject", message: userText }] }
+}
+
+// Best-effort decision label for logging/audit; opaque DataPart resumes fall back to "data".
+function decisionTypeOf(resume) {
+  return resume?.decisions?.[0]?.type ?? "data"
 }
 
 /**
@@ -130,6 +145,99 @@ function extractInterruptDescription(resultOrErr) {
   // Raw interrupt(value) - value is a string or object
   if (typeof payload === "string") return payload
   return JSON.stringify(payload)
+}
+
+/**
+ * Extract the raw structured interrupt payload for opaque carry on a DataPart.
+ * Returns the payload ONLY when it is a plain object; arrays and strings are
+ * carried by the TextPart alone. Payload is app-defined; the plugin never
+ * interprets it.
+ */
+function extractInterruptData(resultOrErr) {
+  const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
+  const payload = interrupt?.value
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined
+  return payload
+}
+
+// Order-invariant JSON serializer for structural arg comparison.
+function canonicalJSON(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value)
+  if (Array.isArray(value)) return "[" + value.map(canonicalJSON).join(",") + "]"
+  const keys = Object.keys(value).sort()
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJSON(value[k])).join(",") + "}"
+}
+
+// Firm note describing HITL edits so the model doesn't apologize on the next turn.
+function composeEditNote(originals, resume) {
+  const decisions = resume?.decisions
+  if (!Array.isArray(decisions) || decisions.length === 0) return undefined
+
+  const consumed = new Set()
+  const takeByName = (name) => {
+    for (let j = 0; j < originals.length; j++) {
+      if (!consumed.has(j) && originals[j]?.name === name) {
+        consumed.add(j)
+        return originals[j]
+      }
+    }
+    return undefined
+  }
+  const takeNextUnconsumed = () => {
+    for (let j = 0; j < originals.length; j++) {
+      if (!consumed.has(j)) {
+        consumed.add(j)
+        return originals[j]
+      }
+    }
+    return undefined
+  }
+
+  const changes = []
+  for (const d of decisions) {
+    if (d?.type !== "edit" || !d.editedAction) continue
+    const editedName = d.editedAction.name
+    const editedArgs = d.editedAction.args
+    const orig = takeByName(editedName) ?? takeNextUnconsumed()
+    if (!orig) continue
+    if (orig.name === editedName && canonicalJSON(orig.args) === canonicalJSON(editedArgs)) continue
+    changes.push({
+      from: { name: orig.name, args: orig.args },
+      to: { name: editedName, args: editedArgs },
+    })
+  }
+  if (changes.length === 0) return undefined
+
+  const lines = changes.map(
+    (c) =>
+      `- \`${c.from.name}(${JSON.stringify(c.from.args)})\` → \`${c.to.name}(${JSON.stringify(c.to.args)})\``,
+  )
+  return [
+    "The user reviewed your proposed tool call(s) in the human-in-the-loop approval flow and edited them before execution. This is intentional user action, NOT a mistake on your part. Do NOT apologize or say you made an error.",
+    "",
+    "Edits applied:",
+    ...lines,
+    "",
+    "Proceed as if the edited values are what the user actually wants. Describe the outcome of the executed call accurately.",
+  ].join("\n")
+}
+
+// Reads the pre-interrupt AI's tool_calls from the checkpointer (still un-mutated at resume time).
+async function getPreInterruptToolCalls(graph, config) {
+  try {
+    if (typeof graph.getState !== "function") return []
+    const state = await graph.getState(config)
+    const messages = state?.values?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m?.tool_calls?.length) {
+        return m.tool_calls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args }))
+      }
+    }
+    return []
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -242,6 +350,8 @@ class GraphExecutor {
           const msgChunk = Array.isArray(payload) ? payload[0] : payload
           const meta = Array.isArray(payload) ? payload[1] : undefined
           if (msgChunk?.type !== "ai") continue
+          // Skip tokens from NESTED model calls (pipe is used as separator by langchain)
+          if (meta?.langgraph_checkpoint_ns?.includes("|")) continue
           // Only stream tokens from the main agent model call.
           if (meta?.langgraph_node && meta.langgraph_node !== "model_request") continue
 
@@ -576,17 +686,22 @@ class GraphExecutor {
         const t0 = Date.now()
 
         if (isResume) {
+          const dataPart = extractData(requestContext)
           const userText = extractText(requestContext)
-          if (!userText.trim()) {
+          // Relaxed guard: accept a DataPart-only resume OR non-empty text.
+          if (dataPart === undefined && !userText.trim()) {
             throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
           }
           const { Command } = await import("@langchain/langgraph")
-          const resume = parseResumeDecision(userText)
+          // DataPart wins over text — a structured resume is self-describing and any
+          // accompanying text is treated as incidental (e.g. a human-readable echo).
+          const resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
+          const decision = decisionTypeOf(resume)
 
           LOG.debug("resuming", {
             conversation: short(contextId),
             service: serviceName,
-            decision: resume.decisions[0].type,
+            decision,
           })
 
           // Audit: task resumed with HITL decision
@@ -595,13 +710,20 @@ class GraphExecutor {
               taskId,
               contextId,
               service: serviceName,
-              decision: resume.decisions[0].type,
+              decision,
               userMessage: requestContext.userMessage,
             },
           })
+          // On edit, stash a diff note in state; the injector middleware prepends it next turn.
+          const commandArgs = { resume }
+          if (decision === "edit") {
+            const originals = await getPreInterruptToolCalls(graph, config)
+            const editNote = composeEditNote(originals, resume)
+            if (editNote) commandArgs.update = { _hitlEditNote: editNote }
+          }
           const resumed = await this._streamWithPublish(
             graph,
-            new Command({ resume }),
+            new Command(commandArgs),
             config,
             eventBus,
             taskId,
@@ -626,10 +748,12 @@ class GraphExecutor {
           result = streamed.state
         }
         // Capture result for usage tracking in finally block
-        usageData = aggregateUsageData(result.messages)
+        // (interrupt-only results may have no `messages` — treat as empty)
+        usageData = aggregateUsageData(result.messages || [])
 
         if (result?.__interrupt__?.length > 0) {
           const description = extractInterruptDescription(result)
+          const interruptData = extractInterruptData(result)
 
           const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
           LOG.info("input-required", {
@@ -667,7 +791,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "input-required",
-              message: agentMessage(description),
+              message: agentMessage(description, interruptData),
               timestamp: new Date().toISOString(),
             },
             final: true,
@@ -1149,7 +1273,16 @@ class GraphExecutor {
   }
 }
 
-export { GraphExecutor, messageText, defaultOutputMapper }
+export {
+  GraphExecutor,
+  messageText,
+  defaultOutputMapper,
+  agentMessage,
+  parseResumeDecision,
+  decisionTypeOf,
+  extractInterruptData,
+  composeEditNote,
+}
 
 /**
  * @param {[import('@langchain/core/messages').Message]} messages

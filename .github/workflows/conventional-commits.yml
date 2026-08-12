@@ -11,7 +11,7 @@ permissions:
 jobs:
   Check-PR-Title:
     name: Validate PR Title
-    runs-on: [self-hosted, solinas]
+    runs-on: ubuntu-latest
     steps:
       - name: Check PR title
-        uses: cap/.github/.github/actions/check-pr-title@f52abfb84ed361d807bc7c3613df7955bc719275 # main
+        uses: cap-js/.github/.github/actions/check-pr-title@main
