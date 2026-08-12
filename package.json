@@ -22,7 +22,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
