@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-const { GET, POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { GET, POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 
 axios.defaults.validateStatus = () => true
 

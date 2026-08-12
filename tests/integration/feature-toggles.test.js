@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const { POST, GET, axios } = cds.test(import.meta.dirname + "/../samples/mtx")
+const { POST, GET, axios } = cds.test(import.meta.dirname + "/../projects/mtx")
 axios.defaults.validateStatus = () => true
 
 const ALICE = { username: "alice", password: "" }
