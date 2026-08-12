@@ -36,17 +36,18 @@ jobs:
           rm -f package-lock.json
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
-          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
+          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3" "overrides.@sap/cds-dk=^9"
           npm pkg set "dependencies.@sap/cds=^9" --ws
           npm pkg set "peerDependencies.@sap/cds=^9"
           npm pkg set "devDependencies.@cap-js/sqlite=^2"
-          npm pkg set "allowScripts.better-sqlite3=true"
+          npm pkg set "allowScripts.better-sqlite3=true
 
       - name: Pin CDS 8 compatible stack
         if: matrix.cds-version == '8'
         run: |
           rm -f package-lock.json
           npm pkg set "overrides.@sap/cds=^8"
+          npm pkg set  "overrides.@sap/cds-dk=^8"
           npm pkg set "overrides.@cap-js/sqlite=^1"
           npm pkg set "overrides.@cap-js/hana=^1"
           npm pkg set "overrides.@sap/cds-mtxs=^2"
@@ -59,7 +60,6 @@ jobs:
           npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "allowScripts.better-sqlite3=true"
 
-      - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
       - run: npm i --omit=peer
       - run: npm test
 
