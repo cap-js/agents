@@ -24,17 +24,20 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Ensure npm12
+      - name: Ensure npm12 # ignores all scripts by default
         if: matrix.node-version == '22'
-        run: npm i npm@12 -g # ignores all scripts by default
-
+        run: npm i npm@12 -g
       - run: npm set min-release-age=3
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
         run: |
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
-          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3" "overrides.@sap/cds-dk=^9"
+          npm pkg set "overrides.@sap/cds=^9"
+          npm pkg set "overrides.@sap/cds-dk=^9"
+          npm pkg set "overrides.@cap-js/sqlite=^2"
+          npm pkg set "overrides.@cap-js/hana=^2"
+          npm pkg set "overrides.@sap/cds-mtxs=^3"
           npm pkg set "dependencies.@sap/cds=^9" --ws
           npm pkg set "peerDependencies.@sap/cds=^9"
           npm pkg set "devDependencies.@cap-js/sqlite=^2"
@@ -43,7 +46,9 @@ jobs:
       - name: Pin CDS 8 compatible stack
         if: matrix.cds-version == '8'
         run: |
-          rm -f package-lock.json
+          npm pkg delete "devDependencies.@cap-js/hana"
+          npm pkg delete "devDependencies.@cap-js/sqlite"
+          npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "overrides.@sap/cds=^8"
           npm pkg set  "overrides.@sap/cds-dk=^8"
           npm pkg set "overrides.@cap-js/sqlite=^1"
@@ -53,9 +58,6 @@ jobs:
           npm pkg set "overrides.better-sqlite3=^12"
           npm pkg set "devDependencies.@cap-js/cds-test=>0"
           npm pkg set "peerDependencies.@sap/cds=^8"
-          npm pkg delete "devDependencies.@cap-js/hana"
-          npm pkg delete "devDependencies.@cap-js/sqlite"
-          npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "allowScripts.better-sqlite3=true" --json
 
       - run: npm i --omit=peer
