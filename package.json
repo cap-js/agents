@@ -23,15 +23,15 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint .",
-    "test": "CDS_ENV=test vitest run --config vitest.config.js",
-    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.hybrid.js",
-    "test:mtx": "CDS_ENV=test vitest run --config vitest.config.js tests/integration/mtx.test.js",
+    "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
+    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
+    "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
     "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/projects/bookshop",
     "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
-    "prettier": "prettier --write .",
-    "prettier:check": "prettier --check ."
+    "prettier": "npx -y prettier@3 --write .",
+    "prettier:check": "npx -y prettier@3 --check ."
   },
   "files": [
     "index.js",
@@ -62,12 +62,8 @@
     "@cap-js/cds-test": "^1",
     "@cap-js/sqlite": "^3",
     "@sap/cds-mtxs": "^4",
-    "@sap/cds-dk": "^10",
     "@toon-format/toon": ">=2.3",
-    "deepagents": "^1.10.2",
-    "eslint": "^10",
-    "prettier": "^3",
-    "vitest": "^4.1.7"
+    "deepagents": "^1.10.2"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",

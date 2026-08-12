@@ -55,8 +55,9 @@ jobs:
           npm pkg delete "devDependencies.@cap-js/hana"
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
+          npm pkg set "allowScripts.better-sqlite3=true"
 
-      - run: npm i
+      - run: npm i --omit=peer
       - run: npm test
 
   test-hybrid:
@@ -83,7 +84,7 @@ jobs:
           password: ${{ secrets.CF_PASSWORD }}
 
       - run: npm i -g @sap/cds-dk@latest
-      - run: npm i
+      - run: npm ci
       - run: cds v -i
       - run: cds bind -2 joule-cap-proxy -o package.json
       - run: npm run test:hybrid
