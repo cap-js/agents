@@ -26,14 +26,12 @@ jobs:
 
       - name: Ensure npm12
         if: matrix.node-version == '22'
-        run: npm i npm@12 -g
+        run: npm i npm@12 -g # ignores all scripts by default
 
       - run: npm set min-release-age=3
-      # - run: npm set ignore-scripts=true
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
         run: |
-          rm -f package-lock.json
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3" "overrides.@sap/cds-dk=^9"
