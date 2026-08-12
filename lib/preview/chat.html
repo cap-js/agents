@@ -51,6 +51,9 @@
         user-select: none;
         flex-shrink: 0;
       }
+      .header-toggle[hidden] {
+        display: none;
+      }
       .header-toggle input[type="checkbox"] {
         accent-color: #7fbce8;
         width: 14px;
@@ -401,8 +404,13 @@
     <header>
       <a class="back" id="back" title="Back to index">&#8592;</a>
       <h1>{{agentName}}</h1>
-      <label class="header-toggle" title="Stream tokens as they arrive" style="margin-left: auto">
-        <input type="checkbox" id="streamToggle" checked />
+      <label
+        class="header-toggle"
+        title="Stream tokens as they arrive"
+        style="margin-left: auto"
+        hidden
+      >
+        <input type="checkbox" id="streamToggle" hidden />
         Streaming
       </label>
       <div class="status-dot" id="dot"></div>
