@@ -131,6 +131,7 @@ Set `cds.agents.fileIO.enabled = true` to let agents receive uploads and emit fi
     "agents": {
       "fileIO": {
         "enabled": true,
+        "maxInputFileSizeBytes": 10485760,
         "maxOutputFileSizeBytes": 10485760, // 10 MB cap per emitted file
         "defaultInputModes": ["text/csv"], // overrides advertised MIME types
         "defaultOutputModes": ["text/plain"],
