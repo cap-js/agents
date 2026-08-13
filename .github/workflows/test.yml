@@ -27,6 +27,7 @@ jobs:
       - name: Ensure npm12 # ignores all scripts by default
         if: matrix.node-version == '22'
         run: npm i npm@12 -g
+      - run: npm set min-release-age-exclude=@cap-js/mcp
       - run: npm set min-release-age=3
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
