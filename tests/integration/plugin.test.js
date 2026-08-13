@@ -21,7 +21,7 @@ describe("@cap-js/agents plugin", () => {
   })
 
   it("should serve the preview UI for @agent services", async () => {
-    const res = await GET("/a2a/catalog/preview")
+    const res = await GET("/a2a/catalog/preview", { auth: { username: "alice", password: "" } })
     expect(res.status).toBe(200)
     expect(res.headers["content-type"]).toMatch(/text\/html/)
     expect(res.data.includes("CatalogService")).toBeTruthy()

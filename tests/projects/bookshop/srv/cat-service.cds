@@ -39,6 +39,7 @@ service CatalogService {
    */
   @description: 'Submit an order for a book'
   @agent.hitl
+  @requires   : ['authenticated-user']
   action   submitOrder(book: Books:ID @mandatory,
                        quantity: Integer @mandatory
   )                                                                              returns {
