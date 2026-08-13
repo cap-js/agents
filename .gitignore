@@ -20,3 +20,5 @@ proposal.md
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+.deploy-patches-backup.json
+cap-js-agents-*.tgz

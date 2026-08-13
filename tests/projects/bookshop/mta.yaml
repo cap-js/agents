@@ -8,8 +8,16 @@ build-parameters:
   before-all:
     - builder: custom
       commands:
+        - node deploy-patches.js apply
+        - npm pack ../../../
+        - npm i cap-js-agents-0.1.0.tgz
         - npm ci
         - npx cds build --production
+        - cp cap-js-agents-0.1.0.tgz ./gen/srv
+  after-all:
+    - builder: custom
+      commands:
+        - node deploy-patches.js revert
 modules:
   - name: bookshop-srv
     type: nodejs
