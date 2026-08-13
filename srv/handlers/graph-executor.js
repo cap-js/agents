@@ -10,6 +10,27 @@ import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 const LOG = cds.log("agents")
 
 /**
+ * Validate against the configured cap and MIME allowlist
+ */
+function checkInputFile(file, cfg) {
+  const maxBytes = cfg?.maxInputFileSizeBytes
+  if (maxBytes > 0 && typeof file?.bytes === "string") {
+    const declared = Buffer.byteLength(file.bytes, "base64")
+    if (declared > maxBytes) {
+      return `exceeds size limit (${formatFileSize(declared)} > ${formatFileSize(maxBytes)})`
+    }
+  }
+  const allowed = cfg?.defaultInputModes
+  if (Array.isArray(allowed) && allowed.length > 0) {
+    const mime = file?.mimeType || "application/octet-stream"
+    if (!allowed.includes(mime)) {
+      return `mime type ${mime} not allowed`
+    }
+  }
+  return null
+}
+
+/**
  * Thrown when a task execution is aborted (client disconnect or tasks/cancel).
  */
 class AbortError extends Error {
@@ -288,8 +309,9 @@ class GraphExecutor {
     }
     // Auto-inject CdsCheckpointSaver if graph has no checkpointer (enables multi-turn + HITL)
     if (!resolved.checkpointer && this._options?.checkpointer !== false) {
-      const { CdsCheckpointSaver } =
-        await import("../../lib/protocol/persistence/checkpoint-saver.js")
+      const { CdsCheckpointSaver } = await import(
+        "../../lib/protocol/persistence/checkpoint-saver.js"
+      )
       resolved.checkpointer = new CdsCheckpointSaver()
       LOG.debug("Auto-injected CdsCheckpointSaver", { service: this._srv.name })
     }
@@ -584,6 +606,22 @@ class GraphExecutor {
               // is a stable DB key, /uploads/ path fragment, and artifactId.
               const safeName = sanitizeFilename(file.name)
               const safeMime = file.mimeType || "application/octet-stream"
+              // Pre-decode guard: reject oversized or disallowed-mime uploads
+              // before allocating a Buffer for the base64 payload.
+              const rejection = checkInputFile(
+                { ...file, mimeType: safeMime },
+                cds.env.agents?.fileIO,
+              )
+              if (rejection) {
+                LOG.warn("input file rejected", {
+                  conversation: short(contextId),
+                  service: serviceName,
+                  name: safeName,
+                  mimeType: safeMime,
+                  reason: rejection,
+                })
+                return `/uploads/${safeName} (rejected: ${rejection})`
+              }
               const buf = Buffer.from(file.bytes, "base64")
               await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
               LOG.info("file uploaded", {
@@ -972,10 +1010,25 @@ class GraphExecutor {
           // Re-persist inline file artifacts from downstream agents to Tasks.inputFiles.
           // Exclude emit_file_part outputs — those are this agent's own artifacts, not
           // downstream files, and re-persisting them would create spurious /uploads/ entries.
+          // Enforce the same size + MIME guard as inbound uploads so a malicious
+          // sub-agent cannot bypass the cap by echoing an oversized FilePart.
           await Promise.all(
             fileArtifacts
               .slice(0, source1Count)
-              .filter((fa) => fa.file?.bytes && fa.file?.name && !fa._fromEmitFilePart)
+              .filter((fa) => {
+                if (!fa.file?.bytes || !fa.file?.name || fa._fromEmitFilePart) return false
+                const rejection = checkInputFile(fa.file, cds.env.agents?.fileIO)
+                if (rejection) {
+                  LOG.warn("downstream file re-persist rejected", {
+                    conversation: short(contextId),
+                    service: serviceName,
+                    name: fa.file.name,
+                    reason: rejection,
+                  })
+                  return false
+                }
+                return true
+              })
               .map((fa) => {
                 const buf = Buffer.from(fa.file.bytes, "base64")
                 const safeName = sanitizeFilename(fa.file.name)
