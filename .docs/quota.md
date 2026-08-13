@@ -67,13 +67,13 @@ Content-Type: application/json
 <details>
 <summary>Per-Task Limits (Task Failed)</summary>
 
-| Limit                       | Checked at          | Effect                       |
-| --------------------------- | ------------------- | ---------------------------- |
-| `maxLLMInvocationsPerTask`  | After each LLM call | Graph throws → task `failed` |
-| `maxLLMTokensPerTask`       | After each LLM call | Same                         |
-| `maxToolCallsPerTask`       | After each LLM call | Same                         |
-| `maxLLMCallTimeout`         | Per LLM HTTP call   | Request aborted → error      |
-| `maxExecutionTimePerTask`   | Timeout wrapper     | Graph throws → task `failed` |
+| Limit                      | Checked at          | Effect                       |
+| -------------------------- | ------------------- | ---------------------------- |
+| `maxLLMInvocationsPerTask` | After each LLM call | Graph throws → task `failed` |
+| `maxLLMTokensPerTask`      | After each LLM call | Same                         |
+| `maxToolCallsPerTask`      | After each LLM call | Same                         |
+| `maxLLMCallTimeout`        | Per LLM HTTP call   | Request aborted → error      |
+| `maxExecutionTimePerTask`  | Timeout wrapper     | Graph throws → task `failed` |
 
 </details>
 
