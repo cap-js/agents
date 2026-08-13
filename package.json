@@ -27,7 +27,7 @@
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
-    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/projects/bookshop",
+    "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
     "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
     "prettier": "npx -y prettier@3 --write .",

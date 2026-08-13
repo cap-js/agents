@@ -4,7 +4,7 @@ import { z } from "zod"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agent:sub-agents")
+const LOG = cds.log("agents:sub-agents")
 
 /**
  * Extract text and file parts from an A2A response (task or message).

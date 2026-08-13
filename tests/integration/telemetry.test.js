@@ -241,8 +241,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
   before(() => {
     originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
     cds.env.agents.pool.maxTasksPerHourPerUser = 200
-    // Intercept cds.log("agent").warn after cds is fully bootstrapped
-    const LOG = cds.log("agent")
+    // Intercept cds.log("agents").warn after cds is fully bootstrapped
+    const LOG = cds.log("agents")
     _originalLogWarn = LOG.warn.bind(LOG)
     LOG.warn = function (...args) {
       const msg = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")
@@ -253,7 +253,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
   after(() => {
     cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
     mock.stop()
-    const LOG = cds.log("agent")
+    const LOG = cds.log("agents")
     if (_originalLogWarn) LOG.warn = _originalLogWarn
   })
   beforeEach(() => {

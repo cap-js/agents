@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { isAllowedDomain } from "../lib/utils/utils.js"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 // Hop limit for callback redirects. Real webhooks rarely need more than a
 // single hop (protocol upgrade or CDN edge routing); 3 leaves headroom

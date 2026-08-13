@@ -3,7 +3,7 @@ import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgra
 import { circuitBreaker, timeout } from "@sap-cloud-sdk/resilience"
 import { ms4 } from "../../../../lib/utils/utils.js"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Circuit breaker integration test service.
