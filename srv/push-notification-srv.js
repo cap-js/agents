@@ -1,6 +1,12 @@
 import cds from "@sap/cds"
+import { isAllowedDomain } from "../lib/utils/utils.js"
 
 const LOG = cds.log("agent")
+
+// Hop limit for callback redirects. Real webhooks rarely need more than a
+// single hop (protocol upgrade or CDN edge routing); 3 leaves headroom
+// without opening a redirect loop as an amplifier.
+const MAX_REDIRECTS = 3
 
 /**
  * CDS service that handles push notification delivery.
@@ -28,12 +34,17 @@ async function pushNotification(url, task) {
     }
   }
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(task),
-    signal: AbortSignal.timeout(10_000),
-  })
+  const allowedDomains = cds.env.agents?.pushNotifications?.allowedDomains
+  const res = await fetchWithRedirects(
+    url,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(task),
+      signal: AbortSignal.timeout(10_000),
+    },
+    allowedDomains,
+  )
 
   if (!res.ok) {
     // Throw so outbox retries on transient failures (5xx, network)
@@ -46,6 +57,62 @@ async function pushNotification(url, task) {
     LOG.error(msg, { taskId: task.id, url, response: body })
   } else {
     LOG.debug("Push notification delivered", { taskId: task.id, url, status: res.status })
+  }
+}
+
+/**
+ * POST to `url` with manual redirect handling. Every hop (including the
+ * initial URL) is re-validated against `allowedDomains` so a compromised or
+ * open-redirect endpoint on an allow-listed domain cannot exfiltrate the
+ * request body + Authorization header to an off-allowlist host.
+ *
+ * Policy:
+ *  - Non-3xx responses are returned as-is.
+ *  - 307 / 308 preserve method + body and follow if the new URL is allowlisted.
+ *  - 301 / 302 / 303 would change POST semantics (spec allows GET downgrade)
+ *    so they are refused - legitimate push webhooks never rely on that.
+ *  - The redirect chain is capped at MAX_REDIRECTS. Absolute and relative
+ *    Location values are both resolved against the previous URL.
+ */
+async function fetchWithRedirects(url, options, allowedDomains, maxRedirects = MAX_REDIRECTS) {
+  let currentUrl = url
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    if (!isAllowedDomain(currentUrl, allowedDomains)) {
+      throw new Error(
+        `Push callback URL not on allowlist: ${currentUrl}` +
+          (hop > 0 ? ` (reached via ${hop} redirect${hop === 1 ? "" : "s"})` : ""),
+      )
+    }
+
+    // Never let fetch follow silently - we validate each hop explicitly.
+    // Sequential await is required
+    // eslint-disable-next-line no-await-in-loop
+    const res = await fetch(currentUrl, { ...options, redirect: "manual" })
+
+    if (res.status < 300 || res.status >= 400) {
+      return res
+    }
+
+    // 3xx: only 307 / 308 preserve method + body. 301 / 302 / 303 semantically
+    // downgrade POST to GET - a push callback that relies on that is misconfigured.
+    if (res.status !== 307 && res.status !== 308) {
+      throw new Error(
+        `Push callback redirect ${res.status} would change method or drop body; refusing`,
+      )
+    }
+
+    if (hop === maxRedirects) {
+      throw new Error(`Push callback exceeded ${maxRedirects} redirects`)
+    }
+
+    const location = res.headers.get("location")
+    if (!location) {
+      // 3xx without Location - nothing to follow, return as-is
+      return res
+    }
+
+    // Resolve relative Locations against the previous URL.
+    currentUrl = new URL(location, currentUrl).toString()
   }
 }
 
