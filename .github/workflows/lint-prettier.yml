@@ -21,7 +21,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24 # npm12
-      - run: npm set min-release-age-exclude=@cap-js/mcp
       - run: npm set min-release-age=3
       - run: npm ci
       - run: npm run lint
