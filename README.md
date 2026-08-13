@@ -52,9 +52,11 @@ See [SAP AI Core → Create a Service Instance](https://help.sap.com/docs/sap-ai
 
 ## Ways to Build Agents
 
+Both approaches start from a CDS service annotated with `@agent` (as shown in [Requirements and Setup](#requirements-and-setup)). They differ only in how the agent's behaviour is defined.
+
 ### Agentify Existing CAP Services
 
-Add `@agent` to any CDS service. The plugin auto-generates tools from entities and actions, creates a ReAct agent loop, and serves the service as a remote agent with zero code required. The agent has access to the tools generated from the service model.
+With `@agent` alone, the plugin auto-generates tools from the service's entities and actions, creates a ReAct agent loop, and serves it as a remote agent — no code required.
 
 ```cds
 @agent
@@ -66,14 +68,7 @@ service CatalogService {
 
 ### Markdown-Based Agents
 
-Define an agent's identity, behaviour, and skills entirely in markdown — no JavaScript handler required. Annotate the CDS service with `@agent` and create a sibling directory matching the slugified service name. The plugin auto-builds the agent at startup.
-
-```cds
-// srv/cat-service.cds
-...
-// @agent.hitl > Action is considered for Human-in-the-loop
-annotate CatalogService.submitOrder with @agent.hitl;
-```
+To define an agent's identity, behaviour, and skills explicitly, add a sibling directory matching the slugified service name. When present, it replaces the default agentification: instead of the auto-generated ReAct agent, the plugin auto-builds the agent from the directory at startup — no JavaScript handler required.
 
 ```
 srv/
@@ -102,6 +97,18 @@ description: >
 
 You are the **Catalog Agent**, a helpful assistant for the capire bookshop.
 ...
+```
+
+
+
+## Human-in-the-Loop
+
+Annotate a CDS action with `@agent.hitl` to require human approval before the agent may execute it. When the agent decides to call the action, the task pauses and transitions to the A2A [`input-required`](https://a2a-protocol.org/latest/specification/#413-taskstate) state instead of running the action immediately.
+
+```cds
+// srv/cat-service.cds
+...
+annotate CatalogService.submitOrder with @agent.hitl;
 ```
 
 
