@@ -91,7 +91,7 @@ The MLflow exporter is added as a **second span processor** alongside any existi
 **Enable:**
 
 ```json
-{ "cds": { "agent": { "mlflow": true } } }
+{ "cds": { "agents": { "mlflow": true } } }
 ```
 
 **Set the experiment ID** via `@Core.SchemaVersion` annotation on your service (feature-toggleable):

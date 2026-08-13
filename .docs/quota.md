@@ -16,7 +16,7 @@ All limits are configured via `cds.env.agents.pool` (defaults provided by the pl
 ```json
 {
   "cds": {
-    "agent": {
+    "agents": {
       "pool": {
         "maxConcurrentTasks": 10,
         "maxConcurrentTasksPerUser": 4,
@@ -73,7 +73,7 @@ Content-Type: application/json
 | `maxLLMTokensPerTask`       | After each LLM call | Same                         |
 | `maxToolCallsPerTask`       | After each LLM call | Same                         |
 | `maxLLMCallTimeout`         | Per LLM HTTP call   | Request aborted → error      |
-| `maxExecutionTimeMsPerTask` | Timeout wrapper     | Graph throws → task `failed` |
+| `maxExecutionTimePerTask`   | Timeout wrapper     | Graph throws → task `failed` |
 
 </details>
 

@@ -126,35 +126,6 @@ The LLM used by an agent is configured via `cds.requires.llm`. You can provide a
 | `aicore`    | The default for `production` and `hybrid`, connects to SAP AI Core                                                                      |
 | `mock`      | The default for `development`, provides a mocked response when called                                                                   |
 
-#### Using Multiple Models (Experimental!)
-
-To use multiple models for different agents, you can define additional ones and reference them via annotation.
-When defining an additional model, you need to prefix the kind with `llm-`.
-
-```jsonc
-{
-  "cds": {
-    "requires": {
-      "small-llm": {
-        // use any name you like
-        "kind": "llm-aicore",
-        "model": "mistralai--mistral-small",
-      },
-    },
-  },
-}
-```
-
-```cds
-@agent
-@agent.llm: 'small-llm'
-service CatalogService { ... }
-```
-
-| Annotation   | Description                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------- |
-| `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
-
 
 
 ## Advanced
@@ -162,7 +133,7 @@ service CatalogService { ... }
 The following capabilities are experimental and documented separately. Their public surface may change.
 
 - [Connectivity](.docs/connectivity.md) — destination-based connectivity, `AICORE_SERVICE_KEY` / `ANTHROPIC_API_KEY`, and the `anthropic` kind
-- [Configuration](.docs/configuration.md) — global and per-service settings, file I/O, and push notifications
+- [Configuration](.docs/configuration.md) — using multiple models, global and per-service settings, file I/O, and push notifications
 - [Quota Enforcement](.docs/quota.md) — configurable rate limits and resource quotas
 - [Audit Logging](.docs/audit-logging.md) — immutable audit trail of agent decisions and tool usage
 - [Telemetry](.docs/telemetry.md) — OpenTelemetry metrics, tracing, and MLflow export

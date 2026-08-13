@@ -3,6 +3,35 @@
 > [!WARNING]
 > The following features are experimental and may be changed or removed at any time.
 
+## Using Multiple Models
+
+To use multiple models for different agents, you can define additional ones and reference them via annotation.
+When defining an additional model, you need to prefix the kind with `llm-`.
+
+```jsonc
+{
+  "cds": {
+    "requires": {
+      "small-llm": {
+        // use any name you like
+        "kind": "llm-aicore",
+        "model": "mistralai--mistral-small",
+      },
+    },
+  },
+}
+```
+
+```cds
+@agent
+@agent.llm: 'small-llm'
+service CatalogService { ... }
+```
+
+| Annotation   | Description                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
+
 ## Advanced Configuration
 
 **Global**
