@@ -4,7 +4,7 @@ import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Register default event handlers for agent graph building on an @agent service.

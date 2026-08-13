@@ -15,7 +15,7 @@ import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.j
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 const unwrap = (result) => {
   const text = result.content?.[0]?.text ?? ""

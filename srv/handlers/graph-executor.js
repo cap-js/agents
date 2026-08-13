@@ -7,7 +7,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Thrown when a task execution is aborted (client disconnect or tasks/cancel).

@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * CDS service that handles push notification delivery.

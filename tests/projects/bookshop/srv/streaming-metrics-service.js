@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Streaming metrics/audit integration test service.

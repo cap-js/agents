@@ -3,7 +3,7 @@ import { MultiServerMCPClient } from "@langchain/mcp-adapters"
 import { generateTools } from "./tools.js"
 import { toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agent:mcp")
+const LOG = cds.log("agents:mcp")
 
 /**
  * Resolve URL and HTTP headers for a BTP destination using the Cloud SDK.

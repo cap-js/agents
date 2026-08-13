@@ -17,7 +17,7 @@
     },
     "log": {
       "levels": {
-        "agent": "debug"
+        "agents": "debug"
       }
     },
     "mcp": {

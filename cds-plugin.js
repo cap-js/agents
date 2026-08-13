@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
