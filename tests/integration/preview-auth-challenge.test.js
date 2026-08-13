@@ -24,9 +24,7 @@ describe("@cap-js/agents - Preview auth challenge (dev-only)", () => {
     // motivated this middleware — silent HITL loop under a partially-gated agent.
     const res = await GET("/a2a/catalog/preview/")
     expect(res.status).toBe(401)
-    expect(res.headers["www-authenticate"] ?? "").toMatch(
-      /Basic realm="cap-agents:CatalogService"/,
-    )
+    expect(res.headers["www-authenticate"] ?? "").toMatch(/Basic realm="cap-agents:CatalogService"/)
   })
 
   it("authenticated GET /preview on a service with inner auth returns the preview HTML (200)", async () => {
