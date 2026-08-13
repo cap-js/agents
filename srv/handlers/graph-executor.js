@@ -309,9 +309,8 @@ class GraphExecutor {
     }
     // Auto-inject CdsCheckpointSaver if graph has no checkpointer (enables multi-turn + HITL)
     if (!resolved.checkpointer && this._options?.checkpointer !== false) {
-      const { CdsCheckpointSaver } = await import(
-        "../../lib/protocol/persistence/checkpoint-saver.js"
-      )
+      const { CdsCheckpointSaver } =
+        await import("../../lib/protocol/persistence/checkpoint-saver.js")
       resolved.checkpointer = new CdsCheckpointSaver()
       LOG.debug("Auto-injected CdsCheckpointSaver", { service: this._srv.name })
     }
