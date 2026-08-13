@@ -66,7 +66,7 @@ jobs:
           npm pkg set "peerDependencies.@sap/cds=^8"
           npm pkg set "allowScripts.better-sqlite3=true" --json
 
-      - run: npm i --omit=peer
+      - run: npm ci --omit=peer
       - run: npm test
 
   test-hybrid:
