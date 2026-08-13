@@ -19,12 +19,11 @@ describe("@cap-js/agents - Preview auth challenge (dev-only)", () => {
   })
 
   it("anonymous GET /preview on service with action-level @requires returns 401 with Basic challenge", async () => {
-    // CatalogService: no service-level @requires, but submitOrder action carries
-    // @requires: ['authenticated-user']. The bookshop-style scenario that
-    // motivated this middleware — silent HITL loop under a partially-gated agent.
-    const res = await GET("/a2a/catalog/preview/")
+    const res = await GET("/a2a/action-requires/preview/")
     expect(res.status).toBe(401)
-    expect(res.headers["www-authenticate"] ?? "").toMatch(/Basic realm="cap-agents:CatalogService"/)
+    expect(res.headers["www-authenticate"] ?? "").toMatch(
+      /Basic realm="cap-agents:ActionRequiresService"/,
+    )
   })
 
   it("authenticated GET /preview on a service with inner auth returns the preview HTML (200)", async () => {
