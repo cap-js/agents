@@ -25,7 +25,7 @@ Annotate the `CatalogService` with `@agent`:
 
 ```cds
 // srv/cat-service.cds
-[...]
+...
 annotate CatalogService with @agent;
 ```
 
@@ -70,8 +70,7 @@ Define an agent's identity, behaviour, and skills entirely in markdown — no Ja
 
 ```cds
 // srv/cat-service.cds
-[...]
-
+...
 // @agent.hitl > Action is considered for Human-in-the-loop
 annotate CatalogService.submitOrder with @agent.hitl;
 ```
@@ -155,6 +154,19 @@ service CatalogService { ... }
 | Annotation   | Description                                                                                 |
 | ------------ | ------------------------------------------------------------------------------------------- |
 | `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
+
+
+
+## Advanced
+
+The following capabilities are experimental and documented separately. Their public surface may change.
+
+- [Connectivity](.docs/connectivity.md) — destination-based connectivity, `AICORE_SERVICE_KEY` / `ANTHROPIC_API_KEY`, and the `anthropic` kind
+- [Configuration](.docs/configuration.md) — global and per-service settings, file I/O, and push notifications
+- [Quota Enforcement](.docs/quota.md) — configurable rate limits and resource quotas
+- [Audit Logging](.docs/audit-logging.md) — immutable audit trail of agent decisions and tool usage
+- [Telemetry](.docs/telemetry.md) — OpenTelemetry metrics, tracing, and MLflow export
+- [Content Filter](.docs/content-filter.md) — SAP AI Core content filtering and prompt injection shielding
 
 
 
