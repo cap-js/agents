@@ -43,23 +43,28 @@ Azure content safety levels: ALLOW_SAFE -> ALLOW_SAFE_LOW -> ALLOW_SAFE_LOW_MEDI
 }
 ```
 
-**Per-service override** via `buildContentFilter` event handler:
+**Per-service override:**
 
-```js
-// Disable for one service (return an empty object)
-this.on("buildContentFilter", () => ({}))
+Define a dedicated LLM service in `cds.requires` and set its `contentFilter`, then bind a service to it via [`@agent.llm`](./configuration.md#using-multiple-models):
 
-// Custom filter
-this.on("buildContentFilter", () => ({
-  input: {
-    azure_content_safety: { prompt_shield: true, hate: "ALLOW_SAFE" },
-    llama_guard_3_8b: { violent_crimes: true },
-  },
-  output: {
-    azure_content_safety: { hate: "ALLOW_SAFE", violence: "ALLOW_SAFE" },
-  },
-}))
+```json
+{
+  "cds": {
+    "requires": {
+      "safe-llm": {
+        "kind": "aicore",
+        "contentFilter": {
+          "input": { "azure_content_safety": { "prompt_shield": true, "hate": "ALLOW_SAFE" } },
+          "output": { "azure_content_safety": { "hate": "ALLOW_SAFE" } }
+        }
+      }
+    }
+  }
+}
 ```
-Resolution order: `buildContentFilter` event handler → `cds.env.agents.contentFilter` → default (Azure Content Safety). Return `{}` from the event handler to disable filtering for the service; returning nothing falls through to the global config.
+
+To disable filtering for a single service, use `"contentFilter": false` in that service's LLM entry.
+
+**Resolution order:** `cds.requires.<llmName>.contentFilter` (per-service, inherits from `kinds.<kind>` via CDS) → package default (`kinds.aicore.contentFilter: true` → Azure Content Safety with `hate=ALLOW_SAFE_LOW`, `violence=ALLOW_SAFE_LOW_MEDIUM`, `prompt_shield=true` for input; `hate=ALLOW_SAFE`, `violence=ALLOW_SAFE_LOW_MEDIUM` for output).
 
 </details>
