@@ -4,8 +4,6 @@
 
 CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
-
-
 ## Requirements and Setup
 
 We use the [@capire/bookshop](https://github.com/capire/bookshop) as a running sample hereinafter. Clone it and open it in VSCode as follows:
@@ -47,8 +45,6 @@ cds w --profile hybrid
 ```
 
 See [SAP AI Core → Create a Service Instance](https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/create-service-instance) for how to create an instance.
-
-
 
 ## Ways to Build Agents
 
@@ -99,8 +95,6 @@ You are the **Catalog Agent**, a helpful assistant for the capire bookshop.
 ...
 ```
 
-
-
 ## Human-in-the-Loop
 
 Annotate a CDS action with `@agent.hitl` to require human approval before the agent may execute it. When the agent decides to call the action, the task pauses and transitions to the A2A [`input-required`](https://a2a-protocol.org/latest/specification/#413-taskstate) state instead of running the action immediately.
@@ -110,8 +104,6 @@ Annotate a CDS action with `@agent.hitl` to require human approval before the ag
 ...
 annotate CatalogService.submitOrder with @agent.hitl;
 ```
-
-
 
 ## Configuration
 
@@ -128,12 +120,10 @@ The LLM used by an agent is configured via `cds.requires.llm`. You can provide a
 }
 ```
 
-| Kind        | Description                                                                                                                             |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `aicore`    | The default for `production` and `hybrid`, connects to SAP AI Core                                                                      |
-| `mock`      | The default for `development`, provides a mocked response when called                                                                   |
-
-
+| Kind     | Description                                                           |
+| -------- | --------------------------------------------------------------------- |
+| `aicore` | The default for `production` and `hybrid`, connects to SAP AI Core    |
+| `mock`   | The default for `development`, provides a mocked response when called |
 
 ## Advanced
 
@@ -145,8 +135,6 @@ The following capabilities are experimental and documented separately. Their pub
 - [Audit Logging](.docs/audit-logging.md) — immutable audit trail of agent decisions and tool usage
 - [Telemetry](.docs/telemetry.md) — OpenTelemetry metrics, tracing, and MLflow export
 - [Content Filter](.docs/content-filter.md) — SAP AI Core content filtering and prompt injection shielding
-
-
 
 ## Support, Feedback, Contributing
 
