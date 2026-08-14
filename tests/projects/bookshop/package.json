@@ -43,6 +43,9 @@
     "mcp": {
       "toon_format": false
     },
+    "[production]": {
+      "server": { "index": true }
+    },
     "requires": {
       "audit-log": false,
       "attachments": {

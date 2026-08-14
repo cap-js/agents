@@ -10,6 +10,8 @@ build-parameters:
       commands:
         - npm ci
         - npx cds build --production --ws-pack
+        - npm pack ../../.. --pack-destination gen/srv # cds build --ws-pack does not pack the package at workspace root
+        - find gen/srv -maxdepth 1 -name 'cap-js-agents-*.tgz' -exec npm i {} --prefix gen/srv \;
 modules:
   - name: bookshop-srv
     type: nodejs

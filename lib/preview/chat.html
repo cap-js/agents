@@ -429,7 +429,29 @@
     <script>
       const AGENT_URL = window.location.pathname.replace(/\/preview\/?$/, "") + "/"
       const AUTH_HEADER = document.querySelector('meta[name="a2a-auth"]')?.content || ""
-      const authHeaders = () => (AUTH_HEADER ? { Authorization: AUTH_HEADER } : {})
+
+      const fetchCsrfToken = async () => {
+        if (document.csrfToken === undefined) {
+          const res = await fetch("/", {
+            method: "HEAD",
+            headers: { "x-csrf-token": "fetch", ...(await authHeaders({ includeCsrf: false })) },
+          })
+          if (!res.ok) {
+            throw new Error(`Could not fetch CSRF token ${res.status}: ${res.statusText}`)
+          }
+          document.csrfToken = res.headers.get("x-csrf-token")
+        }
+        return document.csrfToken
+      }
+
+      const authHeaders = async ({ includeCsrf = true } = {}) => {
+        const headers = AUTH_HEADER ? { Authorization: AUTH_HEADER } : {}
+        if (!includeCsrf) return headers
+        const csrfToken = await fetchCsrfToken()
+        if (csrfToken) headers["x-csrf-token"] = csrfToken
+        return headers
+      }
+
       document.getElementById("back").addEventListener("click", () => history.back())
       const messages = document.getElementById("messages")
       const typing = document.getElementById("typing")
@@ -579,7 +601,7 @@
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeaders() },
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
@@ -677,7 +699,7 @@
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeaders() },
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
@@ -856,7 +878,7 @@
         if (taskId) {
           fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeaders() },
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: "tasks/cancel",
