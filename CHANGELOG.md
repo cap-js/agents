@@ -16,8 +16,8 @@
 - Failing `query`-tool executions shown as success in traces
 - HITL-resumes can now be sent as opaque DataPart
 
-## Version 0.9.0 - 2026-08-10
+## Version 0.9.1 - 2026-08-14
 
 ### Added
 
-- Initial cap-js/agents version
+- Initial @cap-js/agents version
