@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.1.0",
+  "version": "0.9.1",
   "description": "CDS plugin for building agents",
   "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
@@ -68,7 +68,7 @@
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=8"
+    "@sap/cds": ">=9"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
