@@ -8,16 +8,8 @@ build-parameters:
   before-all:
     - builder: custom
       commands:
-        - node deploy-patches.js apply
-        - npm pack ../../../
-        - npm i cap-js-agents-0.1.0.tgz
         - npm ci
-        - npx cds build --production
-        - cp cap-js-agents-0.1.0.tgz ./gen/srv
-  after-all:
-    - builder: custom
-      commands:
-        - node deploy-patches.js revert
+        - npx cds build --production --ws-pack
 modules:
   - name: bookshop-srv
     type: nodejs
@@ -34,7 +26,7 @@ modules:
     requires:
       - name: bookshop-auth
       - name: bookshop-db
-      - name: joule-cap-proxy
+      - name: bookshop-ai
 
   - name: bookshop-db-deployer
     type: hdb
@@ -92,5 +84,8 @@ resources:
     parameters:
       service: hana
       service-plan: hdi-shared
-  - name: joule-cap-proxy
-    type: org.cloudfoundry.existing-service
+  - name: bookshop-ai
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: aicore
+      service-plan: extended
