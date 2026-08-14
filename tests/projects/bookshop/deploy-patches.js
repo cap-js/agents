@@ -8,34 +8,47 @@ if (!mode || !["apply", "revert"].includes(mode)) {
 }
 
 const bookshopDir = import.meta.dirname
-const rootPkg = path.resolve(bookshopDir, "../../../package.json")
+const rootPkgPath = path.resolve(bookshopDir, "../../../package.json")
 const cdsFile = path.resolve(bookshopDir, "srv/agent-dev-service.cds")
+const bookshopPkgPath = path.resolve(bookshopDir, "package.json")
+const backupFile = path.resolve(bookshopDir, ".deploy-patches-backup.json")
 
 if (mode === "apply") {
-  const pkg = JSON.parse(fs.readFileSync(rootPkg, "utf8"))
-  delete pkg.workspaces
-  fs.writeFileSync(rootPkg, JSON.stringify(pkg, null, 2) + "\n")
+  const rootPkgOriginal = fs.readFileSync(rootPkgPath, "utf8")
+  const bookshopPkgOriginal = fs.readFileSync(bookshopPkgPath, "utf8")
+  const cdsOriginal = fs.readFileSync(cdsFile, "utf8")
+  fs.writeFileSync(
+    backupFile,
+    JSON.stringify(
+      { rootPkg: rootPkgOriginal, bookshopPkg: bookshopPkgOriginal, cds: cdsOriginal },
+      null,
+      2,
+    ) + "\n",
+  )
 
-  let cds = fs.readFileSync(cdsFile, "utf8")
-  cds = cds.replace("from '../../../../index.cds'", "from '@cap-js/agents/index'")
+  const rootPkg = JSON.parse(rootPkgOriginal)
+  delete rootPkg.workspaces
+  fs.writeFileSync(rootPkgPath, JSON.stringify(rootPkg, null, 2) + "\n")
+
+  const cds = cdsOriginal.replace("from '../../../../index.cds'", "from '@cap-js/agents/index'")
   fs.writeFileSync(cdsFile, cds)
 
   console.log("Deploy patches applied")
 }
 
 if (mode === "revert") {
-  const pkg = JSON.parse(fs.readFileSync(rootPkg, "utf8"))
-  pkg.workspaces = ["tests/projects/bookshop/"]
-  fs.writeFileSync(rootPkg, JSON.stringify(pkg, null, 2) + "\n")
+  if (fs.existsSync(backupFile)) {
+    const backup = JSON.parse(fs.readFileSync(backupFile, "utf8"))
+    if (backup.rootPkg) fs.writeFileSync(rootPkgPath, backup.rootPkg)
+    if (backup.bookshopPkg) fs.writeFileSync(bookshopPkgPath, backup.bookshopPkg)
+    if (backup.cds) fs.writeFileSync(cdsFile, backup.cds)
+    fs.unlinkSync(backupFile)
+  }
 
-  let cds = fs.readFileSync(cdsFile, "utf8")
-  cds = cds.replace("from '@cap-js/agents/index'", "from '../../../../index.cds'")
-  fs.writeFileSync(cdsFile, cds)
-
-  const bookshopPkg = path.resolve(bookshopDir, "package.json")
-  let bpkg = fs.readFileSync(bookshopPkg, "utf8")
-  bpkg = bpkg.replace('"file:cap-js-agent-0.1.0.tgz"', '"file:../../../."')
-  fs.writeFileSync(bookshopPkg, bpkg)
+  // Clean up any packed tgz left in the bookshop dir
+  for (const f of fs.readdirSync(bookshopDir)) {
+    if (/^cap-js-agents-.*\.tgz$/.test(f)) fs.unlinkSync(path.join(bookshopDir, f))
+  }
 
   console.log("Deploy patches reverted")
 }

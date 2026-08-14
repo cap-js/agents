@@ -9,11 +9,11 @@ build-parameters:
     - builder: custom
       commands:
         - node deploy-patches.js apply
-        - npm pack ../../
-        - npm i cap-js-agent-0.1.0.tgz
+        - npm pack ../../../
+        - npm i cap-js-agents-0.1.0.tgz
         - npm ci
         - npx cds build --production
-        - cp cap-js-agent-0.1.0.tgz ./gen/srv
+        - cp cap-js-agents-0.1.0.tgz ./gen/srv
   after-all:
     - builder: custom
       commands:
