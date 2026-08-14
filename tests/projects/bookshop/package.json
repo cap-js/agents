@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Sample CAP bookshop for @cap-js/agents tests",
   "dependencies": {
-    "@cap-js/agents": "*",
+    "@cap-js/agents": "file:../../../.",
     "@cap-js/audit-logging": ">=1",
     "@cap-js/hana": ">=1",
     "@cap-js/mcp": "^1",
