@@ -44,7 +44,9 @@
       "toon_format": false
     },
     "[production]": {
-      "server": { "index": true }
+      "server": {
+        "index": true
+      }
     },
     "requires": {
       "audit-log": false,
