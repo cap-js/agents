@@ -3,37 +3,20 @@ using {Attachments} from '@cap-js/attachments';
 
 namespace cap.agent;
 
-/**
- * Stores A2A task objects for retrieval via tasks/get.
- */
+//** Stores A2A task objects for retrieval via tasks/get. */
 entity Tasks : managed {
-      /**
-       * A2A task ID (server-generated UUID)
-       */
-  key taskId         : String;
-      /**
-       * Groups related tasks into conversations
-       */
+      // REVISIT: all IDs have to be called ID
+  key taskId         : String; // A2A task ID
       contextId      : String;
-      /**
-       * Current task state (submitted, working, completed, failed, etc.)
-       */
-      state          : String;
-      /**
-       * Full serialized A2A Task JSON
-       */
-      data           : LargeString;
-      /**
-       * Fully qualified CDS service name
-       */
+      state          : String enum {
+        submitted;
+        working;
+        completed;
+        failed;
+      }; // TODO: make the complete list
+      data           : Map; // Full serialized A2A Task JSON
       agentService   : String;
-      /**
-       * Combined LLM Input and Output tokens used for this task
-       */
       usageLlmTokens : Integer64 default 0;
-      /**
-       * Amount of tool calls made by this task
-       */
       usageToolCalls : Integer default 0;
 
       /** Push notification (webhook) configs for this task. Cascade-deleted. */
@@ -98,8 +81,9 @@ entity CheckpointWrites {
  *    and `X-A2A-Notification-Token` header from token field
  */
 entity PushNotificationConfigs : managed {
-  key taskId    : String;
-  key configId  : String;
-      task      : Association to one Tasks on task.taskId = taskId;
-      url       : String(2048);
+  key taskId   : String;
+  key configId : String;
+      task     : Association to one Tasks
+                   on task.taskId = taskId;
+      url      : String(2048);
 }
