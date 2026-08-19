@@ -20,9 +20,6 @@
         "agents": "debug"
       }
     },
-    "mcp": {
-      "toon_format": false
-    },
     "requires": {
       "telemetry": {
         "kind": "telemetry-to-console"
