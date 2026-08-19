@@ -40,9 +40,6 @@
         "activeUsersInterval": "24h"
       }
     },
-    "mcp": {
-      "toon_format": false
-    },
     "[production]": {
       "server": {
         "index": true
