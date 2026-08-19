@@ -233,7 +233,9 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       const queryTool = tools.find((t) => t.name === "destinationguideservice_query")
       expect(queryTool, "destinationguideservice_query tool must be present").toBeTruthy()
 
-      const raw = await queryTool.invoke({ cql: "SELECT from DestinationGuideService.Destinations" })
+      const raw = await queryTool.invoke({
+        cql: "SELECT from DestinationGuideService.Destinations",
+      })
       const result = extractText(raw)
       expect(
         result && result.length > 0,

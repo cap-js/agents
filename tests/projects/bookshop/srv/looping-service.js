@@ -38,7 +38,13 @@ export default class LoopingService extends cds.ApplicationService {
         iteration++
         const msg = new AIMessage({
           content: `Iteration ${iteration}`,
-          tool_calls: [{ name: "query", args: { cql: "SELECT * FROM Books LIMIT 3" }, id: `call-${iteration}` }],
+          tool_calls: [
+            {
+              name: "query",
+              args: { cql: "SELECT * FROM Books LIMIT 3" },
+              id: `call-${iteration}`,
+            },
+          ],
           usage_metadata: { input_tokens: 50, output_tokens: 50, total_tokens: 100 },
         })
         return { generations: [{ message: msg }] }
