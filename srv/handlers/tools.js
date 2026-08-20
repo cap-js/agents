@@ -211,6 +211,10 @@ export function generateTools(srv) {
     }
   }
 
+  // emit_data_part: stateless structured-output emitter; not file I/O, so always
+  // available (independent of the fileIO gate below).
+  tools.push(createEmitDataPartTool())
+
   // File tools — only when fileIO is enabled
   // emit_file_part: stateless protocol emitter; safe to tools.push once at startup.
   // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
@@ -283,6 +287,32 @@ export function createEmitFilePartTool() {
           .string()
           .describe("File content: raw text for text formats, base64 string for binary formats"),
         encoding: z.enum(["utf-8", "base64"]).optional().default("utf-8"),
+      }),
+    },
+  )
+}
+
+/**
+ * Create a tool that emits a structured object as a DataPart of the A2A response.
+ * Pure protocol emitter — the executor's toolResults collection loop parses the
+ * `kind:'data'` JSON from this tool and republishes it as a `data-*` artifact.
+ */
+export function createEmitDataPartTool() {
+  return tool(
+    async ({ data }) => {
+      LOG.info("emit_data_part", {
+        keys: data && typeof data === "object" ? Object.keys(data) : [],
+      })
+      return JSON.stringify({ kind: "data", data })
+    },
+    {
+      name: "emit_data_part",
+      description:
+        "Emit a structured object as a DataPart of the A2A response, so a calling agent receives machine-readable data (not just text). Use for structured results the caller should consume programmatically.",
+      schema: z.object({
+        data: z
+          .record(z.any())
+          .describe("A JSON object to return to the caller as structured data"),
       }),
     },
   )
