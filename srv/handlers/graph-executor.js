@@ -106,9 +106,12 @@ function defaultOutputMapper(result) {
   // 2. Messages-based text.
   if (text) return text
 
-  // 3. Output field (e.g. travel-sample pattern): a plain object becomes a DataPart
-  //    (previously returned as-is and stuffed into a TextPart — malformed); a string
-  //    stays a TextPart.
+  // 3. `output` field: a legacy AgentExecutor result or a custom StateGraph channel
+  //    named `output`. Legacy AgentExecutor and every graph we ship write a string
+  //    here → TextPart. A plain object is not a first-party LangChain/LangGraph
+  //    default (canonical structured output arrives via structuredResponse, case 1),
+  //    but a user-defined `output` channel could carry one — so handle it defensively
+  //    as a DataPart (previously it was stuffed into a TextPart as an object — malformed).
   if (result.output) {
     if (typeof result.output === "object" && !Array.isArray(result.output)) {
       return { text: "", data: result.output }
