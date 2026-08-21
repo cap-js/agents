@@ -41,11 +41,7 @@ modules:
         - npx --yes cds compile ../../srv ../../db -2 json -o _main/srv/csn.json # compile main app model into _main
         - rm -f package-lock.json # make sure there is no package-lock.json
         - npm install --omit=dev --ignore-scripts --no-package-lock --no-bin-links # npm install for the sidecar, with several flags to avoid npm errors
-        - npx --yes cds build --for hana # build agent db entities — outputs to db/src/gen/
-        - rm -rf gen
-        - mkdir gen
-        - cp db/package.json gen/ # hdi-deploy needs package.json alongside artifacts
-        - mv db/src gen/
+        - npx --yes cds build --for hana --dest gen/db # build agent db entities — outputs to gen/db/ (overrides java default of db/src/gen/)
       build-result: .
     properties:
       NODE_ENV: production
@@ -68,7 +64,7 @@ modules:
     build-parameters:
       builder: custom
       commands: []
-      build-result: gen/
+      build-result: gen/db
       requires:
         - name: agent-java-bookshop-sidecar
     requires:
