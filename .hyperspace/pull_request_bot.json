@@ -3,8 +3,8 @@
   "features": {
     "control_panel": false,
     "summarize": {
-      "auto_generate_summary": true,
-      "auto_insert_summary": true,
+      "auto_generate_summary": false,
+      "auto_insert_summary": false,
       "auto_run_on_draft_pr": true,
       "use_custom_summarize_prompt": false,
       "use_custom_summarize_output_template": false

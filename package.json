@@ -10,31 +10,30 @@
     "url": "git+https://github.com/cap-js/agents.git"
   },
   "type": "module",
-  "exports": {
-    ".": "./index.js",
-    "./package.json": "./package.json",
-    "./cds-plugin": "./cds-plugin.js",
-    "./index.cds": "./index.cds",
-    "./lib/models/*": "./lib/models/*.js",
-    "./srv/langgraph-executor-srv": "./srv/langgraph-executor-srv.js",
-    "./srv/*": "./srv/*",
-    "./lib/*": "./lib/*"
-  },
   "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
-    "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
-    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
-    "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
+    "test": "cds-test",
+    "test:hybrid": "CDS_ENV=hybrid,tracing cds bind --exec -- cds-test",
+    "test:mtx": "cds-test tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
-    "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
-    "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
-    "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
-    "prettier": "npx -y prettier@3 --write .",
-    "prettier:check": "npx -y prettier@3 --check ."
+    "watch:hybrid": "cds bind --exec -- npm run watch:sample",
+    "watch:with-claude": "npm run watch:sample -- --profile with-claude",
+    "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "require": "./index.cjs"
+    },
+    "./index.cds": "./index.cds",
+    "./cds-plugin": "./cds-plugin.js",
+    "./package.json": "./package.json",
+    "./lib/*": "./lib/*"
   },
   "files": [
     "index.js",
+    "index.cjs",
     "index.cds",
     "lib",
     "srv",
@@ -42,21 +41,10 @@
     "_i18n"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "^0.3.12",
-    "@cap-js/attachments": "^4",
-    "@cap-js/mcp": "^1.4",
-    "@langchain/anthropic": "^1.5.1",
-    "@langchain/core": "^1",
-    "@langchain/langgraph": "^1",
-    "@langchain/mcp-adapters": "^1.1.3",
-    "@sap-ai-sdk/langchain": "^2.13.0",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/connectivity": "^4.7.0",
     "@sap-cloud-sdk/resilience": "^4.7.0",
-    "deepagents": "^1.10.0",
-    "langchain": "^1.5.0",
-    "marked": "^18",
-    "zod": "^4.0.0"
+    "marked": "^18"
   },
   "devDependencies": {
     "@cap-js/cds-test": "^1",
@@ -84,7 +72,6 @@
   "cds": {
     "agents": {
       "streaming": true,
-      "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",
       "[development]": {
@@ -137,47 +124,28 @@
           "image/png",
           "image/jpeg"
         ]
-      },
-      "pool": {
-        "maxConcurrentTasks": 10,
-        "maxConcurrentTasksPerUser": 4,
-        "maxTasksPerHour": 100,
-        "maxTasksPerHourPerUser": 20,
-        "maxLLMTokensPerDay": 5000000,
-        "maxToolCallsPerHour": 1000,
-        "maxToolCallsPerTask": 50,
-        "maxLLMInvocationsPerTask": 50,
-        "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeout": "120s",
-        "maxExecutionTimePerTask": "5min",
-        "timeoutGrace": "15s",
-        "maxIncomingMessageLength": 5000
       }
     },
     "requires": {
-      "agents": {
-        "model": "@cap-js/agents"
-      },
-      "agent-push-notifications": {
-        "impl": "@cap-js/agents/srv/push-notification-srv.js"
-      },
-      "mlflow": {
-        "vcap": {
-          "label": "user-provided",
-          "name": "mlflow"
-        }
-      },
+      "agents": "agents",
       "kinds": {
+        "agents": {
+          "impl": "@cap-js/agents/lib/agentService.js",
+          "model": "@cap-js/agents/index.cds"
+        },
         "aicore": {
-          "impl": "@cap-js/agents/lib/models/aicore",
-          "model": "anthropic--claude-4.6-sonnet",
+          "impl": "@cap-js/agents/lib/llm/aicore.js",
+          "model": "anthropic--claude-opus-5",
           "contentFilter": true
         },
         "anthropic": {
-          "impl": "@cap-js/agents/lib/models/anthropic"
+          "impl": "@cap-js/agents/lib/llm/anthropic.js"
         },
-        "llm-mock": {
-          "impl": "@cap-js/agents/lib/models/mock"
+        "openai": {
+          "impl": "@cap-js/agents/lib/llm/openai.js"
+        },
+        "mock": {
+          "impl": "@cap-js/agents/lib/llm/mock.js"
         }
       },
       "[development]": {
@@ -196,7 +164,7 @@
     "protocols": {
       "agent": {
         "path": "/a2a",
-        "impl": "@cap-js/agents/lib/index.cjs"
+        "impl": "@cap-js/agents"
       }
     },
     "[agent-sidecar]": {
@@ -211,17 +179,10 @@
     }
   },
   "workspaces": [
-    "tests/projects/bookshop/",
-    "tests/projects/deep-agent/",
+    "tests/projects/*",
     "tests/projects/mtx/mtx/sidecar/",
-    "tests/projects/telemetry-debug/",
-    "tests/projects/telemetry-v1/",
-    "tests/projects/travel/travel-agent/",
-    "tests/projects/travel/xflights/",
-    "tests/projects/travel/leisure-services/",
-    "tests/sidecar-projects/java-bookshop/agent/sidecar",
-    "tests/sidecar-projects/java-bookshop",
-    "tests/sidecar-projects/node-bookshop/agent/sidecar",
-    "tests/sidecar-projects/node-bookshop"
+    "tests/projects/travel/*",
+    "tests/java-bookshop/agent/sidecar",
+    "tests/java-bookshop"
   ]
 }
