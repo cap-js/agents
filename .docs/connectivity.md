@@ -7,7 +7,7 @@
 
 Beyond binding a service instance with `cds bind -2 <instance>`, the plugin can reach SAP AI Core in the following ways:
 
-- **`AICORE_SERVICE_KEY` environment variable** — set it to the JSON service key of your AI Core instance. Useful for local development without a binding.
+- **`AICORE_SERVICE_KEY` environment variable** — set it to the JSON service key of your AI Core instance. Useful for local development without a binding. Additionally you can set a specific resource group with `AICORE_RESOURCE_GROUP` if it's not the "default" one.
 - **BTP Destination** — for a central AI Core instance shared across subaccounts (see [Destination-Based Connectivity](#destination-based-connectivity) below).
 
 When neither a destination nor `AICORE_SERVICE_KEY` is set, the plugin falls back to the standard service binding resolution (`VCAP_SERVICES`).
