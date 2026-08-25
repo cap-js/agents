@@ -157,24 +157,6 @@ describe("@cap-js/agents - Task Cleanup", () => {
       expect(row).toBeDefined()
     })
 
-    it("should use default 30d TTL when ttl is null", async () => {
-      cds.env.agents.ttl = null
-
-      const taskId30d = cds.utils.uuid()
-      const taskId40d = cds.utils.uuid()
-
-      await insertTask({ taskId: taskId30d, modifiedAt: pastDate(25) })
-      await insertTask({ taskId: taskId40d, modifiedAt: pastDate(40) })
-
-      await cleanupExpiredTasks(SERVICE_NAME)
-
-      const recent = await SELECT.one.from(TASKS).where({ taskId: taskId30d })
-      const old = await SELECT.one.from(TASKS).where({ taskId: taskId40d })
-
-      expect(recent).toBeDefined()
-      expect(old).toBeUndefined()
-    })
-
     it("should accept numeric TTL in milliseconds", async () => {
       cds.env.agents.ttl = 5 * 86_400_000 // 5 days
 

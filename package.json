@@ -87,6 +87,7 @@
       "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",
+      "ttl": "30d",
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [

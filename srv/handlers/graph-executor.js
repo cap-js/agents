@@ -591,7 +591,9 @@ class GraphExecutor {
         data: { taskId, contextId, service: serviceName, userMessage: requestContext.userMessage },
       })
       // Lazy scheduling task deletion
-      await triggerCleanup(serviceName)
+      cds.spawn({}, async () => {
+        await triggerCleanup(serviceName)
+      })
     }
 
     // ── File I/O: persist incoming FileParts to cap.agent.Tasks.inputFiles ──
