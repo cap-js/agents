@@ -8,6 +8,7 @@
 
 ### Added
 
+- `cds.agents.retention` (default 30d) to configure retention of Tasks and related assets stored for A2A and the agent
 - Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
 
 ### Fixed

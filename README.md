@@ -133,6 +133,7 @@ The following capabilities are experimental and documented separately. Their pub
 - [Configuration](.docs/configuration.md) — using multiple models, global and per-service settings, file I/O, and push notifications
 - [Quota Enforcement](.docs/quota.md) — configurable rate limits and resource quotas
 - [Audit Logging](.docs/audit-logging.md) — immutable audit trail of agent decisions and tool usage
+- [Data Privacy](.docs/data-privacy.md) — deletion of message history
 - [Telemetry](.docs/telemetry.md) — OpenTelemetry metrics, tracing, and MLflow export
 - [Content Filter](.docs/content-filter.md) — SAP AI Core content filtering and prompt injection shielding
 
