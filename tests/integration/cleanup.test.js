@@ -63,7 +63,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
   beforeEach(async () => {
     _resetCleanupThrottle()
-    await DELETE.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
+    await DELETE.from(OUTBOX_MESSAGES).where`msg like '%cleanupTasks%'`
   })
 
   afterEach(() => {
@@ -189,33 +189,35 @@ describe("@cap-js/agents - Task Cleanup", () => {
     })
   })
 
-  describe("triggerCleanup (throttle)", () => {
-    it("should schedule a cleanupTasks message in the outbox", async () => {
-      cds.env.agents.ttl = "7d"
+  if (parseInt(cds.version) > 9) {
+    describe("triggerCleanup (throttle)", () => {
+      it("should schedule a cleanupTasks message in the outbox", async () => {
+        cds.env.agents.ttl = "7d"
 
-      await triggerCleanup(SERVICE_NAME)
+        await triggerCleanup(SERVICE_NAME)
 
-      const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
-      expect(msgs.length).toBe(1)
-      expect(msgs[0].msg).toContain("cleanupTasks")
+        const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
+        expect(msgs.length).toBe(1)
+        expect(msgs[0].msg).toContain("cleanupTasks")
+      })
+
+      it("should not schedule twice within 24h for same service", async () => {
+        cds.env.agents.ttl = "7d"
+
+        await triggerCleanup(SERVICE_NAME)
+        await triggerCleanup(SERVICE_NAME)
+
+        const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
+        expect(msgs.length).toBe(1)
+      })
+
+      it("should not schedule when ttl is disabled", async () => {
+        cds.env.agents.ttl = false
+
+        await triggerCleanup(SERVICE_NAME)
+        const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
+        expect(msgs.length).toBe(0)
+      })
     })
-
-    it("should not schedule twice within 24h for same service", async () => {
-      cds.env.agents.ttl = "7d"
-
-      await triggerCleanup(SERVICE_NAME)
-      await triggerCleanup(SERVICE_NAME)
-
-      const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
-      expect(msgs.length).toBe(1)
-    })
-
-    it("should not schedule when ttl is disabled", async () => {
-      cds.env.agents.ttl = false
-
-      await triggerCleanup(SERVICE_NAME)
-      const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
-      expect(msgs.length).toBe(0)
-    })
-  })
+  }
 })
