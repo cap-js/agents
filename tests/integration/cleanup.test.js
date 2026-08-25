@@ -63,7 +63,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
   beforeEach(async () => {
     _resetCleanupThrottle()
-    await DELETE.from(OUTBOX_MESSAGES).where({ task: "cleanupTasks" })
+    await DELETE.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
   })
 
   afterEach(() => {
@@ -195,7 +195,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
       await triggerCleanup(SERVICE_NAME)
 
-      const msgs = await SELECT.from(OUTBOX_MESSAGES).where({ task: "cleanupTasks" })
+      const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
       expect(msgs.length).toBe(1)
       expect(msgs[0].msg).toContain("cleanupTasks")
     })
@@ -206,7 +206,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
       await triggerCleanup(SERVICE_NAME)
       await triggerCleanup(SERVICE_NAME)
 
-      const msgs = await SELECT.from(OUTBOX_MESSAGES).where({ task: "cleanupTasks" })
+      const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
       expect(msgs.length).toBe(1)
     })
 
@@ -214,8 +214,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
       cds.env.agents.ttl = false
 
       await triggerCleanup(SERVICE_NAME)
-
-      const msgs = await SELECT.from(OUTBOX_MESSAGES).where({ task: "cleanupTasks" })
+      const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
       expect(msgs.length).toBe(0)
     })
   })
