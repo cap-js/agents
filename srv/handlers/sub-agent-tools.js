@@ -270,7 +270,8 @@ export async function buildSubAgentToolFromConnection(serviceName) {
     )
   }
 
-  const base = agentBaseUrl.replace(/\/$/, "")
+  const path = typeof credentials === "object" ? credentials?.path : null
+  const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
   LOG.info(`Connecting to sub-agent at ${base}`)
 
   // revisit: a2a agents may be tenant specific, card per tenant?

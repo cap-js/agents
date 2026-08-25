@@ -8,7 +8,7 @@
 
 ### Added
 
-- Outgoing MCP connections now consider `credentials.path` together with the destination
+- Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
 
 ## Version 0.9.1 - 2026-08-14
 
