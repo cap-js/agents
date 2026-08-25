@@ -82,17 +82,13 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Setup CF CLI and authenticate
-        uses: cap-js/cf-setup@d9f989795c045b8ba9f80103ae4979de71131844 # v2.0.2
-        with:
-          api: ${{ secrets.CF_API }}
-          org: ${{ secrets.CF_ORG }}
-          space: ${{ secrets.CF_SPACE }}
-          username: ${{ secrets.CF_USERNAME }}
-          password: ${{ secrets.CF_PASSWORD }}
-
       - run: npm i -g @sap/cds-dk@latest
       - run: npm ci
       - run: cds v -i
-      - run: cds bind -2 joule-cap-proxy -o package.json
+      - name: Ensure orchestration deployment
+        env:
+          AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}
+        run: node tests/utils/orchestration-deployment.js
       - run: npm run test:hybrid
+        env:
+          AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}
