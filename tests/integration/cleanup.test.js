@@ -63,7 +63,6 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
   beforeEach(async () => {
     _resetCleanupThrottle()
-    await DELETE.from(OUTBOX_MESSAGES).where`msg like '%cleanupTasks%'`
   })
 
   afterEach(() => {
@@ -191,6 +190,10 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
   if (parseInt(cds.version) > 9) {
     describe("triggerCleanup (throttle)", () => {
+      beforeEach(async () => {
+        await DELETE.from(OUTBOX_MESSAGES).where`msg like '%cleanupTasks%'`
+      })
+
       it("should schedule a cleanupTasks message in the outbox", async () => {
         cds.env.agents.ttl = "7d"
 
