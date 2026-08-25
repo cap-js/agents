@@ -8,6 +8,7 @@ export default [
   {
     files: ["**/*.js"],
     rules: {
+      "no-await-in-loop": "error",
       "no-console": ["error", { allow: ["warn", "error"] }],
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

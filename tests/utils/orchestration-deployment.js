@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-await-in-loop */
 // Creates (or reuses) an SAP AI Core orchestration deployment and waits until RUNNING.
 // Usage: node tests/utils/orchestration-deployment.js [--resource-group <rg>]
 
