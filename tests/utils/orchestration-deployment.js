@@ -71,7 +71,8 @@ export async function createOrchestrationDeployment(opts = {}) {
       headers,
     ).execute()
     configurationId = configResponse.id
-    if (!configurationId) throw new Error(`Configuration creation failed: ${JSON.stringify(configResponse)}`)
+    if (!configurationId)
+      throw new Error(`Configuration creation failed: ${JSON.stringify(configResponse)}`)
   }
 
   // 2. Upsert deployment — reuse existing RUNNING or PENDING deployment for this configuration
@@ -95,7 +96,8 @@ export async function createOrchestrationDeployment(opts = {}) {
     ).execute()
     deploymentId = deployResponse.id
     deployStatus = deployResponse.status
-    if (!deploymentId) throw new Error(`Deployment creation failed: ${JSON.stringify(deployResponse)}`)
+    if (!deploymentId)
+      throw new Error(`Deployment creation failed: ${JSON.stringify(deployResponse)}`)
   }
 
   if (!wait) {
