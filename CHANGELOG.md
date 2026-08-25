@@ -6,6 +6,10 @@
 
 ## Version 0.9.2 - TBD
 
+### Added
+
+- Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
+
 ### Fixed
 
 - Fixed skill loading for markdown-based agents
