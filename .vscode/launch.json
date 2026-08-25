@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "test:hybrid",
       "cwd": "${workspaceFolder}",
@@ -12,7 +12,7 @@
       "console": "integratedTerminal"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "test",
       "cwd": "${workspaceFolder}",
@@ -22,7 +22,7 @@
       "console": "integratedTerminal"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "watch:sample",
       "cwd": "${workspaceFolder}",
@@ -32,7 +32,7 @@
       "console": "integratedTerminal"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "watch:hybrid",
       "cwd": "${workspaceFolder}",
@@ -42,7 +42,7 @@
       "console": "integratedTerminal"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "watch:with-claude",
       "cwd": "${workspaceFolder}",
@@ -52,7 +52,7 @@
       "console": "integratedTerminal"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "watch:deepagent-sample",
       "cwd": "${workspaceFolder}",
@@ -62,7 +62,7 @@
       "console": "integratedTerminal"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "watch:travel-sample",
       "cwd": "${workspaceFolder}",

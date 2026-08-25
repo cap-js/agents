@@ -1,0 +1,25 @@
+{
+  "name": "llm-consumer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sample CAP llm consumer for @cap-js/agents tests",
+  "dependencies": {
+    "@cap-js/agents": "file:../../../.",
+    "@cap-js/hana": ">=1",
+    "@sap/cds": ">=10"
+  },
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": ">=1"
+  },
+  "cds": {
+    "requires": {
+      "llm": {
+        "kind": "openai",
+        "x-model": "qwen3.5"
+      }
+    }
+  }
+}

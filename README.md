@@ -6,7 +6,7 @@ CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) prot
 
 ## Requirements and Setup
 
-We use the [@capire/bookshop](https://github.com/capire/bookshop) as a running sample hereinafter. Clone it and open it in VSCode as follows:
+We use the [@capire/bookshop](https://github.com/capire/bookshop) as a running sample here in after. Clone it and open it in VSCode as follows:
 
 ```bash
 git clone https://github.com/capire/bookshop
