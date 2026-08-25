@@ -874,7 +874,6 @@ class GraphExecutor {
             duration,
             tokenUsage: usageData,
             toolCalls: totalToolCalls(result.messages),
-            output: output?.slice(0, 2000),
             task: requestContext.task,
           },
         })

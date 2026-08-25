@@ -6,6 +6,10 @@
 
 ## Version 0.9.2 - TBD
 
+### Changed
+
+- Adjusted agent audit log attributes to follow latest recommendations
+
 ### Fixed
 
 - Fixed skill loading for markdown-based agents
