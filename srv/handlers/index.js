@@ -3,6 +3,7 @@ import { generateTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
+import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
 
 const LOG = cds.log("agents")
 
@@ -169,5 +170,9 @@ export default function registerDefaultAgentHandlers(srv) {
         return { messages: [new HumanMessage(fullText)] }
       },
     })
+  })
+
+  srv.on("cleanupTasks", async () => {
+    await cleanupExpiredTasks(srv.name)
   })
 }
