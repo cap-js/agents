@@ -206,7 +206,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
   endpoints = Object.fromEntries(endpoints.map((o) => [o.kind, o.path]))
   const { credentials, kind } = cds.requires[serviceName]
 
-  const destinationName = typeof credentials === "string" ? credentials : credentials?.name
+  const destinationName = typeof credentials === "string" ? credentials : (credentials?.destination ?? credentials?.name)
   const localUrl =
     typeof credentials === "string"
       ? null

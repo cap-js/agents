@@ -94,7 +94,7 @@ export async function buildMcpToolsFromConnection(serviceName) {
   const { credentials, kind } = cds.requires[serviceName]
 
   // dest is either a string (BTP destination name) or an object { name, url, ... }
-  const destinationName = typeof credentials === "string" ? credentials : credentials?.name
+  const destinationName = typeof credentials === "string" ? credentials : (credentials?.destination ?? credentials?.name)
   const localUrl =
     typeof credentials === "string"
       ? null
