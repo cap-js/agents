@@ -88,7 +88,7 @@ jobs:
       - name: Ensure orchestration deployment
         env:
           AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}
-        run: node tests/utils/orchestration-deployment.js --wait
+        run: node tests/utils/orchestration-deployment.js
       - run: npm run test:hybrid
         env:
           AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}
