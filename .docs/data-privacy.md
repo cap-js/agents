@@ -5,13 +5,13 @@
 
 The plugin automatically triggers a cleanup of Tasks, and its related entities (Checkpoints, Files, A2A Push Notification configuration).
 
-The TTL can be configured via `cds.agents.ttl`. The default is 30 days and acceptable values are time strings like `30d` or raw millisecond values. Setting it to `false` or `0` disables it.
+The TTL can be configured via `cds.agents.retention`. The default is 30 days and acceptable values are time strings like `30d` or raw millisecond values. Setting it to `false` or `0` disables it.
 
 ```json
 {
   "cds": {
     "agents": {
-      "ttl": "30d"
+      "retention": "30d"
     }
   }
 }

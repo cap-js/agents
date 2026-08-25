@@ -58,7 +58,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
   let originalTtl
 
   before(() => {
-    originalTtl = cds.env.agents?.ttl
+    originalTtl = cds.env.agents?.retention
   })
 
   beforeEach(async () => {
@@ -66,12 +66,12 @@ describe("@cap-js/agents - Task Cleanup", () => {
   })
 
   afterEach(() => {
-    cds.env.agents.ttl = originalTtl
+    cds.env.agents.retention = originalTtl
   })
 
   describe("cleanupExpiredTasks", () => {
     it("should delete tasks older than TTL", async () => {
-      cds.env.agents.ttl = "7d"
+      cds.env.agents.retention = "7d"
 
       const oldTaskId = cds.utils.uuid()
       const recentTaskId = cds.utils.uuid()
@@ -89,7 +89,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
     })
 
     it("should not delete tasks from other services", async () => {
-      cds.env.agents.ttl = "7d"
+      cds.env.agents.retention = "7d"
 
       const taskId = cds.utils.uuid()
       await insertTask({ taskId, agentService: "CatalogService", modifiedAt: pastDate(10) })
@@ -101,7 +101,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
     })
 
     it("should cascade-delete related checkpoints", async () => {
-      cds.env.agents.ttl = "7d"
+      cds.env.agents.retention = "7d"
 
       const taskId = cds.utils.uuid()
       const threadId = cds.utils.uuid()
@@ -117,7 +117,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
     })
 
     it("should cascade-delete related checkpoint writes", async () => {
-      cds.env.agents.ttl = "7d"
+      cds.env.agents.retention = "7d"
 
       const taskId = cds.utils.uuid()
       const threadId = cds.utils.uuid()
@@ -133,8 +133,8 @@ describe("@cap-js/agents - Task Cleanup", () => {
       expect(cw).toBeUndefined()
     })
 
-    it("should do nothing when ttl is disabled (false)", async () => {
-      cds.env.agents.ttl = false
+    it("should do nothing when retention is disabled (false)", async () => {
+      cds.env.agents.retention = false
 
       const taskId = cds.utils.uuid()
       await insertTask({ taskId, modifiedAt: pastDate(100) })
@@ -145,8 +145,8 @@ describe("@cap-js/agents - Task Cleanup", () => {
       expect(row).toBeDefined()
     })
 
-    it("should do nothing when ttl is 0", async () => {
-      cds.env.agents.ttl = 0
+    it("should do nothing when retention is 0", async () => {
+      cds.env.agents.retention = 0
 
       const taskId = cds.utils.uuid()
       await insertTask({ taskId, modifiedAt: pastDate(100) })
@@ -158,7 +158,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
     })
 
     it("should accept numeric TTL in milliseconds", async () => {
-      cds.env.agents.ttl = 5 * 86_400_000 // 5 days
+      cds.env.agents.retention = 5 * 86_400_000 // 5 days
 
       const taskId = cds.utils.uuid()
       await insertTask({ taskId, modifiedAt: pastDate(6) })
@@ -177,7 +177,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
       })
 
       it("should schedule a cleanupTasks message in the outbox", async () => {
-        cds.env.agents.ttl = "7d"
+        cds.env.agents.retention = "7d"
 
         await triggerCleanup(SERVICE_NAME)
 
@@ -187,7 +187,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
       })
 
       it("should not schedule twice within 24h for same service", async () => {
-        cds.env.agents.ttl = "7d"
+        cds.env.agents.retention = "7d"
 
         await triggerCleanup(SERVICE_NAME)
         await triggerCleanup(SERVICE_NAME)
@@ -196,8 +196,8 @@ describe("@cap-js/agents - Task Cleanup", () => {
         expect(msgs.length).toBe(1)
       })
 
-      it("should not schedule when ttl is disabled", async () => {
-        cds.env.agents.ttl = false
+      it("should not schedule when retention is disabled", async () => {
+        cds.env.agents.retention = false
 
         await triggerCleanup(SERVICE_NAME)
         const msgs = await SELECT.from(OUTBOX_MESSAGES).where(`msg like '%cleanupTasks%'`)
