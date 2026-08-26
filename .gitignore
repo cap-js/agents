@@ -1,7 +1,6 @@
 .DS_Store
 node_modules/
 gen/
-package-lock.json
 .env
 .cdsrc-private.json
 resources/*
@@ -18,3 +17,6 @@ proposal.md
 **/*csn.json
 **/*.hdiconfig
 **/undeploy.json
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

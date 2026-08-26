@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.1.0",
+  "version": "0.9.2",
   "description": "CDS plugin for building agents",
   "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
@@ -24,13 +24,10 @@
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
-    "test:cds8": "CDS_ENV=test npx vitest run --config vitest.config.js",
-    "pretest:cds8": "npm pkg set 'overrides.@sap/cds=^8' 'overrides.@cap-js/sqlite=^1' 'overrides.@cap-js/hana=^1' 'overrides.@sap/cds-mtxs=^2' 'overrides.express=^4' && npm pkg set 'devDependencies.@sap/cds=^8' 'devDependencies.@cap-js/sqlite=^1' 'devDependencies.@cap-js/cds-test=>0' 'peerDependencies.@sap/cds=^8' && npm pkg delete 'devDependencies.@cap-js/hana' 'devDependencies.@sap/cds-mtxs' && rm -rf node_modules && npm i --legacy-peer-deps",
-    "posttest:cds8": "git checkout package.json && rm -rf node_modules && npm i --legacy-peer-deps",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
-    "watch:hybrid": "DEBUG=agent cds bind --exec -- cds w tests/projects/bookshop",
+    "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
     "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
     "prettier": "npx -y prettier@3 --write .",
@@ -71,7 +68,7 @@
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=8"
+    "@sap/cds": ">=9"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
@@ -90,6 +87,7 @@
       "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",
+      "retention": "30d",
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [
@@ -119,9 +117,9 @@
         "max_tokens": 4096,
         "temperature": 0
       },
-      "contentFilter": true,
       "fileIO": {
         "enabled": false,
+        "maxInputFileSizeBytes": 2097152,
         "maxOutputFileSizeBytes": 10485760,
         "defaultInputModes": [
           "text/csv",

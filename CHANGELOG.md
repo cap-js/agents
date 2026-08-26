@@ -4,21 +4,21 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.1 - TBD
+## Version 0.9.2 - 2026-08-26
 
 ### Added
 
-- `<provider>/<model>` convenience for known llm providers, for example `cds.requires.llm: anthropic/haiku`
-- Experimental Thinking steps in the preview
+- `cds.agents.retention` (default 30d) to configure retention of Tasks and related assets stored for A2A and the agent
+- Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
+- Added additional OpenTelemetry span attributes detailing how many content filters were active
+- Thinking steps are shown in the preview
 
 ### Fixed
 
-- Authentication in preview
-- Failing `query`-tool executions shown as success in traces
-- HITL-resumes can now be sent as opaque DataPart
+- Fixed skill loading for markdown-based agents
 
-## Version 0.9.0 - 2026-08-10
+## Version 0.9.1 - 2026-08-14
 
 ### Added
 
-- Initial cap-js/agents version
+- Initial release

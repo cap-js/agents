@@ -4,7 +4,7 @@ import { z } from "zod"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agent:sub-agents")
+const LOG = cds.log("agents:sub-agents")
 
 /**
  * Extract text and file parts from an A2A response (task or message).
@@ -206,7 +206,8 @@ export async function buildSubAgentToolFromConnection(serviceName) {
   endpoints = Object.fromEntries(endpoints.map((o) => [o.kind, o.path]))
   const { credentials, kind } = cds.requires[serviceName]
 
-  const destinationName = typeof credentials === "string" ? credentials : credentials?.name
+  const destinationName =
+    typeof credentials === "string" ? credentials : (credentials?.destination ?? credentials?.name)
   const localUrl =
     typeof credentials === "string"
       ? null
@@ -270,7 +271,8 @@ export async function buildSubAgentToolFromConnection(serviceName) {
     )
   }
 
-  const base = agentBaseUrl.replace(/\/$/, "")
+  const path = typeof credentials === "object" ? credentials?.path : null
+  const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
   LOG.info(`Connecting to sub-agent at ${base}`)
 
   // revisit: a2a agents may be tenant specific, card per tenant?

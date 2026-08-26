@@ -37,7 +37,7 @@ export default class DebugService extends cds.ApplicationService {
       if (!queryTool) {
         return { messages: [new AIMessage("No query tool.")], output: "No query tool." }
       }
-      const result = await queryTool.invoke({ entity: "Books", limit: 2 })
+      const result = await queryTool.invoke({ cql: "SELECT * FROM Books LIMIT 2" })
       return { messages: [new AIMessage(result)], output: result }
     }
 

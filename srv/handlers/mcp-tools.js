@@ -3,7 +3,7 @@ import { MultiServerMCPClient } from "@langchain/mcp-adapters"
 import { generateTools } from "./tools.js"
 import { toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agent:mcp")
+const LOG = cds.log("agents:mcp")
 
 /**
  * Resolve URL and HTTP headers for a BTP destination using the Cloud SDK.
@@ -94,7 +94,8 @@ export async function buildMcpToolsFromConnection(serviceName) {
   const { credentials, kind } = cds.requires[serviceName]
 
   // dest is either a string (BTP destination name) or an object { name, url, ... }
-  const destinationName = typeof credentials === "string" ? credentials : credentials?.name
+  const destinationName =
+    typeof credentials === "string" ? credentials : (credentials?.destination ?? credentials?.name)
   const localUrl =
     typeof credentials === "string"
       ? null
@@ -121,7 +122,8 @@ export async function buildMcpToolsFromConnection(serviceName) {
     )
   }
 
-  const mcpUrl = url.replace(/\/$/, "")
+  const path = typeof credentials === "object" ? credentials?.path : null
+  const mcpUrl = url.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
   LOG.info(`Connecting to MCP server at ${mcpUrl}`)
 
   const resolveHeaders = async () => {
