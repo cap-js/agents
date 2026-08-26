@@ -386,7 +386,7 @@ class GraphExecutor {
           // If the finish reason is tool_calls this means it is thinking and running in the loop
           const isThinking =
             msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason ===
-              "tool_calls"
+            "tool_calls"
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
           // ResultManager reads event.append; nesting them leaves it undefined and
