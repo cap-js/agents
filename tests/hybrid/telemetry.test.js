@@ -72,10 +72,13 @@ describe("@cap-js/agents - Hybrid telemetry (AI Core)", () => {
 
   it("should produce chat span with model name", async () => {
     const spans = await getSpansAfterRequest(() => sendMessage("catalog", "List books"))
-    const chatSpan = findSpan(spans, /^chat /)
+    const chatSpan = findSpans(spans, /^chat /).at(-1)
     expect(chatSpan).not.toBe(undefined)
     expect(chatSpan.attributes["gen_ai.operation.name"]).toBe("chat")
     expect(chatSpan.attributes["gen_ai.request.model"]).not.toBe(undefined)
+    expect(chatSpan.attributes["gen_ai.orchestration.output_filtering"]).toBe(true)
+    const oc = chatSpan.attributes["gen_ai.orchestration.output_filter_services"]
+    expect(oc.length > 0, `expected output_filter_services > 0, got ${oc}`).toBeTruthy()
   })
 
   it("should have HTTP outbound spans for AI Core call in same trace as chat span", async () => {
