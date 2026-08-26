@@ -27,7 +27,6 @@
       "fileIO": {
         "enabled": true
       },
-      "contentFilter": false,
       "activeUsersInterval": "1s",
       "[tracing]": {
         "mlflow": true
@@ -36,7 +35,6 @@
         "mlflow": true
       },
       "[hybrid]": {
-        "contentFilter": true,
         "activeUsersInterval": "24h"
       }
     },
@@ -99,6 +97,21 @@
           "credentials": {
             "MLFLOW_HOST": "http://localhost:5678",
             "MLFLOW_EXPERIMENT_ID": "0"
+          }
+        }
+      },
+      "[hybrid]": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "alice": {
+              "features": [
+                "experimental"
+              ]
+            },
+            "bob": {
+              "features": []
+            }
           }
         }
       },
