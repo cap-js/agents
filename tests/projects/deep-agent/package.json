@@ -11,7 +11,7 @@
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
-    "@sap/cds": ">=8",
+    "@sap/cds": "^10.0.6",
     "zod": "^4"
   },
   "cds": {
