@@ -224,5 +224,8 @@
     "tests/sidecar-projects/java-bookshop",
     "tests/sidecar-projects/node-bookshop/agent/sidecar",
     "tests/sidecar-projects/node-bookshop"
-  ]
+  ],
+  "overrides": {
+    "@opentelemetry/propagator-jaeger": "2.9.0"
+  }
 }
