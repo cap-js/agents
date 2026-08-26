@@ -60,7 +60,7 @@ export async function buildMcpToolsLocally(serviceName) {
  * current user's credentials.
  *
  * @param {string} serviceName - cds.requires service key
- * @returns {Promise<{ _mcpDynamic: true, serviceName: string, mcpUrl: string, resolveHeaders: () => Promise<object> }>}
+ * @returns {Promise<{ _mcpDynamic: true, mcpUrl: string, resolveHeaders: () => Promise<object> }>}
  */
 export async function buildMcpToolsFromConnection(serviceName) {
   let endpoints = cds.service.endpoints4({
@@ -113,7 +113,7 @@ export async function buildMcpToolsFromConnection(serviceName) {
 
   // Return a placeholder; tools are resolved dynamically per-request in remoteMcpMiddleware.
   // This ensures each user's auth headers are used for tools/list, not just for tool invocations.
-  return { _mcpDynamic: true, serviceName, mcpUrl, resolveHeaders }
+  return { _mcpDynamic: true, mcpUrl, resolveHeaders }
 }
 
 export async function buildMcpTools(serviceName) {
