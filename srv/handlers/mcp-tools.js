@@ -111,8 +111,6 @@ export async function buildMcpToolsFromConnection(serviceName) {
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
-  // Return a placeholder; tools are resolved dynamically per-request in remoteMcpMiddleware.
-  // This ensures each user's auth headers are used for tools/list, not just for tool invocations.
   return { _mcpDynamic: true, mcpUrl, resolveHeaders }
 }
 
