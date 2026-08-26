@@ -52,7 +52,7 @@ Both approaches start from a CDS service annotated with `@agent` (as shown in [R
 
 ### Agentify Existing CAP Services
 
-With `@agent` alone, the plugin auto-generates tools from the service's entities and actions, creates a ReAct agent loop, and serves it as a remote agent — no code required.
+With `@agent` alone, the plugin auto-generates tools from the service's entities and actions, creates a [ReAct agent](https://arxiv.org/abs/2210.03629) loop, and serves it as a remote agent — no code required.
 
 ```cds
 @agent
