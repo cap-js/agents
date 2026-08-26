@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import { MultiServerMCPClient } from "@langchain/mcp-adapters"
 import { generateTools } from "./tools.js"
 import { toolName } from "../../lib/utils/utils.js"
 
@@ -42,29 +41,6 @@ async function resolveDestination(destinationName, dest, localUrl) {
   }
 }
 
-/**
- * Wrap MCP tool invocations to convert errors into plain string results.
- * deepagents' wrapToolCall middleware marks errors thrown inside it as
- * "middleware errors", which LangChain's ToolNode re-throws rather than
- * converting to a ToolMessage (see ToolNode.js: isMiddlewareError check).
- * MCP tool schema validation errors therefore crash the graph instead of
- * being fed back to the LLM as recoverable feedback.
- */
-function wrapToolsWithErrorHandling(tools, serviceName) {
-  return tools.map((tool) => {
-    const original = tool.invoke.bind(tool)
-    tool.invoke = async (args, config) => {
-      try {
-        return await original(args, config)
-      } catch (err) {
-        LOG.warn(`MCP tool "${tool.name}" error: ${err.message}`, { service: serviceName })
-        return `Error: ${err.message}`
-      }
-    }
-    return tool
-  })
-}
-
 export async function buildMcpToolsLocally(serviceName) {
   const srv = cds.services[serviceName]
   const tools = generateTools(srv)
@@ -78,12 +54,13 @@ export async function buildMcpToolsLocally(serviceName) {
 }
 
 /**
- * Build LangChain tools from a CAP MCP connection.
- * Resolves the destination URL and auth headers, connects to the MCP server,
- * and returns the tools wrapped with error handling for use in agent graphs.
+ * Build a dynamic MCP placeholder from a CAP MCP connection.
+ * Resolves the destination URL and auth-header factory; the actual tools/list
+ * call is deferred to remoteMcpMiddleware which runs per-request with the
+ * current user's credentials.
  *
  * @param {string} serviceName - cds.requires service key
- * @returns {Promise<import("@langchain/core/tools").StructuredTool[]>}
+ * @returns {Promise<{ _mcpDynamic: true, serviceName: string, mcpUrl: string, resolveHeaders: () => Promise<object> }>}
  */
 export async function buildMcpToolsFromConnection(serviceName) {
   let endpoints = cds.service.endpoints4({
@@ -134,22 +111,9 @@ export async function buildMcpToolsFromConnection(serviceName) {
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
-  const client = new MultiServerMCPClient({
-    mcpServers: {
-      [serviceName]: { url: mcpUrl },
-    },
-    beforeToolCall: async () => ({ headers: await resolveHeaders() }),
-  })
-
-  const tools = await client.getTools()
-  const prefix = toolName(`${serviceName}_`)
-  for (const tool of tools) tool.name = `${prefix}${tool.name}`
-
-  LOG.info(
-    `Got ${tools.length} MCP tools from ${serviceName}: ${tools.map((t) => t.name).join(", ")}`,
-  )
-
-  return wrapToolsWithErrorHandling(tools, serviceName)
+  // Return a placeholder; tools are resolved dynamically per-request in remoteMcpMiddleware.
+  // This ensures each user's auth headers are used for tools/list, not just for tool invocations.
+  return { _mcpDynamic: true, serviceName, mcpUrl, resolveHeaders }
 }
 
 export async function buildMcpTools(serviceName) {
