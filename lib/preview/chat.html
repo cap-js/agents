@@ -41,26 +41,6 @@
       header .back:hover {
         color: #fff;
       }
-      .header-toggle {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.78rem;
-        color: #c8def0;
-        cursor: pointer;
-        user-select: none;
-        flex-shrink: 0;
-      }
-      .header-toggle[hidden] {
-        display: none;
-      }
-      .header-toggle input[type="checkbox"] {
-        accent-color: #7fbce8;
-        width: 14px;
-        height: 14px;
-        cursor: pointer;
-      }
-
       header .status-dot {
         width: 8px;
         height: 8px;
@@ -448,14 +428,6 @@
     <header>
       <a class="back" id="back" title="Back to index">&#8592;</a>
       <h1>{{agentName}}</h1>
-      <label
-        class="header-toggle"
-        title="Stream the agent's reasoning steps while it runs (experimental)"
-        style="margin-left: auto"
-      >
-        <input type="checkbox" id="streamToggle" />
-        Show thinking (experimental)
-      </label>
       <div class="status-dot" id="dot"></div>
     </header>
 
@@ -480,7 +452,8 @@
       const prompt = document.getElementById("prompt")
       const sendBtn = document.getElementById("send")
       const dot = document.getElementById("dot")
-      const streamToggle = document.getElementById("streamToggle")
+
+      let useStreaming = false
 
       let busy = false
       let contextId = null
@@ -490,7 +463,16 @@
       let streamingBubble = null
       let streamingText = ""
       let thinkingSummaryEl = null
+      let thinkingBubble = null
       let thinkingStepCount = 0
+
+      // Auto-enable streaming when agent card advertises streaming capability
+      fetch(AGENT_URL + ".well-known/agent-card.json", { headers: authHeaders() })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((card) => {
+          if (card?.capabilities?.streaming) useStreaming = true
+        })
+        .catch(() => {})
 
       const HISTORY_KEY = "chatHistory_" + AGENT_URL
       let inputHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]")
@@ -545,7 +527,10 @@
         el.className = "msg " + role
         if (role === "agent") el.innerHTML = md(text, { sanitize: true })
         else el.textContent = text
-        messages.insertBefore(el, typing)
+        messages.insertBefore(
+          el,
+          thinkingBubble ?? (typing.parentElement === messages ? typing : statusText),
+        )
         messages.scrollTop = messages.scrollHeight
         return el
       }
@@ -558,7 +543,12 @@
           const summary = document.createElement("summary")
           summary.textContent = "Thinking (0 steps)"
           thinkingSummaryEl.appendChild(summary)
-          messages.insertBefore(thinkingSummaryEl, typing)
+          // Initially inside a temporary bubble that also holds the typing indicator
+          thinkingBubble = document.createElement("div")
+          thinkingBubble.className = "msg agent"
+          thinkingBubble.appendChild(thinkingSummaryEl)
+          thinkingBubble.appendChild(typing)
+          messages.insertBefore(thinkingBubble, statusText)
         }
         thinkingStepCount++
         const step = document.createElement("div")
@@ -568,6 +558,17 @@
         thinkingSummaryEl.querySelector("summary").textContent =
           `Thinking (${thinkingStepCount} step${thinkingStepCount === 1 ? "" : "s"})`
         messages.scrollTop = messages.scrollHeight
+      }
+
+      function promoteThinkingPanel(beforeEl) {
+        if (!thinkingSummaryEl) return
+        // Move typing indicator back to messages before dismantling the bubble
+        messages.insertBefore(typing, statusText)
+        if (thinkingBubble) {
+          thinkingBubble.remove()
+          thinkingBubble = null
+        }
+        messages.insertBefore(thinkingSummaryEl, beforeEl)
       }
 
       function addApprovalPrompt(description) {
@@ -596,7 +597,10 @@
         actions.appendChild(approveBtn)
         actions.appendChild(rejectBtn)
         el.appendChild(actions)
-        messages.insertBefore(el, typing)
+        messages.insertBefore(
+          el,
+          thinkingBubble ?? (typing.parentElement === messages ? typing : statusText),
+        )
         messages.scrollTop = messages.scrollHeight
         return el
       }
@@ -608,6 +612,7 @@
       function setBusy(val) {
         busy = val
         prompt.disabled = val
+        if (typing.parentElement !== messages) messages.insertBefore(typing, statusText)
         typing.style.display = val ? "block" : "none"
         dot.className = "status-dot" + (val ? " busy" : "")
         if (val) {
@@ -642,7 +647,7 @@
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
-              method: streamToggle.checked ? "message/stream" : "message/send",
+              method: useStreaming ? "message/stream" : "message/send",
               id: crypto.randomUUID(),
               params: {
                 message: {
@@ -656,7 +661,7 @@
             }),
           })
 
-          if (streamToggle.checked) {
+          if (useStreaming) {
             await handleSSEResponse(resp)
           } else {
             const envelope = await resp.json()
@@ -682,18 +687,12 @@
           pendingTaskId = taskId
           const msgParts = result?.status?.message?.parts ?? []
           const description = partsToText(msgParts)
-          if (streamingBubble && streamingText) {
-            addThinkingStep(streamingText)
-            streamingBubble.remove()
-            streamingBubble = null
-            streamingText = ""
-          }
           addApprovalPrompt(description)
           return
         }
 
-        // If streaming was active and already rendered the final text via lastChunk, skip.
-        if (streamToggle.checked && streamingText !== "") {
+        // If streaming already rendered the final text via lastChunk, skip.
+        if (useStreaming && streamingText !== "") {
           streamingText = ""
           return
         }
@@ -735,9 +734,10 @@
         streamingBubble = null
         streamingText = ""
         thinkingSummaryEl = null
+        thinkingBubble = null
         thinkingStepCount = 0
 
-        const useStream = streamToggle.checked
+        const useStream = useStreaming
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
@@ -846,9 +846,17 @@
           return null
         }
 
-        if (event.kind === "artifact-update" && streamToggle.checked) {
+        if (event.kind === "artifact-update") {
           const parts = event.artifact?.parts ?? []
           const text = partsToText(parts)
+
+          if (event.artifact?.artifactId?.startsWith("thinking")) {
+            if (text) addThinkingStep(text)
+            return null
+          }
+
+          if (event.artifact?.artifactId !== "response") return null
+
           // A2A spec: append/lastChunk are event-level fields (siblings of `artifact`).
           const append = event.append ?? false
           const lastChunk = event.lastChunk ?? false
@@ -862,6 +870,7 @@
               } else {
                 typing.style.display = "none"
                 streamingBubble = addMessage("agent", text)
+                promoteThinkingPanel(streamingBubble)
               }
             }
             if (thinkingSummaryEl) thinkingSummaryEl.open = false
@@ -873,15 +882,9 @@
           if (!text) return null
 
           if (!append) {
-            // New turn boundary — move the previous turn's text (if any) into
-            // the thinking summary and drop its bubble from the DOM. Open a
-            // fresh bubble for the new turn.
-            if (streamingBubble && streamingText) {
-              addThinkingStep(streamingText)
-              streamingBubble.remove()
-            }
             typing.style.display = "none"
             streamingBubble = addMessage("agent", text)
+            promoteThinkingPanel(streamingBubble)
             streamingText = text
           } else if (streamingBubble) {
             // Subsequent token — accumulate into the current turn's bubble.
@@ -891,6 +894,7 @@
             // Defensive: append:true with no bubble yet (unexpected). Open one.
             typing.style.display = "none"
             streamingBubble = addMessage("agent", text)
+            promoteThinkingPanel(streamingBubble)
             streamingText = text
           }
           messages.scrollTop = messages.scrollHeight

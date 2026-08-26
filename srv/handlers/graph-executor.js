@@ -319,6 +319,7 @@ class GraphExecutor {
     // that reasoning text stream normally; the client is responsible for the
     // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
+    let thinkingCount = 0
 
     try {
       if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
@@ -359,6 +360,11 @@ class GraphExecutor {
 
           const text = messageText(msgChunk?.content)
           if (!text) continue
+
+          // If the finish reason is tool_calls this means it is thinking and running in the loop
+          const isThinking =
+            msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason ===
+              "tool_calls" ?? false
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
           // ResultManager reads event.append; nesting them leaves it undefined and
@@ -370,10 +376,11 @@ class GraphExecutor {
             append: tokenCount > 0,
             lastChunk: false,
             artifact: {
-              artifactId: "response",
+              artifactId: isThinking ? `thinking-${thinkingCount}` : "response",
               parts: [{ kind: "text", text }],
             },
           })
+          if (isThinking) thinkingCount++
           tokenCount++
         } else if (mode === "updates") {
           // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
