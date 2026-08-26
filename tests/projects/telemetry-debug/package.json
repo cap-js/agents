@@ -6,7 +6,7 @@
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
     "@cap-js/telemetry": "^2",
-    "@sap/cds": ">=8"
+    "@sap/cds": "^10.0.6"
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1"
