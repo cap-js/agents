@@ -21,6 +21,8 @@ beforeAll(async () => {
 describe("bookshop CatalogService — LLM-as-judge evals", () => {
   test.concurrent("lists books and uses the query tool on the Books entity", async () => {
     const query = "Show me all books"
+    // TODO: Adjust API to look like const agent = await cds.connect.to("CatalogAgent"); await agent.chat(query)
+    // For agent trajectory the whole outputs / LangGraph path is needed
     const { text, toolCalls, toolWasCalled, traceId } = await runAgent("catalog", query)
 
     // Two equivalent styles: bound helper vs direct array inspection.
@@ -32,6 +34,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
       criteria:
         "Response must list multiple books from the catalog with recognisable titles or authors.",
       response: text,
+      // TODO: Currently the label is the assesment name. Adjust API
       label: "list books",
       traceId,
     })
