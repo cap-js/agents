@@ -11,6 +11,7 @@
 - `cds.agents.retention` (default 30d) to configure retention of Tasks and related assets stored for A2A and the agent
 - Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
 - Added additional OpenTelemetry span attributes detailing how many content filters were active
+- Whether a tool succeeded or failed is now written as a debug log. This is for example helpful for investigating whether skills were loaded or not.
 
 ### Fixed
 
