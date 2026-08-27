@@ -15,17 +15,13 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: [self-hosted, solinas]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
-      - name: Configure internal registry
-        run: |
-          echo "@cap-js:registry=https://int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/" >> .npmrc
-          echo "//int.repositories.cloud.sap/artifactory/api/npm/build-releases-npm/:_authToken=${{ secrets.NPM_REGISTRY_TOKEN }}" >> .npmrc
-      - run: npm i
+          node-version: 24 # npm12
+      - run: npm set min-release-age=3
+      - run: npm ci
       - run: npm run lint
       - run: npm run prettier:check

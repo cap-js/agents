@@ -26,7 +26,7 @@ import {
 process.env.CDS_TEST_SILENT = "false"
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/telemetry-v1")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/telemetry-v1")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)", () => {
@@ -106,13 +106,9 @@ describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)
     const exporter = await getSpanExporter()
     exporter.reset()
 
-    let caught
-    try {
-      await failingTool.invoke({})
-    } catch (e) {
-      caught = e
-    }
-    expect(caught?.message).toMatch(/intentional failure/)
+    // Tool errors are swallowed and returned as strings (so LLM can retry)
+    const result = await failingTool.invoke({})
+    expect(result).toMatch(/intentional failure/)
 
     const { trace } = await import("@opentelemetry/api")
     const delegate = trace.getTracerProvider().getDelegate?.() || trace.getTracerProvider()
@@ -158,14 +154,14 @@ describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)
     }
 
     const savedMlflow = cds.env.agents?.mlflow
-    const savedDbx = cds.env.requires?.["databricks-mlflow"]
+    const savedMlflowReq = cds.env.requires?.mlflow
     cds.env.agents ??= {}
     cds.env.agents.mlflow = true
     cds.env.requires ??= {}
-    cds.env.requires["databricks-mlflow"] = {
+    cds.env.requires.mlflow = {
       credentials: {
         MLFLOW_OTLP_ENDPOINT: "http://localhost:65535/api/2.0/otlp/v1/traces",
-        DATABRICKS_TOKEN: "test-token",
+        MLFLOW_TOKEN: "test-token",
       },
     }
 
@@ -176,8 +172,8 @@ describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)
     } finally {
       delegate.addSpanProcessor = original
       cds.env.agents.mlflow = savedMlflow
-      if (savedDbx === undefined) delete cds.env.requires["databricks-mlflow"]
-      else cds.env.requires["databricks-mlflow"] = savedDbx
+      if (savedMlflowReq === undefined) delete cds.env.requires.mlflow
+      else cds.env.requires.mlflow = savedMlflowReq
     }
   })
 

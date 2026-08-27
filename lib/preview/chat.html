@@ -4,19 +4,13 @@
     <title>{{agentName}}</title>
     <meta charset="utf-8" />
     <meta name="color-scheme" content="dark light" />
+    <meta name="a2a-auth" content="{{authHeader}}" />
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-
       body {
         font-family:
           Avenir Next,
           sans-serif;
+        margin: 0;
         background: #f8fbff;
         color: #2a3d52;
         display: flex;
@@ -36,6 +30,7 @@
       header h1 {
         font-size: 1rem;
         font-weight: 500;
+        margin: 0;
       }
       header .back {
         color: #c8def0;
@@ -56,6 +51,9 @@
         user-select: none;
         flex-shrink: 0;
       }
+      .header-toggle[hidden] {
+        display: none;
+      }
       .header-toggle input[type="checkbox"] {
         accent-color: #7fbce8;
         width: 14px;
@@ -68,7 +66,6 @@
         height: 8px;
         border-radius: 50%;
         background: #4caf50;
-        margin-left: auto;
         flex-shrink: 0;
         transition: background 0.3s;
       }
@@ -77,6 +74,14 @@
       }
       header .status-dot.error {
         background: #e53935;
+      }
+
+      table thead {
+        text-align: left;
+      }
+      table {
+        border-spacing: 1em 0.2em;
+        margin: 1em 0;
       }
 
       #messages {
@@ -93,7 +98,7 @@
         padding: 10px 14px;
         border-radius: 12px;
         line-height: 1.5;
-        font-size: 0.9rem;
+        font-size: 90%;
         word-break: break-word;
       }
       .msg.user {
@@ -393,19 +398,20 @@
         }
       }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="marked.min.js"></script>
   </head>
   <body>
     <header>
       <a class="back" id="back" title="Back to index">&#8592;</a>
       <h1>{{agentName}}</h1>
-      <label class="header-toggle" title="Stream tokens as they arrive">
-        <input type="checkbox" id="streamToggle" checked />
-        Token Streaming
-      </label>
-      <label class="header-toggle" title="Deliver results via push notifications">
-        <input type="checkbox" id="push-mode" checked />
-        Push notifications
+      <label
+        class="header-toggle"
+        title="Stream tokens as they arrive"
+        style="margin-left: auto"
+        hidden
+      >
+        <input type="checkbox" id="streamToggle" hidden />
+        Streaming
       </label>
       <div class="status-dot" id="dot"></div>
     </header>
@@ -421,7 +427,31 @@
     </div>
 
     <script>
-      const AGENT_URL = window.location.pathname.replace(/\/preview$/, "") + "/"
+      const AGENT_URL = window.location.pathname.replace(/\/preview\/?$/, "") + "/"
+      const AUTH_HEADER = document.querySelector('meta[name="a2a-auth"]')?.content || ""
+
+      const fetchCsrfToken = async () => {
+        if (document.csrfToken === undefined) {
+          const res = await fetch("/", {
+            method: "HEAD",
+            headers: { "x-csrf-token": "fetch", ...(await authHeaders({ includeCsrf: false })) },
+          })
+          if (!res.ok) {
+            throw new Error(`Could not fetch CSRF token ${res.status}: ${res.statusText}`)
+          }
+          document.csrfToken = res.headers.get("x-csrf-token")
+        }
+        return document.csrfToken
+      }
+
+      const authHeaders = async ({ includeCsrf = true } = {}) => {
+        const headers = AUTH_HEADER ? { Authorization: AUTH_HEADER } : {}
+        if (!includeCsrf) return headers
+        const csrfToken = await fetchCsrfToken()
+        if (csrfToken) headers["x-csrf-token"] = csrfToken
+        return headers
+      }
+
       document.getElementById("back").addEventListener("click", () => history.back())
       const messages = document.getElementById("messages")
       const typing = document.getElementById("typing")
@@ -440,10 +470,6 @@
       let streamingBubble = null
       let streamingText = ""
 
-      let pushMode = false
-      let pushSessionId = null
-      let pushEventSource = null
-
       const HISTORY_KEY = "chatHistory_" + AGENT_URL
       let inputHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]")
       let historyIndex = -1
@@ -456,31 +482,6 @@
           .filter((p) => p.kind === "text" || p.text)
           .map((p) => p.text)
           .join("")
-
-      // Push notification mode toggle
-      const pushModeCheckbox = document.getElementById("push-mode")
-      pushModeCheckbox.addEventListener("change", (e) => {
-        pushMode = e.target.checked
-        if (pushMode) {
-          pushSessionId = crypto.randomUUID()
-          const baseUrl =
-            window.location.origin + window.location.pathname.replace(/\/preview$/, "")
-          const bridgeUrl = baseUrl + "/preview/push/" + pushSessionId
-          pushEventSource = new EventSource(bridgeUrl)
-          pushEventSource.onmessage = (e) => {
-            const task = JSON.parse(e.data)
-            handlePushNotification(task)
-          }
-        } else {
-          pushEventSource?.close()
-          pushEventSource = null
-          pushSessionId = null
-        }
-      })
-      pushModeCheckbox.dispatchEvent(new Event("change"))
-      window.addEventListener("beforeunload", () => {
-        pushEventSource?.close()
-      })
 
       prompt.addEventListener("input", () => {
         prompt.style.height = "auto"
@@ -600,11 +601,11 @@
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
-              method: streamToggle.checked || pushMode ? "message/stream" : "message/send",
+              method: streamToggle.checked ? "message/stream" : "message/send",
               id: crypto.randomUUID(),
               params: {
                 message: {
@@ -614,33 +615,17 @@
                   contextId,
                   parts: [{ kind: "text", text: decision }],
                 },
-                ...(pushMode && pushSessionId
-                  ? {
-                      configuration: {
-                        pushNotificationConfig: {
-                          url:
-                            window.location.origin +
-                            window.location.pathname.replace(/\/preview$/, "") +
-                            "/preview/push/" +
-                            pushSessionId,
-                          token: pushSessionId,
-                        },
-                      },
-                    }
-                  : {}),
               },
             }),
           })
 
-          if (streamToggle.checked || pushMode) {
+          if (streamToggle.checked) {
             await handleSSEResponse(resp)
           } else {
             const envelope = await resp.json()
             if (envelope.error) throw new Error(envelope.error.message || "Request failed")
             await handleResult(envelope.result)
           }
-
-          if (pushMode) statusText.textContent = "Waiting for push notification…"
         } catch (err) {
           if (err.name === "AbortError") return
           dot.className = "status-dot error"
@@ -653,6 +638,9 @@
       }
 
       async function handleResult(result) {
+        if (result?.contextId) contextId = result.contextId
+        if (result?.id) activeTaskId = result.id
+
         const state = result?.status?.state ?? result?.state
         const taskId = result?.id ?? result?.taskId
 
@@ -684,32 +672,16 @@
         addMessage("agent", reply || "(no response)")
       }
 
-      function handlePushNotification(task) {
-        const state = task.status?.state
-        if (state === "working" || state === "submitted") {
-          // Only show working status updates when push notifications are active and agent is running
-          if (!pushMode || !busy) return
-          const text = partsToText(task.status?.message?.parts)
-          if (text) {
-            statusText.textContent = text
-            messages.scrollTop = messages.scrollHeight
-          }
-          return
-        }
-        // Terminal state: if streaming is on it already rendered the result — skip
-        if (streamToggle.checked) return
-        setBusy(false)
-        handleResult(task)
-      }
-
       async function send() {
         const text = prompt.value.trim()
         if (!text || busy) return
 
-        // Save to input history
-        inputHistory.push(text)
-        if (inputHistory.length > 100) inputHistory.shift()
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(inputHistory))
+        // Save to input history (skip if same as last entry)
+        if (inputHistory[inputHistory.length - 1] !== text) {
+          inputHistory.push(text)
+          if (inputHistory.length > 100) inputHistory.shift()
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(inputHistory))
+        }
         historyIndex = -1
         currentDraft = ""
 
@@ -723,11 +695,11 @@
         streamingBubble = null
         streamingText = ""
 
-        const useStream = streamToggle.checked || pushMode
+        const useStream = streamToggle.checked
         try {
           const resp = await fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
             signal: abort.signal,
             body: JSON.stringify({
               jsonrpc: "2.0",
@@ -740,20 +712,6 @@
                   ...(contextId ? { contextId } : {}),
                   parts: [{ kind: "text", text }],
                 },
-                ...(pushMode && pushSessionId
-                  ? {
-                      configuration: {
-                        pushNotificationConfig: {
-                          url:
-                            window.location.origin +
-                            window.location.pathname.replace(/\/preview$/, "") +
-                            "/preview/push/" +
-                            pushSessionId,
-                          token: pushSessionId,
-                        },
-                      },
-                    }
-                  : {}),
               },
             }),
           })
@@ -775,51 +733,6 @@
         } finally {
           setBusy(false)
           prompt.focus()
-        }
-      }
-
-      async function sendPushMode(text) {
-        const baseUrl = window.location.origin + window.location.pathname.replace(/\/preview$/, "")
-        const webhookUrl = baseUrl + "/preview/push/" + pushSessionId
-
-        try {
-          const resp = await fetch(AGENT_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0",
-              method: "message/send",
-              id: crypto.randomUUID(),
-              params: {
-                message: {
-                  role: "user",
-                  messageId: crypto.randomUUID(),
-                  ...(contextId ? { contextId } : {}),
-                  parts: [{ kind: "text", text }],
-                },
-                configuration: {
-                  pushNotificationConfig: {
-                    url: webhookUrl,
-                    token: pushSessionId,
-                  },
-                },
-              },
-            }),
-          })
-
-          const envelope = await resp.json()
-          if (envelope.error) throw new Error(envelope.error.message || "Request failed")
-
-          const task = envelope.result
-          if (task?.id) activeTaskId = task.id
-          if (task?.contextId) contextId = task.contextId
-
-          statusText.textContent = "Waiting for push notification…"
-        } catch (err) {
-          dot.className = "status-dot error"
-          addMessage("error", "⚠ " + (err.message || String(err)))
-          setBusy(false)
-          setTimeout(() => (dot.className = "status-dot"), 3000)
         }
       }
 
@@ -881,14 +794,8 @@
         // Track contextId from status-updates
         if (event.contextId) contextId = event.contextId
 
-        // Non-final status-update with message → show as progress text only when push is on and streaming is off
-        if (
-          event.kind === "status-update" &&
-          !event.final &&
-          event.status?.message &&
-          pushMode &&
-          !streamToggle.checked
-        ) {
+        // Non-final status-update with message → show as progress text from streaming
+        if (event.kind === "status-update" && !event.final && event.status?.message) {
           const text = partsToText(event.status.message.parts)
           if (text) {
             statusText.textContent = text
@@ -940,8 +847,6 @@
 
         // Status update with final=true means terminal state
         if (event.kind === "status-update" && event.final) {
-          // When push-only (no streaming): push notification handles the final render
-          if (pushMode && !streamToggle.checked) return null
           return {
             id: event.taskId || activeTaskId,
             contextId: event.contextId || contextId,
@@ -973,7 +878,7 @@
         if (taskId) {
           fetch(AGENT_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(await authHeaders()) },
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: "tasks/cancel",

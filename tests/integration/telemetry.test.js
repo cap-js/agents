@@ -1,7 +1,6 @@
 import cds from "@sap/cds"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import {
-  captured,
   setup,
   teardown,
   resetCapture,
@@ -29,7 +28,7 @@ process.env.CDS_TEST_SILENT = "false"
 // Must be called BEFORE cds.test()
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const sendMessage = createSendMessage(POST)
 const { sendMessage: sendMsgHelper } = createHelpers({ POST, axios })
 
@@ -74,6 +73,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(span.attributes["gen_ai.operation.name"]).toBe("execute_tool")
     expect(span.attributes["gen_ai.tool.call.id"]).toBe("query")
     expect(span.attributes["gen_ai.tool.call.outcome"]).toBe("success")
+    expect(span.status.code).toBe(1) // OTEL OK
   })
 
   it("should create tool span for custom (non-CDS) tools via prototype patch", async () => {
@@ -83,6 +83,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(span.attributes["gen_ai.operation.name"]).toBe("execute_tool")
     expect(span.attributes["gen_ai.tool.call.id"]).toBe("getBookCount")
     expect(span.attributes["gen_ai.tool.call.outcome"]).toBe("success")
+    expect(span.status.code).toBe(1) // OTEL OK
   })
 
   it("should create RunnableSequence spans for graph nodes", async () => {
@@ -103,7 +104,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
       _llmType() {
         return "mock"
       }
-      async _generate(messages) {
+      async _generate() {
         const msg = new AIMessage({
           content: "",
           tool_calls: [
@@ -240,8 +241,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
   before(() => {
     originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
     cds.env.agents.pool.maxTasksPerHourPerUser = 200
-    // Intercept cds.log("agent").warn after cds is fully bootstrapped
-    const LOG = cds.log("agent")
+    // Intercept cds.log("agents").warn after cds is fully bootstrapped
+    const LOG = cds.log("agents")
     _originalLogWarn = LOG.warn.bind(LOG)
     LOG.warn = function (...args) {
       const msg = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")
@@ -252,7 +253,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
   after(() => {
     cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
     mock.stop()
-    const LOG = cds.log("agent")
+    const LOG = cds.log("agents")
     if (_originalLogWarn) LOG.warn = _originalLogWarn
   })
   beforeEach(() => {

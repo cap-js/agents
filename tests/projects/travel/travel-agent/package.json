@@ -1,0 +1,52 @@
+{
+  "name": "agent-sample-travel-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@cap-js/agents": "file:../../../..",
+    "@cap-js/sqlite": "*",
+    "@sap/cds": "^10.0.6"
+  },
+  "cds": {
+    "agents": {
+      "pool": {
+        "maxLLMInvocationsPerTask": 50
+      },
+      "fileIO": {
+        "enabled": true,
+        "defaultInputModes": [
+          "text/csv"
+        ],
+        "defaultOutputModes": [
+          "text/plain",
+          "text/markdown"
+        ]
+      }
+    },
+    "server": {
+      "port": 4004
+    },
+    "requires": {
+      "audit-log": false,
+      "FlightsService": {
+        "kind": "mcp",
+        "credentials": {
+          "url": "http://localhost:4005/mcp/data"
+        }
+      },
+      "hotel": {
+        "kind": "agent",
+        "credentials": {
+          "url": "http://localhost:4006/a2a/hotel"
+        }
+      },
+      "activity": {
+        "kind": "agent",
+        "credentials": {
+          "url": "http://localhost:4006/a2a/activity"
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import crypto from "crypto"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Compute a stable hash key from cds.context.features.
@@ -22,7 +22,7 @@ export function hashFeatures(features) {
  */
 export class GraphCache {
   constructor() {
-    this._maxSize = cds.env.a2a?.graphCacheSize || 20
+    this._maxSize = cds.env.agents?.graphCacheSize || 20
     this._cache = new Map()
     this._building = new Map()
   }

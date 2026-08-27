@@ -8,7 +8,7 @@ import cds from "@sap/cds"
 import { buildContentFilter, toSdkFilterFormat } from "../../lib/models/aicore.js"
 import InstrumentedOrchestrationClient from "../../lib/models/aicore.js"
 
-cds.test(import.meta.dirname + "/../samples/bookshop")
+cds.test(import.meta.dirname + "/../projects/bookshop")
 
 describe("@cap-js/agents - Content Filter Configuration", () => {
   // ─── Unit Tests: buildContentFilter() pure function ───────────────────────
@@ -117,8 +117,8 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
         s.on(
           "buildModel",
           () =>
-            new InstrumentedOrchestrationClient(MODEL_NAME, null, {
-              modelName: MODEL_NAME,
+            new InstrumentedOrchestrationClient(MODEL_NAME, {
+              model: MODEL_NAME,
               contentFilter,
             }),
         ),

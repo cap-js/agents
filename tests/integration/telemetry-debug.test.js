@@ -1,6 +1,5 @@
 import cds from "@sap/cds"
 import {
-  captured,
   setup,
   teardown,
   resetCapture,
@@ -13,7 +12,7 @@ import {
 process.env.CDS_TEST_SILENT = "false"
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/telemetry-debug")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/telemetry-debug")
 const sendMessage = createSendMessage(POST)
 
 describe("@cap-js/agents - Debug tracing & error handling", () => {
@@ -47,6 +46,12 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
   // ─── Debug content capture ──────────────────────────────────────────
 
   describe("debug content on spans", () => {
+    before(async () => {
+      // Enable tracing for debug content tests (sample has trace_langchain: false for the above tests)
+      cds.env.agents.trace_langchain = true
+      const { patchLangChain } = await import("../../lib/telemetry/tracing.js")
+      await patchLangChain()
+    })
     it("should include gen_ai.tool.call.arguments on tool spans when log level is debug", async () => {
       const spans = await getSpansAfterRequest(() => sendMessage("debug", "Show books"))
       const toolSpan = findSpan(spans, "execute_tool DynamicStructuredTool query")

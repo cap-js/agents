@@ -7,9 +7,12 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    runs-on: [self-hosted, solinas]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     name: Tests with Node.js ${{ matrix.node-version }} (CDS ${{ matrix.cds-version }})
     strategy:
@@ -18,69 +21,74 @@ jobs:
         node-version: [22, 24]
         cds-version: [8, 9, latest]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Ensure npm12 # ignores all scripts by default
+        if: matrix.node-version == '22'
+        run: npm i npm@12 -g
+      - run: npm set min-release-age=3
       - name: Pin CDS 9 compatible stack
         if: matrix.cds-version == '9'
         run: |
+          rm -f package-lock.json
           npm pkg delete "devDependencies.@cap-js/sqlite"
           npm pkg delete "devDependencies.@sap/cds-mtxs"
-          npm pkg set "overrides.@sap/cds=^9" "overrides.@cap-js/sqlite=^2" "overrides.@cap-js/hana=^2" "overrides.@sap/cds-mtxs=^3"
+          npm pkg set "overrides.@sap/cds=^9"
+          npm pkg set "overrides.@sap/cds-dk=^9"
+          npm pkg set "overrides.@cap-js/sqlite=^2"
+          npm pkg set "overrides.@cap-js/hana=^2"
+          npm pkg set "overrides.@sap/cds-mtxs=^3"
           npm pkg set "dependencies.@sap/cds=^9" --ws
           npm pkg set "peerDependencies.@sap/cds=^9"
           npm pkg set "devDependencies.@cap-js/sqlite=^2"
+          npm pkg set "allowScripts.better-sqlite3=true" --json
 
       - name: Pin CDS 8 compatible stack
         if: matrix.cds-version == '8'
         run: |
+          rm -f package-lock.json
+          npm pkg delete "devDependencies.@cap-js/hana"
+          npm pkg delete "devDependencies.@cap-js/sqlite"
+          npm pkg delete "devDependencies.@sap/cds-mtxs"
           npm pkg set "overrides.@sap/cds=^8"
+          npm pkg set  "overrides.@sap/cds-dk=^8"
           npm pkg set "overrides.@cap-js/sqlite=^1"
           npm pkg set "overrides.@cap-js/hana=^1"
           npm pkg set "overrides.@sap/cds-mtxs=^2"
           npm pkg set "overrides.express=^4"
+          npm pkg set "overrides.better-sqlite3=^12"
           npm pkg set "devDependencies.@cap-js/cds-test=>0"
-          npm pkg delete "devDependencies.@cap-js/hana"
-          npm pkg delete "devDependencies.@cap-js/sqlite"
-          npm pkg delete "devDependencies.@sap/cds-mtxs"
+          npm pkg set "peerDependencies.@sap/cds=^8"
+          npm pkg set "allowScripts.better-sqlite3=true" --json
 
-      - run: npm i -g @sap/cds-dk@${{ matrix.cds-version }}
-      - run: npm i --legacy-peer-deps
-      - run: cds v -i
-      - run: npm run test
+      - run: npm i --omit=peer
+      - run: npm test
 
   test-hybrid:
-    runs-on: [self-hosted, solinas-medium]
-    container:
-      image: public.int.repositories.cloud.sap/ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+    runs-on: ubuntu-latest
     name: Hybrid Tests with Node.js ${{ matrix.node-version }}
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22, 24]
+        node-version: [24]
     steps:
-      - run: apt-get update -y && apt-get install make curl -y
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Setup CF CLI and authenticate
-        uses: cap-js/cf-setup@v2
-        with:
-          api: ${{ secrets.CF_API }}
-          org: ${{ secrets.CF_ORG }}
-          space: ${{ secrets.CF_SPACE }}
-          username: ${{ secrets.CF_USERNAME }}
-          password: ${{ secrets.CF_PASSWORD }}
-
       - run: npm i -g @sap/cds-dk@latest
-      - run: npm i
+      - run: npm ci
       - run: cds v -i
-      - run: cds bind -2 joule-cap-proxy -o package.json
+      - name: Ensure orchestration deployment
+        env:
+          AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}
+        run: node tests/utils/orchestration-deployment.js
       - run: npm run test:hybrid
+        env:
+          AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}

@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/deep-agent")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 
@@ -40,7 +40,7 @@ describe("@cap-js/agents - @agent.llm annotation", () => {
     expect(model, "buildModel should return a model").toBeTruthy()
     expect(model.name).toBe("llm")
     const resolvedName = model.orchestrationConfig?.promptTemplating?.model?.name
-    expect(resolvedName).toBe(cds.requires.llm.modelName)
+    expect(resolvedName).toBe(cds.requires.llm.model)
   })
 })
 

@@ -1,0 +1,15 @@
+{
+  "name": "agent-mtx-sidecar",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "cds": {
+    "profile": "mtx-sidecar"
+  },
+  "dependencies": {
+    "@cap-js/agents": "file:../../../../../.",
+    "@cap-js/sqlite": ">=1",
+    "@sap/cds": "^10.0.6",
+    "@sap/cds-mtxs": ">=2"
+  }
+}

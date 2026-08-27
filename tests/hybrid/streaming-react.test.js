@@ -6,7 +6,7 @@
  * and that cds.env.agents.streaming=false falls back to the blocking invoke() path.
  */
 import cds from "@sap/cds"
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { streamMessage, parseSSEFrames, setupErrorDetection } = createHelpers({ POST, axios })
 
@@ -63,7 +63,7 @@ describe("@cap-js/agents - Token streaming, ReAct agent (hybrid)", () => {
       (f) => f.result?.kind === "status-update" && f.result?.final === true,
     )
     expect(completed?.result?.status?.state).toBe("completed")
-  }, 90000)
+  }, 180000)
 
   it("falls back to single artifact frame when streaming:false", async () => {
     cds.env.agents ??= {}
@@ -89,5 +89,5 @@ describe("@cap-js/agents - Token streaming, ReAct agent (hybrid)", () => {
     )
     expect(completed?.result?.status?.state).toBe("completed")
     expect(completed?.result?.status?.message?.parts?.[0]?.text?.length).toBeGreaterThan(0)
-  }, 90000)
+  }, 180000)
 })

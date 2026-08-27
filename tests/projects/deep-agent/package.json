@@ -1,0 +1,99 @@
+{
+  "name": "agent-test-deep-agent-sample",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@cap-js/agents": "file:../../../",
+    "@cap-js/audit-logging": ">=1",
+    "@cap-js/sqlite": "*",
+    "@cap-js/telemetry": "^2",
+    "@langchain/core": "^1",
+    "@langchain/langgraph": "^1",
+    "@sap-ai-sdk/langchain": "^2",
+    "@sap/cds": "^10.0.6",
+    "zod": "^4"
+  },
+  "cds": {
+    "agents": {
+      "[tracing]": {
+        "mlflow": true
+      },
+      "[mlflow]": {
+        "mlflow": true
+      }
+    },
+    "requires": {
+      "audit-log": false,
+      "llm2": {
+        "kind": "llm-mock",
+        "message": "[Mock LLM2] Override for testing"
+      },
+      "telemetry": {
+        "tracing": false,
+        "metrics": false
+      },
+      "[test]": {
+        "audit-log": {
+          "kind": "audit-log-to-console",
+          "outbox": false
+        },
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        }
+      },
+      "[tracing]": {
+        "audit-log": {
+          "kind": "audit-log-to-console",
+          "outbox": false
+        },
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        },
+        "mlflow": {
+          "credentials": {
+            "MLFLOW_HOST": "http://localhost:5678",
+            "MLFLOW_TOKEN": "unused",
+            "MLFLOW_EXPERIMENT_ID": "0"
+          }
+        }
+      },
+      "[mlflow]": {
+        "audit-log": false,
+        "telemetry": {
+          "kind": "telemetry-to-console",
+          "tracing": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleSpanExporter"
+            }
+          },
+          "metrics": {
+            "exporter": {
+              "module": "@cap-js/telemetry",
+              "class": "ConsoleMetricExporter"
+            }
+          }
+        }
+      }
+    }
+  }
+}
