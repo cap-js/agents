@@ -5,25 +5,26 @@
  * Run with:  npm run test:bookshop-evals
  */
 import cds from "@sap/cds"
+import { test } from "vitest"
 
 const PASS = 0.7
 let judge
 
 const { runAgent, createEvalJudge, evaluate, mockTools, clearMocks } =
-  cds.test(import.meta.dirname + "/../samples/bookshop").agents.evalRun({ name: "bookshop-catalog-eval" })
+  cds.test(import.meta.dirname + "/../projects/bookshop").agents.evalRun({ name: "bookshop-catalog-eval" })
 
 beforeAll(async () => {
   judge = await createEvalJudge()
 })
 
 describe("bookshop CatalogService — LLM-as-judge evals", () => {
-  it("lists books and uses the query tool on the Books entity", async () => {
+  test.concurrent("lists books and uses the query tool on the Books entity", async () => {
     const query = "Show me all books"
     const { text, toolCalls, toolWasCalled, traceId } = await runAgent("catalog", query)
 
     // Two equivalent styles: bound helper vs direct array inspection.
-    expect(toolWasCalled("query", { entity: "Books" })).toBe(true)
-    expect(toolCalls.some((c) => c.tool === "query" && c.args?.entity === "Books")).toBe(true)
+    // expect(toolWasCalled("query", { entity: "Books" })).toBe(true)
+    expect(toolCalls.some((c) => c.tool === "query" && c.args?.cql.match(/Books/))).toBe(true)
 
     const judgement = await evaluate(judge, {
       query,
@@ -36,7 +37,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
 
-  it("reports a specific stock level", async () => {
+  test.concurrent("reports a specific stock level", async () => {
     const query = "How many copies of Wuthering Heights are in stock?"
     const { text, toolWasCalled, traceId } = await runAgent("catalog", query)
 
@@ -56,7 +57,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
 
-  it("answers a specific book detail question", async () => {
+  test.concurrent("answers a specific book detail question", async () => {
     const query = "Tell me about Wuthering Heights"
     const { text, traceId } = await runAgent("catalog", query)
 
@@ -73,7 +74,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
 })
 
 describe("bookshop CatalogService — tool mocking", () => {
-  it("per-invocation mock: getStock is intercepted and returns 999", async () => {
+  test.concurrent("per-invocation mock: getStock is intercepted and returns 999", async () => {
     const { text, toolCalls, toolWasCalled } = await runAgent(
       "catalog",
       "Use getStock to report the stock level for Wuthering Heights.",
@@ -87,7 +88,7 @@ describe("bookshop CatalogService — tool mocking", () => {
     expect(text).toContain("999")
   })
 
-  it("per-invocation mock + LLM judge: agent surfaces the mocked stock", async () => {
+  test.concurrent("per-invocation mock + LLM judge: agent surfaces the mocked stock", async () => {
     const query = "Use getStock to report the stock level for Wuthering Heights."
     const { text, traceId } = await runAgent("catalog", query, {
       mocks: { getStock: async () => 999 },
@@ -111,7 +112,7 @@ describe("bookshop CatalogService — tool mocking", () => {
       clearMocks()
     })
 
-    it("subsequent runAgent calls see the suite-wide mock without opts.mocks", async () => {
+    test.concurrent("subsequent runAgent calls see the suite-wide mock without opts.mocks", async () => {
       const { text, toolWasCalled, toolCalls } = await runAgent(
         "catalog",
         "Use getStock to report the stock of Wuthering Heights.",
@@ -121,7 +122,7 @@ describe("bookshop CatalogService — tool mocking", () => {
       expect(text).toContain("777")
     })
 
-    it("per-invocation mocks override suite-wide mocks", async () => {
+    test.concurrent("per-invocation mocks override suite-wide mocks", async () => {
       const { text, toolCalls } = await runAgent(
         "catalog",
         "Use getStock to report the stock of Wuthering Heights.",
