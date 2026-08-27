@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config"
 export default defineConfig({
   test: {
     include: ["tests/evals/*.eval.test.js"],
+    setupFiles: ["tests/evals/setup.js"],
     globals: true,
     environment: "node",
     // Evals make real AI Core calls for both the agent and the LLM-as-judge —

@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { short, audit } from "../../lib/utils/utils.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
-import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
+import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 

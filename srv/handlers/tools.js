@@ -16,7 +16,7 @@ import { getFilteredEntities, getFilteredActions, audit } from "../../lib/utils/
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { INSTRUMENTED } from "../../lib/telemetry/tracing.js"
-import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
+import { mlflowAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 
 const LOG = cds.log("agent")
 

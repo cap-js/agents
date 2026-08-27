@@ -6,26 +6,20 @@
  */
 import cds from "@sap/cds"
 
-const test = cds.test(import.meta.dirname + "/../samples/bookshop")
-
 const PASS = 0.7
 let judge
-let runAgent, createEvalJudge, evaluate, mockTools, clearMocks
+
+const { runAgent, createEvalJudge, evaluate, mockTools, clearMocks } =
+  cds.test(import.meta.dirname + "/../samples/bookshop").agents.evalRun({ name: "bookshop-catalog-eval" })
 
 beforeAll(async () => {
-  const agents = test.agents
-  runAgent = agents.runAgent
-  createEvalJudge = agents.createEvalJudge
-  evaluate = agents.evaluate
-  mockTools = agents.mockTools
-  clearMocks = agents.clearMocks
   judge = await createEvalJudge()
 })
 
 describe("bookshop CatalogService — LLM-as-judge evals", () => {
   it("lists books and uses the query tool on the Books entity", async () => {
     const query = "Show me all books"
-    const { text, toolCalls, toolWasCalled } = await runAgent("catalog", query)
+    const { text, toolCalls, toolWasCalled, traceId } = await runAgent("catalog", query)
 
     // Two equivalent styles: bound helper vs direct array inspection.
     expect(toolWasCalled("query", { entity: "Books" })).toBe(true)
@@ -37,13 +31,14 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
         "Response must list multiple books from the catalog with recognisable titles or authors.",
       response: text,
       label: "list books",
+      traceId,
     })
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
 
   it("reports a specific stock level", async () => {
     const query = "How many copies of Wuthering Heights are in stock?"
-    const { text, toolWasCalled } = await runAgent("catalog", query)
+    const { text, toolWasCalled, traceId } = await runAgent("catalog", query)
 
     // The agent may resolve stock via the `getStock` function tool or by
     // selecting the `stock` field via `query`. Either counts.
@@ -56,13 +51,14 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
       criteria: "Response must state a concrete numeric stock level for Wuthering Heights.",
       response: text,
       label: "stock",
+      traceId,
     })
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
 
   it("answers a specific book detail question", async () => {
     const query = "Tell me about Wuthering Heights"
-    const { text } = await runAgent("catalog", query)
+    const { text, traceId } = await runAgent("catalog", query)
 
     const judgement = await evaluate(judge, {
       query,
@@ -70,6 +66,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
         "Response must identify Emily Brontë as the author and give at least one substantive detail about the book.",
       response: text,
       label: "book detail",
+      traceId,
     })
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
@@ -92,7 +89,7 @@ describe("bookshop CatalogService — tool mocking", () => {
 
   it("per-invocation mock + LLM judge: agent surfaces the mocked stock", async () => {
     const query = "Use getStock to report the stock level for Wuthering Heights."
-    const { text } = await runAgent("catalog", query, {
+    const { text, traceId } = await runAgent("catalog", query, {
       mocks: { getStock: async () => 999 },
     })
 
@@ -101,6 +98,7 @@ describe("bookshop CatalogService — tool mocking", () => {
       criteria: "Response must state 999 as the stock level for Wuthering Heights.",
       response: text,
       label: "mocked stock",
+      traceId,
     })
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
