@@ -10,8 +10,9 @@ import { test } from "vitest"
 const PASS = 0.7
 let judge
 
-const { runAgent, createEvalJudge, evaluate, mockTools, clearMocks } =
-  cds.test(import.meta.dirname + "/../projects/bookshop").agents.evalRun({ name: "bookshop-catalog-eval" })
+const { runAgent, createEvalJudge, evaluate, mockTools, clearMocks } = cds
+  .test(import.meta.dirname + "/../projects/bookshop")
+  .agents.evalRun({ name: "bookshop-catalog-eval" })
 
 beforeAll(async () => {
   judge = await createEvalJudge()
@@ -112,15 +113,18 @@ describe("bookshop CatalogService — tool mocking", () => {
       clearMocks()
     })
 
-    test.concurrent("subsequent runAgent calls see the suite-wide mock without opts.mocks", async () => {
-      const { text, toolWasCalled, toolCalls } = await runAgent(
-        "catalog",
-        "Use getStock to report the stock of Wuthering Heights.",
-      )
-      expect(toolWasCalled("getStock")).toBe(true)
-      expect(toolCalls.find((c) => c.tool === "getStock")?.mocked).toBe(true)
-      expect(text).toContain("777")
-    })
+    test.concurrent(
+      "subsequent runAgent calls see the suite-wide mock without opts.mocks",
+      async () => {
+        const { text, toolWasCalled, toolCalls } = await runAgent(
+          "catalog",
+          "Use getStock to report the stock of Wuthering Heights.",
+        )
+        expect(toolWasCalled("getStock")).toBe(true)
+        expect(toolCalls.find((c) => c.tool === "getStock")?.mocked).toBe(true)
+        expect(text).toContain("777")
+      },
+    )
 
     test.concurrent("per-invocation mocks override suite-wide mocks", async () => {
       const { text, toolCalls } = await runAgent(
