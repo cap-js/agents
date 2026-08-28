@@ -1,8 +1,11 @@
-// srv/ask.js — srv.ask(query, opts?) installed on every @agent service.
-// Returns { text, query, traceId, toolCalls, messages }.
+// srv/ask.js — srv.ask(query, contextId?, opts?) installed on every @agent service.
+// Returns { text, query, contextId, taskId, traceId, toolCalls, messages, spans, latencyMs, metrics }.
 
 import cds from "@sap/cds"
 import { attachCqn } from "./tool-calls.js"
+import { startCollection } from "../lib/testing/span-collector.js"
+import { metricsFromSpans } from "../lib/testing/metrics.js"
+import { _evalRunState, logMlflowMetricsForResult } from "../lib/testing/eval-run.js"
 
 export const COLLECT_RESULT = Symbol.for("@cap-js/agents:ask:collect-result")
 
@@ -55,17 +58,16 @@ class NoopEventBus {
     return ""
   }
 
-  getError() {
+  getStatus() {
     for (const e of this.events) {
       if (e.kind === "status-update") {
         const state = e.status?.state
         const msg = e.status?.message?.parts?.find((p) => p.kind === "text")?.text
-        if (state === "failed") return new Error(`agent.ask: task failed — ${msg || "no message"}`)
-        if (state === "input-required")
-          return new Error(`agent.ask: task requires human input (HITL) — ${msg || ""}`)
+        if (state === "failed") return { error: new Error(`agent.ask: task failed — ${msg || "no message"}`) }
+        if (state === "input-required") return { status: "input-required", description: msg ?? "" }
       }
     }
-    return null
+    return {}
   }
 }
 
@@ -146,16 +148,46 @@ function buildRequestContext(query, opts = {}) {
   }
 }
 
-/** Install srv.ask(query, opts?) on an @agent service. Called from cds.on("serving"). */
+/** Install srv.ask(query, contextId?, opts?) on an @agent service. Called from cds.on("serving"). */
 export function registerAsk(srv) {
-  srv.ask = async function ask(query, opts = {}) {
+  srv.ask = async function ask(query, second, third) {
+    // Resolve opts from flexible overloads:
+    //   ask(query)
+    //   ask(query, contextId)         — string
+    //   ask(query, prevResult)        — result object → extract contextId + taskId (HITL resume)
+    //   ask(query, opts)              — plain opts object
+    //   ask(query, contextId, opts)   — string + opts object
+    let opts = {}
+    if (typeof second === "string") {
+      opts = { contextId: second, ...third }
+    } else if (second && typeof second === "object") {
+      if ("text" in second || "contextId" in second) {
+        // prior ask() result — extract conversation ids and HITL state
+        opts = {
+          contextId: second.contextId,
+          taskId: second.taskId,
+          // mark as resume when prior result was input-required
+          ...(second.status === "input-required" && {
+            task: { id: second.taskId, status: { state: "input-required" } },
+          }),
+          ...(typeof third === "object" ? third : {}),
+        }
+      } else {
+        opts = second
+      }
+    }
     await loadOtel()
+
+    // Open span collection session before execution so the processor
+    // captures all spans from this trace.
+    const collection = await startCollection()
 
     const { LangGraphExecutor } = await import("./langgraph-executor-srv.js")
     const executor = LangGraphExecutor.for(srv)
     const requestContext = buildRequestContext(query, opts)
     const eventBus = new NoopEventBus()
     const evalRunId = cds.context?.["agent.eval.runId"]
+    const t0 = Date.now()
 
     const runInContext = async () => {
       if (evalRunId && cds.context) cds.context["_mlflow.evalRunId"] = evalRunId
@@ -179,14 +211,52 @@ export function registerAsk(srv) {
       )
     }
 
-    const err = eventBus.getError()
-    if (err) throw err
+    const { error, status, description } = eventBus.getStatus()
+    if (error) throw error
 
     const text = eventBus.getFinalText()
     const traceId = readTraceId()
     const messages = eventBus._graphResult?.messages ?? []
     const toolCalls = toolCallsFromMessages(messages)
+    const latencyMs = Date.now() - t0
 
-    return { text, query: String(query), traceId, toolCalls, messages }
+    // Flush pending spans then collect — forceFlush ensures synchronous exporters drain.
+    try {
+      const { trace } = await import("@opentelemetry/api")
+      const provider = trace.getTracerProvider()
+      const delegate = provider.getDelegate?.() || provider
+      if (delegate.forceFlush) await delegate.forceFlush().catch(() => {})
+    } catch { /* OTel absent */ }
+    const spans = collection.collect()
+    const result = {
+      text,
+      query: String(query),
+      contextId: requestContext.contextId,
+      taskId: requestContext.taskId,
+      traceId,
+      toolCalls,
+      messages,
+      spans,
+      latencyMs,
+      ...(status && { status, description }),
+    }
+
+    result.metrics = metricsFromSpans(spans, latencyMs)
+
+    // Track contextId → first traceId for conversation-level MLflow assessments.
+    // MLflow multi-turn: conversation assessments attach to the first trace in the session.
+    const ctxId = result.contextId
+    if (ctxId && traceId) {
+      if (!_evalRunState.conversationTraces) _evalRunState.conversationTraces = new Map()
+      if (!_evalRunState.conversationTraces.has(ctxId)) {
+        _evalRunState.conversationTraces.set(ctxId, traceId)
+      }
+      result._conversationTraceId = _evalRunState.conversationTraces.get(ctxId)
+    }
+
+    // Post metrics to MLflow ootb — fire-and-forget.
+    logMlflowMetricsForResult(result).catch(() => {})
+
+    return result
   }
 }
