@@ -5,7 +5,7 @@ import cds from "@sap/cds"
 import { attachCqn } from "./tool-calls.js"
 import { startCollection } from "../lib/testing/span-collector.js"
 import { metricsFromSpans } from "../lib/testing/metrics.js"
-import { _evalRunState, logMlflowMetricsForResult } from "../lib/testing/eval-run.js"
+import { getActiveRunState, logMlflowMetricsForResult } from "../lib/testing/eval-run.js"
 
 export const COLLECT_RESULT = Symbol.for("@cap-js/agents:ask:collect-result")
 
@@ -59,15 +59,13 @@ class NoopEventBus {
   }
 
   getStatus() {
-    for (const e of this.events) {
-      if (e.kind === "status-update") {
-        const state = e.status?.state
-        const msg = e.status?.message?.parts?.find((p) => p.kind === "text")?.text
-        if (state === "failed") return { error: new Error(`agent.ask: task failed — ${msg || "no message"}`) }
-        if (state === "input-required") return { status: "input-required", description: msg ?? "" }
-      }
+    const e = this.events.at(-1)
+    if (e && e.kind === "status-update" && e.status?.state) {
+      const state = e.status.state
+      const msg = e.status?.message?.parts?.find((p) => p.kind === "text")?.text ?? ""
+      return { status: state, description: msg }
     }
-    return {}
+    return { status: "completed", description: "" }
   }
 }
 
@@ -176,6 +174,7 @@ export function registerAsk(srv) {
         opts = second
       }
     }
+
     await loadOtel()
 
     // Open span collection session before execution so the processor
@@ -188,6 +187,7 @@ export function registerAsk(srv) {
     const eventBus = new NoopEventBus()
     const evalRunId = cds.context?.["agent.eval.runId"]
     const t0 = Date.now()
+    let capturedTraceId
 
     const runInContext = async () => {
       if (evalRunId && cds.context) cds.context["_mlflow.evalRunId"] = evalRunId
@@ -200,6 +200,12 @@ export function registerAsk(srv) {
       await Promise.race([eventBus.finished$, execPromise])
       if (!eventBus._done) eventBus.finished()
       if (execError) throw execError
+
+      // Capture traceId while cds.context is still in scope.
+      // readTraceId() via getActiveSpan() is unreliable after spans end;
+      // the rootSpan set by graph-executor is the authoritative source.
+      const rootSpan = cds.context?.["_mlflow.rootSpan"]
+      if (rootSpan) capturedTraceId = rootSpan.spanContext?.()?.traceId
     }
 
     if (cds.context) {
@@ -211,23 +217,31 @@ export function registerAsk(srv) {
       )
     }
 
-    const { error, status, description } = eventBus.getStatus()
-    if (error) throw error
+    const { status, description } = eventBus.getStatus()
+    if (status === "failed")
+      throw new Error(`agent.ask: task failed — ${description || "no message"}`)
 
     const text = eventBus.getFinalText()
-    const traceId = readTraceId()
+    const traceId = capturedTraceId ?? readTraceId()
     const messages = eventBus._graphResult?.messages ?? []
     const toolCalls = toolCallsFromMessages(messages)
     const latencyMs = Date.now() - t0
 
-    // Flush pending spans then collect — forceFlush ensures synchronous exporters drain.
+    // Flush pending spans then collect, filtering to only spans from this trace.
+    // Build-event spans (buildGraph, buildModel, buildTools) run on different traces
+    // and must be excluded — otherwise metrics compute against the wrong spans.
     try {
       const { trace } = await import("@opentelemetry/api")
       const provider = trace.getTracerProvider()
       const delegate = provider.getDelegate?.() || provider
       if (delegate.forceFlush) await delegate.forceFlush().catch(() => {})
-    } catch { /* OTel absent */ }
-    const spans = collection.collect()
+    } catch {
+      /* OTel absent */
+    }
+    const allSpans = collection.collect()
+    const spans = traceId
+      ? allSpans.filter((s) => s.spanContext?.()?.traceId === traceId)
+      : allSpans
     const result = {
       text,
       query: String(query),
@@ -235,27 +249,35 @@ export function registerAsk(srv) {
       taskId: requestContext.taskId,
       traceId,
       toolCalls,
-      messages,
+      messages: messages.map((m) => {
+        // Needed for Agent Trajectory. content is expected to be a string, else object object is written into the prompt
+        if (m.type === "ai") {
+          if (Array.isArray(m.content) && m.content[0]?.text) {
+            m.content = m.content[0].text
+          }
+        }
+        return m
+      }),
       spans,
       latencyMs,
-      ...(status && { status, description }),
+      status,
+      description,
     }
 
     result.metrics = metricsFromSpans(spans, latencyMs)
 
-    // Track contextId → first traceId for conversation-level MLflow assessments.
-    // MLflow multi-turn: conversation assessments attach to the first trace in the session.
+    const runState = getActiveRunState()
+    // runState captured at the top of ask() — ALS is unreliable here after cds._with.
     const ctxId = result.contextId
-    if (ctxId && traceId) {
-      if (!_evalRunState.conversationTraces) _evalRunState.conversationTraces = new Map()
-      if (!_evalRunState.conversationTraces.has(ctxId)) {
-        _evalRunState.conversationTraces.set(ctxId, traceId)
+    if (runState && ctxId && traceId) {
+      if (!runState.conversationTraces.has(ctxId)) {
+        runState.conversationTraces.set(ctxId, traceId)
       }
-      result._conversationTraceId = _evalRunState.conversationTraces.get(ctxId)
+      result._conversationTraceId = runState.conversationTraces.get(ctxId)
     }
 
-    // Post metrics to MLflow ootb — fire-and-forget.
-    logMlflowMetricsForResult(result).catch(() => {})
+    // Post metrics to MLflow ootb — fire-and-forget. Pass state explicitly.
+    logMlflowMetricsForResult(result, runState).catch(() => {})
 
     return result
   }

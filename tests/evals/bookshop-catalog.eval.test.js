@@ -27,7 +27,9 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     ).toBe(true)
 
     const judgement = await judge
-      .criteria("Response must list multiple books from the catalog with recognisable titles or authors.")
+      .criteria(
+        "Response must list multiple books from the catalog with recognisable titles or authors.",
+      )
       .evaluate(result)
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
@@ -53,7 +55,9 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     const result = await agent.ask("Tell me about Wuthering Heights")
 
     const judgement = await judge
-      .criteria("Response must identify Emily Brontë as the author and give at least one substantive detail.")
+      .criteria(
+        "Response must identify Emily Brontë as the author and give at least one substantive detail.",
+      )
       .evaluate(result)
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
 
@@ -73,36 +77,45 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
 })
 
 describe("bookshop CatalogService — HITL order flow", () => {
-  test.concurrent("submitOrder triggers HITL, approve completes order and reduces stock", async () => {
-    const BOOK_ID = 201
-    const QUANTITY = 1
+  test.concurrent(
+    "submitOrder triggers HITL, approve completes order and reduces stock",
+    async () => {
+      const BOOK_ID = 201
+      const QUANTITY = 1
 
-    // Read stock before order
-    const before = await SELECT.one.from("sap.capire.bookshop.Books").columns("stock").where({ ID: BOOK_ID })
-    expect(before?.stock).toBeGreaterThanOrEqual(QUANTITY)
+      // Read stock before order
+      const before = await SELECT.one
+        .from("sap.capire.bookshop.Books")
+        .columns("stock")
+        .where({ ID: BOOK_ID })
+      expect(before?.stock).toBeGreaterThanOrEqual(QUANTITY)
 
-    const agent = await cds.connect.to("CatalogService")
+      const agent = await cds.connect.to("CatalogService")
 
-    // Step 1: ask agent to order — submitOrder is @agent.hitl so agent pauses for approval
-    const r1 = await agent.ask(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
-    expect(r1.status).toBe("input-required")
-    expect(r1.taskId).toBeTruthy()
+      // Step 1: ask agent to order — submitOrder is @agent.hitl so agent pauses for approval
+      const r1 = await agent.ask(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
+      expect(r1.status).toBe("input-required")
+      expect(r1.taskId).toBeTruthy()
 
-    // Step 2: approve — pass r1 directly so taskId + contextId are forwarded
-    const r2 = await agent.ask("yes", r1)
-    expect(r2.status).toBeUndefined()
-    expect(r2.text).toBeTruthy()
+      // Step 2: approve — pass r1 directly so taskId + contextId are forwarded
+      const r2 = await agent.ask("yes", r1)
+      expect(r2.status).toBe("completed")
+      expect(r2.text).toBeTruthy()
 
-    // Stock reduced
-    const after = await SELECT.one.from("sap.capire.bookshop.Books").columns("stock").where({ ID: BOOK_ID })
-    expect(after.stock).toBe(before.stock - QUANTITY)
+      // Stock reduced
+      const after = await SELECT.one
+        .from("sap.capire.bookshop.Books")
+        .columns("stock")
+        .where({ ID: BOOK_ID })
+      expect(after.stock).toBe(before.stock - QUANTITY)
 
-    // LLM judge confirms the response acknowledges the completed order
-    const judgement = await judge
-      .criteria("Response confirms the order was placed successfully.")
-      .evaluate(r2)
-    expect(judgement.score).toBeGreaterThanOrEqual(PASS)
-  })
+      // LLM judge confirms the response acknowledges the completed order
+      const judgement = await judge
+        .criteria("Response confirms the order was placed successfully.")
+        .evaluate(r2)
+      expect(judgement.score).toBeGreaterThanOrEqual(PASS)
+    },
+  )
 })
 
 describe("bookshop CatalogService — tool mocking via vitest", () => {
@@ -117,7 +130,9 @@ describe("bookshop CatalogService — tool mocking via vitest", () => {
         return original(event, ...args)
       })
 
-      const result = await agent.ask("Use getStock to report the stock level for Wuthering Heights.")
+      const result = await agent.ask(
+        "Use getStock to report the stock level for Wuthering Heights.",
+      )
       expect(result.text).toContain("999")
     },
   )
@@ -133,12 +148,10 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
     expect(pass).toBe(true)
 
     // LLM judge — also contributes to rollup
-    const judgement = await judge
-      .criteria("Response must list multiple books.")
-      .evaluate(result)
+    const judgement = await judge.criteria("Response must list multiple books.").evaluate(result)
     expect(judgement.pass).toBe(true)
 
-    // result.metrics populated ootb; validations accumulate on result[VALIDATIONS]
+    // result.metrics populated ootb; validations flushed in afterEach via evalRun
     expect(result.metrics.latency_ms).toBeGreaterThan(0)
   })
 
@@ -153,4 +166,3 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
     expect(pass).toBe(true)
   })
 })
-
