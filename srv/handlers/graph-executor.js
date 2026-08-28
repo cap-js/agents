@@ -700,6 +700,12 @@ class GraphExecutor {
           }),
         )
         setSpanAttrs(rootSpan, mlflowTraceAttrs())
+        // Required for MLFLow run linking
+        const evalRunId = cds.context?.["_mlflow.evalRunId"]
+        if (evalRunId) {
+          rootSpan.setAttribute("mlflow.sourceRun", evalRunId)
+          wfSpan.setAttribute("mlflow.sourceRun", evalRunId)
+        }
       }
 
       let usageData

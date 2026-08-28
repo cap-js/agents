@@ -177,6 +177,8 @@ export function registerAsk(srv) {
 
     await loadOtel()
 
+    const runState = getActiveRunState()
+
     // Open span collection session before execution so the processor
     // captures all spans from this trace.
     const collection = await startCollection()
@@ -185,12 +187,13 @@ export function registerAsk(srv) {
     const executor = LangGraphExecutor.for(srv)
     const requestContext = buildRequestContext(query, opts)
     const eventBus = new NoopEventBus()
-    const evalRunId = cds.context?.["agent.eval.runId"]
+    const mlflowRunId = runState?.mlflowRunId
     const t0 = Date.now()
     let capturedTraceId
 
     const runInContext = async () => {
-      if (evalRunId && cds.context) cds.context["_mlflow.evalRunId"] = evalRunId
+      // Link the trace to the MLflow eval run — graph-executor reads this to set mlflow.sourceRun.
+      if (mlflowRunId && cds.context) cds.context["_mlflow.evalRunId"] = mlflowRunId
 
       let execError = null
       const execPromise = executor.execute(requestContext, eventBus).catch((err) => {
@@ -266,8 +269,6 @@ export function registerAsk(srv) {
 
     result.metrics = metricsFromSpans(spans, latencyMs)
 
-    const runState = getActiveRunState()
-    // runState captured at the top of ask() — ALS is unreliable here after cds._with.
     const ctxId = result.contextId
     if (runState && ctxId && traceId) {
       if (!runState.conversationTraces.has(ctxId)) {
