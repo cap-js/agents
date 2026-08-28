@@ -6,7 +6,7 @@
 
 ## Version 0.10.0 - ...
 
-### Added 
+### Added
 
 - Added evaluation helpers & MLFlow integration to test the agents behaviour & functional correctness
 

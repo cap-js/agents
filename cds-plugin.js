@@ -4,58 +4,10 @@ const LOG = cds.log("agents")
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
-import { buildAgentsHelpers } from "./lib/testing/index.js"
+import { registerAsk } from "./srv/ask.js"
 import { slugified } from "./lib/utils/markdown.js"
 
 cds.compile.to.a2a = cds_compile_to_a2a
-
-// ──────────────────────────────────────────────────────────────────────────
-// Testing helpers — expose LLM-as-judge + tool-call recorder on cds.test.
-//
-// Usage:
-//   const test = cds.test(dir)
-//   ...
-//   beforeAll(async () => { judge = await test.agents.createEvalJudge() })
-//   it("…", async () => { await test.agents.runAgent("catalog", "…") })
-//
-// Why not `const { agents } = cds.test(dir)` at top-level?
-// `cds.plugins.activate()` (which loads THIS file) only runs asynchronously
-// inside `cds.exec(...)`, which is fired from the `before()` hook registered
-// by `cds.test(dir)`. So at top-level, our plugin has not run yet — any
-// wrap of `cds.test` would land too late. To fix this, we patch
-// `cds.test.Test.prototype` with a lazy `agents` getter. Every Test instance
-// (existing or future) resolves `.agents` via the prototype chain from the
-// moment this plugin loads — which is always before `beforeAll` / `it()`.
-//
-// TODO: enable an eager destructure path (`const { agents } = cds.test(dir)`)
-// via an optional vitest setup file or a `test` profile gate.
-// ──────────────────────────────────────────────────────────────────────────
-const CDS_TEST_AGENTS_PATCHED = Symbol.for("@cap-js/agents:cds-test-agents-patched")
-const CDS_TEST_AGENTS_SLOT = Symbol.for("@cap-js/agents:cds-test-agents-slot")
-try {
-  const Test = cds.test?.Test
-  const proto = Test?.prototype
-  if (proto && !proto[CDS_TEST_AGENTS_PATCHED]) {
-    Object.defineProperty(proto, "agents", {
-      configurable: true,
-      get() {
-        if (this[CDS_TEST_AGENTS_SLOT]) return this[CDS_TEST_AGENTS_SLOT]
-        const helpers = buildAgentsHelpers(this)
-        // Cache as an own non-enumerable prop so future accesses skip the getter.
-        Object.defineProperty(this, CDS_TEST_AGENTS_SLOT, {
-          value: helpers,
-          enumerable: false,
-          writable: false,
-          configurable: false,
-        })
-        return helpers
-      },
-    })
-    Object.defineProperty(proto, CDS_TEST_AGENTS_PATCHED, { value: true, enumerable: false })
-  }
-} catch (err) {
-  LOG.warn("Failed to attach cds.test().agents helper", { error: err.message })
-}
 
 // Detect optional peer plugins (@cap-js/telemetry, @cap-js/audit-logging)
 const hasTelemetry = !!cds.env.requires?.telemetry
@@ -130,6 +82,7 @@ cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.["@agent"]) return
   registerDefaultAgentHandlers(srv)
+  registerAsk(srv)
 })
 
 // Schedule active_users metric computation + MLflow exporter
