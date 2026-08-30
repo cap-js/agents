@@ -1,6 +1,3 @@
-// srv/ask.js — srv.ask(query, contextId?, opts?) installed on every @agent service.
-// Returns { text, query, contextId, taskId, traceId, toolCalls, messages, spans, latencyMs, metrics }.
-
 import cds from "@sap/cds"
 import { attachCqn } from "./tool-calls.js"
 import { startCollection } from "../lib/testing/span-collector.js"
@@ -105,24 +102,6 @@ function toolCallsFromMessages(messages) {
   return entries
 }
 
-const _otel = { _api: null, _loaded: false }
-async function loadOtel() {
-  if (_otel._loaded) return
-  _otel._loaded = true
-  try {
-    _otel._api = await import("@opentelemetry/api")
-  } catch {
-    /* not present */
-  }
-}
-function readTraceId() {
-  try {
-    return _otel._api?.trace?.getActiveSpan?.()?.spanContext?.()?.traceId
-  } catch {
-    return undefined
-  }
-}
-
 function buildRequestContext(query, opts = {}) {
   const taskId = opts.taskId || cds.utils.uuid()
   const contextId = opts.contextId || cds.utils.uuid()
@@ -163,9 +142,9 @@ export function registerAsk(srv) {
         // prior ask() result — extract conversation ids and HITL state
         opts = {
           contextId: second.contextId,
-          taskId: second.taskId,
           // mark as resume when prior result was input-required
           ...(second.status === "input-required" && {
+            taskId: second.taskId,
             task: { id: second.taskId, status: { state: "input-required" } },
           }),
           ...(typeof third === "object" ? third : {}),
@@ -174,8 +153,6 @@ export function registerAsk(srv) {
         opts = second
       }
     }
-
-    await loadOtel()
 
     const runState = getActiveRunState()
 
@@ -189,7 +166,7 @@ export function registerAsk(srv) {
     const eventBus = new NoopEventBus()
     const mlflowRunId = runState?.mlflowRunId
     const t0 = Date.now()
-    let capturedTraceId
+    let traceId
 
     const runInContext = async () => {
       // Link the trace to the MLflow eval run — graph-executor reads this to set mlflow.sourceRun.
@@ -204,11 +181,8 @@ export function registerAsk(srv) {
       if (!eventBus._done) eventBus.finished()
       if (execError) throw execError
 
-      // Capture traceId while cds.context is still in scope.
-      // readTraceId() via getActiveSpan() is unreliable after spans end;
-      // the rootSpan set by graph-executor is the authoritative source.
       const rootSpan = cds.context?.["_mlflow.rootSpan"]
-      if (rootSpan) capturedTraceId = rootSpan.spanContext?.()?.traceId
+      if (rootSpan) traceId = rootSpan.spanContext?.()?.traceId
     }
 
     if (cds.context) {
@@ -225,22 +199,25 @@ export function registerAsk(srv) {
       throw new Error(`agent.ask: task failed — ${description || "no message"}`)
 
     const text = eventBus.getFinalText()
-    const traceId = capturedTraceId ?? readTraceId()
-    const messages = eventBus._graphResult?.messages ?? []
+    const allMessages = eventBus._graphResult?.messages ?? []
+
+    // Find last HumanMessage whose text matches current query; return from there.
+    const queryText = String(query)
+    let turnStart = 0
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      const m = allMessages[i]
+      if (m.getType?.() === "human" || m._getType?.() === "human" || m.type === "human") {
+        const content = typeof m.content === "string" ? m.content : (m.content?.[0]?.text ?? "")
+        if (content.startsWith(queryText) || queryText.startsWith(content.trim())) {
+          turnStart = i
+          break
+        }
+      }
+    }
+    const messages = allMessages.slice(turnStart)
     const toolCalls = toolCallsFromMessages(messages)
     const latencyMs = Date.now() - t0
 
-    // Flush pending spans then collect, filtering to only spans from this trace.
-    // Build-event spans (buildGraph, buildModel, buildTools) run on different traces
-    // and must be excluded — otherwise metrics compute against the wrong spans.
-    try {
-      const { trace } = await import("@opentelemetry/api")
-      const provider = trace.getTracerProvider()
-      const delegate = provider.getDelegate?.() || provider
-      if (delegate.forceFlush) await delegate.forceFlush().catch(() => {})
-    } catch {
-      /* OTel absent */
-    }
     const allSpans = collection.collect()
     const spans = traceId
       ? allSpans.filter((s) => s.spanContext?.()?.traceId === traceId)
@@ -268,16 +245,9 @@ export function registerAsk(srv) {
     }
 
     result.metrics = metricsFromSpans(spans, latencyMs)
+    if (runState) result._evalState = runState
 
-    const ctxId = result.contextId
-    if (runState && ctxId && traceId) {
-      if (!runState.conversationTraces.has(ctxId)) {
-        runState.conversationTraces.set(ctxId, traceId)
-      }
-      result._conversationTraceId = runState.conversationTraces.get(ctxId)
-    }
-
-    // Post metrics to MLflow ootb — fire-and-forget. Pass state explicitly.
+    // Post metrics to MLflow ootb — fire-and-forget.
     logMlflowMetricsForResult(result, runState).catch(() => {})
 
     return result

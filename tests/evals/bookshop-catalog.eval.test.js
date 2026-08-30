@@ -4,7 +4,15 @@
  */
 import cds from "@sap/cds"
 import { vi, test } from "vitest"
-import { Judge, ToxicityJudge, TrajectoryJudge, assertToolCall, evalRun } from "@cap-js/agents"
+import {
+  Judge,
+  ToxicityJudge,
+  TrajectoryJudge,
+  TaskCompletionJudge,
+  KnowledgeRetentionJudge,
+  assertToolCall,
+  evalRun,
+} from "@cap-js/agents"
 
 const PASS = 0.7
 
@@ -165,4 +173,24 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
     const { pass } = await trajectoryJudge.evaluate(result)
     expect(pass).toBe(true)
   })
+})
+
+describe("bookshop CatalogService — conversation-level judges", () => {
+  test.concurrent(
+    "TaskCompletionJudge and KnowledgeRetentionJudge over multi-turn session",
+    async () => {
+      const agent = await cds.connect.to("CatalogService")
+
+      // Multi-turn: two questions in the same conversation context
+      const r1 = await agent.ask("How many copies of Wuthering Heights are in stock?")
+      const r2 = await agent.ask("Tell me about that book.", r1)
+
+      // Conversation-level judges evaluate the full session
+      const completion = await new TaskCompletionJudge().evaluate([r1, r2])
+      expect(completion.pass).toBe(true)
+
+      const retention = await new KnowledgeRetentionJudge().evaluate([r1, r2])
+      expect(retention.pass).toBe(true)
+    },
+  )
 })

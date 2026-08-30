@@ -58,20 +58,17 @@ test("lists books", async () => {
 
   // result.metrics — OTel-derived, populated and posted to MLflow ootb
   expect(result.metrics.tool_call_count).toBeGreaterThan(0)
-  expect(result.metrics.latency_ms).toBeGreaterThan(0)
 
   // Deterministic tool call assertion
   const { pass } = assertToolCall(result, "query", (args) => !!args.cql)
   expect(pass).toBe(true)
 
   // LLM judge
-  const { score, pass: judgePass } = await judge
+  const { pass: judgePass } = await judge
     .criteria("must list multiple books with titles")
     .evaluate(result)
   expect(judgePass).toBe(true)
-
-  // All assertToolCall + judge.evaluate() calls accumulate pass/fail on result
-  // after each test success_rate + output_correctness of all judge.evaluate calls are calculated and send to MLFlow
+  // success_rate + output_correctness computed from all validations and posted to MLflow in afterEach
 })
 ```
 
@@ -85,27 +82,33 @@ const result = await agent.ask("Show me all books")
 result.text // "Here are the books: ..."
 result.query // "Show me all books"
 result.contextId // conversation id — pass to next ask() for multi-turn
-result.taskId // task id, for HITL
+result.taskId // task id — used for HITL resume
 result.traceId // OTel trace id
 result.toolCalls // [{ tool, args, result?, cqn? }]
 result.messages // full LangChain message array
 result.spans // OTel spans captured during execution
-result.latencyMs // wall-clock duration
+result.latencyMs // wall-clock duration ms
 result.metrics // { input_tokens, output_tokens, total_tokens, tool_call_count, latency_ms, cost_usd }
-result.status // Used for HITL, "input-required", "completed", "failed"
+result.status // "completed" | "input-required" | "canceled"
 ```
 
-### HITL and multi-turn conversations
+### Multi-turn conversations and HITL
 
-A response can be forwarded as the second argument to the next query, which causes the next query to be in the same context.
+Pass the prior result (or its `contextId` string) as the second argument to thread the conversation:
 
 ```js
-const r1 = await agent.ask("Order 1 copy of book 201 hitl")
-expect(r1.status).toBe("input-required")
+const r1 = await agent.ask("Show me all books")
+const r2 = await agent.ask("Which is cheapest?", r1) // threads contextId
+const r3 = await agent.ask("Order it", r1.contextId) // string shorthand
 
-const r2 = await agent.ask("yes", r1) // approve — r1 forwarded for resume
-expect(r2.status).toBeUndefined()
+// HITL
+const r4 = await agent.ask("Order 1 copy of book 201 hitl")
+expect(r4.status).toBe("input-required")
+const r5 = await agent.ask("yes", r4) // approve — resumes task
+expect(r5.status).toBe("completed")
 ```
+
+When `contextId` is reused, each turn's messages are available separately via `result.messages`.
 
 ### `result.metrics`
 
@@ -128,15 +131,15 @@ Each entry has a hidden non-enumerable `cqn` property when `args.cql` is present
 result.toolCalls.some((c) => c.tool === "query" && c.cqn?.SELECT?.from?.ref?.[0] === "Books")
 ```
 
-## Judges
+## Single-turn judges
 
-All judges return `{ score, comment, pass }` and automatically accumulate `pass` for the `success_rate` / `output_correctness` rollup posted to MLflow by `ask()`.
+Single-turn judges evaluate one `ask()` result. All return `{ score, comment, pass }` and automatically accumulate `pass` into the per-test validation set — flushed as `success_rate` and `output_correctness` to MLflow in `afterEach`.
 
 ```js
 const { score, comment, pass } = await judge.evaluate(result)
 ```
 
-`.criteria(text)` returns a sibling with new criteria, sharing the initialized LLM:
+`.criteria(text)` returns a sibling judge with new criteria, sharing the initialized LLM:
 
 ```js
 await judge.criteria("must state a concrete stock level").evaluate(result)
@@ -144,44 +147,63 @@ await judge.criteria("must state a concrete stock level").evaluate(result)
 
 ### `Judge`
 
-Base judge uses openevals `ANSWER_RELEVANCE_PROMPT`. Continuous 0–1 score.
+Base judge. Uses openevals `ANSWER_RELEVANCE_PROMPT` — evaluates whether the response directly addresses the question/criterion. Continuous 0–1 score.
 
 ### Safety / quality judges
 
-| Class                | openevals prompt        | `pass` means                   |
-| -------------------- | ----------------------- | ------------------------------ |
-| `ToxicityJudge`      | `TOXICITY_PROMPT`       | not toxic                      |
-| `FairnessJudge`      | `FAIRNESS_PROMPT`       | not biased                     |
-| `ConcisenessJudge`   | `CONCISENESS_PROMPT`    | concise (continuous)           |
-| `ToolSelectionJudge` | `TOOL_SELECTION_PROMPT` | good tool choices (continuous) |
+Boolean (`pass: true` = clean). Inverted where the prompt returns `true` for a negative condition.
 
-### `TrajectoryJudge`
+| Class                | openevals prompt        | `pass` means                      |
+| -------------------- | ----------------------- | --------------------------------- |
+| `ToxicityJudge`      | `TOXICITY_PROMPT`       | not toxic                         |
+| `FairnessJudge`      | `FAIRNESS_PROMPT`       | not biased                        |
+| `ConcisenessJudge`   | `CONCISENESS_PROMPT`    | concise (continuous)              |
+| `ToolSelectionJudge` | `TOOL_SELECTION_PROMPT` | appropriate tool use (continuous) |
 
-LLM scores the full message trajectory. Uses `TRAJECTORY_ACCURACY_PROMPT` via `openevals.createTrajectoryLLMAsJudge`.
+### Trajectory judges
 
 ```js
+// LLM-based — scores the full message trajectory against a criteria
 const { pass } = await new TrajectoryJudge(
   "Agent must call getStock before stating a stock level.",
 ).evaluate(result)
-```
 
-### `TrajectoryMatchJudge`
-
-Deterministic trajectory comparison against a reference message list. Uses `openevals.createTrajectoryMatchEvaluator`. Boolean pass/fail.
-
-```js
+// Deterministic — compares result.messages against a reference list
 const judge = new TrajectoryMatchJudge(referenceMsgs, { mode: "subset", argsMode: "ignore" })
 const { pass } = await judge.evaluate(result)
 ```
 
-Modes: `strict`, `unordered`, `subset`, `superset`.
+`TrajectoryMatchJudge` modes: `strict`, `unordered`, `subset`, `superset`.
+
+## Conversation-level judges
+
+Evaluate the full session — pass an array of results from the same conversation.
+
+```js
+const r1 = await agent.ask("How many copies of Wuthering Heights are in stock?")
+const r2 = await agent.ask("Tell me more about that book.", r1)
+
+const { pass } = await new TaskCompletionJudge().evaluate([r1, r2])
+```
+
+Assessment posted to the first result's trace with `metadata["mlflow.trace.session"] = contextId` → appears in MLflow's Sessions tab.
+
+| Class                     | openevals prompt             | `pass`                 |
+| ------------------------- | ---------------------------- | ---------------------- |
+| `TaskCompletionJudge`     | `TASK_COMPLETION_PROMPT`     | all requests addressed |
+| `UserSatisfactionJudge`   | `USER_SATISFACTION_PROMPT`   | user satisfied         |
+| `KnowledgeRetentionJudge` | `KNOWLEDGE_RETENTION_PROMPT` | facts retained         |
+| `PerceivedErrorJudge`     | `PERCEIVED_ERROR_PROMPT`     | no errors perceived    |
+| `AgentToneJudge`          | `AGENT_TONE_PROMPT`          | consistent tone        |
+
+All accept `{ model, assessmentName }` options.
 
 ## `assertToolCall(result, toolName, matcher?)`
 
 Deterministic tool call assertion. Contributes to `success_rate` rollup.
 
 ```js
-assertToolCall(result, "query") // any call
+assertToolCall(result, "query") // any call with that name
 assertToolCall(result, "query", { entity: "Books" }) // partial args match
 assertToolCall(result, "getStock", (args) => args.book === 42) // predicate
 // returns { pass: boolean, call: object|null }
@@ -189,21 +211,23 @@ assertToolCall(result, "getStock", (args) => args.book === 42) // predicate
 
 ## `evalRun(opts?)`
 
-Registers vitest `beforeAll`/`afterAll` hooks for an MLflow Run. Must be called at file top level.
+Registers vitest `beforeAll` / `afterEach` / `afterAll` hooks for an MLflow Run. Must be called at file top level (outside `describe`).
 
 ```js
 evalRun({ name: "my-eval" })
 ```
 
-No-op when MLflow is not configured or `beforeAll`/`afterAll` globals are not present.
+No-op when MLflow is not configured or vitest globals are absent.
 
-**Metrics posted to MLflow for each `ask()` call:**
+**What gets posted to MLflow per `ask()` call:**
 
-- `input_tokens`, `output_tokens`, `total_tokens`, `tool_call_count`, `latency_ms`, `cost_usd`
-- `success_rate` — 1 if all validations passed, 0 otherwise
+- `input_tokens`, `output_tokens`, `total_tokens`, `tool_call_count`, `latency_ms`, `cost_usd` — run metrics
+- Per-turn judge assessments — `assessmentName` name on the trace
+
+**What gets posted in `afterEach` (per test):**
+
+- `success_rate` — `1` if all `assertToolCall` + `judge.evaluate()` calls passed, `0` otherwise
 - `output_correctness` — fraction of validations that passed
-
-**Conversation-level assessments:** When a multi-turn conversation is detected (same `contextId` across multiple `ask()` calls), judge assessments are posted twice — once on the current turn's trace and once as `conversation.<assessmentName>` on the first trace in the session, matching MLflow's multi-turn evaluation model.
 
 ## Tool mocking
 
@@ -221,5 +245,6 @@ test("mock getStock", async () => {
 
   const result = await agent.ask("What is the stock of Wuthering Heights?")
   expect(result.text).toContain("999")
+  // spy auto-restored after test (restoreMocks: true in vitest config)
 })
 ```
