@@ -32,7 +32,6 @@ service CatalogService {
     excluding {
       descr
     };
-
   // used for pseudonymization tests
   @readonly
   entity Authors     as
