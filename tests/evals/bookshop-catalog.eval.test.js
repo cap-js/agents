@@ -24,7 +24,7 @@ const judge = new Judge("Response fully and accurately answers the user's questi
 describe("bookshop CatalogService — LLM-as-judge evals", () => {
   test.concurrent("lists books and uses the query tool on the Books entity", async () => {
     const agent = await cds.connect.to("CatalogService")
-    const result = await agent.ask("Show me all books")
+    const result = await agent.chat("Show me all books")
 
     // metrics attached ootb on result.metrics
     expect(result.metrics.tool_call_count).toBeGreaterThan(0)
@@ -44,7 +44,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
 
   test.concurrent("reports a specific stock level", async () => {
     const agent = await cds.connect.to("CatalogService")
-    const result = await agent.ask("How many copies of Wuthering Heights are in stock?")
+    const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
 
     const tc = result.toolCalls
     expect(
@@ -60,7 +60,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
 
   test.concurrent("answers a specific book detail question", async () => {
     const agent = await cds.connect.to("CatalogService")
-    const result = await agent.ask("Tell me about Wuthering Heights")
+    const result = await agent.chat("Tell me about Wuthering Heights")
 
     const judgement = await judge
       .criteria(
@@ -75,7 +75,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
 
   test.concurrent("base judge still works with .criteria() chaining", async () => {
     const agent = await cds.connect.to("CatalogService")
-    const result = await agent.ask("Show me all books")
+    const result = await agent.chat("Show me all books")
 
     const judgement = await judge
       .criteria("Response must list multiple books from the catalog.")
@@ -100,13 +100,13 @@ describe("bookshop CatalogService — HITL order flow", () => {
 
       const agent = await cds.connect.to("CatalogService")
 
-      // Step 1: ask agent to order — submitOrder is @agent.hitl so agent pauses for approval
-      const r1 = await agent.ask(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
+      // Step 1: chat agent to order — submitOrder is @agent.hitl so agent pauses for approval
+      const r1 = await agent.chat(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
       expect(r1.status).toBe("input-required")
       expect(r1.taskId).toBeTruthy()
 
       // Step 2: approve — pass r1 directly so taskId + contextId are forwarded
-      const r2 = await agent.ask("yes", r1)
+      const r2 = await agent.chat("yes", r1)
       expect(r2.status).toBe("completed")
       expect(r2.text).toBeTruthy()
 
@@ -138,7 +138,7 @@ describe("bookshop CatalogService — tool mocking via vitest", () => {
         return original(event, ...args)
       })
 
-      const result = await agent.ask(
+      const result = await agent.chat(
         "Use getStock to report the stock level for Wuthering Heights.",
       )
       expect(result.text).toContain("999")
@@ -149,7 +149,7 @@ describe("bookshop CatalogService — tool mocking via vitest", () => {
 describe("bookshop CatalogService — trajectory & tool call validation", () => {
   test.concurrent("assertToolCall + success_rate rollup", async () => {
     const agent = await cds.connect.to("CatalogService")
-    const result = await agent.ask("Show me all books")
+    const result = await agent.chat("Show me all books")
 
     // Deterministic tool call assertion — contributes to success_rate rollup
     const { pass } = assertToolCall(result, "query", (args) => !!args.cql)
@@ -165,7 +165,7 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
 
   test.concurrent("TrajectoryJudge — LLM scores tool usage trajectory", async () => {
     const agent = await cds.connect.to("CatalogService")
-    const result = await agent.ask("How many copies of Wuthering Heights are in stock?")
+    const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
 
     const trajectoryJudge = new TrajectoryJudge(
       "Agent must retrieve stock information using a tool before answering.",
@@ -182,8 +182,8 @@ describe("bookshop CatalogService — conversation-level judges", () => {
       const agent = await cds.connect.to("CatalogService")
 
       // Multi-turn: two questions in the same conversation context
-      const r1 = await agent.ask("How many copies of Wuthering Heights are in stock?")
-      const r2 = await agent.ask("Tell me about that book.", r1)
+      const r1 = await agent.chat("How many copies of Wuthering Heights are in stock?")
+      const r2 = await agent.chat("Tell me about that book.", r1)
 
       // Conversation-level judges evaluate the full session
       const completion = await new TaskCompletionJudge().evaluate([r1, r2])

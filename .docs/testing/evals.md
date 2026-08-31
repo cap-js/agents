@@ -54,7 +54,7 @@ const judge = new Judge("Response fully and accurately answers the user's questi
 
 test("lists books", async () => {
   const agent = await cds.connect.to("CatalogService")
-  const result = await agent.ask("Show me all books")
+  const result = await agent.chat("Show me all books")
 
   // result.metrics — OTel-derived, populated and posted to MLflow ootb
   expect(result.metrics.tool_call_count).toBeGreaterThan(0)
@@ -72,16 +72,16 @@ test("lists books", async () => {
 })
 ```
 
-## `agent.ask(query, contextId?, opts?)`
+## `agent.chat(query, contextId?, opts?)`
 
 Calls the agent in-process. Returns a result object.
 
 ```js
-const result = await agent.ask("Show me all books")
+const result = await agent.chat("Show me all books")
 
 result.text // "Here are the books: ..."
 result.query // "Show me all books"
-result.contextId // conversation id — pass to next ask() for multi-turn
+result.contextId // conversation id — pass to next chat() for multi-turn
 result.taskId // task id — used for HITL resume
 result.traceId // OTel trace id
 result.toolCalls // [{ tool, args, result?, cqn? }]
@@ -97,14 +97,14 @@ result.status // "completed" | "input-required" | "canceled"
 Pass the prior result (or its `contextId` string) as the second argument to thread the conversation:
 
 ```js
-const r1 = await agent.ask("Show me all books")
-const r2 = await agent.ask("Which is cheapest?", r1) // threads contextId
-const r3 = await agent.ask("Order it", r1.contextId) // string shorthand
+const r1 = await agent.chat("Show me all books")
+const r2 = await agent.chat("Which is cheapest?", r1) // threads contextId
+const r3 = await agent.chat("Order it", r1.contextId) // string shorthand
 
 // HITL
-const r4 = await agent.ask("Order 1 copy of book 201 hitl")
+const r4 = await agent.chat("Order 1 copy of book 201 hitl")
 expect(r4.status).toBe("input-required")
-const r5 = await agent.ask("yes", r4) // approve — resumes task
+const r5 = await agent.chat("yes", r4) // approve — resumes task
 expect(r5.status).toBe("completed")
 ```
 
@@ -112,7 +112,7 @@ When `contextId` is reused, each turn's messages are available separately via `r
 
 ### `result.metrics`
 
-Populated ootb by `ask()` from OTel spans.
+Populated ootb by `chat()` from OTel spans.
 
 | Field             | Source                                        |
 | ----------------- | --------------------------------------------- |
@@ -133,7 +133,7 @@ result.toolCalls.some((c) => c.tool === "query" && c.cqn?.SELECT?.from?.ref?.[0]
 
 ## Single-turn judges
 
-Single-turn judges evaluate one `ask()` result. All return `{ score, comment, pass }` and automatically accumulate `pass` into the per-test validation set — flushed as `success_rate` and `output_correctness` to MLflow in `afterEach`.
+Single-turn judges evaluate one `chat()` result. All return `{ score, comment, pass }` and automatically accumulate `pass` into the per-test validation set — flushed as `success_rate` and `output_correctness` to MLflow in `afterEach`.
 
 ```js
 const { score, comment, pass } = await judge.evaluate(result)
@@ -180,8 +180,8 @@ const { pass } = await judge.evaluate(result)
 Evaluate the full session — pass an array of results from the same conversation.
 
 ```js
-const r1 = await agent.ask("How many copies of Wuthering Heights are in stock?")
-const r2 = await agent.ask("Tell me more about that book.", r1)
+const r1 = await agent.chat("How many copies of Wuthering Heights are in stock?")
+const r2 = await agent.chat("Tell me more about that book.", r1)
 
 const { pass } = await new TaskCompletionJudge().evaluate([r1, r2])
 ```
@@ -219,7 +219,7 @@ evalRun({ name: "my-eval" })
 
 No-op when MLflow is not configured or vitest globals are absent.
 
-**What gets posted to MLflow per `ask()` call:**
+**What gets posted to MLflow per `chat()` call:**
 
 - `input_tokens`, `output_tokens`, `total_tokens`, `tool_call_count`, `latency_ms`, `cost_usd` — run metrics
 - Per-turn judge assessments — `assessmentName` name on the trace
@@ -243,7 +243,7 @@ test("mock getStock", async () => {
     return original(event, ...args)
   })
 
-  const result = await agent.ask("What is the stock of Wuthering Heights?")
+  const result = await agent.chat("What is the stock of Wuthering Heights?")
   expect(result.text).toContain("999")
   // spy auto-restored after test (restoreMocks: true in vitest config)
 })

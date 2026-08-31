@@ -1,4 +1,4 @@
-// srv/tool-calls.js — attachCqn helper used by ask.js when building toolCalls from messages.
+// srv/tool-calls.js — attachCqn helper used by chat.js when building toolCalls from messages.
 
 import cds from "@sap/cds"
 

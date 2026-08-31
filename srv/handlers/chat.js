@@ -1,10 +1,10 @@
 import cds from "@sap/cds"
-import { attachCqn } from "./tool-calls.js"
-import { startCollection } from "../lib/testing/span-collector.js"
-import { metricsFromSpans } from "../lib/testing/metrics.js"
-import { getActiveRunState, logMlflowMetricsForResult } from "../lib/testing/eval-run.js"
+import { attachCqn } from "../tool-calls.js"
+import { startCollection } from "../../lib/testing/span-collector.js"
+import { metricsFromSpans } from "../../lib/testing/metrics.js"
+import { getActiveRunState, logMlflowMetricsForResult } from "../../lib/testing/eval-run.js"
 
-export const COLLECT_RESULT = Symbol.for("@cap-js/agents:ask:collect-result")
+export const COLLECT_RESULT = Symbol.for("@cap-js/agents:chat:collect-result")
 
 class NoopEventBus {
   constructor() {
@@ -125,21 +125,21 @@ function buildRequestContext(query, opts = {}) {
   }
 }
 
-/** Install srv.ask(query, contextId?, opts?) on an @agent service. Called from cds.on("serving"). */
-export function registerAsk(srv) {
-  srv.ask = async function ask(query, second, third) {
+/** Install srv.chat(query, contextId?, opts?) on an @agent service. Called from cds.on("serving"). */
+export function registerChat(srv) {
+  srv.chat = async function chat(query, second, third) {
     // Resolve opts from flexible overloads:
-    //   ask(query)
-    //   ask(query, contextId)         — string
-    //   ask(query, prevResult)        — result object → extract contextId + taskId (HITL resume)
-    //   ask(query, opts)              — plain opts object
-    //   ask(query, contextId, opts)   — string + opts object
+    //   chat(query)
+    //   chat(query, contextId)         — string
+    //   chat(query, prevResult)        — result object → extract contextId + taskId (HITL resume)
+    //   chat(query, opts)              — plain opts object
+    //   chat(query, contextId, opts)   — string + opts object
     let opts = {}
     if (typeof second === "string") {
       opts = { contextId: second, ...third }
     } else if (second && typeof second === "object") {
       if ("text" in second || "contextId" in second) {
-        // prior ask() result — extract conversation ids and HITL state
+        // prior chat() result — extract conversation ids and HITL state
         opts = {
           contextId: second.contextId,
           // mark as resume when prior result was input-required
@@ -160,7 +160,7 @@ export function registerAsk(srv) {
     // captures all spans from this trace.
     const collection = await startCollection()
 
-    const { LangGraphExecutor } = await import("./langgraph-executor-srv.js")
+    const { LangGraphExecutor } = await import("../langgraph-executor-srv.js")
     const executor = LangGraphExecutor.for(srv)
     const requestContext = buildRequestContext(query, opts)
     const eventBus = new NoopEventBus()
@@ -196,7 +196,7 @@ export function registerAsk(srv) {
 
     const { status, description } = eventBus.getStatus()
     if (status === "failed")
-      throw new Error(`agent.ask: task failed — ${description || "no message"}`)
+      throw new Error(`agent.chat: task failed — ${description || "no message"}`)
 
     const text = eventBus.getFinalText()
     const allMessages = eventBus._graphResult?.messages ?? []

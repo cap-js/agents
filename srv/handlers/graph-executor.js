@@ -7,7 +7,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
-import { COLLECT_RESULT } from "../ask.js"
+import { COLLECT_RESULT } from "./chat.js"
 
 const LOG = cds.log("agents")
 
@@ -1085,7 +1085,7 @@ class GraphExecutor {
           })
         }
 
-        // Programmatic .ask() path: stash graph result on eventBus so ask.js
+        // Programmatic .chat() path: stash graph result on eventBus so chat.js
         // can read messages without an extra checkpoint roundtrip.
         if (eventBus[COLLECT_RESULT]) {
           eventBus._graphResult = { messages: result.messages || [] }
