@@ -854,7 +854,9 @@ class GraphExecutor {
           setSpanAttrs(
             wfSpan,
             mlflowAttrs("AGENT", {
-              outputs: { choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+              },
               functionName: serviceName,
             }),
           )
@@ -864,7 +866,9 @@ class GraphExecutor {
           setSpanAttrs(
             rootSpan,
             mlflowAttrs("CHAIN", {
-              outputs: { choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+              },
             }),
           )
         }

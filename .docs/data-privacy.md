@@ -50,11 +50,11 @@ The plugin handles the rest automatically:
 
 ### Supported annotations
 
-| Annotation | Effect |
-|---|---|
-| `@PersonalData.IsPotentiallyPersonal` | Field pseudonymized |
-| `@PersonalData.IsPotentiallySensitive` | Field pseudonymized |
-| `@PersonalData.FieldSemantics: 'UserID'` | Field pseudonymized |
+| Annotation                                      | Effect              |
+| ----------------------------------------------- | ------------------- |
+| `@PersonalData.IsPotentiallyPersonal`           | Field pseudonymized |
+| `@PersonalData.IsPotentiallySensitive`          | Field pseudonymized |
+| `@PersonalData.FieldSemantics: 'UserID'`        | Field pseudonymized |
 | `@PersonalData.FieldSemantics: 'DataSubjectID'` | Field pseudonymized |
 
 Applies to all field types except `Boolean`, `Date`, `DateTime`, and `Timestamp`.

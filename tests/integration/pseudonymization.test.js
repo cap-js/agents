@@ -1,10 +1,25 @@
 import cds from "@sap/cds"
 import { PseudoSession } from "../../lib/pseudonymize/store.js"
 import * as pseudo from "../../lib/pseudonymize/helpers.js"
+import { createMockAICore } from "../utils/mock-ai-core.js"
+import {
+  setup,
+  teardown,
+  resetCapture,
+  getSpansAfterRequest,
+  createSendMessage,
+} from "../utils/telemetry-utils.js"
 
-cds.test(import.meta.dirname + "/../projects/bookshop")
+const mock = createMockAICore()
+const mockPort = await mock.start()
+process.env.MOCK_AICORE_PORT = String(mockPort)
+process.env.CDS_TEST_SILENT = "false"
+setup()
 
-describe("@cap-js/agents - pseudonymization", () => {
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
+const sendMessage = createSendMessage(POST)
+
+describe("pseudonymization", () => {
   describe("PseudoSession", () => {
     const threadId = `CatalogService:test-context-${Date.now()}`
 
@@ -165,7 +180,10 @@ describe("@cap-js/agents - pseudonymization", () => {
 
     it("hashes annotated fields in a row array in place", async () => {
       const session = await PseudoSession.loadOrCreate(threadId)
-      const rows = [{ name: "Emily", ID: 1 }, { name: "Charlotte", ID: 2 }]
+      const rows = [
+        { name: "Emily", ID: 1 },
+        { name: "Charlotte", ID: 2 },
+      ]
       _pseudonymizeData(rows, new Set(["name"]), session)
       expect(rows[0].name).toMatch(/^name_[0-9a-f]{8}$/)
       expect(rows[0].ID).toBe(1) // untouched
@@ -310,13 +328,9 @@ describe("@cap-js/agents - pseudonymization", () => {
           })
 
     beforeAll(async () => {
-      ;({ pseudonymizeMiddleware } = await import(
-        "../../lib/agents/middleware/pseudonymize.js"
-      ))
+      ;({ pseudonymizeMiddleware } = await import("../../lib/agents/middleware/pseudonymize.js"))
       ;({ encode } = await import("@toon-format/toon"))
-      ;({ HumanMessage, AIMessage, ToolMessage } = await import(
-        "@langchain/core/messages"
-      ))
+      ;({ HumanMessage, AIMessage, ToolMessage } = await import("@langchain/core/messages"))
     })
 
     afterEach(() => PseudoSession.evict(threadId))
@@ -399,10 +413,7 @@ describe("@cap-js/agents - pseudonymization", () => {
       const hash = session.pseudonymize("Emily Brontë", "name")
 
       const state = {
-        messages: [
-          new HumanMessage("q"),
-          new AIMessage(`The author is ${hash}.`),
-        ],
+        messages: [new HumanMessage("q"), new AIMessage(`The author is ${hash}.`)],
       }
       const out = await mw.afterAgent(state)
       const last = out.messages[out.messages.length - 1]
@@ -415,7 +426,11 @@ describe("@cap-js/agents - pseudonymization", () => {
 
       const rawContent = encode({ data: [{ ID: 1, name: "Emily Brontë" }] })
       const toolReq = {
-        toolCall: { name: "query", id: "tc1", args: { cql: "SELECT ID, name FROM CatalogService.Authors" } },
+        toolCall: {
+          name: "query",
+          id: "tc1",
+          args: { cql: "SELECT ID, name FROM CatalogService.Authors" },
+        },
         tool: {},
       }
       const toolMsg = await mw.wrapToolCall(
@@ -443,7 +458,8 @@ describe("@cap-js/agents - pseudonymization", () => {
       }
       const result = await mw.wrapToolCall(
         request,
-        async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "findAuthor" }),
+        async () =>
+          new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "findAuthor" }),
       )
       const content = result.content
 
@@ -529,3 +545,71 @@ describe("@cap-js/agents - pseudonymization", () => {
     })
   })
 })
+
+// OTel leak check: run agent flow and verify no personal data reaches any agent/LLM/tool span.
+describe("pseudonymization OTel leak check", () => {
+  const AGENT_SPAN = /^(chat |execute_tool |workflow |task |invoke_agent)/
+
+  axios.defaults.validateStatus = () => true
+  let originalMlflow
+  before(() => {
+    originalMlflow = cds.env.agents?.mlflow
+    cds.env.agents = cds.env.agents || {}
+    cds.env.agents.mlflow = true
+  })
+  after(async () => {
+    cds.env.agents.mlflow = originalMlflow
+    teardown()
+    await mock.stop()
+  })
+  beforeEach(resetCapture)
+
+  it("does not leak personal data into any agent/LLM/tool OTel span", async () => {
+    const allSpans = await getSpansAfterRequest(() =>
+      sendMessage("pseudo-book", "Who wrote these books?"),
+    )
+    const spans = allSpans.filter((s) => AGENT_SPAN.test(s.name))
+    expect(spans.length).toBeGreaterThan(0)
+
+    const authors = (await SELECT.from("CatalogService.Authors")).map((a) => a.name)
+    const offenders = []
+    let sawHash = false
+    for (const span of spans) {
+      for (const s of collectSpanStrings(span)) {
+        if (/name_[0-9a-f]{8}/.test(s)) sawHash = true
+        for (const pii of authors) {
+          if (s.includes(pii)) {
+            offenders.push({ span: span.name, pii, snippet: s.slice(0, 160) })
+          }
+        }
+      }
+    }
+
+    expect(offenders).toEqual([])
+    expect(sawHash).toBe(true)
+  })
+
+  it("resolves pseudonymized names back to originals in the user-facing response", async () => {
+    resetCapture()
+    const res = await sendMessage("pseudo-book", "Who wrote these books?")
+    expect(res.status).toBe(200)
+    const text = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""
+    expect(text).toMatch(/Brontë|Poe|Carpenter/)
+    expect(text).not.toMatch(/name_[0-9a-f]{8}/)
+  })
+})
+
+function collectSpanStrings(span) {
+  const out = []
+  const walk = (v) => {
+    if (v == null) return
+    if (typeof v === "string") out.push(v)
+    else if (Array.isArray(v)) v.forEach(walk)
+    else if (typeof v === "object") for (const k of Object.keys(v)) walk(v[k])
+  }
+  walk(span.name)
+  walk(span.attributes)
+  walk(span.events)
+  walk(span.status)
+  return out
+}

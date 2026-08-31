@@ -23,9 +23,7 @@ export default class PseudoBookService extends cds.ApplicationService {
         return this
       }
       async _generate(messages) {
-        const toolMsg = [...messages]
-          .reverse()
-          .find((m) => (m._getType?.() ?? m.type) === "tool")
+        const toolMsg = [...messages].reverse().find((m) => (m._getType?.() ?? m.type) === "tool")
 
         if (!toolMsg) {
           return {
