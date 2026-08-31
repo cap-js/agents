@@ -152,13 +152,13 @@ describe("pseudonymization", () => {
       expect(set.has("age")).toBe(false) // numeric, not a key
     })
 
-    it("excludes @agent.masking:false fields when forLlm=true", () => {
+    it("excludes @Common.Masked:false fields when forLlm=true", () => {
       const def = {
         elements: {
           name: {
             type: "cds.String",
             "@PersonalData.IsPotentiallyPersonal": true,
-            "@agent.masking": false,
+            "@Common.Masked": false,
           },
         },
       }

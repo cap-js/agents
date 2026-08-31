@@ -61,12 +61,12 @@ Applies to all field types except `Boolean`, `Date`, `DateTime`, and `Timestamp`
 
 ### Opting out
 
-If a field must be sent to the LLM as-is — for example a display name the LLM needs to include verbatim in its response — add `@agent.masking: false`. OTel traces are still scrubbed.
+If a field must be sent to the LLM as-is — for example a display name the LLM needs to include verbatim in its response — add `@Common.Masked: false`. OTel traces are still scrubbed.
 
 ```cds
 entity Contacts {
   @PersonalData.IsPotentiallyPersonal
-  @agent.masking: false   // LLM sees the real value; trace still hashed
+  @Common.Masked: false   // LLM sees the real value; trace still hashed
   displayName : String;
 }
 ```
