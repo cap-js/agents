@@ -13,7 +13,6 @@ import {
 const mock = createMockAICore()
 const mockPort = await mock.start()
 process.env.MOCK_AICORE_PORT = String(mockPort)
-process.env.CDS_TEST_SILENT = "false"
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
