@@ -97,31 +97,29 @@ describe("syncPromptVersion", () => {
     if (!cds.env.agents) cds.env.agents = {}
     cds.env.agents.mlflow = true
 
-    // Seed the cache directly by a successful first sync (mocked)
     const template = "You are a helpful assistant."
     const hash = hashPrompt(template)
     const promptName = "CachedService"
 
-    // Mock fetch to simulate: registered-model GET 200, model-versions/search returns v1 with same hash
     let fetchCalls = 0
-    global.fetch = async (url, opts) => {
+    global.fetch = async (url) => {
       fetchCalls++
-      const body = JSON.parse(opts?.body || "{}")
       if (url.includes("registered-models/get")) {
-        return { ok: true, json: async () => ({ registered_model: { name: promptName } }) }
-      }
-      if (url.includes("model-versions/search")) {
         return {
           ok: true,
           json: async () => ({
-            model_versions: [{ version: "3", tags: [{ key: "_cap_prompt_hash", value: hash }] }],
+            registered_model: {
+              name: promptName,
+              tags: [],
+              // latest_versions carries version-level tags incl. hash
+              latest_versions: [{ version: "3", tags: [{ key: "_cap_prompt_hash", value: hash }] }],
+            },
           }),
         }
       }
       return { ok: true, json: async () => ({}) }
     }
 
-    // Seed credentials
     const savedReq = cds.env.requires
     cds.env.requires = {
       ...cds.env.requires,
@@ -136,7 +134,7 @@ describe("syncPromptVersion", () => {
     fetchCalls = 0
     const result2 = await syncPromptVersion(promptName, template)
     expect(result2).toEqual({ name: promptName, version: "3" })
-    expect(fetchCalls).toBe(0) // served from cache
+    expect(fetchCalls).toBe(0)
 
     cds.env.requires = savedReq
   })
@@ -152,14 +150,17 @@ describe("syncPromptVersion", () => {
 
     global.fetch = async (url) => {
       if (url.includes("registered-models/get")) {
-        return { ok: true, json: async () => ({ registered_model: { name: promptName } }) }
-      }
-      if (url.includes("model-versions/search")) {
-        // Latest version has OLD hash
         return {
           ok: true,
           json: async () => ({
-            model_versions: [{ version: "2", tags: [{ key: "_cap_prompt_hash", value: oldHash }] }],
+            registered_model: {
+              name: promptName,
+              tags: [],
+              // latest_versions carries OLD hash → triggers new version upload
+              latest_versions: [
+                { version: "2", tags: [{ key: "_cap_prompt_hash", value: oldHash }] },
+              ],
+            },
           }),
         }
       }
@@ -201,20 +202,17 @@ describe("syncPromptVersion", () => {
 
     global.fetch = async (url, opts) => {
       const body = opts?.body ? JSON.parse(opts.body) : {}
-      // ensurePrompt — model already exists
       if (url.includes("registered-models/get")) {
-        // First call: get for ensurePrompt; second: getRegisteredModelTag (no existing tag)
-        return {
-          ok: true,
-          json: async () => ({ registered_model: { name: promptName, tags: [] } }),
-        }
-      }
-      if (url.includes("model-versions/search")) {
-        // Same hash → reuse existing version
+        // ensurePrompt GET — returns model with tags (no existing _mlflow_experiment_ids)
+        // and latest_versions with matching hash so no new version is created
         return {
           ok: true,
           json: async () => ({
-            model_versions: [{ version: "1", tags: [{ key: "_cap_prompt_hash", value: hash }] }],
+            registered_model: {
+              name: promptName,
+              tags: [], // no _mlflow_experiment_ids yet
+              latest_versions: [{ version: "1", tags: [{ key: "_cap_prompt_hash", value: hash }] }],
+            },
           }),
         }
       }
@@ -232,7 +230,6 @@ describe("syncPromptVersion", () => {
     }
 
     await syncPromptVersion(promptName, template)
-    // Allow the fire-and-forget _linkToExperiment to settle
     await new Promise((r) => setTimeout(r, 20))
 
     expect(
