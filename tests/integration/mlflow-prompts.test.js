@@ -7,15 +7,6 @@ import {
   syncPromptVersion,
 } from "../../lib/telemetry/mlflow/prompts.js"
 
-import cds from "@sap/cds"
-import {
-  resolvePromptName,
-  hashPrompt,
-  linkedPromptsAttr,
-  getCachedPromptVersion,
-  syncPromptVersion,
-} from "../../lib/telemetry/mlflow/prompts.js"
-
 describe("resolvePromptName", () => {
   it("returns service name when service has no AGENTS.md dir", () => {
     const srv = { name: "CatalogService", definition: {} }
