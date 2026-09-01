@@ -72,8 +72,7 @@
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=9",
-    "openevals": ">=0.2"
+    "@sap/cds": ">=9"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
