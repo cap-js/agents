@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
-import { circuitBreaker, timeout } from "@sap-cloud-sdk/resilience"
+import { circuitBreaker, timeout } from "@cap-js/agents/lib/utils/resilience.js"
 import { ms4 } from "@cap-js/agents/lib/utils/utils.js"
 
 const LOG = cds.log("agents")
@@ -33,10 +33,9 @@ export default class CircuitBreakerService extends cds.ApplicationService {
     const { OrchestrationClient } = await import("@sap-ai-sdk/langchain")
 
     /**
-     * Subclass that injects resilience middleware — replicates the exact pattern
-     * from lib/llm.js createInstrumentedClient() without telemetry.
-     * Both _generate and _streamResponseChunks are overridden so the circuit
-     * breaker middleware is applied regardless of which path is used.
+     * Subclass that injects resilience middleware without telemetry.
+     * Both paths overridden so the circuit breaker applies regardless of
+     * whether the streaming or blocking path is used.
      */
     class CircuitBreakerTestModel extends OrchestrationClient {
       _withMiddleware(opts) {

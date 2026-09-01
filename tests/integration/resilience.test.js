@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import { createRequire } from "node:module"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 
 // Start mock AI Core BEFORE cds.test() boots
@@ -11,11 +10,10 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 
-// Access shared circuit breakers map (CJS — same reference as runtime)
-const require = createRequire(import.meta.url)
+// Access shared circuit breakers map (same module reference as runtime)
 let circuitBreakers
 try {
-  circuitBreakers = require("@sap-cloud-sdk/resilience/dist/circuit-breaker.js").circuitBreakers
+  ;({ circuitBreakers } = await import("../../lib/utils/resilience.js"))
 } catch {
   circuitBreakers = null
 }
