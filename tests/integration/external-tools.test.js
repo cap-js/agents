@@ -10,10 +10,10 @@
  *     CDS model (no cds.requires) — via the in-process buildMcpToolsLocally path
  *
  * Tests verify:
- *   - MCP tools are returned with the correct flightsservice_ prefix
+ *   - Remote MCP connection is represented as a dynamic placeholder in buildTools
  *   - Sub-agent tools are returned with names derived from real agent cards
  *   - No tool name collisions (regression guard for the deepagents bug)
- *   - Tool invocation returns real data from xflights SQLite
+ *   - Remote MCP tool invocation returns real data (via full agent graph)
  *   - Deduplication and graceful-failure paths
  *
  * These tests run in development mode (mock LLM executor) — no AI Core needed.
@@ -103,37 +103,18 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       expect(Array.isArray(tools) && tools.length > 0).toBe(true)
     })
 
-    it("MCP tools carry the flightsservice_ prefix (FlightService slug)", () => {
-      const mcpTools = tools.filter((t) => t.name.startsWith("flightsservice_"))
+    it("remote MCP connection (FlightsService) is represented as a dynamic placeholder", () => {
+      const placeholder = tools.find((t) => t._mcpDynamic)
       expect(
-        mcpTools.length > 0,
-        `expected tools prefixed with flightsservice_, got: ${tools.map((t) => t.name).join(", ")}`,
-      ).toBe(true)
-    })
-
-    it("MCP tools include flightsservice_describe, flightsservice_query, and a flightsservice_call_action or per-action tool", () => {
-      const names = new Set(tools.map((t) => t.name))
-      expect(
-        names.has("flightsservice_describe"),
-        `expected flightsservice_describe — got: ${[...names].sort().join(", ")}`,
-      ).toBe(true)
-      expect(
-        names.has("flightsservice_query"),
-        `expected flightsservice_query — got: ${[...names].sort().join(", ")}`,
-      ).toBe(true)
-      // actions are exposed as a combined flightsservice_call tool
-      const hasActionTool =
-        names.has("flightsservice_bookFlight") ||
-        names.has("flightsservice_call_action") ||
-        names.has("flightsservice_call")
-      expect(
-        hasActionTool,
-        `expected flightsservice_bookFlight, flightsservice_call_action, or flightsservice_call — got: ${[...names].sort().join(", ")}`,
-      ).toBe(true)
+        placeholder,
+        `expected a _mcpDynamic placeholder — got: ${tools.map((t) => t.name ?? t.mcpUrl).join(", ")}`,
+      ).toBeTruthy()
+      expect(placeholder.mcpUrl).toBeTruthy()
+      expect(typeof placeholder.resolveHeaders).toBe("function")
     })
 
     it("sub-agent tools present for hotel and activity services", () => {
-      const names = new Set(tools.map((t) => t.name))
+      const names = new Set(tools.filter((t) => t.name).map((t) => t.name))
       // Tool names come from agent card names (HotelService / ActivityService → lowercased)
       expect(
         names.has("hotelservice"),
@@ -152,7 +133,7 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
     })
 
     it("no duplicate tool names (collision regression guard)", () => {
-      const names = tools.map((t) => t.name)
+      const names = tools.filter((t) => t.name).map((t) => t.name)
       const seen = new Set()
       for (const name of names) {
         expect(seen.has(name), `duplicate tool name detected: '${name}'`).toBe(false)
@@ -160,8 +141,8 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       }
     })
 
-    it("all tools have a schema", () => {
-      for (const tool of tools) {
+    it("all named tools have a schema", () => {
+      for (const tool of tools.filter((t) => t.name)) {
         expect(tool.schema, `tool '${tool.name}' is missing a schema`).toBeTruthy()
       }
     })
@@ -173,15 +154,15 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       const PREFIX = "destinationguideservice_"
 
       it("local MCP tools carry the destinationguideservice_ prefix", () => {
-        const localTools = tools.filter((t) => t.name.startsWith(PREFIX))
+        const localTools = tools.filter((t) => t.name?.startsWith(PREFIX))
         expect(
           localTools.length > 0,
-          `expected tools prefixed with ${PREFIX}, got: ${tools.map((t) => t.name).join(", ")}`,
+          `expected tools prefixed with ${PREFIX}, got: ${tools.map((t) => t.name ?? t.mcpUrl).join(", ")}`,
         ).toBe(true)
       })
 
       it("exposes destinationguideservice_describe and destinationguideservice_query", () => {
-        const names = new Set(tools.map((t) => t.name))
+        const names = new Set(tools.filter((t) => t.name).map((t) => t.name))
         expect(
           names.has(`${PREFIX}describe`),
           `expected ${PREFIX}describe — got: ${[...names].sort().join(", ")}`,
@@ -194,35 +175,71 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
     })
   })
 
-  // ── Tool invocation ────────────────────────────────────────────────────
+  // ── Remote MCP tool invocation via agent graph ─────────────────────────
+  // Remote MCP tools are resolved dynamically per-request inside remoteMcpMiddleware.
+  // They are not present in the buildTools array; we exercise them by running a full
+  // agent graph with a fake model that calls the specific tool exactly once.
 
-  describe("MCP tool invocation (flightsservice_query against real xflights)", () => {
-    it("flightsservice_query returns real airport data from xflights SQLite", async () => {
+  describe("MCP tool invocation (flightsservice tools against real xflights)", () => {
+    async function invokeViaGraph(toolName, toolArgs) {
+      const { createAgent } = await import("langchain")
+      const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
+      const { AIMessage, HumanMessage, ToolMessage } = await import("@langchain/core/messages")
+
       const srv = cds.services.TravelAgentService
       const tools = await srv.send("buildTools")
-      const queryTool = tools.find((t) => t.name === "flightsservice_query")
-      expect(queryTool, "flightsservice_query tool must be present").toBeTruthy()
+      const middleware = await srv.send("buildMiddleware", { tools })
 
-      const raw = await queryTool.invoke({ cql: "SELECT * FROM Airports" })
-      const result = extractText(raw)
+      // Single-shot fake model: first call issues the tool call, second ends.
+      let turn = 0
+      class OneShotModel extends BaseChatModel {
+        _llmType() {
+          return "oneshot-mock"
+        }
+        bindTools() {
+          return this
+        }
+        async _generate() {
+          turn++
+          if (turn === 1) {
+            return {
+              generations: [
+                {
+                  message: new AIMessage({
+                    content: "",
+                    tool_calls: [{ name: toolName, args: toolArgs, id: "tc1" }],
+                  }),
+                },
+              ],
+            }
+          }
+          return { generations: [{ message: new AIMessage("done") }] }
+        }
+      }
+
+      const agent = createAgent({ model: new OneShotModel({}), tools, middleware })
+      const result = await agent.invoke({ messages: [new HumanMessage("go")] })
+      return result.messages.find((m) => ToolMessage.isInstance(m) && m.name === toolName)
+    }
+
+    it("flightsservice_query returns real airport data from xflights SQLite", async () => {
+      const msg = await invokeViaGraph("flightsservice_query", { cql: "SELECT * FROM Airports" })
+      expect(msg, "expected a ToolMessage for flightsservice_query").toBeTruthy()
+      const result = extractText(msg.content)
       expect(
         result && result.length > 0,
-        `tool result should be non-empty, got: ${JSON.stringify(raw)}`,
+        `tool result should be non-empty, got: ${msg.content}`,
       ).toBe(true)
       expect(result).toMatch(/FRA|JFK|Frankfurt|New York|Airport/i)
     })
 
     it("flightsservice_describe returns schema information for the Flights entity", async () => {
-      const srv = cds.services.TravelAgentService
-      const tools = await srv.send("buildTools")
-      const describeTool = tools.find((t) => t.name === "flightsservice_describe")
-      expect(describeTool, "flightsservice_describe tool must be present").toBeTruthy()
-
-      const raw = await describeTool.invoke({ entity: "Flights" })
-      const result = extractText(raw)
+      const msg = await invokeViaGraph("flightsservice_describe", { entity: "Flights" })
+      expect(msg, "expected a ToolMessage for flightsservice_describe").toBeTruthy()
+      const result = extractText(msg.content)
       expect(
         result && result.length > 0,
-        `describe should return non-empty, got: ${JSON.stringify(raw)}`,
+        `describe should return non-empty, got: ${msg.content}`,
       ).toBe(true)
       expect(result).toMatch(/date|price|flight|ID/i)
     })
