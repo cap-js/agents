@@ -8,6 +8,7 @@ import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
+import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
 
 const LOG = cds.log("agents")
 
@@ -1258,6 +1259,10 @@ class GraphExecutor {
           final: true,
         })
       } finally {
+        // setSpanAttrs must happen at the end for the linking as else prompt might not yet have been created
+        const rootSpan = cds.context["_mlflow.rootSpan"]
+        setSpanAttrs(rootSpan, linkTraceToPrompt())
+
         this._abortControllers.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 

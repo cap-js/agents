@@ -16,7 +16,6 @@ import {
   syncPromptVersion,
 } from "../../lib/telemetry/mlflow/prompts.js"
 
-
 describe("resolvePromptName", () => {
   it("returns service name when service has no AGENTS.md dir", () => {
     const srv = { name: "CatalogService", definition: {} }
@@ -189,5 +188,57 @@ describe("syncPromptVersion", () => {
     expect(linked).not.toBeNull()
     const parsed = JSON.parse(linked)
     expect(parsed).toEqual([{ name: "UpdatedService", version: "3" }])
+  })
+
+  it("links prompt to experiment ID via _mlflow_experiment_ids tag", async () => {
+    if (!cds.env.agents) cds.env.agents = {}
+    cds.env.agents.mlflow = true
+
+    const promptName = "ExperimentLinkedService"
+    const template = "Link me to an experiment."
+    const hash = hashPrompt(template)
+    const setTagCalls = []
+
+    global.fetch = async (url, opts) => {
+      const body = opts?.body ? JSON.parse(opts.body) : {}
+      // ensurePrompt — model already exists
+      if (url.includes("registered-models/get")) {
+        // First call: get for ensurePrompt; second: getRegisteredModelTag (no existing tag)
+        return {
+          ok: true,
+          json: async () => ({ registered_model: { name: promptName, tags: [] } }),
+        }
+      }
+      if (url.includes("model-versions/search")) {
+        // Same hash → reuse existing version
+        return {
+          ok: true,
+          json: async () => ({
+            model_versions: [{ version: "1", tags: [{ key: "_cap_prompt_hash", value: hash }] }],
+          }),
+        }
+      }
+      if (url.includes("registered-models/set-tag")) {
+        setTagCalls.push(body)
+        return { ok: true, json: async () => ({}) }
+      }
+      return { ok: true, json: async () => ({}) }
+    }
+
+    const savedReq = cds.env.requires
+    cds.env.requires = {
+      ...cds.env.requires,
+      mlflow: { credentials: { MLFLOW_HOST: "http://mlflow.test", MLFLOW_EXPERIMENT_ID: "42" } },
+    }
+
+    await syncPromptVersion(promptName, template)
+    // Allow the fire-and-forget _linkToExperiment to settle
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(
+      setTagCalls.some((c) => c.key === "_mlflow_experiment_ids" && c.value.includes("42")),
+    ).toBe(true)
+
+    cds.env.requires = savedReq
   })
 })
