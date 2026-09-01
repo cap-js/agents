@@ -15,9 +15,15 @@ const { sendMessage } = createHelpers({ POST, axios })
 const require = createRequire(import.meta.url)
 let circuitBreakers
 try {
-  circuitBreakers = require("@sap-cloud-sdk/resilience/dist/circuit-breaker.js").circuitBreakers
+  // 4.9.1+: package.json exports field exposes ./internal; dist/circuit-breaker.js is blocked
+  circuitBreakers = require("@sap-cloud-sdk/resilience/internal").circuitBreakers
 } catch {
-  circuitBreakers = null
+  try {
+    // <4.9.0: no exports field, deep path works
+    circuitBreakers = require("@sap-cloud-sdk/resilience/dist/circuit-breaker.js").circuitBreakers
+  } catch {
+    circuitBreakers = null
+  }
 }
 
 describe("@cap-js/agents - LLM Circuit Breaker", () => {
