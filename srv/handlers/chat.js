@@ -165,7 +165,6 @@ export function registerChat(srv) {
     const requestContext = buildRequestContext(query, opts)
     const eventBus = new NoopEventBus()
     const mlflowRunId = runState?.mlflowRunId
-    const t0 = Date.now()
     let traceId
 
     const runInContext = async () => {
@@ -216,7 +215,6 @@ export function registerChat(srv) {
     }
     const messages = allMessages.slice(turnStart)
     const toolCalls = toolCallsFromMessages(messages)
-    const latencyMs = Date.now() - t0
 
     const allSpans = collection.collect()
     const spans = traceId
@@ -239,12 +237,11 @@ export function registerChat(srv) {
         return m
       }),
       spans,
-      latencyMs,
       status,
       description,
     }
 
-    result.metrics = metricsFromSpans(spans, latencyMs)
+    result.metrics = metricsFromSpans(spans)
     if (runState) result._evalState = runState
 
     // Post metrics to MLflow ootb — fire-and-forget.

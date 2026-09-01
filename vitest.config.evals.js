@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   test: {
-    include: ["tests/evals/*.eval.test.js"],
+    include: ["tests/hybrid/*.eval.test.js"],
     globals: true,
     environment: "node",
     restoreMocks: true,

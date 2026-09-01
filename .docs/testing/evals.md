@@ -87,7 +87,6 @@ result.traceId // OTel trace id
 result.toolCalls // [{ tool, args, result?, cqn? }]
 result.messages // full LangChain message array
 result.spans // OTel spans captured during execution
-result.latencyMs // wall-clock duration ms
 result.metrics // { input_tokens, output_tokens, total_tokens, tool_call_count, latency_ms, cost_usd }
 result.status // "completed" | "input-required" | "canceled"
 ```
