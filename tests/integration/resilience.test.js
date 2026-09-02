@@ -86,8 +86,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
-    // Wait for resetTimeout (200ms in test profile) so breaker goes half-open.
-    await new Promise((r) => setTimeout(r, 300)) // eslint-disable-line no-await-in-loop
+    // Wait for resetTimeout (500ms in test profile) so breaker goes half-open.
+    await new Promise((r) => setTimeout(r, 600)) // eslint-disable-line no-await-in-loop
     mock.setStatus(200)
     mock.resetCallCount()
 
