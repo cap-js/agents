@@ -6,6 +6,10 @@
 
 ## Version 0.9.3 - tbd
 
+### Added
+
+- Debug logs for tool calls
+
 ### Changed
 
 - LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
