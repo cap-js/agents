@@ -28,6 +28,15 @@
         "enabled": true
       },
       "activeUsersInterval": "1s",
+      "[test]": {
+        "pool": {
+          "maxTasksPerHour": 10000,
+          "maxTasksPerHourPerUser": 10000
+        },
+        "circuitBreaker": {
+          "resetTimeout": 3000
+        }
+      },
       "[tracing]": {
         "mlflow": true
       },

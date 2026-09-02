@@ -10,30 +10,13 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 
-// Access shared circuit breakers map (same module reference as runtime)
-let circuitBreakers
-try {
-  ;({ circuitBreakers } = await import("../../lib/utils/resilience.js"))
-} catch {
-  circuitBreakers = null
-}
-
 describe("@cap-js/agents - LLM Circuit Breaker", () => {
   axios.defaults.validateStatus = () => true
 
-  let originalQuota
-  before(() => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
-  })
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
     mock.stop()
   })
   beforeEach(() => {
-    if (circuitBreakers) {
-      for (const key of Object.keys(circuitBreakers)) delete circuitBreakers[key]
-    }
     mock.resetCallCount()
     mock.setStatus(200)
   })
@@ -52,7 +35,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should NOT open circuit breaker on 4xx errors (httpErrorFilter)", async () => {
     mock.setStatus(429)
-    // volumeThreshold=10 — send 12 to exceed it; 4xx are filtered (don't trip breaker)
+    // volumeThreshold=10, send 12 to exceed it; 4xx are filtered so breaker stays closed
     for (let i = 0; i < 12; i++) {
       await sendMessage("circuit-breaker", `rate-limit-${i}`) // eslint-disable-line no-await-in-loop
     }
@@ -66,14 +49,14 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should open circuit breaker after repeated 5xx failures", async () => {
     mock.setStatus(502)
-    // volumeThreshold=10, errorThreshold=50% → opens after ≥10 failures
+    // volumeThreshold=10, errorThreshold=50%, opens after 10+ failures
     for (let i = 0; i < 11; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
     mock.resetCallCount()
     await sendMessage("circuit-breaker", "after-open")
-    expect(mock.getCallCount(), "breaker open — no HTTP calls expected").toBe(0)
+    expect(mock.getCallCount(), "breaker open, no HTTP calls expected").toBe(0)
   })
 
   it("open circuit breaker should cause immediate failure, not timeout from retries", async () => {
@@ -83,23 +66,30 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
-    // Breaker open → should fail fast, not retry with exponential backoff.
-    // Without fix: pRetry retries EOPENBREAKER 6× with backoff (~30-60s).
-    // With fix: onFailedAttempt throws on EOPENBREAKER → immediate abort.
+    // Without fix: pRetry retries EOPENBREAKER 6x with backoff (~30-60s).
+    // With fix: onFailedAttempt throws on EOPENBREAKER, immediate abort.
     mock.resetCallCount()
     const t0 = Date.now()
     const res = await sendMessage("circuit-breaker", "should-fail-fast")
     const duration = Date.now() - t0
 
     expect(res.data.result?.status?.state).toBe("failed")
-    expect(mock.getCallCount(), "breaker open — no HTTP calls expected").toBe(0)
+    expect(mock.getCallCount(), "breaker open, no HTTP calls expected").toBe(0)
     expect(duration < 5000, `Expected fast failure, but took ${duration}ms`).toBeTruthy()
   })
 
   it("should recover after circuit breaker state is reset", async () => {
-    if (circuitBreakers) {
-      for (const key of Object.keys(circuitBreakers)) delete circuitBreakers[key]
+    mock.setStatus(502)
+    // Trip the breaker
+    for (let i = 0; i < 11; i++) {
+      await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
+
+    // Wait for resetTimeout (3000ms in test profile) so breaker goes half-open.
+    await new Promise((r) => setTimeout(r, 3500)) // eslint-disable-line no-await-in-loop
+    mock.setStatus(200)
+    mock.resetCallCount()
+
     const res = await sendMessage("circuit-breaker", "recovered")
     expect(res.data.result?.status?.state).toBe("completed")
     expect(mock.getCallCount() > 0, "expected HTTP calls after recovery").toBeTruthy()
