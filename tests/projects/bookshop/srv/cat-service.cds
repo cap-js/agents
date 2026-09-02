@@ -32,6 +32,13 @@ service CatalogService {
     excluding {
       descr
     };
+  // used for pseudonymization tests
+  @readonly
+  entity Authors     as
+    projection on my.Authors
+    excluding {
+      books
+    };
 
   /**
    * Submit an order for a book
@@ -51,4 +58,12 @@ service CatalogService {
    */
   @description: 'Get stock level for a specific book'
   function getStock(  @description: 'The book ID'  book: Books:ID  @mandatory  ) returns Integer;
+
+  // used for pseudonymization tests
+  @description: 'Look up author contact details'
+  function findAuthor(@description: 'The author ID' id : Integer) returns {
+    @PersonalData.IsPotentiallyPersonal
+    name  : String;
+    email : String;
+  };
 }
