@@ -26,7 +26,6 @@
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:bookshop-evals": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.evals.js",
-    "test:goallab-evals": "npm test --workspace=goallab-prediction-agent",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
     "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",

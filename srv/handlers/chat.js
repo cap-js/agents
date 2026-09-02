@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import { attachCqn } from "../tool-calls.js"
 import { startCollection } from "../../lib/testing/span-collector.js"
 import { metricsFromSpans } from "../../lib/testing/metrics.js"
 import { getActiveRunState, logMlflowMetricsForResult } from "../../lib/testing/eval-run.js"
@@ -102,6 +101,26 @@ function toolCallsFromMessages(messages) {
   return entries
 }
 
+/**
+ * If entry.args.cql attaches cqn as hidden property.
+ * No-op when cql is absent or faulty.
+ */
+function attachCqn(entry) {
+  const cql = entry.args?.cql
+  if (typeof cql !== "string") return
+  try {
+    const cqn = cds.parse.cql(cql)
+    Object.defineProperty(entry, "cqn", {
+      value: cqn,
+      enumerable: false,
+      writable: false,
+      configurable: true,
+    })
+  } catch {
+    /* unparseable CQL — skip */
+  }
+}
+
 function buildRequestContext(query, opts = {}) {
   const taskId = opts.taskId || cds.utils.uuid()
   const contextId = opts.contextId || cds.utils.uuid()
@@ -154,11 +173,12 @@ export function registerChat(srv) {
       }
     }
 
-    const runState = getActiveRunState()
+    const includeDetails = shouldIncludeChatDetails(opts)
+    const runState = includeDetails ? getActiveRunState() : null
 
     // Open span collection session before execution so the processor
     // captures all spans from this trace.
-    const collection = await startCollection()
+    const collection = includeDetails ? await startCollection() : null
 
     const { LangGraphExecutor } = await import("../langgraph-executor-srv.js")
     const executor = LangGraphExecutor.for(srv)
@@ -180,8 +200,10 @@ export function registerChat(srv) {
       if (!eventBus._done) eventBus.finished()
       if (execError) throw execError
 
-      const rootSpan = cds.context?.["_mlflow.rootSpan"]
-      if (rootSpan) traceId = rootSpan.spanContext?.()?.traceId
+      if (includeDetails) {
+        const rootSpan = cds.context?.["_mlflow.rootSpan"]
+        if (rootSpan) traceId = rootSpan.spanContext?.()?.traceId
+      }
     }
 
     if (cds.context) {
@@ -198,36 +220,41 @@ export function registerChat(srv) {
       throw new Error(`agent.chat: task failed — ${description || "no message"}`)
 
     const text = eventBus.getFinalText()
-    const allMessages = eventBus._graphResult?.messages ?? []
-
-    // Find last HumanMessage whose text matches current query; return from there.
-    const queryText = String(query)
-    let turnStart = 0
-    for (let i = allMessages.length - 1; i >= 0; i--) {
-      const m = allMessages[i]
-      if (m.getType?.() === "human" || m._getType?.() === "human" || m.type === "human") {
-        const content = typeof m.content === "string" ? m.content : (m.content?.[0]?.text ?? "")
-        if (content.startsWith(queryText) || queryText.startsWith(content.trim())) {
-          turnStart = i
-          break
-        }
-      }
-    }
-    const messages = allMessages.slice(turnStart)
-    const toolCalls = toolCallsFromMessages(messages)
-
-    const allSpans = collection.collect()
-    const spans = traceId
-      ? allSpans.filter((s) => s.spanContext?.()?.traceId === traceId)
-      : allSpans
     const result = {
       text,
-      query: String(query),
       contextId: requestContext.contextId,
       taskId: requestContext.taskId,
-      traceId,
-      toolCalls,
-      messages: messages.map((m) => {
+      status,
+    }
+
+    if (includeDetails) {
+      const allMessages = eventBus._graphResult?.messages ?? []
+
+      // Find last HumanMessage whose text matches current query; return from there.
+      const queryText = String(query)
+      let turnStart = 0
+      for (let i = allMessages.length - 1; i >= 0; i--) {
+        const m = allMessages[i]
+        if (m.getType?.() === "human" || m._getType?.() === "human" || m.type === "human") {
+          const content = typeof m.content === "string" ? m.content : (m.content?.[0]?.text ?? "")
+          if (content.startsWith(queryText) || queryText.startsWith(content.trim())) {
+            turnStart = i
+            break
+          }
+        }
+      }
+      const messages = allMessages.slice(turnStart)
+      const toolCalls = toolCallsFromMessages(messages)
+
+      const allSpans = collection.collect()
+      const spans = traceId
+        ? allSpans.filter((s) => s.spanContext?.()?.traceId === traceId)
+        : allSpans
+
+      result.query = String(query)
+      result.traceId = traceId
+      result.toolCalls = toolCalls
+      result.messages = messages.map((m) => {
         // Needed for Agent Trajectory. content is expected to be a string, else object object is written into the prompt
         if (m.type === "ai") {
           if (Array.isArray(m.content) && m.content[0]?.text) {
@@ -235,18 +262,18 @@ export function registerChat(srv) {
           }
         }
         return m
-      }),
-      spans,
-      status,
-      description,
+      })
+      result.spans = spans
+      result.metrics = metricsFromSpans(spans)
+      if (runState) result._evalState = runState
+      // Post metrics to MLflow ootb — fire-and-forget.
+      logMlflowMetricsForResult(result, runState).catch(() => {})
     }
-
-    result.metrics = metricsFromSpans(spans)
-    if (runState) result._evalState = runState
-
-    // Post metrics to MLflow ootb — fire-and-forget.
-    logMlflowMetricsForResult(result, runState).catch(() => {})
 
     return result
   }
+}
+
+export function shouldIncludeChatDetails(opts = {}) {
+  return cds.env.profiles?.includes("test") || opts._details === true
 }

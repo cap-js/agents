@@ -4,22 +4,15 @@
  */
 import cds from "@sap/cds"
 import { vi, test } from "vitest"
-import {
-  Judge,
-  ToxicityJudge,
-  TrajectoryJudge,
-  TaskCompletionJudge,
-  KnowledgeRetentionJudge,
-  assertToolCall,
-  evalRun,
-} from "@cap-js/agents"
+import { Judge, TrajectoryJudge, ConverstationJudge, matchToolCall } from "@cap-js/agents"
 
 const PASS = 0.7
 
 cds.test(import.meta.dirname + "/../projects/bookshop")
-evalRun({ name: "bookshop-catalog-eval" })
 
-const judge = new Judge("Response fully and accurately answers the user's question.")
+const judge = new Judge("ANSWER_RELEVANCE_PROMPT").criteria(
+  "Response fully and accurately answers the user's question.",
+)
 
 describe("bookshop CatalogService — LLM-as-judge evals", () => {
   test.concurrent("lists books and uses the query tool on the Books entity", async () => {
@@ -69,8 +62,10 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
       .evaluate(result)
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
 
-    const toxicity = await new ToxicityJudge().evaluate(result)
-    expect(toxicity.pass).toBe(true)
+    const toxicity = await new Judge({ criteria: "TOXICITY_PROMPT", continuous: false }).evaluate(
+      result,
+    )
+    expect(toxicity.score).toBe(false)
   })
 
   test.concurrent("base judge still works with .criteria() chaining", async () => {
@@ -147,13 +142,12 @@ describe("bookshop CatalogService — tool mocking via vitest", () => {
 })
 
 describe("bookshop CatalogService — trajectory & tool call validation", () => {
-  test.concurrent("assertToolCall + success_rate rollup", async () => {
+  test.concurrent("matchToolCall + success_rate rollup", async () => {
     const agent = await cds.connect.to("CatalogService")
     const result = await agent.chat("Show me all books")
 
     // Deterministic tool call assertion — contributes to success_rate rollup
-    const { pass } = assertToolCall(result, "query", (args) => !!args.cql)
-    expect(pass).toBe(true)
+    expect(matchToolCall(result, "query", (args) => !!args.cql)).toBe(true)
 
     // LLM judge — also contributes to rollup
     const judgement = await judge.criteria("Response must list multiple books.").evaluate(result)
@@ -167,7 +161,7 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
     const agent = await cds.connect.to("CatalogService")
     const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
 
-    const trajectoryJudge = new TrajectoryJudge(
+    const trajectoryJudge = new TrajectoryJudge().criteria(
       "Agent must retrieve stock information using a tool before answering.",
     )
     const { pass } = await trajectoryJudge.evaluate(result)
@@ -176,21 +170,18 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
 })
 
 describe("bookshop CatalogService — conversation-level judges", () => {
-  test.concurrent(
-    "TaskCompletionJudge and KnowledgeRetentionJudge over multi-turn session",
-    async () => {
-      const agent = await cds.connect.to("CatalogService")
+  test.concurrent("Conversation judges over multi-turn session", async () => {
+    const agent = await cds.connect.to("CatalogService")
 
-      // Multi-turn: two questions in the same conversation context
-      const r1 = await agent.chat("How many copies of Wuthering Heights are in stock?")
-      const r2 = await agent.chat("Tell me about that book.", r1)
+    // Multi-turn: two questions in the same conversation context
+    const r1 = await agent.chat("How many copies of Wuthering Heights are in stock?")
+    const r2 = await agent.chat("Tell me about that book.", r1)
 
-      // Conversation-level judges evaluate the full session
-      const completion = await new TaskCompletionJudge().evaluate([r1, r2])
-      expect(completion.pass).toBe(true)
+    // Conversation-level judges evaluate the full session
+    const completion = await new ConverstationJudge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
+    expect(completion.pass).toBe(true)
 
-      const retention = await new KnowledgeRetentionJudge().evaluate([r1, r2])
-      expect(retention.pass).toBe(true)
-    },
-  )
+    const retention = await new ConverstationJudge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
+    expect(retention.pass).toBe(true)
+  })
 })

@@ -14,26 +14,6 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "test:bookshop-evals",
-      "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "test:bookshop-evals"],
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "pwa-node",
-      "request": "launch",
-      "name": "test:goallab-evals",
-      "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "test:goallab-evals"],
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "pwa-node",
-      "request": "launch",
       "name": "test",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "npm",
