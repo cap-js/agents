@@ -14,20 +14,22 @@ In development, audit events are logged to the console. In production, they are 
 <details>
 <summary>Events</summary>
 
-| Event                  | Trigger                         | Key Fields                                                                       |
-| ---------------------- | ------------------------------- | -------------------------------------------------------------------------------- |
-| `AgentTaskStarted`     | New task submitted              | `taskId`, `contextId`, `service`, `userMessage`                                  |
-| `AgentTaskResumed`     | HITL resume (approve/reject)    | `taskId`, `contextId`, `service`, `decision`, `userMessage`                      |
-| `AgentDecision`        | LLM invocation returns          | `taskId`, `service`, `model`, `iteration`, `toolCalls`, `tokenUsage`, `duration` |
-| `ToolInvocation`       | Tool executed                   | `taskId`, `service`, `tool`, `args`, `outcome`, `duration`                       |
-| `AgentInputRequired`   | Agent requests human approval   | `taskId`, `contextId`, `service`, `description`, `userMessage`                   |
-| `AgentTaskCompleted`   | Task succeeds                   | `taskId`, `contextId`, `service`, `duration`, `tokens`, `toolCalls`, `task`      |
-| `AgentTaskFailed`      | Task fails                      | `taskId`, `contextId`, `service`, `error`, `errorCode`, `task`                   |
-| `AgentTaskCanceled`    | Task canceled                   | `taskId`, `service`                                                              |
-| `QuotaExceeded`        | Quota breach                    | `action`, `service`, `user`, `reason`, `forwardedIp` + `ip` (top-level)          |
-| `ContentFilterBlocked` | Input blocked by content filter | `service`, `user`, `taskId`, `reason`, `source` (`user` or `tool`)               |
+<!-- audit-docs:start -->
 
-All events include the original event name in the `data` field for filtering and forensic reconstruction. Common fields (`uuid`, `tenant`, `user`, `time`) are auto-filled by `@cap-js/audit-logging`. Every event also carries a `correlationId` (`cds.context.id`) for cross-referencing with auto-emitted DPP events.
+| Event | Fields |
+| ----- | ------ |
+| `AgentDecision` | `service`, `taskId`, `contextId`, `duration`, `iteration`, `model`, `tokenUsage`, `toolCalls` |
+| `AgentInputRequired` | `service`, `taskId`, `contextId`, `description`, `interruptData` |
+| `AgentTaskCanceled` | `service`, `taskId`, `contextId` |
+| `AgentTaskCompleted` | `service`, `taskId`, `contextId`, `duration`, `task`, `tokenUsage`, `toolCalls` |
+| `AgentTaskFailed` | `service`, `taskId`, `contextId`, `error`, `errorCode`, `task` |
+| `AgentTaskResumed` | `service`, `taskId`, `contextId`, `decision` |
+| `AgentTaskStarted` | `service`, `taskId`, `contextId`, `userMessage` |
+| `ContentFilterBlocked` | `service`, `taskId`, `reason`, `source`, `user` |
+| `IncomingMessageExceedingLength` | `service`, `forwardedIp`, `ip`, `message`, `user` |
+| `QuotaExceeded` | `service`, `taskId`, `forwardedIp`, `ip`, `reason`, `user` |
+| `ToolInvocation` | `service`, `taskId`, `args`, `duration`, `error?`, `outcome`, `tool` |
+<!-- audit-docs:end -->
 
 </details>
 
