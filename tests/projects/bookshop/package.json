@@ -35,7 +35,7 @@
         },
         "circuitBreaker": {
           "volumeThreshold": 2,
-          "resetTimeout": 500
+          "resetTimeout": 200
         }
       },
       "[tracing]": {
