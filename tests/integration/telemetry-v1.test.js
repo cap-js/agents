@@ -133,7 +133,7 @@ describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)
     expect(output).toMatch(/outcome: /)
   })
 
-  // ─── mlflow.js v1 path: setupMlflowExporter calls addSpanProcessor ──────
+  // ─── mlflow folder v1 path: setupMlflowExporter calls addSpanProcessor ──────
   // Complements the v2 test in telemetry-mlflow.test.js.
 
   it("should register mlflow span processor via v1 addSpanProcessor path", async () => {
@@ -164,7 +164,7 @@ describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)
     }
 
     try {
-      const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow.js")
+      const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow/index.js")
       await setupMlflowExporter()
       expect(called, "v1 addSpanProcessor path must run").toBe(1)
     } finally {
