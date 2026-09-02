@@ -35,7 +35,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should NOT open circuit breaker on 4xx errors (httpErrorFilter)", async () => {
     mock.setStatus(429)
-    // volumeThreshold=10, send 12 to exceed it; 4xx are filtered so breaker stays closed
+    // volumeThreshold=10 — send 12 to exceed it; 4xx are filtered (don't trip breaker)
     for (let i = 0; i < 12; i++) {
       await sendMessage("circuit-breaker", `rate-limit-${i}`) // eslint-disable-line no-await-in-loop
     }
@@ -49,14 +49,14 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should open circuit breaker after repeated 5xx failures", async () => {
     mock.setStatus(502)
-    // volumeThreshold=10, errorThreshold=50%, opens after 10+ failures
+    // volumeThreshold=10, errorThreshold=50% → opens after ≥10 failures
     for (let i = 0; i < 11; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
     mock.resetCallCount()
     await sendMessage("circuit-breaker", "after-open")
-    expect(mock.getCallCount(), "breaker open, no HTTP calls expected").toBe(0)
+    expect(mock.getCallCount(), "breaker open — no HTTP calls expected").toBe(0)
   })
 
   it("open circuit breaker should cause immediate failure, not timeout from retries", async () => {
@@ -66,15 +66,16 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
-    // Without fix: pRetry retries EOPENBREAKER 6x with backoff (~30-60s).
-    // With fix: onFailedAttempt throws on EOPENBREAKER, immediate abort.
+    // Breaker open → should fail fast, not retry with exponential backoff.
+    // Without fix: pRetry retries EOPENBREAKER 6× with backoff (~30-60s).
+    // With fix: onFailedAttempt throws on EOPENBREAKER → immediate abort.
     mock.resetCallCount()
     const t0 = Date.now()
     const res = await sendMessage("circuit-breaker", "should-fail-fast")
     const duration = Date.now() - t0
 
     expect(res.data.result?.status?.state).toBe("failed")
-    expect(mock.getCallCount(), "breaker open, no HTTP calls expected").toBe(0)
+    expect(mock.getCallCount(), "breaker open — no HTTP calls expected").toBe(0)
     expect(duration < 5000, `Expected fast failure, but took ${duration}ms`).toBeTruthy()
   })
 
