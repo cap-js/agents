@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.3 - tbd
+
+### Added
+
+- Debug logs for tool calls
+
 ## Version 0.9.2 - 2026-08-26
 
 ### Added
@@ -11,7 +17,6 @@
 - `cds.agents.retention` (default 30d) to configure retention of Tasks and related assets stored for A2A and the agent
 - Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
 - Added additional OpenTelemetry span attributes detailing how many content filters were active
-- Whether a tool succeeded or failed is now written as a debug log. This is for example helpful for investigating whether skills were loaded or not.
 
 ### Fixed
 
