@@ -47,7 +47,7 @@ export async function buildMcpToolsLocally(serviceName) {
   const prefix = toolName(`${serviceName}_`)
   for (const tool of tools) tool.name = `${prefix}${tool.name}`
 
-  LOG.info(
+  LOG.debug(
     `Got ${tools.length} MCP tools from ${serviceName}: ${tools.map((t) => t.name).join(", ")}`,
   )
   return tools
@@ -111,7 +111,7 @@ export async function buildMcpToolsFromConnection(serviceName) {
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
-  return { _mcpDynamic: true, mcpUrl, resolveHeaders }
+  return { _mcpDynamic: true, mcpUrl, serviceName, resolveHeaders }
 }
 
 export async function buildMcpTools(serviceName) {
