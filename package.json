@@ -112,6 +112,12 @@
       },
       "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
+      "circuitBreaker": {
+        "errorThresholdPercentage": 50,
+        "volumeThreshold": 10,
+        "resetTimeout": 30000,
+        "rollingCountTimeout": 10000
+      },
       "params": {
         "max_tokens": 4096,
         "temperature": 0
