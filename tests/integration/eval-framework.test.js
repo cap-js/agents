@@ -1,13 +1,3 @@
-/**
- * Unit tests for the feat/eval framework:
- *   - metricsFromSpans  (lib/testing/metrics.js)
- *   - startCollection   (lib/testing/span-collector.js)
- *   - eval-run helpers  (lib/testing/eval-run.js)
- *   - chat.js helpers   (srv/handlers/chat.js)
- *   - Judge / matchToolCall deterministic paths (lib/testing/Judge.js)
- *
- * No LLM calls; all tests are deterministic.
- */
 import cds from "@sap/cds"
 import { metricsFromSpans } from "../../lib/testing/metrics.js"
 import {
@@ -16,8 +6,10 @@ import {
   ConverstationJudge,
   matchToolCall,
 } from "../../lib/testing/Judge.js"
-import { getActiveRunState, recordValidation } from "../../lib/testing/eval-run.js"
+import { getActiveRunState, recordEvaluation } from "../../lib/testing/eval-run.js"
 import { installEvalDescribe } from "../../lib/testing/eval-describe.js"
+
+cds.test(import.meta.dirname + "/../projects/bookshop")
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -378,11 +370,19 @@ describe("ConverstationJudge.evaluate input validation", () => {
   })
 })
 
-// ─── eval-run: recordValidation + getActiveRunState ──────────────────────────
+// ─── eval-run: recordEvaluation + getActiveRunState ──────────────────────────
 
 describe("eval-run helpers", () => {
+  const originalMlflow = cds.env.agents?.mlflow
+
+  beforeEach(() => {
+    cds.env.agents ??= {}
+    cds.env.agents.mlflow = true
+  })
+
   afterEach(() => {
     cds._activeEvalRun = null
+    cds.env.agents.mlflow = originalMlflow
   })
 
   it("getActiveRunState returns null when no run is active", () => {
@@ -395,32 +395,54 @@ describe("eval-run helpers", () => {
     expect(getActiveRunState()).toBe(state)
   })
 
-  it("recordValidation accumulates pass/fail on the state keyed by taskId", () => {
+  it("recordEvaluation accumulates pass/fail on the state keyed by taskId", () => {
     const state = { runId: "r1", validationsByTask: new Map() }
     cds._activeEvalRun = state
     const result = { taskId: "task-1", traceId: "tr1", _evalState: state }
-    recordValidation(result, true)
-    recordValidation(result, false)
+    recordEvaluation(result, { pass: true })
+    recordEvaluation(result, { pass: false })
     const entry = state.validationsByTask.get("task-1")
     expect(entry.passes).toEqual([true, false])
     expect(entry.traceId).toBe("tr1")
   })
 
-  it("recordValidation is a no-op when result has no taskId", () => {
+  it("recordEvaluation is a no-op when result has no taskId", () => {
     const state = { runId: "r1", validationsByTask: new Map() }
     cds._activeEvalRun = state
-    recordValidation({ traceId: "tr1" }, true)
+    recordEvaluation({ traceId: "tr1" }, { pass: true })
     expect(state.validationsByTask.size).toBe(0)
   })
 
-  it("recordValidation prefers result._evalState over cds._activeEvalRun", () => {
+  it("recordEvaluation prefers result._evalState over cds._activeEvalRun", () => {
     const state1 = { runId: "r1", validationsByTask: new Map() }
     const state2 = { runId: "r2", validationsByTask: new Map() }
     cds._activeEvalRun = state2
     const result = { taskId: "t1", traceId: "tr1", _evalState: state1 }
-    recordValidation(result, true)
+    recordEvaluation(result, { pass: true })
     expect(state1.validationsByTask.get("t1").passes).toEqual([true])
     expect(state2.validationsByTask.size).toBe(0)
+  })
+
+  it("recordEvaluation does not add conversation-level scores to task validation", () => {
+    const state = { runId: "r1", validationsByTask: new Map() }
+    cds._activeEvalRun = state
+    const result = { taskId: "t1", _evalState: state }
+    recordEvaluation(result, {
+      pass: true,
+      score: true,
+      assessmentName: "conversation",
+      conversationLevel: true,
+    })
+    expect(state.validationsByTask.size).toBe(0)
+  })
+
+  it("recordEvaluation is a no-op when mlflow is disabled", () => {
+    cds.env.agents.mlflow = false
+    const state = { runId: "r1", validationsByTask: new Map() }
+    cds._activeEvalRun = state
+    const result = { taskId: "t1", traceId: "tr1", _evalState: state }
+    recordEvaluation(result, { pass: true })
+    expect(state.validationsByTask.size).toBe(0)
   })
 })
 
