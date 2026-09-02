@@ -380,13 +380,11 @@ class GraphExecutor {
             tokenCount = 0
           }
 
+          const lastChunk =
+            !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
+
           const text = messageText(msgChunk?.content)
           if (!text) continue
-
-          // If the finish reason is tool_calls this means it is thinking and running in the loop
-          const isThinking =
-            msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason ===
-            "tool_calls"
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
           // ResultManager reads event.append; nesting them leaves it undefined and
@@ -396,13 +394,13 @@ class GraphExecutor {
             taskId,
             contextId,
             append: tokenCount > 0,
-            lastChunk: false,
+            lastChunk: lastChunk,
             artifact: {
-              artifactId: isThinking ? `thinking-${thinkingCount}` : "response",
+              artifactId: `thinking-${thinkingCount}`,
               parts: [{ kind: "text", text }],
             },
           })
-          if (isThinking) thinkingCount++
+          if (lastChunk) thinkingCount++
           tokenCount++
         } else if (mode === "updates") {
           // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
