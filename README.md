@@ -52,7 +52,7 @@ Both approaches start from a CDS service annotated with `@agent` (as shown in [R
 
 ### Agentify Existing CAP Services
 
-With `@agent` alone, the plugin auto-generates tools from the service's entities and actions, creates a ReAct agent loop, and serves it as a remote agent — no code required.
+With `@agent` alone, the plugin auto-generates tools from the service's entities and actions, creates a [ReAct agent](https://arxiv.org/abs/2210.03629) loop, and serves it as a remote agent — no code required.
 
 ```cds
 @agent
@@ -133,6 +133,7 @@ The following capabilities are experimental and documented separately. Their pub
 - [Configuration](.docs/configuration.md) — using multiple models, global and per-service settings, file I/O, and push notifications
 - [Quota Enforcement](.docs/quota.md) — configurable rate limits and resource quotas
 - [Audit Logging](.docs/audit-logging.md) — immutable audit trail of agent decisions and tool usage
+- [Data Privacy](.docs/data-privacy.md) — deletion of message history
 - [Telemetry](.docs/telemetry.md) — OpenTelemetry metrics, tracing, and MLflow export
 - [Content Filter](.docs/content-filter.md) — SAP AI Core content filtering and prompt injection shielding
 

@@ -6,6 +6,7 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
+import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 
 const LOG = cds.log("agents")
 
@@ -588,6 +589,10 @@ class GraphExecutor {
       // Audit: task started
       audit("AgentTaskStarted", {
         data: { taskId, contextId, service: serviceName, userMessage: requestContext.userMessage },
+      })
+      // Lazy scheduling task deletion
+      cds.spawn({}, async () => {
+        await triggerCleanup(serviceName)
       })
     }
 

@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "CDS plugin for building agents",
   "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
@@ -87,6 +87,7 @@
       "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",
+      "retention": "30d",
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [
@@ -116,7 +117,6 @@
         "max_tokens": 4096,
         "temperature": 0
       },
-      "contentFilter": true,
       "fileIO": {
         "enabled": false,
         "maxInputFileSizeBytes": 2097152,
