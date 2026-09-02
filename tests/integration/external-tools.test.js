@@ -218,8 +218,10 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       }
 
       const agent = createAgent({ model: new OneShotModel({}), tools, middleware })
-      const result = await agent.invoke({ messages: [new HumanMessage("go")] })
-      return result.messages.find((m) => ToolMessage.isInstance(m) && m.name === toolName)
+      return cds.tx({ user: new cds.User.Privileged() }, async () => {
+        const result = await agent.invoke({ messages: [new HumanMessage("go")] })
+        return result.messages.find((m) => ToolMessage.isInstance(m) && m.name === toolName)
+      })
     }
 
     it("flightsservice_query returns real airport data from xflights SQLite", async () => {
