@@ -32,7 +32,7 @@
       "FlightsService": {
         "kind": "mcp",
         "credentials": {
-          "url": "http://localhost:4005/mcp/flights"
+          "url": "http://localhost:4005/mcp/data"
         }
       },
       "hotel": {
