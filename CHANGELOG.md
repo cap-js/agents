@@ -10,6 +10,10 @@
 
 - Fixed remote MCP connections with authenticated server cards
 
+### Added
+
+- Debug logs for tool calls
+
 ## Version 0.9.2 - 2026-08-26
 
 ### Added

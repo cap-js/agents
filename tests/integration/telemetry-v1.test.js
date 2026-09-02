@@ -106,9 +106,7 @@ describe("@cap-js/agents - OTEL v1 backward compatibility (@cap-js/telemetry ^1)
     const exporter = await getSpanExporter()
     exporter.reset()
 
-    // Tool errors are swallowed and returned as strings (so LLM can retry)
-    const result = await failingTool.invoke({})
-    expect(result).toMatch(/intentional failure/)
+    await expect(failingTool.invoke({})).rejects.toThrow(/intentional failure/)
 
     const { trace } = await import("@opentelemetry/api")
     const delegate = trace.getTracerProvider().getDelegate?.() || trace.getTracerProvider()
