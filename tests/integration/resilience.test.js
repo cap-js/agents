@@ -35,8 +35,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should NOT open circuit breaker on 4xx errors (httpErrorFilter)", async () => {
     mock.setStatus(429)
-    // volumeThreshold=10 — send 12 to exceed it; 4xx are filtered (don't trip breaker)
-    for (let i = 0; i < 12; i++) {
+    // volumeThreshold=2 — send 4 to exceed it; 4xx are filtered (don't trip breaker)
+    for (let i = 0; i < 4; i++) {
       await sendMessage("circuit-breaker", `rate-limit-${i}`) // eslint-disable-line no-await-in-loop
     }
 
@@ -49,8 +49,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should open circuit breaker after repeated 5xx failures", async () => {
     mock.setStatus(502)
-    // volumeThreshold=10, errorThreshold=50% → opens after ≥10 failures
-    for (let i = 0; i < 11; i++) {
+    // volumeThreshold=2, errorThreshold=50% → opens after ≥2 failures
+    for (let i = 0; i < 3; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
@@ -62,7 +62,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
   it("open circuit breaker should cause immediate failure, not timeout from retries", async () => {
     mock.setStatus(502)
     // Trip the breaker
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 3; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
@@ -82,12 +82,12 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
   it("should recover after circuit breaker state is reset", async () => {
     mock.setStatus(502)
     // Trip the breaker
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 3; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
-    // Wait for resetTimeout (3000ms in test profile) so breaker goes half-open.
-    await new Promise((r) => setTimeout(r, 3500)) // eslint-disable-line no-await-in-loop
+    // Wait for resetTimeout (500ms in test profile) so breaker goes half-open.
+    await new Promise((r) => setTimeout(r, 600)) // eslint-disable-line no-await-in-loop
     mock.setStatus(200)
     mock.resetCallCount()
 
