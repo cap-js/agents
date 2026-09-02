@@ -11,6 +11,10 @@
 - Added evaluation helpers & MLFlow integration to test the agents behaviour & functional correctness
 - Debug logs for tool calls
 
+### Fixed
+
+- No longer emits orphaned spans during graph creation
+
 ## Version 0.9.2 - 2026-08-26
 
 ### Added
