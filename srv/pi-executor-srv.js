@@ -28,51 +28,6 @@ function publishedStatus(taskId, contextId, state, text, final) {
   }
 }
 
-function configuredLlm(srv) {
-  const name = srv?.options?.agent?.llm || srv?.definition?.["@agent.llm"] || "llm"
-  const config = cds.requires?.[name]
-  if (!config) throw new Error(`No model configuration found in cds.requires.${name}`)
-
-  const kind = config.kind || name
-  const provider = config.provider || kind.replace(/^llm-/, "")
-  const credentials = config.credentials || {}
-  const model =
-    config.model ||
-    config.modelName ||
-    credentials.model ||
-    (provider === "anthropic"
-      ? process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6"
-      : provider === "mock"
-        ? "mock"
-        : undefined)
-
-  if (!model) {
-    throw new Error(
-      `Pi requires a model in cds.requires.${name}.model (resolved provider: ${provider})`,
-    )
-  }
-
-  return {
-    name,
-    provider,
-    model,
-    apiKey:
-      config.apiKey ||
-      credentials.apiKey ||
-      credentials.anthropicApiKey ||
-      (provider === "anthropic" ? process.env.ANTHROPIC_AUTH_TOKEN : undefined) ||
-      process.env[`${provider.toUpperCase().replace(/-/g, "_")}_API_KEY`],
-    baseUrl:
-      config.baseUrl ||
-      config.apiUrl ||
-      config.anthropicApiUrl ||
-      credentials.baseUrl ||
-      credentials.url,
-    headers: config.headers || credentials.headers,
-    message: config.message || credentials.message,
-  }
-}
-
 function toolText(result) {
   const value = Array.isArray(result) && result.length === 2 ? result[0] : result
   if (typeof value === "string") return value
@@ -128,30 +83,9 @@ function assistantText(message) {
     .join("")
 }
 
-async function defaultRuntime(llm) {
+async function defaultRuntime() {
   const { Agent } = await import("@earendil-works/pi-agent-core")
-
-  if (llm.provider === "mock") {
-    const [{ createModels }, { fauxAssistantMessage, fauxProvider }] = await Promise.all([
-      import("@earendil-works/pi-ai"),
-      import("@earendil-works/pi-ai/providers/faux"),
-    ])
-    const faux = fauxProvider({ provider: "mock", models: [{ id: llm.model }] })
-    const response = () => {
-      faux.appendResponses([response])
-      return fauxAssistantMessage(
-        llm.message ||
-          "[Mock LLM] This is a mocked response from @cap-js/agents development mode. No real LLM was invoked.",
-      )
-    }
-    faux.setResponses([response])
-    const models = createModels()
-    models.setProvider(faux.provider)
-    return { Agent, models }
-  }
-
-  const { builtinModels } = await import("@earendil-works/pi-ai/providers/all")
-  return { Agent, models: builtinModels() }
+  return { Agent }
 }
 
 /**
@@ -183,31 +117,28 @@ export default class PiExecutor {
   }
 
   async _createAgent(srv, options) {
-    const llm = configuredLlm(srv)
-    const [{ Agent, models }, tools, systemPrompt] = await Promise.all([
-      this.constructor.runtime(llm),
+    const [{ Agent }, runtimeModel, tools, systemPrompt] = await Promise.all([
+      this.constructor.runtime(),
+      srv.send("buildModel"),
       srv.send("buildTools"),
       srv.send("buildSystemPrompt"),
     ])
-    const catalogModel = models.getModel(llm.provider, llm.model)
-    if (!catalogModel) {
-      throw new Error(`Pi does not know model "${llm.provider}/${llm.model}"`)
+    if (!runtimeModel?.model || typeof runtimeModel.streamFn !== "function") {
+      throw new Error(
+        "Pi models must expose a model and streamFn; configure a Pi model kind such as pi-anthropic",
+      )
     }
-
-    const model = { ...catalogModel }
-    if (llm.baseUrl) model.baseUrl = llm.baseUrl
-    if (llm.headers) model.headers = { ...model.headers, ...llm.headers }
 
     return new Agent({
       initialState: {
         systemPrompt,
-        model,
+        model: runtimeModel.model,
         thinkingLevel: options.thinkingLevel || "off",
         tools: toPiTools(tools),
         messages: [],
       },
-      streamFn: models.streamSimple.bind(models),
-      ...(llm.apiKey && { getApiKey: async () => llm.apiKey }),
+      streamFn: runtimeModel.streamFn,
+      ...(runtimeModel.getApiKey && { getApiKey: runtimeModel.getApiKey }),
     })
   }
 
@@ -263,7 +194,7 @@ export default class PiExecutor {
 
       const prompt = partsToText(requestContext.userMessage?.parts)
       await agent.prompt(prompt)
-      if (controller.signal.aborted) throw new DOMException("Task canceled", "AbortError")
+      if (controller.signal.aborted) throw new globalThis.DOMException("Task canceled", "AbortError")
       if (agent.state?.errorMessage) throw new Error(agent.state.errorMessage)
 
       const messages = agent.state?.messages || []
@@ -309,4 +240,4 @@ export default class PiExecutor {
   }
 }
 
-export { PiExecutor, configuredLlm, assistantText, publishedStatus }
+export { PiExecutor, assistantText, publishedStatus }

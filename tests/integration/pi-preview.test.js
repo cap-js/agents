@@ -32,7 +32,7 @@ describe("Pi chat preview", () => {
     const oldLlm = cds.requires["pi-preview-llm"]
     cds.requires["agent-executor"] = { kind: "agent-executor-pi" }
     cds.requires["pi-preview-llm"] = {
-      kind: "mock",
+      kind: "pi-mock",
       message: "Hello from Pi preview",
     }
 
@@ -40,7 +40,14 @@ describe("Pi chat preview", () => {
       const srv = {
         name: "PiPreviewService",
         definition: { "@agent.llm": "pi-preview-llm" },
-        send: async (event) => (event === "buildTools" ? [] : "Be helpful"),
+        send: async (event) => {
+          if (event === "buildTools") return []
+          if (event === "buildSystemPrompt") return "Be helpful"
+          if (event === "buildModel") {
+            const { default: Model } = await import("../../lib/models/pi-mock.js")
+            return new Model("pi-preview-llm", cds.requires["pi-preview-llm"])
+          }
+        },
       }
       const executor = await createExecutor(srv)
       const card = {
