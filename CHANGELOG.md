@@ -10,6 +10,10 @@
 
 - Debug logs for tool calls
 
+### Fixed
+
+- A2A agent card advertises `https://` instead of `http://` when deployed behind a cloud reverse proxy (CF, BTP, Kyma) by reading `X-Forwarded-Proto`
+
 ## Version 0.9.2 - 2026-08-26
 
 ### Added
