@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
-import { circuitBreaker, timeout } from "@cap-js/agents/lib/utils/resilience.js"
+import { circuitBreaker, circuitBreakers, timeout } from "@cap-js/agents/lib/utils/resilience.js"
 import { ms4 } from "@cap-js/agents/lib/utils/utils.js"
 
 const LOG = cds.log("agents")
@@ -20,6 +20,9 @@ export default class CircuitBreakerService extends cds.ApplicationService {
   init() {
     this.on("buildGraph", async () => {
       return this._buildGraph()
+    })
+    this.on("resetBreakers", () => {
+      for (const key of Object.keys(circuitBreakers)) delete circuitBreakers[key]
     })
     return super.init()
   }

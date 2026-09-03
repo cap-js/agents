@@ -13,10 +13,15 @@ const { sendMessage } = createHelpers({ POST, axios })
 describe("@cap-js/agents - LLM Circuit Breaker", () => {
   axios.defaults.validateStatus = () => true
 
+  // Reset the server-side circuit breaker state via a test-only OData action so
+  // each test starts with closed breakers and we never wait out resetTimeout.
+  const resetBreakers = () => POST("/odata/v4/circuit-breaker/resetBreakers", {})
+
   after(() => {
     mock.stop()
   })
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetBreakers()
     mock.resetCallCount()
     mock.setStatus(200)
   })
@@ -35,7 +40,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should NOT open circuit breaker on 4xx errors (httpErrorFilter)", async () => {
     mock.setStatus(429)
-    // volumeThreshold=2 — send 4 to exceed it; 4xx are filtered (don't trip breaker)
+    // volumeThreshold=2, send 4 to exceed it. 4xx are filtered (don't trip breaker).
     for (let i = 0; i < 4; i++) {
       await sendMessage("circuit-breaker", `rate-limit-${i}`) // eslint-disable-line no-await-in-loop
     }
@@ -86,8 +91,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
-    // Wait for resetTimeout (500ms in test profile) so breaker goes half-open.
-    await new Promise((r) => setTimeout(r, 600)) // eslint-disable-line no-await-in-loop
+    // Reset breaker state directly instead of waiting out resetTimeout.
+    await resetBreakers()
     mock.setStatus(200)
     mock.resetCallCount()
 
