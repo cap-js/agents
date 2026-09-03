@@ -3,7 +3,7 @@
 > [!WARNING]
 > The following features are experimental and may be changed or removed at any time.
 
-Eval tests run your agent against real LLM calls and score the responses with an LLM-as-judge. Results and metrics are posted to MLflow automatically if MLflow is enabled.
+Eval tests run your agent against real LLM calls and can score responses with an LLM-as-judge. Results, metrics, and validation rollups are posted to MLflow automatically if MLflow is enabled.
 
 ## Setup
 
@@ -13,14 +13,10 @@ Install optional peer dependencies:
 npm install --save-dev openevals
 ```
 
-Add a script to `package.json`:
+Run a specific eval test with your project’s binding/profile setup, for example:
 
-```json
-{
-  "scripts": {
-    "test:evals": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run"
-  }
-}
+```bash
+CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run test/eval/<scenario>.test.js
 ```
 
 ## Writing eval tests
@@ -28,190 +24,179 @@ Add a script to `package.json`:
 ```js
 import cds from "@sap/cds"
 import { test } from "vitest"
-import { Judge, TrajectoryJudge, ConverstationJudge, matchToolCall } from "@cap-js/agents"
+import { Judge, matchToolCall } from "@cap-js/agents/eval"
 
 cds.test(".")
 
-const judge = new Judge("ANSWER_RELEVANCE_PROMPT").criteria(
-  "Response fully and accurately answers the user's question.",
-)
+const judge = new Judge("Response fully and accurately answers the user's question.")
 
 describe("catalog-eval", () => {
   test("lists books", async () => {
     const agent = await cds.connect.to("CatalogService")
     const result = await agent.chat("Show me all books")
 
-    // result.metrics — OTel-derived, populated and posted to MLflow ootb
+    // OTel-derived metrics are available in the test profile and posted to MLflow.
     expect(result.metrics.tool_call_count).toBeGreaterThan(0)
 
-    // Deterministic tool call assertion
+    // Deterministic validation; also contributes to eval rollups.
     expect(matchToolCall(result, "query", (args) => !!args.cql)).toBe(true)
 
-    // LLM judge
-    const { pass, comment, score } = await judge
+    // LLM-as-judge validation; also contributes to eval rollups.
+    const { pass, score, comment } = await judge
       .criteria("must list multiple books with titles")
       .evaluate(result)
-    expect(pass).toBe(true)
-    // success_rate + output_correctness computed from all validations and posted to MLflow in afterEach
-  })
 
-  test("HITL", async () => {
-    const agent = await cds.connect.to("CatalogService")
-    const r1 = await agent.chat("Show me all books")
-    // r1 threads contextId
-    const r2 = await agent.chat("Which is cheapest?", r1)
-    const r3 = await agent.chat("Order it", r2)
-    // result.messages does not include previous conversation entries
-    expect(r3.messages?.length).toBe(2)
-
-    // HITL
-    expect(r3.status).toBe("input-required")
-    // approve — resumes task
-    const r4 = await agent.chat("yes", r2)
-    expect(r4.status).toBe("completed")
-
-    // Use ConverstationJudge to evaluate the whole session
-    const { pass } = await new ConverstationJudge("AGENT_TONE_PROMPT").evaluate([r1, r2, r3, r4])
     expect(pass).toBe(true)
   })
+})
+```
+
+For multi-turn or HITL evals, pass the previous `agent.chat()` result to continue the same context. If the previous result has status `input-required`, the same task is resumed.
+
+```js
+test("approves an order", async () => {
+  const agent = await cds.connect.to("CatalogService")
+
+  const r1 = await agent.chat("Show me all books")
+  const r2 = await agent.chat("Order the cheapest one", r1)
+  expect(r2.status).toBe("input-required")
+
+  const r3 = await agent.chat("yes", r2)
+  expect(r3.status).toBe("completed")
+
+  const { pass } = await new Judge("The final response confirms the order.").evaluate(r3)
+  expect(pass).toBe(true)
 })
 ```
 
 ## Eval run lifecycle
 
-Importing from `@cap-js/agents` automatically creates an MLflow eval run for each top-level `describe("name", ...)` block. The `describe` name is used as the MLflow run name.
-
-```js
-describe("catalog-eval", () => {
-  test("lists books", async () => {
-    // logged under the MLflow run named "catalog-eval"
-  })
-})
-```
+Importing from `@cap-js/agents/eval` installs eval test integration for top-level `describe("name", ...)` blocks. The describe name is used as the eval run name.
 
 Rules:
 
-- import `@cap-js/agents` before declaring the top-level `describe`
-- use the global `describe`; do not import `describe` from `vitest`, because imported bindings bypass the global patch
-- only top-level `describe` blocks create eval runs; nested `describe` blocks are regular grouping only
-- skipped and todo suites do not create eval runs
-- validation rollups are flushed after each test and once again when the suite finishes
+- Import from `@cap-js/agents/eval` before declaring the top-level `describe`.
+- Use the global `describe`; do not import `describe` from `vitest`, because imported bindings bypass the global patch.
+- Only top-level `describe` blocks create eval runs; nested `describe` blocks are grouping only.
+- Skipped and todo suites do not create eval runs.
 
-Call `evalRun({ name })` manually at file top level before defining tests to start a run, if the global describe is not an option.
+Validation helpers such as `matchToolCall()` and `judge.evaluate()` contribute to per-test rollups. When MLflow is enabled, those rollups are flushed automatically.
 
-<details>
-<summary>What an eval run entails</summary>
+## `agent.chat(query, previous?)`
 
-Registers vitest `beforeAll` / `afterEach` / `afterAll` hooks for an MLflow Run. Importing `@cap-js/agents` calls this automatically for each top-level `describe`, using the suite name as `opts.name`.
+`agent.chat()` calls the agent in-process. It is registered on `@agent` services by the agent service handlers and is intended for tests and evals.
 
-If MLflow is not configured or vitest globals are absent, it's a no-op.
-
-**What gets posted to MLflow per `chat()` call:**
-
-- `input_tokens`, `output_tokens`, `total_tokens`, `tool_call_count`, `latency_ms`, `cost_usd` — run metrics
-- Per-turn judge assessments
-
-**What gets posted in `afterEach` (per test):**
-
-- `success_rate` — `1` if all `matchToolCall` + `judge.evaluate()` calls passed, `0` otherwise
-- `output_correctness` — fraction of validations that passed
-
-</details>
-
-## `agent.chat(query, contextId?, opts?)`
-
-Calls the agent in-process. Returns a result object.
+Supported forms:
 
 ```js
-const result = await agent.chat("Show me all books")
+await agent.chat("Show me all books")
+await agent.chat("Order it", previousResult)
+```
 
-result.text // "Here are the books: ..."
-result.contextId // conversation id — pass to next chat() for multi-turn
+The stable result properties are always available:
+
+```js
+result.text // final text response
+result.contextId // conversation id — pass to the next chat() for multi-turn
 result.taskId // task id — used for HITL resume
 result.status // "completed" | "input-required" | "canceled"
 ```
 
-When the `test` profile is active additional properties are available on the result
+When the `test` profile is active, additional eval details are available:
 
 ```js
-result.query // "Show me all books", required for Judges
+result.query // original query string, used by judges
 result.traceId // OTel trace id
-result.toolCalls // [{ tool, args, result?, cqn? }] - cqn is populated for the query tool call
-result.messages // full LangChain message array
-result.spans // OTel spans captured during execution for the traceId
-result.metrics // { input_tokens, output_tokens, total_tokens, tool_call_count, latency_ms, cost_usd } captured from OTEL spans
+result.toolCalls // [{ tool, args, result?, cqn? }]
+result.messages // LangChain messages for the current turn
+result.spans // OTel spans captured for the trace
+result.metrics // input/output tokens, tool count, latency, cost
 ```
 
-## Single-turn judges
+## `Judge`
 
-Single-turn judges evaluate one `chat()` result. All return `{ score, comment, pass }` and automatically accumulate `pass` into the per-test validation set — flushed as `success_rate` and `output_correctness` to MLflow in `afterEach`.
+`Judge` evaluates one `agent.chat()` result and returns `{ score, comment, pass }`.
 
 ```js
-const { score, comment, pass } = await judge.evaluate(result)
+const { score, comment, pass } = await new Judge(
+  "Answer must mention at least one concrete book title.",
+).evaluate(result)
 ```
 
-`.criteria(text)` returns a sibling judge with appended criteria, sharing the initialized LLM:
+The constructor accepts one argument:
 
 ```js
-await judge.criteria("must state a concrete stock level").evaluate(result)
+await new Judge("CONCISENESS_PROMPT").evaluate(result)
+await new Judge({ criteria: "TOXICITY_PROMPT", continuous: false }).evaluate(result)
 ```
-
-### `Judge`
-
-Base judge. The constructor accepts one argument:
-
-- a string shorthand, treated as `criteria`
-- or an object, for example `{ criteria: "ANSWER_RELEVANCE_PROMPT", assessmentName: "answer_relevance", continuous: true }`
 
 `criteria` is used as the judge prompt source:
 
 - if it matches an `openevals` prompt export such as `ANSWER_RELEVANCE_PROMPT`, the built-in prompt is used
-- else the string is passed as a prompt template string
+- otherwise the string is passed as the prompt
 
-Use `.criteria(text)` to append additional instructions to the current prompt/criteria.
-
-### Single-turn openevals prompts
-
-Use these with `Judge`, for example:
+Use `.criteria(text)` to append additional instructions to the existing criteria. It returns a sibling judge and does not replace the original criteria.
 
 ```js
-await new Judge({ criteria: "TOXICITY_PROMPT", continuous: false }).evaluate(result)
-await new Judge({ criteria: "CONCISENESS_PROMPT", continuous: true }).evaluate(result)
+const base = new Judge("Response must answer the user question.")
+
+await base.criteria("Response must include stock information.").evaluate(result)
 ```
 
-The `Judge` defaults to `ANSWER_RELEVANCE_PROMPT`. Other possible prompts are in the [openevals docs](https://github.com/langchain-ai/openevals#prebuilt-prompts).
+Other possible prompts are in the [OpenEvals prebuilt prompts](https://github.com/langchain-ai/openevals#prebuilt-prompts).
 
-### Trajectory judges
+## `TrajectoryJudge`
+
+`TrajectoryJudge` evaluates `result.messages` and with that the steps the agent took, not only the final answer.
 
 ```js
-// LLM-based — scores the full message trajectory against a criteria
-const { pass } = await new TrajectoryJudge()
+import { TrajectoryJudge } from "@cap-js/agents/eval"
+
+const { pass, score, comment } = await new TrajectoryJudge()
   .criteria("Agent must call getStock before stating a stock level.")
   .evaluate(result)
+
+expect(pass).toBe(true)
 ```
 
-`TrajectoryJudge` defaults to `TRAJECTORY_ACCURACY_PROMPT`. Other possible prompts are in the [openevals docs](https://github.com/langchain-ai/openevals#trajectory-prompts).
-
-## Conversation-level judges
-
-Evaluate the full session — pass an array of results from the same conversation.
+By default, `TrajectoryJudge` uses `TRAJECTORY_ACCURACY_PROMPT`. Other trajectory prompt keys from OpenEvals can be used through the same constructor. See the [OpenEvals trajectory prompts](https://github.com/langchain-ai/openevals#trajectory-prompts).
 
 ```js
+await new TrajectoryJudge("TRAJECTORY_ACCURACY_PROMPT").evaluate(result)
+```
+
+## `ConversationJudge`
+
+`ConversationJudge` evaluates a full session instead of a single turn. Pass all `agent.chat()` results for the conversation in order.
+
+```js
+import { ConversationJudge } from "@cap-js/agents/eval"
+
 const r1 = await agent.chat("How many copies of Wuthering Heights are in stock?")
 const r2 = await agent.chat("Tell me more about that book.", r1)
 
-const { pass } = await new ConverstationJudge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
+const { pass, score, comment } = await new ConversationJudge("TASK_COMPLETION_PROMPT").evaluate([
+  r1,
+  r2,
+])
+
+expect(pass).toBe(true)
 ```
 
-`ConverstationJudge` defaults to `TASK_COMPLETION_PROMPT`. The assessment is posted to the MLflow session. Other possible prompts are in the [openevals docs](https://github.com/langchain-ai/openevals#conversation-prompts).
+`ConversationJudge` evaluates the collected messages from all passed results. It defaults to `TASK_COMPLETION_PROMPT` and posts the assessment with session metadata when MLflow is enabled.
+
+Other conversation prompt keys from OpenEvals can be used with the same base class. See the [OpenEvals conversation prompts](https://github.com/langchain-ai/openevals#conversation-prompts).
+
+```js
+await new ConversationJudge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
+```
 
 ## `matchToolCall(result, toolName, matcher?)`
 
-Deterministic tool call assertion. Contributes to `success_rate` rollup.
+`matchToolCall()` is a deterministic tool-call assertion. It returns a boolean and contributes to eval rollups.
 
 ```js
-matchToolCall(result, "query") // any call with that name
+matchToolCall(result, "query") // any call with that tool name
 matchToolCall(result, "query", { entity: "Books" }) // partial args match
 matchToolCall(result, "getStock", (args) => args.book === 42) // predicate
-// returns boolean
 ```

@@ -144,32 +144,31 @@ function buildRequestContext(query, opts = {}) {
   }
 }
 
-/** Install srv.chat(query, contextId?, opts?) on an @agent service. Called from cds.on("serving"). */
+/** Install srv.chat(query, previous?) on an @agent service for eval tests. */
 export function registerChat(srv) {
-  srv.chat = async function chat(query, second, third) {
-    // Resolve opts from flexible overloads:
+  srv.chat = async function chat(query, previous) {
+    // Resolve the small eval helper API:
     //   chat(query)
-    //   chat(query, contextId)         — string
-    //   chat(query, prevResult)        — result object → extract contextId + taskId (HITL resume)
-    //   chat(query, opts)              — plain opts object
-    //   chat(query, contextId, opts)   — string + opts object
+    //   chat(query, prevResult) — extract contextId + taskId for HITL resume
+    //   chat(query, { _details: true }) — internal/test escape hatch outside test profile
     let opts = {}
-    if (typeof second === "string") {
-      opts = { contextId: second, ...third }
-    } else if (second && typeof second === "object") {
-      if ("text" in second || "contextId" in second) {
+    if (typeof previous === "string") {
+      throw new TypeError(
+        "agent.chat: second argument must be a previous chat result object or options object",
+      )
+    } else if (previous && typeof previous === "object") {
+      if ("text" in previous || "contextId" in previous) {
         // prior chat() result — extract conversation ids and HITL state
         opts = {
-          contextId: second.contextId,
+          contextId: previous.contextId,
           // mark as resume when prior result was input-required
-          ...(second.status === "input-required" && {
-            taskId: second.taskId,
-            task: { id: second.taskId, status: { state: "input-required" } },
+          ...(previous.status === "input-required" && {
+            taskId: previous.taskId,
+            task: { id: previous.taskId, status: { state: "input-required" } },
           }),
-          ...(typeof third === "object" ? third : {}),
         }
       } else {
-        opts = second
+        opts = { _details: previous._details === true }
       }
     }
 
@@ -255,7 +254,7 @@ export function registerChat(srv) {
       result.traceId = traceId
       result.toolCalls = toolCalls
       result.messages = messages.map((m) => {
-        // Needed for Agent Trajectory. content is expected to be a string, else object object is written into the prompt
+        // Eval prompts expect text content, not content-block objects.
         if (m.type === "ai") {
           if (Array.isArray(m.content) && m.content[0]?.text) {
             m.content = m.content[0].text

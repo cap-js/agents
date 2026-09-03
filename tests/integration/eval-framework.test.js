@@ -3,7 +3,7 @@ import { metricsFromSpans } from "../../lib/testing/metrics.js"
 import {
   Judge,
   TrajectoryJudge,
-  ConverstationJudge,
+  ConversationJudge,
   matchToolCall,
 } from "../../lib/testing/Judge.js"
 import { getActiveRunState, recordEvaluation } from "../../lib/testing/eval-run.js"
@@ -335,17 +335,17 @@ describe("TrajectoryJudge constructor", () => {
   })
 })
 
-// ─── ConverstationJudge.evaluate input validation ────────────────────────────
+// ─── ConversationJudge.evaluate input validation ─────────────────────────────
 
-describe("ConverstationJudge.evaluate input validation", () => {
+describe("ConversationJudge.evaluate input validation", () => {
   it("defaults to task completion", () => {
-    const j = new ConverstationJudge()
+    const j = new ConversationJudge()
     expect(j._criteria).toBe("TASK_COMPLETION_PROMPT")
     expect(j._assessmentName).toBe("task_completion")
   })
 
   it("uses explicit assessmentName over static criteria", () => {
-    const j = new ConverstationJudge({
+    const j = new ConversationJudge({
       criteria: "TASK_COMPLETION_PROMPT",
       assessmentName: "conversation_completeness",
     })
@@ -353,19 +353,19 @@ describe("ConverstationJudge.evaluate input validation", () => {
   })
 
   it("does not keep model configuration on conversations", () => {
-    const j = new ConverstationJudge()
+    const j = new ConversationJudge()
     expect(j._model).toBeUndefined()
     expect(j._modelOptions).toBeUndefined()
   })
 
   it("throws when results is not an array", async () => {
-    const j = new ConverstationJudge()
+    const j = new ConversationJudge()
     await expect(j.evaluate(null)).rejects.toThrow()
     await expect(j.evaluate("string")).rejects.toThrow()
   })
 
   it("throws when results is an empty array", async () => {
-    const j = new ConverstationJudge()
+    const j = new ConversationJudge()
     await expect(j.evaluate([])).rejects.toThrow()
   })
 })
@@ -511,13 +511,13 @@ describe("eval describe patch", () => {
     ])
   })
 
-  it("package entrypoint installs the global describe patch", async () => {
+  it("eval entrypoint installs the global describe patch", async () => {
     const originalDescribe = globalThis.describe
     const describeDouble = makeDescribeDouble()
     globalThis.describe = describeDouble
 
     try {
-      await import("../../index.js")
+      await import("../../lib/eval/index.js")
       expect(globalThis.describe).not.toBe(describeDouble)
       expect(globalThis.describe._original).toBe(describeDouble)
     } finally {
@@ -526,12 +526,12 @@ describe("eval describe patch", () => {
   })
 })
 
-// ─── chat.js: toolCallsFromMessages (tested via import) ──────────────────────
+// ─── chat.js: toolCallsFromMessages (tested via import) ────────────────────
 // toolCallsFromMessages is not exported; we test its behavior indirectly via
 // the shape of result.toolCalls returned by srv.chat(). That requires a running
 // agent (hybrid). For the unit layer we test the module-private logic by
 // checking the exported COLLECT_RESULT symbol and NoopEventBus-equivalent behavior
-// through the public chat.js surface.
+// through the chat.js surface.
 
 import { COLLECT_RESULT, registerChat, shouldIncludeChatDetails } from "../../srv/handlers/chat.js"
 import { startCollection } from "../../lib/testing/span-collector.js"
@@ -560,6 +560,15 @@ describe("chat.js: result details gate", () => {
     cds.env.profiles = ["development"]
     expect(shouldIncludeChatDetails()).toBe(false)
     expect(shouldIncludeChatDetails({ _details: true })).toBe(true)
+  })
+
+  it("rejects a string second argument", async () => {
+    const srv = {}
+    registerChat(srv)
+
+    await expect(srv.chat("hello", "context-id")).rejects.toThrow(
+      "agent.chat: second argument must be a previous chat result object or options object",
+    )
   })
 
   it("returns only stable fields outside test profile by default", async () => {

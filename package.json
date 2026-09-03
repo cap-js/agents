@@ -12,6 +12,7 @@
   "type": "module",
   "exports": {
     ".": "./index.js",
+    "./eval": "./lib/eval/index.js",
     "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
     "./index.cds": "./index.cds",
@@ -25,7 +26,6 @@
     "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
     "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
-    "test:bookshop-evals": "CDS_ENV=test,hybrid,tracing cds bind --exec -- vitest run --config vitest.config.evals.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
     "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
@@ -65,13 +65,13 @@
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "deepagents": "^1.10.2",
-    "openevals": "^0.2.0",
-    "vitest": "^4.1.10"
+    "openevals": "^0.2.0"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=9"
+    "@sap/cds": ">=9",
+    "openevals": ">=0.2"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
