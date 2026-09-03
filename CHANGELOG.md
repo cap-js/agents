@@ -14,6 +14,10 @@
 
 - Debug logs for tool calls
 
+### Changed
+
+- LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
+
 ### Fixed
 
 - A2A agent card advertises `https://` instead of `http://` when deployed behind a cloud reverse proxy (CF, BTP, Kyma) by reading `X-Forwarded-Proto`

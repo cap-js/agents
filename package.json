@@ -52,7 +52,6 @@
     "@sap-ai-sdk/langchain": "^2.13.0",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/connectivity": "^4.7.0",
-    "@sap-cloud-sdk/resilience": "^4.7.0",
     "deepagents": "^1.10.0",
     "langchain": "^1.5.0",
     "marked": "^18",
@@ -113,6 +112,12 @@
       },
       "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
+      "circuitBreaker": {
+        "errorThresholdPercentage": 50,
+        "volumeThreshold": 10,
+        "resetTimeout": 30000,
+        "rollingCountTimeout": 10000
+      },
       "params": {
         "max_tokens": 4096,
         "temperature": 0
