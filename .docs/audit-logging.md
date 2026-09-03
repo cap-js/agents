@@ -16,19 +16,19 @@ In development, audit events are logged to the console. In production, they are 
 
 <!-- audit-docs:start -->
 
-| Event                            | Fields                                                                                                                                    |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `AgentDecision`                  | `service`, `taskId`, `contextId`, `duration`, `finishReason`, `iteration`, `model`, `modelParams?`, `provider`, `tokenUsage`, `toolCalls` |
-| `AgentInputRequired`             | `service`, `taskId`, `contextId`, `description`, `interruptData`                                                                          |
-| `AgentTaskCanceled`              | `service`, `taskId`, `contextId`                                                                                                          |
-| `AgentTaskCompleted`             | `service`, `taskId`, `contextId`, `duration`, `task`, `tokenUsage`, `toolCalls`                                                           |
-| `AgentTaskFailed`                | `service`, `taskId`, `contextId`, `error`, `errorCode`, `task`                                                                            |
-| `AgentTaskResumed`               | `service`, `taskId`, `contextId`, `decision`                                                                                              |
-| `AgentTaskStarted`               | `service`, `taskId`, `contextId`, `userMessage`                                                                                           |
-| `ContentFilterBlocked`           | `service`, `taskId`, `reason`, `source`, `user`                                                                                           |
-| `IncomingMessageExceedingLength` | `service`, `forwardedIp`, `ip`, `message`, `user`                                                                                         |
-| `QuotaExceeded`                  | `service`, `taskId`, `forwardedIp`, `ip`, `reason`, `user`                                                                                |
-| `ToolInvocation`                 | `service`, `taskId`, `args`, `duration`, `error?`, `outcome`, `tool`                                                                      |
+| Event                            | Trigger                               | Fields                                                                                                                                    |
+| -------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentDecision`                  | LLM invocation returns                | `service`, `taskId`, `contextId`, `duration`, `finishReason`, `iteration`, `model`, `modelParams?`, `provider`, `tokenUsage`, `toolCalls` |
+| `AgentInputRequired`             | Agent requests human approval         | `service`, `taskId`, `contextId`, `description`, `interruptData`                                                                          |
+| `AgentTaskCanceled`              | Task canceled                         | `service`, `taskId`, `contextId`                                                                                                          |
+| `AgentTaskCompleted`             | Task succeeds                         | `service`, `taskId`, `contextId`, `duration`, `task`, `tokenUsage`, `toolCalls`                                                           |
+| `AgentTaskFailed`                | Task fails                            | `service`, `taskId`, `contextId`, `error`, `errorCode`, `task`                                                                            |
+| `AgentTaskResumed`               | HITL resume (approve/reject)          | `service`, `taskId`, `contextId`, `decision`                                                                                              |
+| `AgentTaskStarted`               | New task submitted                    | `service`, `taskId`, `contextId`, `userMessage`                                                                                           |
+| `ContentFilterBlocked`           | Input blocked by content filter       | `service`, `taskId`, `reason`, `source`, `user`                                                                                           |
+| `IncomingMessageExceedingLength` | Incoming message exceeds length limit | `service`, `forwardedIp`, `ip`, `message`, `user`                                                                                         |
+| `QuotaExceeded`                  | Quota breach                          | `service`, `taskId`, `forwardedIp`, `ip`, `reason`, `user`                                                                                |
+| `ToolInvocation`                 | Tool executed                         | `service`, `taskId`, `args`, `duration`, `error?`, `outcome`, `tool`                                                                      |
 
 <!-- audit-docs:end -->
 

@@ -15,6 +15,19 @@ const DETAILS_END = "</details>"
 const GENERATED_START = "<!-- audit-docs:start -->"
 const GENERATED_END = "<!-- audit-docs:end -->"
 const FIELD_ORDER = ["service", "taskId", "contextId"]
+const TRIGGERS = {
+  AgentDecision: "LLM invocation returns",
+  AgentInputRequired: "Agent requests human approval",
+  AgentTaskCanceled: "Task canceled",
+  AgentTaskCompleted: "Task succeeds",
+  AgentTaskFailed: "Task fails",
+  AgentTaskResumed: "HITL resume (approve/reject)",
+  AgentTaskStarted: "New task submitted",
+  ContentFilterBlocked: "Input blocked by content filter",
+  IncomingMessageExceedingLength: "Incoming message exceeds length limit",
+  QuotaExceeded: "Quota breach",
+  ToolInvocation: "Tool executed",
+}
 
 const files = SOURCE_DIRS.flatMap((dir) => walk(path.join(ROOT, dir))).filter((file) =>
   file.endsWith(".js"),
@@ -165,10 +178,10 @@ function generateSection(auditCalls) {
       const fields = unique(
         eventCalls.flatMap((call) => [...call.dataFields, ...call.envelopeFields]),
       ).sort(compareFields)
-      return [`\`${event}\``, formatList(fields)]
+      return [`\`${event}\``, TRIGGERS[event] || "-", formatList(fields)]
     })
 
-  const table = formatTable(["Event", "Fields"], rows)
+  const table = formatTable(["Event", "Trigger", "Fields"], rows)
 
   const callSites = auditCalls
     .map((call) => `- \`${call.event}\` - ${call.file}:${call.line}`)
