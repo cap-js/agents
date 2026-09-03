@@ -20,9 +20,13 @@ const files = SOURCE_DIRS.flatMap((dir) => walk(path.join(ROOT, dir))).filter((f
   file.endsWith(".js"),
 )
 
-const calls = files.flatMap(readAuditCalls).sort((a, b) =>
-  a.event === b.event ? a.file.localeCompare(b.file) || a.line - b.line : a.event.localeCompare(b.event),
-)
+const calls = files
+  .flatMap(readAuditCalls)
+  .sort((a, b) =>
+    a.event === b.event
+      ? a.file.localeCompare(b.file) || a.line - b.line
+      : a.event.localeCompare(b.event),
+  )
 
 const currentDoc = fs.readFileSync(DOC_PATH, "utf8")
 const nextDoc = updateDoc(currentDoc, calls)
@@ -144,7 +148,8 @@ function updateDoc(doc, auditCalls) {
   }
 
   const detailsStart = doc.indexOf(DETAILS_START)
-  if (detailsStart === -1) return `${doc.trimEnd()}\n\n${DETAILS_START}\n\n${generated}\n\n${DETAILS_END}\n`
+  if (detailsStart === -1)
+    return `${doc.trimEnd()}\n\n${DETAILS_START}\n\n${generated}\n\n${DETAILS_END}\n`
 
   const detailsEnd = doc.indexOf(DETAILS_END, detailsStart)
   if (detailsEnd === -1) throw new Error("Could not find closing </details> for Events section")
@@ -160,9 +165,10 @@ function generateSection(auditCalls) {
       const fields = unique(
         eventCalls.flatMap((call) => [...call.dataFields, ...call.envelopeFields]),
       ).sort(compareFields)
-      return `| \`${event}\` | ${formatList(fields)} |`
+      return [`\`${event}\``, formatList(fields)]
     })
-    .join("\n")
+
+  const table = formatTable(["Event", "Fields"], rows)
 
   const callSites = auditCalls
     .map((call) => `- \`${call.event}\` - ${call.file}:${call.line}`)
@@ -170,10 +176,27 @@ function generateSection(auditCalls) {
 
   return `${GENERATED_START}
 
-| Event | Fields |
-| ----- | ------ |
-${rows}
+${table}
+
 ${GENERATED_END}`
+}
+
+function formatTable(headers, rows) {
+  const widths = headers.map((header, index) =>
+    Math.max(header.length, ...rows.map((row) => row[index].length)),
+  )
+  return [
+    formatTableRow(headers, widths),
+    formatTableRow(
+      widths.map((width) => "-".repeat(width)),
+      widths,
+    ),
+    ...rows.map((row) => formatTableRow(row, widths)),
+  ].join("\n")
+}
+
+function formatTableRow(cells, widths) {
+  return `| ${cells.map((cell, index) => cell.padEnd(widths[index])).join(" | ")} |`
 }
 
 function groupBy(items, keyFn) {

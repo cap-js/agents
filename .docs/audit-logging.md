@@ -16,19 +16,20 @@ In development, audit events are logged to the console. In production, they are 
 
 <!-- audit-docs:start -->
 
-| Event | Fields |
-| ----- | ------ |
-| `AgentDecision` | `service`, `taskId`, `contextId`, `duration`, `iteration`, `model`, `tokenUsage`, `toolCalls` |
-| `AgentInputRequired` | `service`, `taskId`, `contextId`, `description`, `interruptData` |
-| `AgentTaskCanceled` | `service`, `taskId`, `contextId` |
-| `AgentTaskCompleted` | `service`, `taskId`, `contextId`, `duration`, `task`, `tokenUsage`, `toolCalls` |
-| `AgentTaskFailed` | `service`, `taskId`, `contextId`, `error`, `errorCode`, `task` |
-| `AgentTaskResumed` | `service`, `taskId`, `contextId`, `decision` |
-| `AgentTaskStarted` | `service`, `taskId`, `contextId`, `userMessage` |
-| `ContentFilterBlocked` | `service`, `taskId`, `reason`, `source`, `user` |
-| `IncomingMessageExceedingLength` | `service`, `forwardedIp`, `ip`, `message`, `user` |
-| `QuotaExceeded` | `service`, `taskId`, `forwardedIp`, `ip`, `reason`, `user` |
-| `ToolInvocation` | `service`, `taskId`, `args`, `duration`, `error?`, `outcome`, `tool` |
+| Event                            | Fields                                                                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentDecision`                  | `service`, `taskId`, `contextId`, `duration`, `finishReason`, `iteration`, `model`, `modelParams?`, `provider`, `tokenUsage`, `toolCalls` |
+| `AgentInputRequired`             | `service`, `taskId`, `contextId`, `description`, `interruptData`                                                                          |
+| `AgentTaskCanceled`              | `service`, `taskId`, `contextId`                                                                                                          |
+| `AgentTaskCompleted`             | `service`, `taskId`, `contextId`, `duration`, `task`, `tokenUsage`, `toolCalls`                                                           |
+| `AgentTaskFailed`                | `service`, `taskId`, `contextId`, `error`, `errorCode`, `task`                                                                            |
+| `AgentTaskResumed`               | `service`, `taskId`, `contextId`, `decision`                                                                                              |
+| `AgentTaskStarted`               | `service`, `taskId`, `contextId`, `userMessage`                                                                                           |
+| `ContentFilterBlocked`           | `service`, `taskId`, `reason`, `source`, `user`                                                                                           |
+| `IncomingMessageExceedingLength` | `service`, `forwardedIp`, `ip`, `message`, `user`                                                                                         |
+| `QuotaExceeded`                  | `service`, `taskId`, `forwardedIp`, `ip`, `reason`, `user`                                                                                |
+| `ToolInvocation`                 | `service`, `taskId`, `args`, `duration`, `error?`, `outcome`, `tool`                                                                      |
+
 <!-- audit-docs:end -->
 
 </details>
