@@ -6,17 +6,18 @@
 
 ## Version 0.9.3 - tbd
 
-### Fixed
-
-- Fixed remote MCP connections with authenticated server cards
-
 ### Added
 
 - Debug logs for tool calls
 
+### Changed
+
+- Adjusted agent audit log attributes to follow latest recommendations
+
 ### Fixed
 
 - A2A agent card advertises `https://` instead of `http://` when deployed behind a cloud reverse proxy (CF, BTP, Kyma) by reading `X-Forwarded-Proto`
+- Fixed remote MCP connections with authenticated server cards
 
 ## Version 0.9.2 - 2026-08-26
 
@@ -25,10 +26,6 @@
 - `cds.agents.retention` (default 30d) to configure retention of Tasks and related assets stored for A2A and the agent
 - Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
 - Added additional OpenTelemetry span attributes detailing how many content filters were active
-
-### Changed
-
-- Adjusted agent audit log attributes to follow latest recommendations
 
 ### Fixed
 
