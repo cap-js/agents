@@ -18,6 +18,7 @@
     "./lib/models/*": "./lib/models/*.js",
     "./srv/langgraph-executor-srv": "./srv/langgraph-executor-srv.js",
     "./srv/pi-executor-srv": "./srv/pi-executor-srv.js",
+    "./srv/webagent-executor-srv": "./srv/webagent-executor-srv.js",
     "./srv/*": "./srv/*",
     "./lib/*": "./lib/*"
   },
@@ -193,6 +194,9 @@
         },
         "agent-executor-pi": {
           "impl": "@cap-js/agents/srv/pi-executor-srv"
+        },
+        "agent-executor-webagent": {
+          "impl": "@cap-js/agents/srv/webagent-executor-srv"
         }
       },
       "agent-executor": {
@@ -212,6 +216,12 @@
       },
       "[pi]": {
         "agent-executor": "pi",
+        "[with-claude]": {
+          "llm": "pi-anthropic"
+        }
+      },
+      "[webagent]": {
+        "agent-executor": "webagent",
         "[with-claude]": {
           "llm": "pi-anthropic"
         }
