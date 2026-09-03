@@ -6,6 +6,10 @@
 
 ## Version 0.9.3 - tbd
 
+### Fixed
+
+- Fixed remote MCP connections with authenticated server cards
+
 ### Added
 
 - Debug logs for tool calls
