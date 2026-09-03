@@ -9,7 +9,7 @@ import { GraphCache, hashFeatures } from "./graph-cache.js"
  * Graphs cached per feature vector (cds.context.features) in a FIFO cache.
  * Lazy init: graph built on first request (features not available at startup).
  */
-export class LangGraphExecutor {
+export default class LangGraphExecutor {
   static _instance
   _caches = new Map()
 
@@ -68,3 +68,5 @@ export class LangGraphExecutor {
     return executor.execute(requestContext, eventBus)
   }
 }
+
+export { LangGraphExecutor }

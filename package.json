@@ -17,6 +17,7 @@
     "./index.cds": "./index.cds",
     "./lib/models/*": "./lib/models/*.js",
     "./srv/langgraph-executor-srv": "./srv/langgraph-executor-srv.js",
+    "./srv/pi-executor-srv": "./srv/pi-executor-srv.js",
     "./srv/*": "./srv/*",
     "./lib/*": "./lib/*"
   },
@@ -45,6 +46,8 @@
     "@a2a-js/sdk": "^0.3.12",
     "@cap-js/attachments": "^4",
     "@cap-js/mcp": "^1.4",
+    "@earendil-works/pi-agent-core": "^0.82.1",
+    "@earendil-works/pi-ai": "^0.82.1",
     "@langchain/anthropic": "^1.5.1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
@@ -79,7 +82,7 @@
     }
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.19.0"
   },
   "cds": {
     "agents": {
@@ -178,7 +181,16 @@
         },
         "llm-mock": {
           "impl": "@cap-js/agents/lib/models/mock"
+        },
+        "agent-executor-langgraph": {
+          "impl": "@cap-js/agents/srv/langgraph-executor-srv"
+        },
+        "agent-executor-pi": {
+          "impl": "@cap-js/agents/srv/pi-executor-srv"
         }
+      },
+      "agent-executor": {
+        "kind": "agent-executor-langgraph"
       },
       "[development]": {
         "llm": "mock"
@@ -191,6 +203,9 @@
       },
       "[production]": {
         "llm": "aicore"
+      },
+      "[pi]": {
+        "agent-executor": "pi"
       }
     },
     "protocols": {
