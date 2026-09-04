@@ -69,7 +69,7 @@ test("approves an order", async () => {
 })
 ```
 
-## Eval run lifecycle
+## Eval run lifecycle in MLflow
 
 Importing from `@cap-js/agents/eval` installs eval test integration for top-level `describe("name", ...)` blocks. The describe name is used as the eval run name.
 
@@ -86,20 +86,18 @@ Validation helpers such as `matchToolCall()` and `judge.evaluate()` contribute t
 
 `agent.chat()` calls the agent in-process. It is registered on `@agent` services by the agent service handlers and is intended for tests and evals.
 
-Supported forms:
-
 ```js
 await agent.chat("Show me all books")
 await agent.chat("Order it", previousResult)
 ```
 
-The stable result properties are always available:
+The typical result:
 
 ```js
 result.text // final text response
+result.status // "completed" | "input-required" | "canceled"
 result.contextId // conversation id — pass to the next chat() for multi-turn
 result.taskId // task id — used for HITL resume
-result.status // "completed" | "input-required" | "canceled"
 ```
 
 When the `test` profile is active, additional eval details are available:
@@ -126,8 +124,8 @@ const { score, comment, pass } = await new Judge(
 The constructor accepts one argument:
 
 ```js
-await new Judge("CONCISENESS_PROMPT").evaluate(result)
-await new Judge({ criteria: "TOXICITY_PROMPT", continuous: false }).evaluate(result)
+await new Judge("ANSWER_RELEVANCE_PROMPT").evaluate(result)
+await new Judge({ criteria: "ANSWER_RELEVANCE_PROMPT", continuous: false }).evaluate(result)
 ```
 
 `criteria` is used as the judge prompt source:

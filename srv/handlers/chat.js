@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
-import { startCollection } from "../../lib/testing/span-collector.js"
-import { metricsFromSpans } from "../../lib/testing/metrics.js"
-import { getActiveRunState, logMlflowMetricsForResult } from "../../lib/testing/eval-run.js"
+import { startCollection } from "../../lib/eval/span-collector.js"
+import { metricsFromSpans } from "../../lib/eval/metrics.js"
+import { getActiveRunState, logMlflowMetricsForResult } from "../../lib/eval/eval-run.js"
 
 export const COLLECT_RESULT = Symbol.for("@cap-js/agents:chat:collect-result")
 

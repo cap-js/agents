@@ -1,13 +1,8 @@
 import cds from "@sap/cds"
-import { metricsFromSpans } from "../../lib/testing/metrics.js"
-import {
-  Judge,
-  TrajectoryJudge,
-  ConversationJudge,
-  matchToolCall,
-} from "../../lib/testing/Judge.js"
-import { getActiveRunState, recordEvaluation } from "../../lib/testing/eval-run.js"
-import { installEvalDescribe } from "../../lib/testing/eval-describe.js"
+import { metricsFromSpans } from "../../lib/eval/metrics.js"
+import { Judge, TrajectoryJudge, ConversationJudge, matchToolCall } from "../../lib/eval/Judge.js"
+import { getActiveRunState, recordEvaluation } from "../../lib/eval/eval-run.js"
+import { installEvalDescribe } from "../../lib/eval/eval-describe.js"
 
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
@@ -289,7 +284,7 @@ describe("Judge prompt resolution", () => {
       ANSWER_RELEVANCE_PROMPT: "built-in answer relevance prompt",
       createLLMAsJudge,
     }))
-    const { Judge: MockedJudge } = await import("../../lib/testing/Judge.js")
+    const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
 
     await new MockedJudge("ANSWER_RELEVANCE_PROMPT")._ensureJudge()
 
@@ -301,7 +296,7 @@ describe("Judge prompt resolution", () => {
   it("passes custom criteria strings directly as the prompt", async () => {
     const createLLMAsJudge = vi.fn(() => async () => ({ score: true, comment: "" }))
     vi.doMock("openevals", () => ({ createLLMAsJudge }))
-    const { Judge: MockedJudge } = await import("../../lib/testing/Judge.js")
+    const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
     const prompt = "Evaluate this according to {inputs} and {outputs}."
 
     await new MockedJudge(prompt)._ensureJudge()
@@ -315,7 +310,7 @@ describe("Judge prompt resolution", () => {
       ANSWER_RELEVANCE_PROMPT: "built-in answer relevance prompt",
       createLLMAsJudge,
     }))
-    const { Judge: MockedJudge } = await import("../../lib/testing/Judge.js")
+    const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
 
     await new MockedJudge("ANSWER_RELEVANCE_PROMPT").criteria("Be strict.")._ensureJudge()
 
@@ -534,7 +529,7 @@ describe("eval describe patch", () => {
 // through the chat.js surface.
 
 import { COLLECT_RESULT, registerChat, shouldIncludeChatDetails } from "../../srv/handlers/chat.js"
-import { startCollection } from "../../lib/testing/span-collector.js"
+import { startCollection } from "../../lib/eval/span-collector.js"
 
 describe("chat.js: COLLECT_RESULT symbol", () => {
   it("is a Symbol with the expected key", () => {
