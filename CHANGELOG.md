@@ -13,6 +13,7 @@
 ### Changed
 
 - Adjusted agent audit log attributes to follow latest recommendations
+- LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
 
 ### Fixed
 
