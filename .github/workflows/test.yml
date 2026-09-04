@@ -13,7 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     name: Tests with Node.js ${{ matrix.node-version }} (CDS ${{ matrix.cds-version }})
     strategy:
       fail-fast: false
@@ -65,7 +65,7 @@ jobs:
           npm pkg set "peerDependencies.@sap/cds=^8"
           npm pkg set "allowScripts.better-sqlite3=true" --json
 
-      - run: npm i
+      - run: npm i --omit=peer
       - run: npm test
 
   test-hybrid:
