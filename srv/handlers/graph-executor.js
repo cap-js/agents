@@ -334,16 +334,14 @@ class GraphExecutor {
 
     let tokenCount = 0
     let finalState = null
-    // Track the current turn (langchain message id) and whether it has emitted a
-    // tool call. Anthropic-style turns can stream a text preamble BEFORE their
-    // tool_use block ("Let me first look up …"); we can't tell in advance that
-    // such a turn is planning rather than the final answer, so we stream those
-    // tokens optimistically. Once we see tool_call_chunks for the same turn, we
-    // know retrospectively that the preamble was planning — emit an authoritative
-    // event-level replace with empty text to wipe the leaked preamble, then skip
-    // all further text from this turn.
+    // Track the current turn (langchain message id). Each new turn opens a fresh
+    // bubble on the client via `append:false`; subsequent tokens of the same turn
+    // are `append:true` (accumulate). Anthropic-style turns can stream a text
+    // preamble BEFORE their tool_use block ("Let me first look up …") — we let
+    // that reasoning text stream normally; the client is responsible for the
+    // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
-    let turnHasToolCall = false
+    let thinkingCount = 0
 
     try {
       if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
@@ -379,30 +377,11 @@ class GraphExecutor {
 
           if (msgChunk.id && msgChunk.id !== currentMsgId) {
             currentMsgId = msgChunk.id
-            turnHasToolCall = false
             tokenCount = 0
           }
 
-          // Retroactively invalidate a leaked planning preamble. In a ReAct loop
-          // the model can emit "Let me look this up …" before its tool_use block
-          if (msgChunk.tool_call_chunks?.length && !turnHasToolCall) {
-            turnHasToolCall = true
-            if (tokenCount > 0) {
-              eventBus.publish({
-                kind: "artifact-update",
-                taskId,
-                contextId,
-                append: false,
-                lastChunk: false,
-                artifact: {
-                  artifactId: "response",
-                  parts: [{ kind: "text", text: "" }],
-                },
-              })
-              tokenCount = 0
-            }
-          }
-          if (turnHasToolCall) continue
+          const lastChunk =
+            !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
           const text = messageText(msgChunk?.content)
           if (!text) continue
@@ -415,12 +394,13 @@ class GraphExecutor {
             taskId,
             contextId,
             append: tokenCount > 0,
-            lastChunk: false,
+            lastChunk: lastChunk,
             artifact: {
-              artifactId: "response",
+              artifactId: `thinking-${thinkingCount}`,
               parts: [{ kind: "text", text }],
             },
           })
+          if (lastChunk) thinkingCount++
           tokenCount++
         } else if (mode === "updates") {
           // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
