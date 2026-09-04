@@ -2,11 +2,13 @@ import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
 import { partsToText, buildChatMessages, firstDataPart } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
-import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
+import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
+import { COLLECT_RESULT } from "./chat.js"
+import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
 
 const LOG = cds.log("agents")
 
@@ -679,6 +681,12 @@ class GraphExecutor {
           }),
         )
         setSpanAttrs(rootSpan, mlflowTraceAttrs())
+        // Required for MLFLow run linking
+        const evalRunId = cds.context?.["_mlflow.evalRunId"]
+        if (evalRunId) {
+          rootSpan.setAttribute("mlflow.sourceRun", evalRunId)
+          wfSpan.setAttribute("mlflow.sourceRun", evalRunId)
+        }
       }
 
       let usageData
@@ -1056,6 +1064,12 @@ class GraphExecutor {
           })
         }
 
+        // Programmatic .chat() path: stash graph result on eventBus so chat.js
+        // can read messages without an extra checkpoint roundtrip.
+        if (eventBus[COLLECT_RESULT]) {
+          eventBus._graphResult = { messages: result.messages || [] }
+        }
+
         eventBus.publish({
           kind: "status-update",
           taskId,
@@ -1223,6 +1237,10 @@ class GraphExecutor {
           final: true,
         })
       } finally {
+        // setSpanAttrs must happen at the end for the linking as else prompt might not yet have been created
+        const rootSpan = cds.context["_mlflow.rootSpan"]
+        setSpanAttrs(rootSpan, linkTraceToPrompt())
+
         this._abortControllers.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 
