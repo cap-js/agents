@@ -11,6 +11,7 @@
   },
   "type": "module",
   "exports": {
+    "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
     "./lib/index.cjs": "./lib/index.cjs",
     "./lib/models/*": "./lib/models/*.js",
