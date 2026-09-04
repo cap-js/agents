@@ -1,25 +1,18 @@
 import cds from "@sap/cds"
 
+import { AgentHarness } from "@sap/webagent"
 import { partsToText } from "../lib/utils/message-handling.js"
-import { publishedStatus } from "./pi-executor-srv.js"
-import { toPiTools } from "./pi-executor-srv.js"
+import { publishedStatus, toPiTools } from "./pi-executor-srv.js"
 
 const LOG = cds.log("agents")
 
-async function defaultRuntime() {
-  const { createHarness } = await import("@sap/webagent/harness")
-  return { createHarness }
-}
-
 /**
- * A2A executor backed by the @sap/webagent AgentHarness.
+ * A2A executor backed by @sap/webagent AgentHarness.
  * Reuses the same CDS tool and model contracts as PiExecutor but delegates
- * the agent loop (including retry and context-compaction) to the webagent
- * harness instead of driving pi-agent-core's Agent directly.
+ * the agent loop (including retry and context-compaction) to AgentHarness.
  */
 export default class WebAgentExecutor {
   static _instance
-  static runtime = defaultRuntime
 
   _sessions = new Map()
   _running = new Map()
@@ -41,29 +34,50 @@ export default class WebAgentExecutor {
     return `${cds.context?.tenant || "anonymous"}:${srv.name}:${contextId}`
   }
 
-  async _createHarness(srv, options) {
-    const [{ createHarness }, runtimeModel, tools, systemPrompt] = await Promise.all([
-      this.constructor.runtime(),
+  async _createHarness(srv, streamed, taskId, contextId, eventBus) {
+    const [runtimeModel, tools, systemPrompt] = await Promise.all([
       srv.send("buildModel"),
       srv.send("buildTools"),
       srv.send("buildSystemPrompt"),
     ])
 
-    if (!runtimeModel?.model || typeof runtimeModel.streamFn !== "function") {
+    if (!runtimeModel?.model) {
       throw new Error(
         "WebAgent executor requires a Pi-compatible model; configure a model kind such as pi-anthropic",
       )
     }
 
-    const harness = createHarness({
-      model: runtimeModel.model,
-      streamFn: runtimeModel.streamFn,
+    // AgentHarness's internal shim only supports "openai-completions". The pi-anthropic model uses
+    // "anthropic-messages", so we coerce the api field here. The caller must configure baseUrl to
+    // point at an OpenAI-compatible proxy (e.g. LiteLLM at http://localhost:6655/litellm/v1) and
+    // set modelName to the proxy's expected model ID (e.g. "anthropic/claude-sonnet-4-6" for LiteLLM).
+    const model = { ...runtimeModel.model, api: "openai-completions" }
+
+    // AgentHarnessConfig has no systemPrompt field — must be patched onto agent.state after construction.
+    // authToken must be a static string; AgentHarness does not accept a getter function.
+    const authToken = runtimeModel.getApiKey ? await runtimeModel.getApiKey() : runtimeModel.authToken
+
+    const harness = new AgentHarness({
+      model,
+      authToken,
       tools: toPiTools(tools),
-      systemPrompt,
+      onEvent(event) {
+        const update = event?.assistantMessageEvent
+        if (event?.type !== "message_update" || update?.type !== "text_delta" || !update.delta) return
+        eventBus.publish({
+          kind: "artifact-update",
+          taskId,
+          contextId,
+          append: streamed.value,
+          lastChunk: false,
+          artifact: { artifactId: "response", parts: [{ kind: "text", text: update.delta }] },
+        })
+        streamed.value = true
+      },
     })
 
-    if (runtimeModel.getApiKey && harness.agent) {
-      harness.agent.getApiKey = runtimeModel.getApiKey
+    if (systemPrompt) {
+      harness.agent.state.systemPrompt = systemPrompt
     }
 
     return harness
@@ -73,9 +87,8 @@ export default class WebAgentExecutor {
     const { taskId, contextId } = requestContext
     const controller = new AbortController()
     const sessionKey = this._sessionKey(srv, contextId)
-    let harness
-    let unsubscribe
-    let streamed = false
+    // Mutable ref so the onEvent closure and execute body share the same streamed flag.
+    const streamed = { value: false }
 
     if (cds.context) {
       cds.context["agent.task.id"] = taskId
@@ -96,28 +109,12 @@ export default class WebAgentExecutor {
     eventBus.publish(publishedStatus(taskId, contextId, "working", undefined, false))
 
     try {
-      harness = this._sessions.get(sessionKey)
+      let harness = this._sessions.get(sessionKey)
       if (!harness) {
-        harness = await this._createHarness(srv, options)
+        harness = await this._createHarness(srv, streamed, taskId, contextId, eventBus)
         this._sessions.set(sessionKey, harness)
       }
       this._running.set(taskId, { controller, harness })
-
-      unsubscribe = harness.agent.subscribe((event) => {
-        const update = event?.assistantMessageEvent
-        if (event?.type !== "message_update" || update?.type !== "text_delta" || !update.delta) {
-          return
-        }
-        eventBus.publish({
-          kind: "artifact-update",
-          taskId,
-          contextId,
-          append: streamed,
-          lastChunk: false,
-          artifact: { artifactId: "response", parts: [{ kind: "text", text: update.delta }] },
-        })
-        streamed = true
-      })
 
       const prompt = partsToText(requestContext.userMessage?.parts)
       const output = await harness.prompt(prompt)
@@ -146,7 +143,6 @@ export default class WebAgentExecutor {
       if (!canceled) LOG.error("WebAgent executor failed", { service: srv.name, error: error.message })
       eventBus.publish(publishedStatus(taskId, contextId, state, text, true))
     } finally {
-      if (typeof unsubscribe === "function") unsubscribe()
       this._running.delete(taskId)
       eventBus.finished()
     }
