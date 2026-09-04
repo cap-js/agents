@@ -80,6 +80,9 @@
         line-height: 1.5;
         font-size: 90%;
         word-break: break-word;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
       .msg.user {
         align-self: flex-end;
@@ -378,14 +381,8 @@
         }
       }
 
-      /* Thinking messages: shown as regular agent bubbles while streaming,
-         then collapsed into a <details> summary once the response arrives. */
-      .msg.thinking {
-        background: #e8eef4;
-        color: #4a6275;
-        font-style: italic;
-        border-left: 2px solid #91adc5;
-      }
+      /* Thinking messages are streamed into an expanded <details> panel,
+         then collapsed once the final response arrives. */
       .thinking-summary {
         margin: 4px 0 8px 0;
         font-size: 0.88em;
@@ -415,11 +412,6 @@
         margin-top: 4px;
       }
       @media (prefers-color-scheme: dark) {
-        .msg.thinking {
-          background: #122a3e;
-          color: #8eb0c8;
-          border-left-color: #2a4a63;
-        }
         .thinking-summary {
           color: #999;
           border-left-color: #444;
@@ -486,6 +478,7 @@
       const dot = document.getElementById("dot")
 
       let useStreaming = false
+      const THINKING_STEP_BUFFER_MS = 100
 
       let busy = false
       let contextId = null
@@ -494,12 +487,14 @@
       let activeAbort = null
       let streamingBubble = null
       let streamingText = ""
-      let thinkingMsgEls = [] // live thinking message bubbles
+      let thinkingStepEls = [] // thinking steps inside the summary panel
       let thinkingTexts = [] // accumulated text per thinking step
       let thinkingStepCount = 0
-      let thinkingSummaryEl = null // <details> created on collapse
-      let currentThinkingArtifactId = null // artifactId of open thinking bubble
+      let thinkingSummaryEl = null // <details> containing thinking steps
+      let currentThinkingArtifactId = null // artifactId of open thinking step
       let currentThinkingClosed = false // true once lastChunk seen for current id
+      let pendingThinkingUpdate = null
+      let pendingThinkingTimer = null
 
       // Auto-enable streaming when agent card advertises streaming capability
       fetch(AGENT_URL + ".well-known/agent-card.json", { headers: authHeaders() })
@@ -569,58 +564,138 @@
         return el
       }
 
-      function addThinkingStep(artifactId, text, lastChunk) {
-        const isNewBubble = artifactId !== currentThinkingArtifactId || currentThinkingClosed
-        if (isNewBubble) {
-          // Start new thinking bubble
-          const el = addMessage("agent thinking", text)
-          el._artifactId = artifactId
-          thinkingMsgEls.push(el)
+      function updateThinkingSummaryLabel() {
+        if (!thinkingSummaryEl) return
+        const summary = thinkingSummaryEl.querySelector("summary")
+        if (!summary) return
+        const count = thinkingStepCount
+        summary.textContent = `Thinking (${count} step${count === 1 ? "" : "s"})`
+      }
+
+      function ensureThinkingSummary() {
+        if (!thinkingSummaryEl) {
+          thinkingSummaryEl = document.createElement("details")
+          thinkingSummaryEl.className = "thinking-summary"
+          thinkingSummaryEl.open = true
+          const summary = document.createElement("summary")
+          thinkingSummaryEl.appendChild(summary)
+          updateThinkingSummaryLabel()
+          messages.insertBefore(
+            thinkingSummaryEl,
+            typing.parentElement === messages ? typing : statusText,
+          )
+        }
+        thinkingSummaryEl.open = true
+        return thinkingSummaryEl
+      }
+
+      function clearPendingThinkingUpdate() {
+        if (pendingThinkingTimer) clearTimeout(pendingThinkingTimer)
+        pendingThinkingTimer = null
+        pendingThinkingUpdate = null
+      }
+
+      function flushPendingThinkingUpdate() {
+        const pending = pendingThinkingUpdate
+        clearPendingThinkingUpdate()
+        if (pending) renderThinkingStep(pending.artifactId, pending.text, pending.lastChunk)
+      }
+
+      function renderThinkingStep(artifactId, text, lastChunk) {
+        const panel = ensureThinkingSummary()
+        const isNewStep = artifactId !== currentThinkingArtifactId || currentThinkingClosed
+        if (isNewStep) {
+          const step = document.createElement("div")
+          step.className = "thinking-step"
+          step._artifactId = artifactId
+          step.innerHTML = md(text)
+          panel.appendChild(step)
+          thinkingStepEls.push(step)
           thinkingTexts.push(text)
-          thinkingStepCount = thinkingMsgEls.length
+          thinkingStepCount = thinkingStepEls.length
+          updateThinkingSummaryLabel()
           currentThinkingArtifactId = artifactId
           currentThinkingClosed = false
         } else {
-          // Append to current open bubble for this artifactId
-          const idx = thinkingMsgEls.length - 1
+          // Append to current open step for this artifactId
+          const idx = thinkingStepEls.length - 1
           thinkingTexts[idx] += text
-          thinkingMsgEls[idx].innerHTML = md(thinkingTexts[idx])
+          thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
         }
         if (lastChunk) currentThinkingClosed = true
         messages.scrollTop = messages.scrollHeight
       }
 
-      function collapseThinkingMessages(beforeEl, responseText) {
-        if (thinkingMsgEls.length === 0) return
-        // Drop last thinking step if it duplicates the response text
-        const texts = [...thinkingTexts]
-        const els = [...thinkingMsgEls]
+      function addThinkingStep(artifactId, text, lastChunk) {
         if (
-          responseText &&
-          texts.length > 0 &&
-          texts[texts.length - 1].trim() === responseText.trim()
+          pendingThinkingUpdate &&
+          pendingThinkingUpdate.artifactId === artifactId &&
+          !pendingThinkingUpdate.lastChunk
         ) {
-          texts.pop()
-          els.pop()
+          pendingThinkingUpdate.text += text
+          pendingThinkingUpdate.lastChunk = lastChunk
+        } else {
+          flushPendingThinkingUpdate()
+          pendingThinkingUpdate = { artifactId, text, lastChunk }
         }
-        // Remove live thinking bubbles from DOM
-        for (const el of thinkingMsgEls) el.remove()
-        if (texts.length === 0) return
-        // Build <details> summary from accumulated thinking messages
-        thinkingSummaryEl = document.createElement("details")
-        thinkingSummaryEl.className = "thinking-summary"
-        const summary = document.createElement("summary")
-        const count = texts.length
-        summary.textContent = `Thinking (${count} step${count === 1 ? "" : "s"})`
-        thinkingSummaryEl.appendChild(summary)
-        for (const text of texts) {
-          const step = document.createElement("div")
-          step.className = "thinking-step"
-          step.innerHTML = md(text)
-          thinkingSummaryEl.appendChild(step)
+
+        if (pendingThinkingTimer) clearTimeout(pendingThinkingTimer)
+        pendingThinkingTimer = setTimeout(flushPendingThinkingUpdate, THINKING_STEP_BUFFER_MS)
+      }
+
+      function latestThinkingMatches(responseText) {
+        return (
+          responseText &&
+          thinkingTexts.length > 0 &&
+          thinkingTexts[thinkingTexts.length - 1].trim() === responseText.trim()
+        )
+      }
+
+      function promoteLatestThinkingToResponse(responseText) {
+        if (!thinkingSummaryEl || !latestThinkingMatches(responseText)) return null
+
+        thinkingTexts.pop()
+        const responseEl = thinkingStepEls.pop()
+        thinkingStepCount = thinkingStepEls.length
+
+        responseEl.className = "msg agent"
+        responseEl.innerHTML = md(responseText)
+        messages.insertBefore(responseEl, typing.parentElement === messages ? typing : statusText)
+
+        if (thinkingStepEls.length === 0) {
+          thinkingSummaryEl.remove()
+          thinkingSummaryEl = null
+        } else {
+          updateThinkingSummaryLabel()
+          thinkingSummaryEl.open = false
         }
-        // Insert collapsed details before response bubble
-        messages.insertBefore(thinkingSummaryEl, beforeEl)
+
+        messages.scrollTop = messages.scrollHeight
+        return responseEl
+      }
+
+      function finalizeThinking(beforeEl, responseText) {
+        clearPendingThinkingUpdate()
+        if (thinkingStepEls.length === 0 || !thinkingSummaryEl) return
+        // Drop last thinking step if it duplicates the response text
+        if (latestThinkingMatches(responseText)) {
+          thinkingTexts.pop()
+          const duplicate = thinkingStepEls.pop()
+          duplicate?.remove()
+          thinkingStepCount = thinkingStepEls.length
+          updateThinkingSummaryLabel()
+        }
+
+        if (thinkingStepEls.length === 0) {
+          thinkingSummaryEl.remove()
+          thinkingSummaryEl = null
+          return
+        }
+
+        if (beforeEl && thinkingSummaryEl.nextSibling !== beforeEl) {
+          messages.insertBefore(thinkingSummaryEl, beforeEl)
+        }
+        thinkingSummaryEl.open = false
       }
 
       function addApprovalPrompt(description) {
@@ -739,12 +814,15 @@
           pendingTaskId = taskId
           const msgParts = result?.status?.message?.parts ?? []
           const description = partsToText(msgParts)
+          flushPendingThinkingUpdate()
           addApprovalPrompt(description)
           return
         }
 
         // If streaming already rendered the final text via lastChunk, skip.
         if (useStreaming && streamingText !== "") {
+          finalizeThinking(streamingBubble, streamingText)
+          streamingBubble = null
           streamingText = ""
           return
         }
@@ -752,6 +830,7 @@
         // Clean up any open bubble (streaming was interrupted before lastChunk)
         if (streamingBubble) {
           if (streamingText) streamingBubble.innerHTML = md(streamingText)
+          finalizeThinking(streamingBubble, streamingText)
           streamingBubble = null
           streamingText = ""
           return
@@ -760,7 +839,9 @@
         const parts =
           result?.parts ?? result?.status?.message?.parts ?? result?.artifacts?.[0]?.parts ?? []
         const reply = partsToText(parts)
-        addMessage("agent", reply || "(no response)")
+        const replyEl =
+          promoteLatestThinkingToResponse(reply) || addMessage("agent", reply || "(no response)")
+        finalizeThinking(replyEl, reply)
       }
 
       async function send() {
@@ -785,7 +866,8 @@
         activeAbort = abort
         streamingBubble = null
         streamingText = ""
-        thinkingMsgEls = []
+        clearPendingThinkingUpdate()
+        thinkingStepEls = []
         thinkingTexts = []
         thinkingStepCount = 0
         thinkingSummaryEl = null
@@ -925,11 +1007,10 @@
                 messages.scrollTop = messages.scrollHeight
               } else {
                 typing.style.display = "none"
-                streamingBubble = addMessage("agent", text)
-                collapseThinkingMessages(streamingBubble, text)
+                streamingBubble = promoteLatestThinkingToResponse(text) || addMessage("agent", text)
               }
             }
-            if (thinkingSummaryEl) thinkingSummaryEl.open = false
+            finalizeThinking(streamingBubble, text)
             streamingBubble = null
             streamingText = text // dedupe with handleResult
             return null
@@ -940,7 +1021,6 @@
           if (!append) {
             typing.style.display = "none"
             streamingBubble = addMessage("agent", text)
-            collapseThinkingMessages(streamingBubble)
             streamingText = text
           } else if (streamingBubble) {
             // Subsequent token — accumulate into the current turn's bubble.
@@ -950,7 +1030,6 @@
             // Defensive: append:true with no bubble yet (unexpected). Open one.
             typing.style.display = "none"
             streamingBubble = addMessage("agent", text)
-            collapseThinkingMessages(streamingBubble)
             streamingText = text
           }
           messages.scrollTop = messages.scrollHeight
