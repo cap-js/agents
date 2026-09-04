@@ -4,6 +4,22 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.3 - tbd
+
+### Added
+
+- Debug logs for tool calls
+
+### Changed
+
+- Adjusted agent audit log attributes to follow latest recommendations
+- LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
+
+### Fixed
+
+- A2A agent card advertises `https://` instead of `http://` when deployed behind a cloud reverse proxy (CF, BTP, Kyma) by reading `X-Forwarded-Proto`
+- Fixed remote MCP connections with authenticated server cards
+
 ## Version 0.9.2 - 2026-08-26
 
 ### Added

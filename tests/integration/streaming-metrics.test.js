@@ -94,6 +94,9 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
     const data = decisions[0].data.data
     expect(data.event).toBe("AgentDecision")
     expect(data.model).toBe("mock-streaming-model")
+    expect(data.provider).toBe(cds.env.requires.llm.kind)
+    expect(data.modelParams).toEqual({ temperature: 0, max_tokens: 100 })
+    expect(data.finishReason).toBe("stop")
     expect(typeof data.taskId).toBe("string")
     expect(typeof data.duration).toBe("number")
     expect(data.tokenUsage.input_tokens).toBe(10) // from mock AI Core

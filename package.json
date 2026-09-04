@@ -25,6 +25,8 @@
     "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
     "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
+    "docs:audit": "node .scripts/generate-audit-docs.js",
+    "docs:audit:check": "node .scripts/generate-audit-docs.js --check",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
   },
@@ -45,7 +47,6 @@
     "@sap-ai-sdk/langchain": "^2.13.0",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/connectivity": "^4.7.0",
-    "@sap-cloud-sdk/resilience": "^4.7.0",
     "deepagents": "^1.10.0",
     "langchain": "^1.5.0",
     "marked": "^18",
@@ -56,6 +57,7 @@
     "@cap-js/sqlite": "^3",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
+    "acorn": "^8.18.0",
     "deepagents": "^1.10.2"
   },
   "peerDependencies": {
@@ -106,6 +108,12 @@
       },
       "persistAllCheckpointWrites": false,
       "activeUsersInterval": "24h",
+      "circuitBreaker": {
+        "errorThresholdPercentage": 50,
+        "volumeThreshold": 10,
+        "resetTimeout": 30000,
+        "rollingCountTimeout": 10000
+      },
       "params": {
         "max_tokens": 4096,
         "temperature": 0
