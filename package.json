@@ -14,6 +14,7 @@
     "./cds-plugin": "./cds-plugin.js",
     "./lib/index.cjs": "./lib/index.cjs",
     "./lib/models/*": "./lib/models/*.js",
+    "./srv/entities.cds": "./srv/entities.cds",
     "./srv/push-notification-srv.js": "./srv/push-notification-srv.js"
   },
   "scripts": {
