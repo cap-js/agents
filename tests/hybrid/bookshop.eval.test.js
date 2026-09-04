@@ -35,6 +35,15 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
 
+  test.concurrent("Custom prompt", async () => {
+    const agent = await cds.connect.to("CatalogService")
+    const result = await agent.chat("Show me all books")
+    const judge = new Judge("Should behave as a helpful librarian")
+
+    const judgement = await judge.evaluate(result)
+    expect(judgement.score).toBeGreaterThanOrEqual(PASS)
+  })
+
   test.concurrent("reports a specific stock level", async () => {
     const agent = await cds.connect.to("CatalogService")
     const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
