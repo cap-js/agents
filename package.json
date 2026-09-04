@@ -10,6 +10,11 @@
     "url": "git+https://github.com/cap-js/agents.git"
   },
   "type": "module",
+  "exports": {
+    "./cds-plugin": "./cds-plugin.js",
+    "./lib/index.cjs": "./lib/index.cjs",
+    "./lib/models/*": "./lib/models/*.js"
+  },
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
