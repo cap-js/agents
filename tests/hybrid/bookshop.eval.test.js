@@ -42,7 +42,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     const tc = result.toolCalls
     expect(
       tc.some((c) => c.tool === "getStock") ||
-      tc.some((c) => c.tool === "query" && JSON.stringify(c.args).includes("stock")),
+        tc.some((c) => c.tool === "query" && JSON.stringify(c.args).includes("stock")),
     ).toBe(true)
 
     const judgement = await judge
