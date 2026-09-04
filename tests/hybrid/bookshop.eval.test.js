@@ -4,7 +4,7 @@
  */
 import cds from "@sap/cds"
 import { vi, test } from "vitest"
-import { Judge, TrajectoryJudge, ConverstationJudge, matchToolCall } from "@cap-js/agents"
+import { Judge, TrajectoryJudge, ConversationJudge, matchToolCall } from "@cap-js/agents/eval"
 
 const PASS = 0.7
 
@@ -178,10 +178,10 @@ describe("bookshop CatalogService — conversation-level judges", () => {
     const r2 = await agent.chat("Tell me about that book.", r1)
 
     // Conversation-level judges evaluate the full session
-    const completion = await new ConverstationJudge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
+    const completion = await new ConversationJudge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
     expect(completion.pass).toBe(true)
 
-    const retention = await new ConverstationJudge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
+    const retention = await new ConversationJudge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
     expect(retention.pass).toBe(true)
   })
 })
