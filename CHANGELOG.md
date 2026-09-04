@@ -14,6 +14,7 @@
 
 - Adjusted agent audit log attributes to follow latest recommendations
 - LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
+- Prompt caching is now applied when GPT models are used (previously it was only applied with anthropic models)
 
 ### Fixed
 
