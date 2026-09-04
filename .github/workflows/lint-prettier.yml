@@ -24,4 +24,5 @@ jobs:
       - run: npm set min-release-age=3
       - run: npm ci
       - run: npm run lint
+      - run: npm run docs:audit:check
       - run: npm run prettier:check

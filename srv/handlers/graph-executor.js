@@ -753,7 +753,6 @@ class GraphExecutor {
               contextId,
               service: serviceName,
               decision,
-              userMessage: requestContext.userMessage,
             },
           })
           // On edit, stash a diff note in state; the injector middleware prepends it next turn.
@@ -823,7 +822,7 @@ class GraphExecutor {
               contextId,
               service: serviceName,
               description,
-              userMessage: requestContext.userMessage,
+              interruptData,
             },
           })
 
@@ -878,8 +877,7 @@ class GraphExecutor {
             service: serviceName,
             duration,
             tokenUsage: usageData,
-            toolCalls: totalToolCalls(result.messages),
-            output: output?.slice(0, 2000),
+            toolCalls: toolCallsShortened(result.messages),
             task: requestContext.task,
           },
         })
@@ -1371,4 +1369,14 @@ function totalToolCalls(messages) {
     if (val.type === "tool") acc++
     return acc
   }, 0)
+}
+
+/**
+ * @param {[import('@langchain/core/messages').Message]} messages
+ */
+function toolCallsShortened(messages) {
+  return messages.reduce((acc, val) => {
+    if (val.type === "tool") acc.push(val.name)
+    return acc
+  }, [])
 }
