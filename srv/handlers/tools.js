@@ -31,6 +31,7 @@ function cachedAuth(srv) {
 
 class GenericReadTool extends DynamicStructuredTool {
   constructor(srv, entities) {
+    const log = cds.log("agents:" + srv.name)
     const def = createGenericReadToolDefinition(Object.keys(entities), srv.name, "")
     super({
       name: def.name,
@@ -38,7 +39,7 @@ class GenericReadTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
+        return unwrap(await executeGenericReadTool(srv, entities, args, { log }))
       },
     })
     this.srv = srv
@@ -67,6 +68,7 @@ class GenericReadTool extends DynamicStructuredTool {
 
 class DescribeTool extends DynamicStructuredTool {
   constructor(srv, entities, actions) {
+    const log = cds.log("agents:" + srv.name)
     const def = createDescribeToolDefinition(
       Object.keys(entities),
       Object.keys(actions),
@@ -79,7 +81,7 @@ class DescribeTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
+        return unwrap(await executeDescribe(srv, entities, actions, args, { log }))
       },
     })
     this.srv = srv
@@ -119,6 +121,7 @@ class DescribeTool extends DynamicStructuredTool {
 
 class PerActionTool extends DynamicStructuredTool {
   constructor(srv, actionName, action) {
+    const log = cds.log("agents:" + srv.name)
     const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
     super({
       name: def.name,
@@ -126,7 +129,7 @@ class PerActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executePerActionTool(srv, actionName, action, args, { log: LOG }))
+        return unwrap(await executePerActionTool(srv, actionName, action, args, { log }))
       },
     })
     this.srv = srv
@@ -142,6 +145,7 @@ class PerActionTool extends DynamicStructuredTool {
 
 class CallActionTool extends DynamicStructuredTool {
   constructor(srv, actions) {
+    const log = cds.log("agents:" + srv.name)
     const def = createCallActionToolDefinition(Object.keys(actions), srv.name, "")
     super({
       name: def.name,
@@ -149,7 +153,7 @@ class CallActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
+        return unwrap(await executeCallActionTool(srv, actions, args, { log }))
       },
     })
     this.srv = srv
