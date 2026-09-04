@@ -413,7 +413,7 @@
       }
       @media (prefers-reduced-motion: no-preference) {
         .thinking-summary {
-          transition: height 0.18s ease;
+          transition: height 0.16s ease;
         }
       }
       @media (prefers-color-scheme: dark) {
@@ -484,6 +484,7 @@
 
       let useStreaming = false
       const THINKING_STEP_BUFFER_MS = 100
+      const THINKING_SUMMARY_ANIMATION_MS = 160
 
       let busy = false
       let contextId = null
@@ -583,6 +584,7 @@
           thinkingSummaryEl.className = "thinking-summary"
           thinkingSummaryEl.open = true
           const summary = document.createElement("summary")
+          summary.addEventListener("click", toggleThinkingSummary)
           thinkingSummaryEl.appendChild(summary)
           updateThinkingSummaryLabel()
           messages.insertBefore(
@@ -590,6 +592,7 @@
             typing.parentElement === messages ? typing : statusText,
           )
         }
+        cancelThinkingSummaryAnimation(thinkingSummaryEl)
         thinkingSummaryEl.open = true
         return thinkingSummaryEl
       }
@@ -604,6 +607,29 @@
         const pending = pendingThinkingUpdate
         clearPendingThinkingUpdate()
         if (pending) renderThinkingStep(pending.artifactId, pending.text, pending.lastChunk)
+      }
+
+      function prefersReducedMotion() {
+        return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      }
+
+      function resetThinkingSummaryAnimation(el) {
+        el.style.height = ""
+        el.style.overflow = ""
+      }
+
+      function cancelThinkingSummaryAnimation(el) {
+        if (!el) return
+        el._thinkingAnimationId = (el._thinkingAnimationId ?? 0) + 1
+        resetThinkingSummaryAnimation(el)
+      }
+
+      function toggleThinkingSummary(event) {
+        if (prefersReducedMotion()) return
+        event.preventDefault()
+        const el = event.currentTarget.parentElement
+        if (el.open) collapseThinkingSummary(el)
+        else expandThinkingSummary(el)
       }
 
       function renderThinkingStep(artifactId, text, lastChunk) {
@@ -672,7 +698,7 @@
           thinkingSummaryEl = null
         } else {
           updateThinkingSummaryLabel()
-          collapseThinkingSummary()
+          collapseThinkingSummary(thinkingSummaryEl)
         }
 
         messages.scrollTop = messages.scrollHeight
@@ -700,15 +726,13 @@
         if (beforeEl && thinkingSummaryEl.nextSibling !== beforeEl) {
           messages.insertBefore(thinkingSummaryEl, beforeEl)
         }
-        collapseThinkingSummary()
+        collapseThinkingSummary(thinkingSummaryEl)
       }
 
-      function collapseThinkingSummary() {
-        const el = thinkingSummaryEl
+      function collapseThinkingSummary(el) {
         if (!el || !el.open) return
 
-        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        if (prefersReducedMotion) {
+        if (prefersReducedMotion()) {
           el.open = false
           return
         }
@@ -716,24 +740,61 @@
         const summary = el.querySelector("summary")
         const startHeight = `${el.offsetHeight}px`
         const endHeight = `${summary?.offsetHeight ?? 0}px`
+        const animationId = (el._thinkingAnimationId ?? 0) + 1
+        el._thinkingAnimationId = animationId
         let finished = false
 
         const finish = () => {
+          el.removeEventListener("transitionend", finish)
+          if (el._thinkingAnimationId !== animationId) return
           if (finished) return
           finished = true
-          el.removeEventListener("transitionend", finish)
-          if (thinkingSummaryEl === el) el.open = false
-          el.style.height = ""
-          el.style.overflow = ""
+          el.open = false
+          resetThinkingSummaryAnimation(el)
         }
 
+        resetThinkingSummaryAnimation(el)
         el.style.overflow = "hidden"
         el.style.height = startHeight
         requestAnimationFrame(() => {
           el.style.height = endHeight
         })
         el.addEventListener("transitionend", finish)
-        setTimeout(finish, 240)
+        setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
+      }
+
+      function expandThinkingSummary(el) {
+        if (!el || el.open) return
+
+        if (prefersReducedMotion()) {
+          el.open = true
+          return
+        }
+
+        el.open = true
+        const summary = el.querySelector("summary")
+        const startHeight = `${summary?.offsetHeight ?? 0}px`
+        const endHeight = `${el.scrollHeight}px`
+        const animationId = (el._thinkingAnimationId ?? 0) + 1
+        el._thinkingAnimationId = animationId
+        let finished = false
+
+        const finish = () => {
+          el.removeEventListener("transitionend", finish)
+          if (el._thinkingAnimationId !== animationId) return
+          if (finished) return
+          finished = true
+          resetThinkingSummaryAnimation(el)
+        }
+
+        resetThinkingSummaryAnimation(el)
+        el.style.overflow = "hidden"
+        el.style.height = startHeight
+        requestAnimationFrame(() => {
+          el.style.height = endHeight
+        })
+        el.addEventListener("transitionend", finish)
+        setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
       }
 
       function addApprovalPrompt(description) {
