@@ -11,17 +11,14 @@
   },
   "type": "module",
   "exports": {
-    ".": "./index.js",
-    "./eval": "./lib/eval/index.js",
     "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
-    "./index.cds": "./index.cds",
+    "./eval": "./lib/eval/index.js",
+    "./lib/index.cjs": "./lib/index.cjs",
     "./lib/models/*": "./lib/models/*.js",
-    "./srv/langgraph-executor-srv": "./srv/langgraph-executor-srv.js",
-    "./srv/*": "./srv/*",
-    "./lib/*": "./lib/*"
+    "./srv/entities.cds": "./srv/entities.cds",
+    "./srv/push-notification-srv.js": "./srv/push-notification-srv.js"
   },
-  "main": "index.js",
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
@@ -37,11 +34,9 @@
     "prettier:check": "npx -y prettier@3 --check ."
   },
   "files": [
-    "index.js",
-    "index.cds",
+    "cds-plugin.js",
     "lib",
     "srv",
-    "cds-plugin.js",
     "_i18n"
   ],
   "dependencies": {
@@ -170,7 +165,7 @@
     },
     "requires": {
       "agents": {
-        "model": "@cap-js/agents"
+        "model": "@cap-js/agents/srv/entities.cds"
       },
       "agent-push-notifications": {
         "impl": "@cap-js/agents/srv/push-notification-srv.js"

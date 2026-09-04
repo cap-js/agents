@@ -2,7 +2,7 @@ using {
   cap.agent.Tasks,
   cap.agent.Checkpoints,
   cap.agent.CheckpointWrites
-} from '../../../../../index.cds';
+} from '../../../../../srv/entities';
 
 service AgentDevService {
   entity AgentTasks            as projection on Tasks;
