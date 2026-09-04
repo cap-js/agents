@@ -96,7 +96,7 @@ cds.on("served", async () => {
   }
 
   if (cds.env.agents?.mlflow) {
-    const { setupMlflowExporter } = await import("./lib/telemetry/mlflow.js")
+    const { setupMlflowExporter } = await import("./lib/telemetry/mlflow/index.js")
     setupMlflowExporter()
   }
 })

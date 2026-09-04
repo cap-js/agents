@@ -13,6 +13,7 @@
   "exports": {
     "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
+    "./eval": "./lib/eval/index.js",
     "./lib/index.cjs": "./lib/index.cjs",
     "./lib/models/*": "./lib/models/*.js",
     "./srv/entities.cds": "./srv/entities.cds",
@@ -60,18 +61,23 @@
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "acorn": "^8.18.0",
-    "deepagents": "^1.10.2"
+    "deepagents": "^1.10.2",
+    "openevals": "^0.2.0"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
-    "@sap/cds": ">=9"
+    "@sap/cds": ">=9",
+    "openevals": ">=0.2"
   },
   "peerDependenciesMeta": {
     "@cap-js/telemetry": {
       "optional": true
     },
     "@cap-js/audit-logging": {
+      "optional": true
+    },
+    "openevals": {
       "optional": true
     }
   },
