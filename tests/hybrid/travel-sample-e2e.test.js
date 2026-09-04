@@ -114,8 +114,14 @@ describe("@cap-js/agents - Travel Sample E2E", () => {
     const skillIds = card.skills.map((s) => s.id).sort()
     expect(
       skillIds,
-      `expected four skills from skills/ scan, got: ${JSON.stringify(skillIds)}`,
-    ).toEqual(["file-based-planning", "flight-booking", "itinerary-summary", "trip-planning"])
+      `expected five skills from skills/ scan, got: ${JSON.stringify(skillIds)}`,
+    ).toEqual([
+      "file-based-planning",
+      "flight-booking",
+      "itinerary-export",
+      "itinerary-summary",
+      "trip-planning",
+    ])
 
     const trip = card.skills.find((s) => s.id === "trip-planning")
     expect(trip.name).toMatch(/Trip Planning/i)

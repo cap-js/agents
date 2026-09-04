@@ -53,3 +53,7 @@ IMPORTANT: For MCP tools, always call `flights_describe` first to learn the exac
 
 When the user uploads a file, it is available at `/uploads/<filename>`. Use `read_file` to retrieve its contents.
 When you produce an itinerary that should be saved, use `write_file` with a path under `/outputs/`.
+
+### Structured Data
+
+When the caller is another agent or a program (or the user asks for the plan "as data" / "structured" / "machine-readable"), return the itinerary as a structured object via `emit_data_part({ data })`. It rides back alongside your text answer as a DataPart the caller can consume programmatically — do not dump raw JSON into your prose. See the `itinerary-export` skill.

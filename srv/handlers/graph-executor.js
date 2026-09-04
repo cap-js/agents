@@ -86,31 +86,61 @@ function messageText(content) {
 }
 
 /**
- * Default output mapper: extracts response text from graph result.
- * Priority: last AI message content > result.output > JSON stringified result.
+ * Default output mapper: derive the agent's final answer from the graph result.
+ * Returns either a plain string (TextPart only) or `{ text, data }` when the
+ * result carries structured data (emitted as a TextPart + DataPart). Structured
+ * data is recognized so it is no longer silently JSON-stringified into a TextPart.
+ * Priority: structuredResponse > last AI message text > result.output > JSON fallback.
  */
 function defaultOutputMapper(result) {
-  // 1. Messages-based: last message content (standard LangChain pattern)
+  // Text from the last message (standard LangChain pattern), if any.
+  let text = ""
   if (result.messages?.length > 0) {
-    const lastMsg = result.messages[result.messages.length - 1]
-    const text = messageText(lastMsg?.content)
-    if (text) return text
+    text = messageText(result.messages[result.messages.length - 1]?.content) || ""
   }
-  // 2. Output field (e.g. travel-sample pattern)
-  if (result.output) return result.output
-  // 3. Fallback
+
+  // 1. LangGraph structured output (responseFormat) → DataPart, plus text when present.
+  if (result.structuredResponse && typeof result.structuredResponse === "object") {
+    return { text, data: result.structuredResponse }
+  }
+
+  // 2. Messages-based text.
+  if (text) return text
+
+  // 3. `output` field: a legacy AgentExecutor result or a custom StateGraph channel
+  //    named `output`. Legacy AgentExecutor and every graph we ship write a string
+  //    here → TextPart. A plain object is not a first-party LangChain/LangGraph
+  //    default (canonical structured output arrives via structuredResponse, case 1),
+  //    but a user-defined `output` channel could carry one — so handle it defensively
+  //    as a DataPart (previously it was stuffed into a TextPart as an object — malformed).
+  if (result.output) {
+    if (typeof result.output === "object" && !Array.isArray(result.output)) {
+      return { text: "", data: result.output }
+    }
+    return result.output
+  }
+
+  // 4. Fallback — truly-unknown result, not agent-intended structured output.
   return JSON.stringify(result)
+}
+
+// Build A2A message parts: always a TextPart; append a DataPart when `data` is a
+// plain object (arrays/strings/null carry on the TextPart alone). Shared so the
+// completed status message and the "response" artifact build identical parts from
+// one place — keeping the single v0.3 `{kind:"data"}` emit branch DRY.
+function messageParts(text, data) {
+  const parts = [{ kind: "text", text }]
+  if (data && typeof data === "object" && !Array.isArray(data)) parts.push({ kind: "data", data })
+  return parts
 }
 
 // Construct a spec-compliant A2A Message; when `data` is a plain object, append it as a DataPart.
 function agentMessage(text, data) {
-  const parts = [{ kind: "text", text }]
-  if (data && typeof data === "object") parts.push({ kind: "data", data })
   return {
     kind: "message",
     messageId: cds.utils.uuid(),
     role: "agent",
-    parts,
+    parts: messageParts(text, data),
   }
 }
 
@@ -844,7 +874,13 @@ class GraphExecutor {
 
         const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = outputMapper(result) || "I could not generate a response."
+        // The mapper may return a string (TextPart only) or { text, data } (TextPart +
+        // DataPart). Normalize: `output` stays a string for spans/audit/artifact text;
+        // `outputData`, when present, rides a DataPart on the completed message + artifact.
+        const mapped = outputMapper(result)
+        const output =
+          (typeof mapped === "string" ? mapped : mapped?.text) || "I could not generate a response."
+        const outputData = mapped && typeof mapped === "object" ? mapped.data : undefined
 
         LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
 
@@ -897,7 +933,7 @@ class GraphExecutor {
           lastChunk: true,
           artifact: {
             artifactId: "response",
-            parts: [{ kind: "text", text: output }],
+            parts: messageParts(output, outputData),
           },
         })
 
@@ -906,6 +942,10 @@ class GraphExecutor {
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
         const fileArtifacts = []
+        // DataParts embedded in tool-result content (e.g. emit_data_part). Structured,
+        // opaque objects — no byte cap, no /uploads re-persist. Published as their own
+        // `data-*` artifact-update events below.
+        const dataArtifacts = []
         const maxFileBytes = cds.env.agents.fileIO.maxOutputFileSizeBytes
 
         // Artifacts from emit_file_part are this agent's own outputs — they must be
@@ -929,7 +969,11 @@ class GraphExecutor {
           const content = typeof msg.content === "string" ? msg.content : ""
           let pos = 0
           while (pos < content.length) {
-            const start = content.indexOf('{"kind":"file"', pos)
+            // Find the earliest next FilePart or DataPart marker. The walker below is
+            // kind-agnostic; routing happens after JSON.parse via `artifact.kind`.
+            const fileAt = content.indexOf('{"kind":"file"', pos)
+            const dataAt = content.indexOf('{"kind":"data"', pos)
+            const start = fileAt === -1 ? dataAt : dataAt === -1 ? fileAt : Math.min(fileAt, dataAt)
             if (start === -1) break
             // Walk forward tracking depth and quoted strings so that '}' inside
             // a string value (e.g. a filename like "result_{final}.csv") does not
@@ -958,6 +1002,12 @@ class GraphExecutor {
             const raw = content.slice(start, i + 1)
             try {
               const artifact = JSON.parse(raw)
+              if (artifact.kind === "data") {
+                // Opaque structured payload — surfaced verbatim as a DataPart artifact.
+                dataArtifacts.push(artifact)
+                pos = i + 1
+                continue
+              }
               // Apply the same per-file size cap as Source 2. Decode-length is
               // computed by Buffer.byteLength (zero allocation — pure formula
               // over string length + padding) so an oversized blob never pins
@@ -1078,13 +1128,37 @@ class GraphExecutor {
           })
         }
 
+        // Publish DataParts collected from tool-result content as their own
+        // artifact-update events, so structured tool output surfaces to A2A clients
+        // (mirrors the FilePart path above; the completed message carries the agent's
+        // final-answer DataPart separately).
+        dataArtifacts.forEach((artifact, i) => {
+          if (artifact.data == null || typeof artifact.data !== "object") {
+            LOG.warn("skipping malformed data artifact", {
+              conversation: short(contextId),
+              service: serviceName,
+            })
+            return
+          }
+          LOG.info("data emitted", { conversation: short(contextId), service: serviceName })
+          eventBus.publish({
+            kind: "artifact-update",
+            taskId,
+            contextId,
+            artifact: {
+              artifactId: `data-${i}`,
+              parts: [{ kind: "data", data: artifact.data }],
+            },
+          })
+        })
+
         eventBus.publish({
           kind: "status-update",
           taskId,
           contextId,
           status: {
             state: "completed",
-            message: agentMessage(output),
+            message: agentMessage(output, outputData),
             timestamp: new Date().toISOString(),
           },
           final: true,

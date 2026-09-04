@@ -126,3 +126,51 @@ Content-Type: application/json
     "id": "<TASK_ID>"
   }
 }
+
+###
+# DataPart scenario — return the itinerary as machine-readable structured data.
+#
+# What this exercises end-to-end (the itinerary-export skill):
+#   1. Agent plans the trip (flights + hotel + activities) as usual
+#   2. Agent assembles a structured itinerary object and calls emit_data_part({ data })
+#   3. emit_data_part returns {"kind":"data", data} as its tool-result content
+#   4. After graph.invoke(), the executor's tool-result scanner finds the
+#      {"kind":"data"} marker and republishes it as a "data-0" artifact-update
+#   5. The completed message carries a TextPart (human recap) AND — when the graph
+#      surfaces structured data — a {"kind":"data"} Part alongside it
+#
+# A calling agent recovers the object with firstDataPart(parts) — the B→A hand-off.
+# Requires an LLM (run leisure-services with --profile hybrid); dev-mode mocks won't
+# trigger the emission, same as the FilePart scenario above.
+POST http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "message/send",
+  "params": {
+    "message": {
+      "messageId": "msg-006",
+      "contextId": null,
+      "role": "user",
+      "parts": [{"kind": "text", "text": "Plan a weekend trip to Rome from New York, moderate budget, I love food and history. Return the plan as machine-readable structured data so my booking system can ingest it."}]
+    }
+  }
+}
+
+###
+# Verify the DataPart artifact — replace <TASK_ID> from the response above.
+# Look for an artifact with artifactId "data-0" whose parts contain a
+# {"kind":"data", "data": {...}} Part holding the structured itinerary object.
+GET http://localhost:4004/a2a/travel-agent/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "tasks/get",
+  "params": {
+    "id": "<TASK_ID>"
+  }
+}
