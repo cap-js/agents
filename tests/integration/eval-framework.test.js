@@ -38,6 +38,10 @@ function makeAgentSpan(startMs, endMs) {
   }
 }
 
+function customJudgePrompt(criteria) {
+  return `${criteria}\n\n<input>\n{inputs}\n</input>\n\n<output>\n{outputs}\n</output>`
+}
+
 function makeDescribeDouble() {
   const calls = []
 
@@ -306,7 +310,7 @@ describe("Judge prompt resolution", () => {
     )
   })
 
-  it("passes custom criteria strings directly as the prompt", async () => {
+  it("adds input and output placeholders to custom criteria prompts", async () => {
     const createLLMAsJudge = vi.fn(() => async () => ({ score: true, comment: "" }))
     vi.doMock("openevals", () => ({ createLLMAsJudge }))
     const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
@@ -314,7 +318,9 @@ describe("Judge prompt resolution", () => {
 
     await new MockedJudge(prompt)._ensureJudge()
 
-    expect(createLLMAsJudge).toHaveBeenCalledWith(expect.objectContaining({ prompt }))
+    expect(createLLMAsJudge).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: customJudgePrompt(prompt) }),
+    )
   })
 
   it("resolves an openevals prompt key before appended criteria", async () => {
@@ -341,7 +347,9 @@ describe("Judge prompt resolution", () => {
 
     await new MockedJudge({ criteria: prompt, type: "trajectory" })._ensureJudge()
 
-    expect(createTrajectoryLLMAsJudge).toHaveBeenCalledWith(expect.objectContaining({ prompt }))
+    expect(createTrajectoryLLMAsJudge).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: customJudgePrompt(prompt) }),
+    )
     expect(createLLMAsJudge).not.toHaveBeenCalled()
   })
 
@@ -375,7 +383,7 @@ describe("Judge prompt resolution", () => {
     ])
 
     expect(createLLMAsJudge).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "custom trajectory prompt" }),
+      expect.objectContaining({ prompt: customJudgePrompt("custom trajectory prompt") }),
     )
     expect(createTrajectoryLLMAsJudge).not.toHaveBeenCalled()
     expect(judgeImpl).toHaveBeenCalledWith({ outputs: ["m1"] })
