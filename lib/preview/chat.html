@@ -411,6 +411,11 @@
         border-top: 1px dashed #e0e0e0;
         margin-top: 4px;
       }
+      @media (prefers-reduced-motion: no-preference) {
+        .thinking-summary {
+          transition: height 0.18s ease;
+        }
+      }
       @media (prefers-color-scheme: dark) {
         .thinking-summary {
           color: #999;
@@ -667,7 +672,7 @@
           thinkingSummaryEl = null
         } else {
           updateThinkingSummaryLabel()
-          thinkingSummaryEl.open = false
+          collapseThinkingSummary()
         }
 
         messages.scrollTop = messages.scrollHeight
@@ -695,7 +700,40 @@
         if (beforeEl && thinkingSummaryEl.nextSibling !== beforeEl) {
           messages.insertBefore(thinkingSummaryEl, beforeEl)
         }
-        thinkingSummaryEl.open = false
+        collapseThinkingSummary()
+      }
+
+      function collapseThinkingSummary() {
+        const el = thinkingSummaryEl
+        if (!el || !el.open) return
+
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        if (prefersReducedMotion) {
+          el.open = false
+          return
+        }
+
+        const summary = el.querySelector("summary")
+        const startHeight = `${el.offsetHeight}px`
+        const endHeight = `${summary?.offsetHeight ?? 0}px`
+        let finished = false
+
+        const finish = () => {
+          if (finished) return
+          finished = true
+          el.removeEventListener("transitionend", finish)
+          if (thinkingSummaryEl === el) el.open = false
+          el.style.height = ""
+          el.style.overflow = ""
+        }
+
+        el.style.overflow = "hidden"
+        el.style.height = startHeight
+        requestAnimationFrame(() => {
+          el.style.height = endHeight
+        })
+        el.addEventListener("transitionend", finish)
+        setTimeout(finish, 240)
       }
 
       function addApprovalPrompt(description) {
