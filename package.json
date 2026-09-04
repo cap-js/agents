@@ -30,8 +30,8 @@
     "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
     "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
-    "docs:audit": "node scripts/generate-audit-docs.js",
-    "docs:audit:check": "node scripts/generate-audit-docs.js --check",
+    "docs:audit": "node .scripts/generate-audit-docs.js",
+    "docs:audit:check": "node .scripts/generate-audit-docs.js --check",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
   },
