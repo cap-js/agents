@@ -73,8 +73,13 @@
         gap: 14px;
       }
 
-      .msg {
+      .msg,
+      .thinking-summary {
         max-width: 75%;
+        box-sizing: border-box;
+      }
+
+      .msg {
         padding: 10px 14px;
         border-radius: 12px;
         line-height: 1.5;
@@ -384,11 +389,13 @@
       /* Thinking messages are streamed into an expanded <details> panel,
          then collapsed once the final response arrives. */
       .thinking-summary {
+        align-self: flex-start;
         margin: 4px 0 8px 0;
         font-size: 0.88em;
         color: #666;
         border-left: 2px solid #ccc;
         padding-left: 10px;
+        overflow-wrap: anywhere;
       }
       .thinking-summary summary {
         cursor: pointer;
@@ -404,8 +411,10 @@
         content: "▼ ";
       }
       .thinking-step {
+        min-width: 0;
         padding: 4px 0;
         font-style: italic;
+        overflow-x: auto;
       }
       .thinking-step + .thinking-step {
         border-top: 1px dashed #e0e0e0;
@@ -493,6 +502,7 @@
       let activeAbort = null
       let streamingBubble = null
       let streamingText = ""
+      let thinkingFinalized = false
       let thinkingStepEls = [] // thinking steps inside the summary panel
       let thinkingTexts = [] // accumulated text per thinking step
       let thinkingStepCount = 0
@@ -690,6 +700,7 @@
         thinkingStepCount = thinkingStepEls.length
 
         responseEl.className = "msg agent"
+        responseEl._promotedFromThinking = true
         responseEl.innerHTML = md(responseText)
         messages.insertBefore(responseEl, typing.parentElement === messages ? typing : statusText)
 
@@ -707,15 +718,15 @@
 
       function finalizeThinking(beforeEl, responseText) {
         clearPendingThinkingUpdate()
+        if (beforeEl?._promotedFromThinking) return
         if (thinkingStepEls.length === 0 || !thinkingSummaryEl) return
-        // Drop last thinking step if it duplicates the response text
-        if (latestThinkingMatches(responseText)) {
-          thinkingTexts.pop()
-          const duplicate = thinkingStepEls.pop()
-          duplicate?.remove()
-          thinkingStepCount = thinkingStepEls.length
-          updateThinkingSummaryLabel()
-        }
+        // Stream labels every model turn as thinking until terminal response is
+        // known. Its final turn is authoritative response, never a thinking step.
+        thinkingTexts.pop()
+        const finalResponse = thinkingStepEls.pop()
+        finalResponse?.remove()
+        thinkingStepCount = thinkingStepEls.length
+        updateThinkingSummaryLabel()
 
         if (thinkingStepEls.length === 0) {
           thinkingSummaryEl.remove()
@@ -920,7 +931,7 @@
 
         // If streaming already rendered the final text via lastChunk, skip.
         if (useStreaming && streamingText !== "") {
-          finalizeThinking(streamingBubble, streamingText)
+          if (!thinkingFinalized) finalizeThinking(streamingBubble, streamingText)
           streamingBubble = null
           streamingText = ""
           return
@@ -965,6 +976,7 @@
         activeAbort = abort
         streamingBubble = null
         streamingText = ""
+        thinkingFinalized = false
         clearPendingThinkingUpdate()
         thinkingStepEls = []
         thinkingTexts = []
@@ -1110,6 +1122,7 @@
               }
             }
             finalizeThinking(streamingBubble, text)
+            thinkingFinalized = true
             streamingBubble = null
             streamingText = text // dedupe with handleResult
             return null
