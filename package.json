@@ -13,7 +13,8 @@
   "exports": {
     "./cds-plugin": "./cds-plugin.js",
     "./lib/index.cjs": "./lib/index.cjs",
-    "./lib/models/*": "./lib/models/*.js"
+    "./lib/models/*": "./lib/models/*.js",
+    "./srv/push-notification-srv.js": "./srv/push-notification-srv.js"
   },
   "scripts": {
     "lint": "npx eslint .",

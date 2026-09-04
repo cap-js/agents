@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { StateGraph, Annotation, messagesStateReducer } from "@langchain/langgraph"
 import { circuitBreaker, timeout } from "@sap-cloud-sdk/resilience"
-import { ms4 } from "@cap-js/agents/lib/utils/utils.js"
+import { ms4 } from "../../../../lib/utils/utils.js"
 
 const LOG = cds.log("agents")
 
