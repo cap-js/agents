@@ -6,10 +6,6 @@
 
 ## Version 0.9.3 - tbd
 
-### Fixed
-
-- Fixed remote MCP connections with authenticated server cards
-
 ### Added
 
 - Added evaluation helpers & MLFlow integration to test the agents behaviour & functional correctness
@@ -17,12 +13,14 @@
 
 ### Changed
 
+- Adjusted agent audit log attributes to follow latest recommendations
 - LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
 
 ### Fixed
 
 - A2A agent card advertises `https://` instead of `http://` when deployed behind a cloud reverse proxy (CF, BTP, Kyma) by reading `X-Forwarded-Proto`
 - No longer emits orphaned spans during graph creation
+- Fixed remote MCP connections with authenticated server cards
 
 ## Version 0.9.2 - 2026-08-26
 

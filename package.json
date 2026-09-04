@@ -31,6 +31,8 @@
     "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
     "watch:with-claude": "cds w tests/projects/bookshop --profile with-claude",
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
+    "docs:audit": "node .scripts/generate-audit-docs.js",
+    "docs:audit:check": "node .scripts/generate-audit-docs.js --check",
     "prettier": "npx -y prettier@3 --write .",
     "prettier:check": "npx -y prettier@3 --check ."
   },
@@ -64,7 +66,8 @@
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "deepagents": "^1.10.2",
-    "openevals": "^0.2.0"
+    "openevals": "^0.2.0",
+    "acorn": "^8.18.0"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
