@@ -42,7 +42,7 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     const tc = result.toolCalls
     expect(
       tc.some((c) => c.tool === "getStock") ||
-        tc.some((c) => c.tool === "query" && JSON.stringify(c.args).includes("stock")),
+      tc.some((c) => c.tool === "query" && JSON.stringify(c.args).includes("stock")),
     ).toBe(true)
 
     const judgement = await judge
@@ -77,96 +77,54 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
       .evaluate(result)
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
-})
 
-describe("bookshop CatalogService — HITL order flow", () => {
-  test.concurrent(
-    "submitOrder triggers HITL, approve completes order and reduces stock",
-    async () => {
-      const BOOK_ID = 201
-      const QUANTITY = 1
+  describe("bookshop CatalogService — tool mocking via vitest", () => {
+    test.concurrent(
+      "mock getStock with vi.spyOn(agent, 'send') — auto-restored after test",
+      async () => {
+        const agent = await cds.connect.to("CatalogService")
+        const original = agent.send.bind(agent)
 
-      // Read stock before order
-      const before = await SELECT.one
-        .from("sap.capire.bookshop.Books")
-        .columns("stock")
-        .where({ ID: BOOK_ID })
-      expect(before?.stock).toBeGreaterThanOrEqual(QUANTITY)
+        vi.spyOn(agent, "send").mockImplementation((event, ...args) => {
+          if (event === "getStock" || event?.event === "getStock") return 999
+          return original(event, ...args)
+        })
 
-      const agent = await cds.connect.to("CatalogService")
-
-      // Step 1: chat agent to order — submitOrder is @agent.hitl so agent pauses for approval
-      const r1 = await agent.chat(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
-      expect(r1.status).toBe("input-required")
-      expect(r1.taskId).toBeTruthy()
-
-      // Step 2: approve — pass r1 directly so taskId + contextId are forwarded
-      const r2 = await agent.chat("yes", r1)
-      expect(r2.status).toBe("completed")
-      expect(r2.text).toBeTruthy()
-
-      // Stock reduced
-      const after = await SELECT.one
-        .from("sap.capire.bookshop.Books")
-        .columns("stock")
-        .where({ ID: BOOK_ID })
-      expect(after.stock).toBe(before.stock - QUANTITY)
-
-      // LLM judge confirms the response acknowledges the completed order
-      const judgement = await judge
-        .criteria("Response confirms the order was placed successfully.")
-        .evaluate(r2)
-      expect(judgement.score).toBeGreaterThanOrEqual(PASS)
-    },
-  )
-})
-
-describe("bookshop CatalogService — tool mocking via vitest", () => {
-  test.concurrent(
-    "mock getStock with vi.spyOn(agent, 'send') — auto-restored after test",
-    async () => {
-      const agent = await cds.connect.to("CatalogService")
-      const original = agent.send.bind(agent)
-
-      vi.spyOn(agent, "send").mockImplementation((event, ...args) => {
-        if (event === "getStock" || event?.event === "getStock") return 999
-        return original(event, ...args)
-      })
-
-      const result = await agent.chat(
-        "Use getStock to report the stock level for Wuthering Heights.",
-      )
-      expect(result.text).toContain("999")
-    },
-  )
-})
-
-describe("bookshop CatalogService — trajectory & tool call validation", () => {
-  test.concurrent("matchToolCall + success_rate rollup", async () => {
-    const agent = await cds.connect.to("CatalogService")
-    const result = await agent.chat("Show me all books")
-
-    // Deterministic tool call assertion — contributes to success_rate rollup
-    expect(matchToolCall(result, "query", (args) => !!args.cql)).toBe(true)
-
-    // LLM judge — also contributes to rollup
-    const judgement = await judge.criteria("Response must list multiple books.").evaluate(result)
-    expect(judgement.pass).toBe(true)
-
-    // result.metrics populated ootb; validations flushed in afterEach via evalRun
-    expect(result.metrics.latency_ms).toBeGreaterThan(0)
+        const result = await agent.chat(
+          "Use getStock to report the stock level for Wuthering Heights.",
+        )
+        expect(result.text).toContain("999")
+      },
+    )
   })
 
-  test.concurrent("Judge trajectory mode — LLM scores tool usage trajectory", async () => {
-    const agent = await cds.connect.to("CatalogService")
-    const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
+  describe("bookshop CatalogService — trajectory & tool call validation", () => {
+    test.concurrent("matchToolCall + success_rate rollup", async () => {
+      const agent = await cds.connect.to("CatalogService")
+      const result = await agent.chat("Show me all books")
 
-    const trajectoryJudge = new Judge({
-      criteria: "TRAJECTORY_ACCURACY_PROMPT",
-      type: "trajectory",
-    }).criteria("Agent must retrieve stock information using a tool before answering.")
-    const { pass } = await trajectoryJudge.evaluate(result)
-    expect(pass).toBe(true)
+      // Deterministic tool call assertion — contributes to success_rate rollup
+      expect(matchToolCall(result, "query", (args) => !!args.cql)).toBe(true)
+
+      // LLM judge — also contributes to rollup
+      const judgement = await judge.criteria("Response must list multiple books.").evaluate(result)
+      expect(judgement.pass).toBe(true)
+
+      // result.metrics populated ootb; validations flushed in afterEach via evalRun
+      expect(result.metrics.latency_ms).toBeGreaterThan(0)
+    })
+
+    test.concurrent("Judge trajectory mode — LLM scores tool usage trajectory", async () => {
+      const agent = await cds.connect.to("CatalogService")
+      const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
+
+      const trajectoryJudge = new Judge({
+        criteria: "TRAJECTORY_ACCURACY_PROMPT",
+        type: "trajectory",
+      }).criteria("Agent must retrieve stock information using a tool before answering.")
+      const { pass } = await trajectoryJudge.evaluate(result)
+      expect(pass).toBe(true)
+    })
   })
 })
 
@@ -184,5 +142,47 @@ describe("bookshop CatalogService — conversation-level judges", () => {
 
     const retention = await new Judge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
     expect(retention.pass).toBe(true)
+  })
+
+  describe("bookshop CatalogService — HITL order flow", () => {
+    test.concurrent(
+      "submitOrder triggers HITL, approve completes order and reduces stock",
+      async () => {
+        const BOOK_ID = 201
+        const QUANTITY = 1
+
+        // Read stock before order
+        const before = await SELECT.one
+          .from("sap.capire.bookshop.Books")
+          .columns("stock")
+          .where({ ID: BOOK_ID })
+        expect(before?.stock).toBeGreaterThanOrEqual(QUANTITY)
+
+        const agent = await cds.connect.to("CatalogService")
+
+        // Step 1: chat agent to order — submitOrder is @agent.hitl so agent pauses for approval
+        const r1 = await agent.chat(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
+        expect(r1.status).toBe("input-required")
+        expect(r1.taskId).toBeTruthy()
+
+        // Step 2: approve — pass r1 directly so taskId + contextId are forwarded
+        const r2 = await agent.chat("yes", r1)
+        expect(r2.status).toBe("completed")
+        expect(r2.text).toBeTruthy()
+
+        // Stock reduced
+        const after = await SELECT.one
+          .from("sap.capire.bookshop.Books")
+          .columns("stock")
+          .where({ ID: BOOK_ID })
+        expect(after.stock).toBe(before.stock - QUANTITY)
+
+        // LLM judge confirms the response acknowledges the completed order
+        const judgement = await judge
+          .criteria("Response confirms the order was placed successfully.")
+          .evaluate(r2)
+        expect(judgement.score).toBeGreaterThanOrEqual(PASS)
+      },
+    )
   })
 })
