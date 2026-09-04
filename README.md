@@ -1,3 +1,5 @@
+[![REUSE status](https://api.reuse.software/badge/github.com/cap-js/agents)](https://api.reuse.software/info/github.com/cap-js/agents)
+
 # SAP Cloud Application Programming Model, agent development plugin for Node.js
 
 ## About this project
