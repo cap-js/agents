@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { metricsFromSpans } from "../../lib/eval/metrics.js"
-import { Judge, TrajectoryJudge, ConversationJudge, matchToolCall } from "../../lib/eval/Judge.js"
+import { Judge, matchToolCall } from "../../lib/eval/Judge.js"
 import { getActiveRunState, recordEvaluation } from "../../lib/eval/eval-run.js"
 import { installEvalDescribe } from "../../lib/eval/eval-describe.js"
 
@@ -193,8 +193,10 @@ describe("matchToolCall", () => {
 // ─── Judge constructor validation ─────────────────────────────────────────────
 
 describe("Judge constructor", () => {
-  it("throws TypeError when criteria is missing", () => {
-    expect(() => new Judge()).toThrow(TypeError)
+  it("defaults to answer relevance when criteria is missing", () => {
+    const j = new Judge()
+    expect(j._criteria).toBe("ANSWER_RELEVANCE_PROMPT")
+    expect(j._assessmentName).toBe("answer_relevance")
   })
 
   it("throws TypeError when criteria is not a string", () => {
@@ -206,9 +208,6 @@ describe("Judge constructor", () => {
     expect(() => new Judge("ANSWER_RELEVANCE_PROMPT", { assessmentName: "custom" })).toThrow(
       TypeError,
     )
-    expect(
-      () => new TrajectoryJudge("TOOL_SELECTION_PROMPT", { assessmentName: "custom" }),
-    ).toThrow(TypeError)
   })
 
   it("constructs with valid criteria string", () => {
@@ -224,6 +223,19 @@ describe("Judge constructor", () => {
     expect(j._criteria).toBe("Answer must be helpful.")
     expect(j._assessmentName).toBe("helpfulness")
     expect(j._continuous).toBe(false)
+  })
+
+  it("constructs with trajectory type", () => {
+    const j = new Judge({ criteria: "custom trajectory prompt", type: "trajectory" })
+    expect(j._criteria).toBe("custom trajectory prompt")
+    expect(j._type).toBe("trajectory")
+    expect(j._assessmentName).toBe("trajectory")
+  })
+
+  it("throws TypeError for unsupported judge type", () => {
+    expect(() => new Judge({ criteria: "Answer must be helpful.", type: "session" })).toThrow(
+      TypeError,
+    )
   })
 
   it("derives assessmentName from openevals prompt-key criteria", () => {
@@ -262,11 +274,12 @@ describe("Judge constructor", () => {
     expect(j2._assessmentName).toBe(j._assessmentName)
   })
 
-  it("criteria() shares judgeImpl when already loaded", () => {
+  it("criteria() does not reuse judgeImpl when criteria changes", () => {
     const j = new Judge("orig")
     j._judgeImpl = () => {}
     const j2 = j.criteria("new")
-    expect(j2._judgeImpl).toBe(j._judgeImpl)
+    expect(j2._judgeImpl).toBeNull()
+    expect(j._judgeImpl).toBeDefined()
   })
 })
 
@@ -318,50 +331,65 @@ describe("Judge prompt resolution", () => {
       expect.objectContaining({ prompt: "built-in answer relevance prompt\n\nBe strict." }),
     )
   })
-})
 
-// ─── TrajectoryJudge constructor ─────────────────────────────────────────────
+  it("uses a trajectory judge when type is trajectory", async () => {
+    const createLLMAsJudge = vi.fn(() => async () => ({ score: true, comment: "" }))
+    const createTrajectoryLLMAsJudge = vi.fn(() => async () => ({ score: true, comment: "" }))
+    vi.doMock("openevals", () => ({ createLLMAsJudge, createTrajectoryLLMAsJudge }))
+    const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
+    const prompt = "custom trajectory prompt"
 
-describe("TrajectoryJudge constructor", () => {
-  it("defaults to trajectory accuracy", () => {
-    const j = new TrajectoryJudge()
-    expect(j._criteria).toBe("TRAJECTORY_ACCURACY_PROMPT")
-    expect(j._assessmentName).toBe("trajectory")
+    await new MockedJudge({ criteria: prompt, type: "trajectory" })._ensureJudge()
+
+    expect(createTrajectoryLLMAsJudge).toHaveBeenCalledWith(expect.objectContaining({ prompt }))
+    expect(createLLMAsJudge).not.toHaveBeenCalled()
+  })
+
+  it("evaluates an array as a session assessment without changing criteria", async () => {
+    const judgeImpl = vi.fn(async () => ({ score: true, comment: "ok" }))
+    const createLLMAsJudge = vi.fn(() => judgeImpl)
+    vi.doMock("openevals", () => ({ createLLMAsJudge }))
+    const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
+
+    const judgement = await new MockedJudge("ANSWER_RELEVANCE_PROMPT").evaluate([
+      { contextId: "c1", messages: ["m1"] },
+      { contextId: "c1", messages: ["m2"] },
+    ])
+
+    expect(judgement.pass).toBe(true)
+    expect(createLLMAsJudge).toHaveBeenCalledWith(
+      expect.objectContaining({ assessmentName: "answer_relevance" }),
+    )
+    expect(judgeImpl).toHaveBeenCalledWith({ outputs: ["m1", "m2"] })
+  })
+
+  it("evaluates an array as a session assessment even when type is trajectory", async () => {
+    const judgeImpl = vi.fn(async () => ({ score: true, comment: "ok" }))
+    const createLLMAsJudge = vi.fn(() => judgeImpl)
+    const createTrajectoryLLMAsJudge = vi.fn(() => async () => ({ score: true, comment: "" }))
+    vi.doMock("openevals", () => ({ createLLMAsJudge, createTrajectoryLLMAsJudge }))
+    const { Judge: MockedJudge } = await import("../../lib/eval/Judge.js")
+
+    await new MockedJudge({ criteria: "custom trajectory prompt", type: "trajectory" }).evaluate([
+      { contextId: "c1", messages: ["m1"] },
+    ])
+
+    expect(createLLMAsJudge).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: "custom trajectory prompt" }),
+    )
+    expect(createTrajectoryLLMAsJudge).not.toHaveBeenCalled()
+    expect(judgeImpl).toHaveBeenCalledWith({ outputs: ["m1"] })
   })
 })
 
-// ─── ConversationJudge.evaluate input validation ─────────────────────────────
+// ─── Judge session input validation ──────────────────────────────────────────
 
-describe("ConversationJudge.evaluate input validation", () => {
-  it("defaults to task completion", () => {
-    const j = new ConversationJudge()
-    expect(j._criteria).toBe("TASK_COMPLETION_PROMPT")
-    expect(j._assessmentName).toBe("task_completion")
-  })
-
-  it("uses explicit assessmentName over static criteria", () => {
-    const j = new ConversationJudge({
-      criteria: "TASK_COMPLETION_PROMPT",
-      assessmentName: "conversation_completeness",
-    })
-    expect(j._assessmentName).toBe("conversation_completeness")
-  })
-
-  it("does not keep model configuration on conversations", () => {
-    const j = new ConversationJudge()
-    expect(j._model).toBeUndefined()
-    expect(j._modelOptions).toBeUndefined()
-  })
-
-  it("throws when results is not an array", async () => {
-    const j = new ConversationJudge()
-    await expect(j.evaluate(null)).rejects.toThrow()
-    await expect(j.evaluate("string")).rejects.toThrow()
-  })
-
+describe("Judge session input validation", () => {
   it("throws when results is an empty array", async () => {
-    const j = new ConversationJudge()
-    await expect(j.evaluate([])).rejects.toThrow()
+    const j = new Judge()
+    await expect(j.evaluate([])).rejects.toThrow(
+      "Judge.evaluate: session assessment requires a non-empty array of chat() results",
+    )
   })
 })
 

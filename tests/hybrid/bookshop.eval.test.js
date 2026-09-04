@@ -4,7 +4,7 @@
  */
 import cds from "@sap/cds"
 import { vi, test } from "vitest"
-import { Judge, TrajectoryJudge, ConversationJudge, matchToolCall } from "@cap-js/agents/eval"
+import { Judge, matchToolCall } from "@cap-js/agents/eval"
 
 const PASS = 0.7
 
@@ -157,13 +157,14 @@ describe("bookshop CatalogService — trajectory & tool call validation", () => 
     expect(result.metrics.latency_ms).toBeGreaterThan(0)
   })
 
-  test.concurrent("TrajectoryJudge — LLM scores tool usage trajectory", async () => {
+  test.concurrent("Judge trajectory mode — LLM scores tool usage trajectory", async () => {
     const agent = await cds.connect.to("CatalogService")
     const result = await agent.chat("How many copies of Wuthering Heights are in stock?")
 
-    const trajectoryJudge = new TrajectoryJudge().criteria(
-      "Agent must retrieve stock information using a tool before answering.",
-    )
+    const trajectoryJudge = new Judge({
+      criteria: "TRAJECTORY_ACCURACY_PROMPT",
+      type: "trajectory",
+    }).criteria("Agent must retrieve stock information using a tool before answering.")
     const { pass } = await trajectoryJudge.evaluate(result)
     expect(pass).toBe(true)
   })
@@ -178,10 +179,10 @@ describe("bookshop CatalogService — conversation-level judges", () => {
     const r2 = await agent.chat("Tell me about that book.", r1)
 
     // Conversation-level judges evaluate the full session
-    const completion = await new ConversationJudge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
+    const completion = await new Judge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
     expect(completion.pass).toBe(true)
 
-    const retention = await new ConversationJudge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
+    const retention = await new Judge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
     expect(retention.pass).toBe(true)
   })
 })

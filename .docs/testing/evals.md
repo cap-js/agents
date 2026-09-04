@@ -121,16 +121,19 @@ const { score, comment, pass } = await new Judge(
 ).evaluate(result)
 ```
 
-The constructor accepts one argument:
+The constructor accepts zero or one argument:
 
 ```js
+await new Judge().evaluate(result)
 await new Judge("ANSWER_RELEVANCE_PROMPT").evaluate(result)
 await new Judge({ criteria: "ANSWER_RELEVANCE_PROMPT", continuous: false }).evaluate(result)
 ```
 
+If no criteria is passed, `Judge` defaults to `ANSWER_RELEVANCE_PROMPT`.
+
 `criteria` is used as the judge prompt source:
 
-- if it matches an `openevals` prompt export such as `ANSWER_RELEVANCE_PROMPT`, the built-in prompt is used
+- if it matches an `openevals` prompt like `ANSWER_RELEVANCE_PROMPT`, the built-in prompt is used
 - otherwise the string is passed as the prompt
 
 Use `.criteria(text)` to append additional instructions to the existing criteria. It returns a sibling judge and does not replace the original criteria.
@@ -143,51 +146,43 @@ await base.criteria("Response must include stock information.").evaluate(result)
 
 Other possible prompts are in the [OpenEvals prebuilt prompts](https://github.com/langchain-ai/openevals#prebuilt-prompts).
 
-## `TrajectoryJudge`
+## Trajectory judging with `Judge`
 
-`TrajectoryJudge` evaluates `result.messages` and with that the steps the agent took, not only the final answer.
+Trajectory judging evaluates the steps the agent took, not only the final answer. Set `type: "trajectory"` explicitly.
 
 ```js
-import { TrajectoryJudge } from "@cap-js/agents/eval"
+import { Judge } from "@cap-js/agents/eval"
 
-const { pass, score, comment } = await new TrajectoryJudge()
+const { pass, score, comment } = await new Judge({
+  criteria: "TRAJECTORY_ACCURACY_PROMPT",
+  type: "trajectory",
+})
   .criteria("Agent must call getStock before stating a stock level.")
   .evaluate(result)
 
 expect(pass).toBe(true)
 ```
 
-By default, `TrajectoryJudge` uses `TRAJECTORY_ACCURACY_PROMPT`. Other trajectory prompt keys from OpenEvals can be used through the same constructor. See the [OpenEvals trajectory prompts](https://github.com/langchain-ai/openevals#trajectory-prompts).
+Trajectory prompt keys from OpenEvals can be used through the same constructor. See the [OpenEvals trajectory prompts](https://github.com/langchain-ai/openevals#trajectory-prompts).
+
+## Session judging with `Judge`
+
+To evaluate a full session instead of a single turn, pass all `agent.chat()` results for the conversation in order.
 
 ```js
-await new TrajectoryJudge("TRAJECTORY_ACCURACY_PROMPT").evaluate(result)
-```
-
-## `ConversationJudge`
-
-`ConversationJudge` evaluates a full session instead of a single turn. Pass all `agent.chat()` results for the conversation in order.
-
-```js
-import { ConversationJudge } from "@cap-js/agents/eval"
+import { Judge } from "@cap-js/agents/eval"
 
 const r1 = await agent.chat("How many copies of Wuthering Heights are in stock?")
 const r2 = await agent.chat("Tell me more about that book.", r1)
 
-const { pass, score, comment } = await new ConversationJudge("TASK_COMPLETION_PROMPT").evaluate([
-  r1,
-  r2,
-])
+const { pass, score, comment } = await new Judge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
 
 expect(pass).toBe(true)
 ```
 
-`ConversationJudge` evaluates the collected messages from all passed results. It defaults to `TASK_COMPLETION_PROMPT` and posts the assessment with session metadata when MLflow is enabled.
+Session judging evaluates the collected messages from all passed results and posts the assessment with session metadata when MLflow is enabled.
 
-Other conversation prompt keys from OpenEvals can be used with the same base class. See the [OpenEvals conversation prompts](https://github.com/langchain-ai/openevals#conversation-prompts).
-
-```js
-await new ConversationJudge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
-```
+Conversation prompt keys from OpenEvals can be used with the same base class. See the [OpenEvals conversation prompts](https://github.com/langchain-ai/openevals#conversation-prompts).
 
 ## `matchToolCall(result, toolName, matcher?)`
 
