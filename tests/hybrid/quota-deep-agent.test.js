@@ -1,14 +1,18 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import createHelpers from "../utils/helpers.js"
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/deep-agent")
 
 describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
   let sendMessage
   let auditLogs = []
+  let pool
 
   before(async () => {
     const helpers = createHelpers({ POST, axios })
     sendMessage = helpers.sendMessage
+    const srv = cds.services.ProductAgentService
+    pool = srv.definition["@agent.quota"] = { ...agentConfig(srv, "quota") }
 
     // Capture audit events
     if (!cds.env.requires?.["audit-log"]?.kind)
@@ -33,10 +37,8 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
   })
 
   it("should cancel task with summary and emit QuotaExceeded when maxLLMInvocationsPerTask is exceeded", async () => {
-    cds.env.agents ??= {}
-    cds.env.agents.pool ??= {}
-    const orig = cds.env.agents.pool.maxLLMInvocationsPerTask
-    cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+    const orig = pool.maxLLMInvocationsPerTask
+    pool.maxLLMInvocationsPerTask = 1
 
     try {
       const res = await sendMessage(
@@ -54,15 +56,13 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
       expect(quotaEvent, "Should emit QuotaExceeded audit event").toBeTruthy()
       expect(quotaEvent.data.data.reason).toMatch(/LLM call limit exceeded/)
     } finally {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = orig
+      pool.maxLLMInvocationsPerTask = orig
     }
   })
 
   it("should cancel task with summary and emit QuotaExceeded when maxToolCallsPerTask is exceeded", async () => {
-    cds.env.agents ??= {}
-    cds.env.agents.pool ??= {}
-    const orig = cds.env.agents.pool.maxToolCallsPerTask
-    cds.env.agents.pool.maxToolCallsPerTask = 1
+    const orig = pool.maxToolCallsPerTask
+    pool.maxToolCallsPerTask = 1
 
     try {
       const res = await sendMessage(
@@ -79,15 +79,13 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
       expect(quotaEvent, "Should emit QuotaExceeded audit event").toBeTruthy()
       expect(quotaEvent.data.data.reason).toMatch(/Tool call limit exceeded/)
     } finally {
-      cds.env.agents.pool.maxToolCallsPerTask = orig
+      pool.maxToolCallsPerTask = orig
     }
   })
 
   it("should cancel task with summary and emit QuotaExceeded when maxLLMTokensPerTask is exceeded", async () => {
-    cds.env.agents ??= {}
-    cds.env.agents.pool ??= {}
-    const orig = cds.env.agents.pool.maxLLMTokensPerTask
-    cds.env.agents.pool.maxLLMTokensPerTask = 100
+    const orig = pool.maxLLMTokensPerTask
+    pool.maxLLMTokensPerTask = 100
 
     try {
       const res = await sendMessage("product-agent", "Tell me about all your products in detail")
@@ -102,7 +100,7 @@ describe("@cap-js/agents - Quota Enforcer Middleware (deepagents)", () => {
       expect(quotaEvent, "Should emit QuotaExceeded audit event").toBeTruthy()
       expect(quotaEvent.data.data.reason).toMatch(/Token limit exceeded/)
     } finally {
-      cds.env.agents.pool.maxLLMTokensPerTask = orig
+      pool.maxLLMTokensPerTask = orig
     }
   })
 })

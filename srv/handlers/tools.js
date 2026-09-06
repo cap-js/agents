@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import { DynamicStructuredTool, tool } from "@langchain/core/tools"
 import z from "zod"
 import {
@@ -218,7 +219,7 @@ export function generateTools(srv) {
   // File tools — only when fileIO is enabled
   // emit_file_part: stateless protocol emitter; safe to tools.push once at startup.
   // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
-  if (cds.env.agents?.fileIO?.enabled) {
+  if (agentConfig(srv, "fileIO")?.enabled) {
     tools.push(createEmitFilePartTool())
   }
 

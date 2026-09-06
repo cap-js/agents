@@ -40,7 +40,7 @@ Then send a message to the travel agent at `http://localhost:4004/a2a/travel-age
 - **Markdown-based orchestrator** — `AGENTS.md` for identity, `skills/` for progressive workflow disclosure. The plugin auto-builds the deepagents graph; no `service.js` file is needed.
 - **Agentified CAP services** — Hotels and activities are standard CAP services annotated with `@agent`. They get their own LLM and tools automatically — no custom code needed.
 - **Natural-language delegation** — The orchestrator sends descriptive messages to downstream agents. They handle tool selection and execution independently.
-- **File I/O** — `cds.agents.fileIO.enabled = true` in the sample's `package.json` enables A2A `FilePart` ingestion + `read_file('/uploads/…')` + `write_file('/outputs/…')` (deepagents backends auto-wired). See `requests.http` request #4 for an end-to-end CSV-to-itinerary scenario.
+- **File I/O** — `@agent.fileIO: true`, or an object with MIME overrides, on `TravelAgentService` enables A2A `FilePart` ingestion + `read_file('/uploads/…')` + `write_file('/outputs/…')` (deepagents backends auto-wired). See `requests.http` request #4 for an end-to-end CSV-to-itinerary scenario.
 - **MCP for structured tool access** — Flight data is accessed via MCP tools with structured parameters (query, describe, bookFlight, cancelFlight). The orchestrator calls these directly.
 - **Multi-turn conversations** — `CdsCheckpointSaver` (auto-injected) persists LangGraph state, enabling multi-turn conversations across requests (plan first, then book).
 - **Parallel tool invocation** — The orchestrator calls multiple downstream agents and MCP tools in parallel when the request spans multiple domains.

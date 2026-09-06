@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import {
   setup,
@@ -171,8 +172,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
 
   // ─── Monkey-patching ────────────────────────────────────────────────
 
-  it("should have LangChain patches applied (feature flag default on)", async () => {
-    expect(cds.env.agents.trace_langchain).not.toBe(false)
+  it("should have LangChain patches applied", async () => {
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
     const PATCHED = Symbol.for("@cap-js/agents:patched")
     expect(BaseChatModel.prototype[PATCHED]).toBe(true)
@@ -239,8 +239,10 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
 
   let originalQuota
   before(() => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
+    const srv = cds.services.GraphBookService
+    const pool = (srv.definition["@agent.quota"] ??= { ...agentConfig(srv, "quota") })
+    originalQuota = pool.maxTasksPerHourPerUser
+    pool.maxTasksPerHourPerUser = 200
     // Intercept cds.log("agents").warn after cds is fully bootstrapped
     const LOG = cds.log("agents")
     _originalLogWarn = LOG.warn.bind(LOG)
@@ -251,7 +253,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
     }
   })
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
+    cds.services.GraphBookService.definition["@agent.quota"].maxTasksPerHourPerUser = originalQuota
     mock.stop()
     const LOG = cds.log("agents")
     if (_originalLogWarn) LOG.warn = _originalLogWarn

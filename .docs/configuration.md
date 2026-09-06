@@ -32,6 +32,27 @@ service CatalogService { ... }
 | ------------ | ------------------------------------------------------------------------------------------- |
 | `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
 
+LLM model parameters, HTTP timeout, and circuit breaker settings belong to the selected LLM service.
+
+```jsonc
+{
+  "cds": {
+    "requires": {
+      "llm": {
+        "params": { "max_tokens": 4096, "temperature": 0 },
+        "timeout": "120s",
+        "circuitBreaker": {
+          "errorThresholdPercentage": 50,
+          "volumeThreshold": 10,
+          "resetTimeout": 30000,
+          "rollingCountTimeout": 10000,
+        },
+      },
+    },
+  },
+}
+```
+
 ## `@agent.directory`
 
 Service annotation. Path to the agent directory, overriding the slug convention. Resolved relative to the `.cds` source file.
@@ -123,22 +144,26 @@ When configured, the agent rejects push notification registrations whose callbac
 
 ## File I/O
 
-Set `cds.agents.fileIO.enabled = true` to let agents receive uploads and emit files via the A2A protocol.
+Set `@agent.fileIO: true` on an agent service to let it receive uploads and emit files via A2A. Any `@agent.fileIO` object enables file I/O too.
 
-```jsonc
-{
-  "cds": {
-    "agents": {
-      "fileIO": {
-        "enabled": true,
-        "maxInputFileSizeBytes": 2097152,
-        "maxOutputFileSizeBytes": 10485760, // 10 MB cap per emitted file
-        "defaultInputModes": ["text/csv"], // overrides advertised MIME types
-        "defaultOutputModes": ["text/plain"],
-      },
-    },
-  },
+```cds
+@agent.fileIO: {
+  maxInputFileSizeBytes: 2097152,
+  maxOutputFileSizeBytes: 10485760, // 10 MB cap per emitted file
+  defaultInputModes: ['text/csv'], // overrides advertised MIME types
+  defaultOutputModes: ['text/plain']
 }
+service CatalogAgent {}
 ```
 
 Sending a file - A2A clients send a `FilePart` (`{ kind: "file", file: { name, mimeType, bytes } }`) and the plugin persists the file and prepends a `[Uploaded files: /uploads/<name> (<mime>, <size>)]` manifest to the user message. It uses `@cap-js/attachments` to persist the files.
+
+## Persistence
+
+Configure retention and checkpoint writes per service. `@agent.dataRetention` defaults to `"30d"`; `@agent.persistAllCheckpointWrites` defaults to `false`.
+
+```cds
+@agent.dataRetention: "30d"
+@agent.persistAllCheckpointWrites: true
+service CatalogAgent {}
+```

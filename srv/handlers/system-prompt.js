@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import { getDescription } from "../../lib/utils/utils.js"
 
 export function buildSystemPrompt(srv) {
@@ -14,7 +15,7 @@ export function buildSystemPrompt(srv) {
     cds.env.agents?.per_action_tool !== false
       ? "Call action and function tools directly by name."
       : "Use the `call` tool to invoke actions and functions.",
-    ...(cds.env.agents?.fileIO?.enabled
+    ...(agentConfig(srv, "fileIO")?.enabled
       ? [
           "When the user's message contains '[Uploaded files: ...]', use the `read_file` tool to read each listed file before answering.",
           "Use `emit_file_part` to return files in your response.",

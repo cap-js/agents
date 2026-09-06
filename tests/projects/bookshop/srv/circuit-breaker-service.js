@@ -42,7 +42,7 @@ export default class CircuitBreakerService extends cds.ApplicationService {
      */
     class CircuitBreakerTestModel extends OrchestrationClient {
       _withMiddleware(opts) {
-        const llmTimeout = ms4(cds.env.agents?.pool?.maxLLMCallTimeout || "120s")
+        const llmTimeout = ms4(cds.env.requires.llm?.timeout || "120s")
         return {
           ...opts,
           customRequestConfig: {

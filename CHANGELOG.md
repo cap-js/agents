@@ -4,6 +4,24 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.4 - ...
+
+### Changed
+
+- Converted `cds.env.agents` configurations to service annotations to allow them to be feature toggled
+  - `cds.env.agents.fileIO` is now `@agent.fileIO`
+  - `cds.env.agents.pool` is now `@agent.quota`
+  - `cds.env.agents.retention` is now `@agent.dataRetention`
+  - `cds.env.agents.persistAllCheckpointWrites` is now `@agent.persistAllCheckpointWrites`
+- Moved LLM specific `cds.env.agents` configurations under `cds.env.requires.llm`
+  - `cds.env.agents.params` is now `cds.env.requires.llm.params`
+  - `cds.env.agents.circuitBreaker` is now `cds.env.requires.llm.circuitBreaker`
+  - `cds.env.agents.pool.maxLLMCallTimeout` is now `cds.env.requires.llm.timeout`
+
+### Removed
+
+- Removed `cds.agents.trace_langchain` option.
+
 ## Version 0.9.3 - 2026-09-04
 
 ### Added

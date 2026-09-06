@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 
 const test = cds.test(import.meta.dirname + "/../projects/bookshop")
 const { POST, GET, axios } = test
@@ -106,13 +107,15 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("SecurityEvent (quota breach)", () => {
     it("should emit on quota breach (maxTasksPerHourPerUser)", async () => {
-      const originalMax = cds.env.agents.pool.maxTasksPerHourPerUser
-      cds.env.agents.pool.maxTasksPerHourPerUser = 0
+      const srv = cds.services.GraphBookService
+      const pool = (srv.definition["@agent.quota"] ??= { ...agentConfig(srv, "quota") })
+      const originalMax = pool.maxTasksPerHourPerUser
+      pool.maxTasksPerHourPerUser = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.agents.pool.maxTasksPerHourPerUser = originalMax
+      pool.maxTasksPerHourPerUser = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       expect(events.length).toBe(1)
@@ -125,13 +128,15 @@ describe("@cap-js/agents - Audit Logging", () => {
     })
 
     it("should emit on quota breach (maxConcurrentTasks)", async () => {
-      const originalMax = cds.env.agents.pool.maxConcurrentTasks
-      cds.env.agents.pool.maxConcurrentTasks = 0
+      const srv = cds.services.GraphBookService
+      const pool = (srv.definition["@agent.quota"] ??= { ...agentConfig(srv, "quota") })
+      const originalMax = pool.maxConcurrentTasks
+      pool.maxConcurrentTasks = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.agents.pool.maxConcurrentTasks = originalMax
+      pool.maxConcurrentTasks = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       expect(events.length).toBe(1)

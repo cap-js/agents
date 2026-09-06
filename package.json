@@ -87,10 +87,8 @@
   "cds": {
     "agents": {
       "streaming": true,
-      "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",
-      "retention": "30d",
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [
@@ -114,56 +112,22 @@
           "cloud.sap"
         ]
       },
-      "persistAllCheckpointWrites": false,
-      "activeUsersInterval": "24h",
-      "circuitBreaker": {
-        "errorThresholdPercentage": 50,
-        "volumeThreshold": 10,
-        "resetTimeout": 30000,
-        "rollingCountTimeout": 10000
-      },
-      "params": {
-        "max_tokens": 4096,
-        "temperature": 0
-      },
-      "fileIO": {
-        "enabled": false,
-        "maxInputFileSizeBytes": 2097152,
-        "maxOutputFileSizeBytes": 10485760,
-        "defaultInputModes": [
-          "text/csv",
-          "application/json",
-          "text/plain",
-          "application/pdf",
-          "image/png",
-          "image/jpeg"
-        ],
-        "defaultOutputModes": [
-          "text/csv",
-          "application/json",
-          "text/plain",
-          "application/pdf",
-          "image/png",
-          "image/jpeg"
-        ]
-      },
-      "pool": {
-        "maxConcurrentTasks": 10,
-        "maxConcurrentTasksPerUser": 4,
-        "maxTasksPerHour": 100,
-        "maxTasksPerHourPerUser": 20,
-        "maxLLMTokensPerDay": 5000000,
-        "maxToolCallsPerHour": 1000,
-        "maxToolCallsPerTask": 50,
-        "maxLLMInvocationsPerTask": 50,
-        "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeout": "120s",
-        "maxExecutionTimePerTask": "5min",
-        "timeoutGrace": "15s",
-        "maxIncomingMessageLength": 5000
-      }
+      "activeUsersInterval": "24h"
     },
     "requires": {
+      "llm": {
+        "timeout": "120s",
+        "params": {
+          "max_tokens": 4096,
+          "temperature": 0
+        },
+        "circuitBreaker": {
+          "errorThresholdPercentage": 50,
+          "volumeThreshold": 10,
+          "resetTimeout": 30000,
+          "rollingCountTimeout": 10000
+        }
+      },
       "agents": {
         "model": "@cap-js/agents/srv/entities.cds"
       },
@@ -190,16 +154,24 @@
         }
       },
       "[development]": {
-        "llm": "mock"
+        "llm": {
+          "kind": "mock"
+        }
       },
       "[with-claude]": {
-        "llm": "anthropic"
+        "llm": {
+          "kind": "anthropic"
+        }
       },
       "[hybrid]": {
-        "llm": "aicore"
+        "llm": {
+          "kind": "aicore"
+        }
       },
       "[production]": {
-        "llm": "aicore"
+        "llm": {
+          "kind": "aicore"
+        }
       }
     },
     "protocols": {
