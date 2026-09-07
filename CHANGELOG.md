@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.4 - ...
+
+### Fixed
+
+- Multiple tools with HITL needed in the same round no longer cause an error
+
 ## Version 0.9.3 - 2026-09-04
 
 ### Added
