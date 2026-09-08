@@ -24,9 +24,10 @@ function extractResult(result) {
   }
 
   if (result.kind === "task") {
-    if (result.artifacts) for (let artifact of result.artifacts) {
-      if (!artifact.artifactId.startsWith('thinking')) processParts(artifact.parts)
-    }
+    if (result.artifacts)
+      for (let artifact of result.artifacts) {
+        if (!artifact.artifactId.startsWith("thinking")) processParts(artifact.parts)
+      }
     else if (result.status?.message) processParts(result.status.message.parts)
     if (text.length === 0 && files.length === 0) {
       return { text: `Task ${result.id}: ${result.status?.state || "unknown"}`, files: [] }
@@ -79,7 +80,7 @@ function createA2ATool(client, agentCard) {
     async ({ message }) => {
       try {
         const messageId = cds.utils.uuid()
-        LOG.info(`Sending message to ${subagent}`, { messageId }, '\n\n'+ message +'\n')
+        LOG.info(`Sending message to ${subagent}`, { messageId }, "\n\n" + message + "\n")
         const result = await client.sendMessage({
           message: {
             kind: "message",
@@ -88,9 +89,11 @@ function createA2ATool(client, agentCard) {
             parts: [{ kind: "text", text: message }],
           },
         })
-        if (LOG._debug) LOG.trace (`Raw results from ${subagent}`, inspect (result, { depth: null, colors: true }))
+        if (LOG._debug)
+          LOG.trace(`Raw results from ${subagent}`, inspect(result, { depth: null, colors: true }))
         let response = formatToolResult(extractResult(result))
-        if (response) LOG.info (`Got response from ${subagent}`, { messageId }, '\n\n'+ response +'\n')
+        if (response)
+          LOG.info(`Got response from ${subagent}`, { messageId }, "\n\n" + response + "\n")
         return response
       } catch (err) {
         LOG.warn("Sub agent tool error", { subagent, error: err.message })
@@ -115,7 +118,7 @@ export async function buildSubAgentToolLocally(serviceName) {
 
   const { generateAgentCard } = await import("../../lib/protocol/agent-card.js")
   const agentCard = generateAgentCard(srv)
-  LOG.info(`Connecting to sub agent ${serviceName}`, '(local)')
+  LOG.info(`Connecting to sub agent ${serviceName}`, "(local)")
 
   const { RequestContext, DefaultExecutionEventBus } = await import("@a2a-js/sdk/server")
 

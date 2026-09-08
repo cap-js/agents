@@ -649,12 +649,10 @@
         if (append && idx >= 0) {
           thinkingTexts[idx] += text
           thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
-        }
-        else if (artifactId === currentThinkingArtifactId && !currentThinkingClosed) {
-          thinkingTexts[idx] += '\n' + text
+        } else if (artifactId === currentThinkingArtifactId && !currentThinkingClosed) {
+          thinkingTexts[idx] += "\n" + text
           thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
-        }
-        else {
+        } else {
           const step = document.createElement("div")
           step.className = "thinking-step"
           step._artifactId = artifactId
@@ -1104,7 +1102,8 @@
 
           if (event.artifact?.artifactId?.startsWith("thinking")) {
             const lastChunk = event.lastChunk ?? false
-            if (text) addThinkingStep(event.artifact.artifactId, text, lastChunk, event.append ?? false)
+            if (text)
+              addThinkingStep(event.artifact.artifactId, text, lastChunk, event.append ?? false)
             return null
           }
 
