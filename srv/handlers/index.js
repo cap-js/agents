@@ -5,6 +5,7 @@ import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
 import { registerChat } from "./chat.js"
+import { agentConfig } from "../../lib/agents/config.js"
 
 const LOG = cds.log("agents")
 
@@ -131,7 +132,7 @@ export default function registerDefaultAgentHandlers(srv) {
 
     // File-IO: add a read_file tool that resolves context at invocation time.
     // cds.context["agent.context.id"] and user.id are set by GraphExecutor before invoke.
-    if (cds.env.agents?.fileIO?.enabled) {
+    if (agentConfig(srv, "fileIO")?.enabled) {
       const { CdsFileStore } = await import("../../lib/protocol/persistence/file-store.js")
       const fileStore = new CdsFileStore()
       const readFileTool = createReadFileTool(fileStore)

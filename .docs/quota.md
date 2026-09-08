@@ -11,30 +11,24 @@ The plugin enforces configurable rate limits and resource quotas at two levels:
 <details>
 <summary>Configuration</summary>
 
-All limits are configured via `cds.env.agents.pool` (defaults provided by the plugin):
+Configure limits per agent service with `@agent.quota`. Defaults come from the plugin. Set `@agent.quota: false` to disable quota enforcement for that service.
 
-```json
-{
-  "cds": {
-    "agents": {
-      "pool": {
-        "maxConcurrentTasks": 10,
-        "maxConcurrentTasksPerUser": 4,
-        "maxTasksPerHour": 100,
-        "maxTasksPerHourPerUser": 20,
-        "maxLLMTokensPerDay": 5000000,
-        "maxToolCallsPerHour": 1000,
-        "maxToolCallsPerTask": 50,
-        "maxLLMInvocationsPerTask": 50,
-        "maxLLMTokensPerTask": 200000,
-        "maxLLMCallTimeout": "120s",
-        "maxExecutionTimePerTask": "5min",
-        "timeoutGrace": "15s",
-        "maxIncomingMessageLength": 5000
-      }
-    }
-  }
+```cds
+@agent.quota: {
+  maxConcurrentTasks: 10,
+  maxConcurrentTasksPerUser: 4,
+  maxTasksPerHour: 100,
+  maxTasksPerHourPerUser: 20,
+  maxLLMTokensPerDay: 5000000,
+  maxToolCallsPerHour: 1000,
+  maxToolCallsPerTask: 50,
+  maxLLMInvocationsPerTask: 50,
+  maxLLMTokensPerTask: 200000,
+  maxExecutionTimePerTask: "5min",
+  timeoutGrace: "15s",
+  maxIncomingMessageLength: 5000
 }
+service CatalogAgent {}
 ```
 
 </details>
@@ -72,7 +66,6 @@ Content-Type: application/json
 | `maxLLMInvocationsPerTask` | After each LLM call | Graph throws → task `failed` |
 | `maxLLMTokensPerTask`      | After each LLM call | Same                         |
 | `maxToolCallsPerTask`      | After each LLM call | Same                         |
-| `maxLLMCallTimeout`        | Per LLM HTTP call   | Request aborted → error      |
 | `maxExecutionTimePerTask`  | Timeout wrapper     | Graph throws → task `failed` |
 
 </details>
@@ -80,14 +73,14 @@ Content-Type: application/json
 <details>
 <summary>LLM Circuit Breaker</summary>
 
-Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](https://sap.github.io/cloud-sdk/docs/js/guides/resilience#circuit-breaker)) and a per-call timeout (`maxLLMCallTimeout`, default 120s). This prevents cascading failures when the LLM backend is degraded.
+Every LLM call is protected by a circuit breaker and a per-call timeout. Configure both under `cds.requires.llm`. This prevents cascading failures when LLM backend is degraded.
 
-| Parameter        | Value                              | Description                                   |
-| ---------------- | ---------------------------------- | --------------------------------------------- |
-| Timeout          | `maxLLMCallTimeout` (120s default) | Individual HTTP call timeout                  |
-| Error threshold  | 50%                                | Opens breaker if ≥50% of calls fail in window |
-| Volume threshold | 10                                 | Minimum calls in window before evaluating     |
-| Reset timeout    | 30s                                | Time before half-open test request            |
+| Parameter        | Value                    | Description                                   |
+| ---------------- | ------------------------ | --------------------------------------------- |
+| Timeout          | `timeout` (120s default) | Individual HTTP call timeout                  |
+| Error threshold  | 50%                      | Opens breaker if ≥50% of calls fail in window |
+| Volume threshold | 10                       | Minimum calls in window before evaluating     |
+| Reset timeout    | 30s                      | Time before half-open test request            |
 
 **Behavior:**
 
@@ -95,5 +88,23 @@ Every LLM call is protected by a circuit breaker ([`@sap-cloud-sdk/resilience`](
 - When the breaker opens, all subsequent LLM calls fail immediately until the reset timeout elapses.
 - After reset, one test request passes through (half-open). If successful, the breaker closes.
 - The circuit breaker is always active — no opt-out configuration.
+
+```jsonc
+{
+  "cds": {
+    "requires": {
+      "llm": {
+        "timeout": "120s",
+        "circuitBreaker": {
+          "errorThresholdPercentage": 50,
+          "volumeThreshold": 10,
+          "resetTimeout": 30000,
+          "rollingCountTimeout": 10000,
+        },
+      },
+    },
+  },
+}
+```
 
 </details>

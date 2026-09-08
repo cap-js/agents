@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
@@ -8,6 +9,10 @@ const wait = (ms = 150) => new Promise((r) => setTimeout(r, ms))
 
 describe("@cap-js/agents - Production error sanitization", () => {
   let originalNodeEnv
+  const pool = () => {
+    const srv = cds.services.LoopingService
+    return (srv.definition["@agent.quota"] ??= { ...agentConfig(srv, "quota") })
+  }
 
   beforeEach(() => {
     originalNodeEnv = process.env.NODE_ENV
@@ -48,13 +53,13 @@ describe("@cap-js/agents - Production error sanitization", () => {
     it("should hide error details in production", async () => {
       process.env.NODE_ENV = "production"
 
-      const originalMax = cds.env.agents.pool.maxLLMInvocationsPerTask
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+      const originalMax = pool().maxLLMInvocationsPerTask
+      pool().maxLLMInvocationsPerTask = 1
 
       const res = await sendMessage("looping", "trigger")
       await wait()
 
-      cds.env.agents.pool.maxLLMInvocationsPerTask = originalMax
+      pool().maxLLMInvocationsPerTask = originalMax
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
@@ -66,13 +71,13 @@ describe("@cap-js/agents - Production error sanitization", () => {
     it("should show error details in development", async () => {
       process.env.NODE_ENV = "development"
 
-      const originalMax = cds.env.agents.pool.maxLLMInvocationsPerTask
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+      const originalMax = pool().maxLLMInvocationsPerTask
+      pool().maxLLMInvocationsPerTask = 1
 
       const res = await sendMessage("looping", "trigger")
       await wait()
 
-      cds.env.agents.pool.maxLLMInvocationsPerTask = originalMax
+      pool().maxLLMInvocationsPerTask = originalMax
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text

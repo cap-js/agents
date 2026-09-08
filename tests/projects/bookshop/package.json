@@ -24,19 +24,7 @@
   },
   "cds": {
     "agents": {
-      "fileIO": {
-        "enabled": true
-      },
       "activeUsersInterval": "1s",
-      "[test]": {
-        "pool": {
-          "maxTasksPerHour": 10000,
-          "maxTasksPerHourPerUser": 10000
-        },
-        "circuitBreaker": {
-          "volumeThreshold": 2
-        }
-      },
       "[tracing]": {
         "mlflow": true
       },
@@ -62,6 +50,11 @@
         "metrics": false
       },
       "[test]": {
+        "llm": {
+          "circuitBreaker": {
+            "volumeThreshold": 2
+          }
+        },
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"

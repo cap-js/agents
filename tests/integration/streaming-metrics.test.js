@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import {
   setup,
@@ -36,8 +37,10 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
   let originalQuota
 
   before(async () => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
+    const service = cds.services.StreamingMetricsService
+    const pool = (service.definition["@agent.quota"] ??= { ...agentConfig(service, "quota") })
+    originalQuota = pool.maxTasksPerHourPerUser
+    pool.maxTasksPerHourPerUser = 200
 
     // Wire audit capture
     if (!cds.env.requires?.["audit-log"]?.kind)
@@ -50,7 +53,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
   })
 
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
+    cds.services.StreamingMetricsService.definition["@agent.quota"].maxTasksPerHourPerUser =
+      originalQuota
     teardown()
     mock.stop()
   })

@@ -9,28 +9,28 @@
  */
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import createHelpers from "../utils/helpers.js"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const { sendMessage } = createHelpers({ POST, axios })
 
 describe("@cap-js/agents - patch-tool-calls middleware (hybrid)", () => {
-  let origTokensPerTask
+  let pool
 
   before(() => {
-    cds.env.agents ??= {}
-    cds.env.agents.pool ??= {}
-    origTokensPerTask = cds.env.agents.pool.maxLLMTokensPerTask
+    const srv = cds.services.GraphBookService
+    pool = srv.definition["@agent.quota"] = { ...agentConfig(srv, "quota") }
   })
 
   afterEach(() => {
-    cds.env.agents.pool.maxLLMTokensPerTask = origTokensPerTask
+    pool.maxLLMTokensPerTask = 200000
   })
 
   it("follow-up message succeeds after first turn was canceled due to quota exceeded", async () => {
     const contextId = `patch-tool-calls-${Date.now()}`
 
-    cds.env.agents.pool.maxLLMTokensPerTask = 20
+    pool.maxLLMTokensPerTask = 20
     const res1 = await sendMessage("catalog", "Show me all books", { contextId })
     assert.strictEqual(
       res1.data.result.status.state,
@@ -38,7 +38,7 @@ describe("@cap-js/agents - patch-tool-calls middleware (hybrid)", () => {
       "expected first turn to be canceled by quota",
     )
 
-    cds.env.agents.pool.maxLLMTokensPerTask = origTokensPerTask
+    pool.maxLLMTokensPerTask = 200000
     const res2 = await sendMessage("catalog", "Just say hello", { contextId })
     assert.notStrictEqual(
       res2.data.result.status.state,

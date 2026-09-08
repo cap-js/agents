@@ -14,16 +14,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const { POST, axios } = cds.test(path.join(__dirname, "../projects/bookshop"))
 axios.defaults.validateStatus = () => true
 
-const FILE_IO_KEY = "fileIO"
-
 let originalFileIO
 
 beforeAll(() => {
-  cds.env.agents = cds.env.agents || {}
-  originalFileIO = { ...(cds.env.agents[FILE_IO_KEY] || {}) }
-  cds.env.agents[FILE_IO_KEY] = {
-    ...originalFileIO,
-    enabled: true,
+  const definition = cds.services.GraphBookService.definition
+  originalFileIO = definition["@agent.fileIO"]
+  definition["@agent.fileIO"] = {
     // 1 KiB cap keeps fixtures small while exercising the guard.
     maxInputFileSizeBytes: 1024,
     // Narrow allowlist so an image/png upload is rejected by the MIME check.
@@ -32,7 +28,7 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-  cds.env.agents[FILE_IO_KEY] = originalFileIO
+  cds.services.GraphBookService.definition["@agent.fileIO"] = originalFileIO
 })
 
 function sendFile(service, file) {
@@ -64,7 +60,7 @@ describe("@cap-js/agents - inbound FilePart guard (graph-executor)", () => {
   it("oversized inbound FilePart is rejected before decode; no Tasks.inputFiles row is written", async () => {
     // Base64 payload that decodes to just over the 1 KiB cap.
     const oversized = Buffer.alloc(
-      cds.env.agents.fileIO.maxInputFileSizeBytes + 128,
+      cds.services.GraphBookService.definition["@agent.fileIO"].maxInputFileSizeBytes + 128,
       0x41,
     ).toString("base64")
     const res = await sendFile("graph-book", {

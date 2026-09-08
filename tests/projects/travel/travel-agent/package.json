@@ -9,21 +9,6 @@
     "@sap/cds": "^10.0.6"
   },
   "cds": {
-    "agents": {
-      "pool": {
-        "maxLLMInvocationsPerTask": 50
-      },
-      "fileIO": {
-        "enabled": true,
-        "defaultInputModes": [
-          "text/csv"
-        ],
-        "defaultOutputModes": [
-          "text/plain",
-          "text/markdown"
-        ]
-      }
-    },
     "server": {
       "port": 4004
     },

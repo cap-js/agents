@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
+import { AGENT_DEFAULTS } from "../../lib/agents/config.js"
 
 const { GraphExecutor } = await import("../../srv/handlers/graph-executor.js")
+const testService = {
+  name: "TestService",
+  definition: { "@agent.quota": { ...AGENT_DEFAULTS.quota } },
+}
 
 /** Mimics real LangGraph abort behavior — throws DOMException with name "AbortError" */
 function abortError() {
@@ -281,12 +286,10 @@ describe("GraphExecutor - graceful timeout", () => {
       }
 
       // Use very short timeout for test speed
-      cds.env.agents = cds.env.agents || {}
-      cds.env.agents.pool = cds.env.agents.pool || {}
-      cds.env.agents.pool.maxExecutionTimePerTask = 200
-      cds.env.agents.pool.timeoutGrace = 100
+      testService.definition["@agent.quota"].maxExecutionTimePerTask = 200
+      testService.definition["@agent.quota"].timeoutGrace = 100
 
-      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), testService, {})
 
       await executor.execute(
         {
@@ -302,8 +305,8 @@ describe("GraphExecutor - graceful timeout", () => {
       await new Promise((r) => setTimeout(r, 50))
 
       // Restore
-      cds.env.agents.pool.maxExecutionTimePerTask = "5min"
-      cds.env.agents.pool.timeoutGrace = "15s"
+      testService.definition["@agent.quota"].maxExecutionTimePerTask = "5min"
+      testService.definition["@agent.quota"].timeoutGrace = "15s"
 
       const canceledEvent = publishedEvents.find((e) => e.status?.state === "canceled")
       assert.ok(canceledEvent, "timeout should publish canceled status")
@@ -352,12 +355,10 @@ describe("GraphExecutor - graceful timeout", () => {
         finished: () => {},
       }
 
-      cds.env.agents = cds.env.agents || {}
-      cds.env.agents.pool = cds.env.agents.pool || {}
-      cds.env.agents.pool.maxExecutionTimePerTask = 200
-      cds.env.agents.pool.timeoutGrace = 100
+      testService.definition["@agent.quota"].maxExecutionTimePerTask = 200
+      testService.definition["@agent.quota"].timeoutGrace = 100
 
-      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), testService, {})
       // Inject resolved graph directly so checkpointer is accessible
       executor._graph = fakeGraph
 
@@ -375,8 +376,8 @@ describe("GraphExecutor - graceful timeout", () => {
       await new Promise((r) => setTimeout(r, 50))
 
       // Restore
-      cds.env.agents.pool.maxExecutionTimePerTask = "5min"
-      cds.env.agents.pool.timeoutGrace = "15s"
+      testService.definition["@agent.quota"].maxExecutionTimePerTask = "5min"
+      testService.definition["@agent.quota"].timeoutGrace = "15s"
 
       const canceledEvent = publishedEvents.find((e) => e.status?.state === "canceled")
       assert.ok(canceledEvent, "timeout with checkpointer should publish canceled status")
@@ -411,14 +412,12 @@ describe("GraphExecutor - graceful timeout", () => {
         finished: () => {},
       }
 
-      cds.env.agents = cds.env.agents || {}
-      cds.env.agents.pool = cds.env.agents.pool || {}
       // 2000ms total, 200ms grace → soft timeout at 1800ms
       // (must be > 1000ms floor in _invokeWithTimeout)
-      cds.env.agents.pool.maxExecutionTimePerTask = 2000
-      cds.env.agents.pool.timeoutGrace = 200
+      testService.definition["@agent.quota"].maxExecutionTimePerTask = 2000
+      testService.definition["@agent.quota"].timeoutGrace = 200
 
-      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), testService, {})
 
       const t0 = Date.now()
       await executor.execute(
@@ -436,8 +435,8 @@ describe("GraphExecutor - graceful timeout", () => {
       await new Promise((r) => setTimeout(r, 50))
 
       // Restore
-      cds.env.agents.pool.maxExecutionTimePerTask = "5min"
-      cds.env.agents.pool.timeoutGrace = "15s"
+      testService.definition["@agent.quota"].maxExecutionTimePerTask = "5min"
+      testService.definition["@agent.quota"].timeoutGrace = "15s"
 
       // Should timeout around 1800ms (2000 - 200 grace), not 2000ms
       assert.ok(elapsed < 1950, `should timeout before hard limit, elapsed: ${elapsed}ms`)

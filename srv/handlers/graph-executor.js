@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { agentConfig } from "../../lib/agents/config.js"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
 import { partsToText, buildChatMessages, firstDataPart } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
@@ -326,7 +327,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(agentConfig(this._srv, "quota")?.maxExecutionTimePerTask || "5min")
     const grace = this._getGrace()
     const softTimeout = Math.max(maxExecution - grace, 1000)
 
@@ -468,11 +469,11 @@ class GraphExecutor {
    * Parse configured timeout grace period.
    */
   _getGrace() {
-    return ms4(cds.env.agents?.pool?.timeoutGrace ?? "15s")
+    return ms4(agentConfig(this._srv, "quota")?.timeoutGrace ?? "15s")
   }
 
   async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(agentConfig(this._srv, "quota")?.maxExecutionTimePerTask || "5min")
     const grace = this._getGrace()
     // Soft timeout fires early to allow graceful summarization
     const softTimeout = Math.max(maxExecution - grace, 1000)
@@ -580,7 +581,8 @@ class GraphExecutor {
 
     // ── File I/O: persist incoming FileParts to cap.agent.Tasks.inputFiles ──
     // Build a manifest string so the LLM sees /uploads/<name> paths, not raw bytes.
-    const fileStore = cds.env.agents?.fileIO?.enabled ? new CdsFileStore() : null
+    const fileIO = agentConfig(this._srv, "fileIO")
+    const fileStore = fileIO?.enabled ? new CdsFileStore() : null
     if (fileStore && !isResume) {
       const fileParts = requestContext.userMessage?.parts?.filter((p) => p.kind === "file") || []
       const manifestLines = await Promise.all(
@@ -594,10 +596,7 @@ class GraphExecutor {
               const safeMime = file.mimeType || "application/octet-stream"
               // Pre-decode guard: reject oversized or disallowed-mime uploads
               // before allocating a Buffer for the base64 payload.
-              const rejection = checkInputFile(
-                { ...file, mimeType: safeMime },
-                cds.env.agents?.fileIO,
-              )
+              const rejection = checkInputFile({ ...file, mimeType: safeMime }, fileIO)
               if (rejection) {
                 LOG.warn("input file rejected", {
                   conversation: short(contextId),
@@ -892,7 +891,7 @@ class GraphExecutor {
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
         const fileArtifacts = []
-        const maxFileBytes = cds.env.agents.fileIO.maxOutputFileSizeBytes
+        const maxFileBytes = fileIO?.maxOutputFileSizeBytes
 
         // Artifacts from emit_file_part are this agent's own outputs — they must be
         // published as A2A FileParts but must NOT be re-persisted as inputFiles
@@ -1007,7 +1006,7 @@ class GraphExecutor {
               .slice(0, source1Count)
               .filter((fa) => {
                 if (!fa.file?.bytes || !fa.file?.name || fa._fromEmitFilePart) return false
-                const rejection = checkInputFile(fa.file, cds.env.agents?.fileIO)
+                const rejection = checkInputFile(fa.file, fileIO)
                 if (rejection) {
                   LOG.warn("downstream file re-persist rejected", {
                     conversation: short(contextId),

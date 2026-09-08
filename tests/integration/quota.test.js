@@ -7,6 +7,7 @@ import {
   createSendMessage,
 } from "../utils/telemetry-utils.js"
 import { ms4 } from "../../lib/utils/utils.js"
+import { agentConfig } from "../../lib/agents/config.js"
 
 process.env.CDS_TEST_SILENT = "false"
 setup()
@@ -20,14 +21,25 @@ describe("@cap-js/agents - Quota enforcement", () => {
   beforeEach(resetCapture)
 
   let originalPool
+  let originalPools
+  let pool
 
   before(() => {
-    originalPool = { ...cds.env.agents.pool }
+    pool = { ...agentConfig(cds.services.GraphBookService, "quota") }
+    originalPool = { ...pool }
+    originalPools = Object.values(cds.services)
+      .filter((srv) => srv.definition?.["@agent"])
+      .map((srv) => [srv.definition, srv.definition["@agent.quota"]])
+    for (const [definition] of originalPools) definition["@agent.quota"] = pool
   })
 
   afterEach(() => {
     // Restore pool config after each test
-    Object.assign(cds.env.agents.pool, originalPool)
+    Object.assign(pool, originalPool)
+  })
+
+  after(() => {
+    for (const [definition, original] of originalPools) definition["@agent.quota"] = original
   })
 
   describe("quotaEnforcerAtStart", () => {
@@ -38,8 +50,19 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(res.data.result.status.state).toBe("completed")
     })
 
+    it("disables quota enforcement when @agent.quota is false", async () => {
+      const definition = cds.services.GraphBookService.definition
+      definition["@agent.quota"] = false
+      try {
+        const res = await sendMessage("graph-book", "Show me books")
+        expect(res.status).toBe(200)
+      } finally {
+        definition["@agent.quota"] = pool
+      }
+    })
+
     it("should return 429 when maxTasksPerHourPerUser is exceeded", async () => {
-      cds.env.agents.pool.maxTasksPerHourPerUser = 0
+      pool.maxTasksPerHourPerUser = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       expect(res.status).toBe(429)
@@ -52,7 +75,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should return 429 when maxTasksPerHour is exceeded", async () => {
-      cds.env.agents.pool.maxTasksPerHour = 0
+      pool.maxTasksPerHour = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       expect(res.status).toBe(429)
@@ -61,7 +84,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should return 429 when maxConcurrentTasks is exceeded", async () => {
-      cds.env.agents.pool.maxConcurrentTasks = 0
+      pool.maxConcurrentTasks = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       expect(res.status).toBe(429)
@@ -71,7 +94,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should return 429 when maxToolCallsPerHour is exceeded", async () => {
-      cds.env.agents.pool.maxToolCallsPerHour = 0
+      pool.maxToolCallsPerHour = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       expect(res.status).toBe(429)
@@ -79,7 +102,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should return 429 when maxLLMTokensPerDay is exceeded", async () => {
-      cds.env.agents.pool.maxLLMTokensPerDay = 0
+      pool.maxLLMTokensPerDay = 0
 
       const res = await sendMessage("graph-book", "Should reject")
       expect(res.status).toBe(429)
@@ -91,7 +114,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should include Retry-After header with specific values", async () => {
-      cds.env.agents.pool.maxConcurrentTasksPerUser = 0
+      pool.maxConcurrentTasksPerUser = 0
 
       const res = await sendMessage("graph-book", "Check header")
       expect(res.status).toBe(429)
@@ -100,7 +123,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should include JSON-RPC error code -32029", async () => {
-      cds.env.agents.pool.maxTasksPerHour = 0
+      pool.maxTasksPerHour = 0
 
       const res = await sendMessage("graph-book", "Check error code")
       expect(res.data.error.code).toBe(-32029)
@@ -109,7 +132,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
 
   describe("maxIncomingMessageLength", () => {
     it("should reject messages exceeding maxIncomingMessageLength with 400", async () => {
-      cds.env.agents.pool.maxIncomingMessageLength = 10
+      pool.maxIncomingMessageLength = 10
 
       const res = await sendMessage("graph-book", "This message is longer than ten characters")
       expect(res.status).toBe(400)
@@ -118,7 +141,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should allow messages within maxIncomingMessageLength", async () => {
-      cds.env.agents.pool.maxIncomingMessageLength = 5000
+      pool.maxIncomingMessageLength = 5000
 
       const res = await sendMessage("graph-book", "Short message")
       expect(res.status).toBe(200)
@@ -128,7 +151,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
 
   describe("quotaEnforcerMiddleware (e2e)", () => {
     it("should cancel task when maxLLMInvocationsPerTask exceeded during graph execution", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 2
+      pool.maxLLMInvocationsPerTask = 2
 
       const res = await sendMessage("looping", "trigger loop")
       expect(res.status).toBe(200)
@@ -138,8 +161,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should cancel task when maxToolCallsPerTask exceeded during graph execution", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
-      cds.env.agents.pool.maxToolCallsPerTask = 1
+      pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
+      pool.maxToolCallsPerTask = 1
 
       const res = await sendMessage("looping", "trigger tool limit")
       expect(res.status).toBe(200)
@@ -149,9 +172,9 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should cancel task when maxLLMTokensPerTask exceeded during graph execution", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxToolCallsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 150 // agent adds 100 tokens per iteration → exceeds after 2nd
+      pool.maxLLMInvocationsPerTask = 100
+      pool.maxToolCallsPerTask = 100
+      pool.maxLLMTokensPerTask = 150 // agent adds 100 tokens per iteration → exceeds after 2nd
 
       const res = await sendMessage("looping", "trigger token limit")
       expect(res.status).toBe(200)
@@ -161,9 +184,9 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should cancel when per-task limits are exceeded with looping model", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 3
-      cds.env.agents.pool.maxToolCallsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 100000
+      pool.maxLLMInvocationsPerTask = 3
+      pool.maxToolCallsPerTask = 100
+      pool.maxLLMTokensPerTask = 100000
 
       const res = await sendMessage("looping", "limited loop")
       expect(res.status).toBe(200)
@@ -182,15 +205,15 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should return middleware with afterModel hook", async () => {
-      const [mw] = await quotaEnforcerMiddleware()
+      const [mw] = await quotaEnforcerMiddleware(cds.services.GraphBookService)
       expect(mw.name).toBe("agentQuotaEnforcerMiddleware")
       expect(mw.afterModel).not.toBe(undefined)
       expect(typeof mw.afterModel.hook).toBe("function")
     })
 
     it("afterModel hook should throw when maxLLMInvocationsPerTask exceeded", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 2
-      const [mw] = await quotaEnforcerMiddleware()
+      pool.maxLLMInvocationsPerTask = 2
+      const [mw] = await quotaEnforcerMiddleware(cds.services.GraphBookService)
       const { AIMessage } = await import("@langchain/core/messages")
       const state = {
         runModelCallCount: 5,
@@ -207,9 +230,9 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("afterModel hook should throw when maxLLMTokensPerTask exceeded", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 500
-      const [mw] = await quotaEnforcerMiddleware()
+      pool.maxLLMInvocationsPerTask = 100
+      pool.maxLLMTokensPerTask = 500
+      const [mw] = await quotaEnforcerMiddleware(cds.services.GraphBookService)
       const { AIMessage } = await import("@langchain/core/messages")
       const state = {
         runModelCallCount: 0,
@@ -226,10 +249,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("afterModel hook should throw when maxToolCallsPerTask exceeded", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 100000
-      cds.env.agents.pool.maxToolCallsPerTask = 5
-      const [mw] = await quotaEnforcerMiddleware()
+      pool.maxLLMInvocationsPerTask = 100
+      pool.maxLLMTokensPerTask = 100000
+      pool.maxToolCallsPerTask = 5
+      const [mw] = await quotaEnforcerMiddleware(cds.services.GraphBookService)
       const { AIMessage } = await import("@langchain/core/messages")
       const state = {
         runModelCallCount: 0,
@@ -247,10 +270,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("afterModel hook should return updated counts when within limits", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 100000
-      cds.env.agents.pool.maxToolCallsPerTask = 100
-      const [mw] = await quotaEnforcerMiddleware()
+      pool.maxLLMInvocationsPerTask = 100
+      pool.maxLLMTokensPerTask = 100000
+      pool.maxToolCallsPerTask = 100
+      const [mw] = await quotaEnforcerMiddleware(cds.services.GraphBookService)
       const { AIMessage } = await import("@langchain/core/messages")
       const state = {
         runModelCallCount: 0,
@@ -287,7 +310,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should write usageToolCalls to task record when graph tracks it", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 3
+      pool.maxLLMInvocationsPerTask = 3
       const res = await sendMessage("looping", "Track tools")
 
       expect(res.data.result.status.state).toBe("canceled")
@@ -305,7 +328,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should write usage fields even when task fails", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 2
+      pool.maxLLMInvocationsPerTask = 2
       const res = await sendMessage("looping", "Fail and track")
 
       expect(res.data.result.status.state).toBe("canceled")
@@ -407,10 +430,9 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
   })
 
-  describe("pool config", () => {
-    it("should have all expected pool limits defined", () => {
-      const pool = cds.env.agents.pool
-      expect(cds.env.agents?.pool).not.toBe(undefined)
+  describe("quota config", () => {
+    it("should have all expected quota limits defined", () => {
+      expect(pool).not.toBe(undefined)
       expect(pool.maxConcurrentTasks > 0, `expected ${pool.maxConcurrentTasks} > 0`).toBeTruthy()
       expect(
         pool.maxConcurrentTasksPerUser > 0,

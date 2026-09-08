@@ -20,26 +20,23 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
   after(teardown)
   beforeEach(resetCapture)
 
-  // ─── trace_langchain = false ────────────────────────────────────────
-
-  describe("trace_langchain disabled", () => {
-    it("should NOT patch BaseChatModel when trace_langchain is false", async () => {
-      expect(cds.env.agents.trace_langchain).toBe(false)
+  describe("LangChain tracing", () => {
+    it("patches BaseChatModel when telemetry is configured", async () => {
       const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
-      expect(BaseChatModel.prototype[PATCHED]).toBe(undefined)
+      expect(BaseChatModel.prototype[PATCHED]).toBe(true)
     })
 
-    it("should NOT patch StructuredTool when trace_langchain is false", async () => {
+    it("patches StructuredTool", async () => {
       const { StructuredTool } = await import("@langchain/core/tools")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
-      expect(StructuredTool.prototype[PATCHED]).toBe(undefined)
+      expect(StructuredTool.prototype[PATCHED]).toBe(true)
     })
 
-    it("should NOT patch RunnableLambda when trace_langchain is false", async () => {
+    it("patches RunnableLambda", async () => {
       const { RunnableLambda } = await import("@langchain/core/runnables")
       const PATCHED = Symbol.for("@cap-js/agents:patched")
-      expect(RunnableLambda.prototype[PATCHED]).toBe(undefined)
+      expect(RunnableLambda.prototype[PATCHED]).toBe(true)
     })
   })
 
@@ -47,8 +44,6 @@ describe("@cap-js/agents - Debug tracing & error handling", () => {
 
   describe("debug content on spans", () => {
     before(async () => {
-      // Enable tracing for debug content tests (sample has trace_langchain: false for the above tests)
-      cds.env.agents.trace_langchain = true
       const { patchLangChain } = await import("../../lib/telemetry/tracing.js")
       await patchLangChain()
     })

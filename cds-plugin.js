@@ -89,10 +89,7 @@ cds.on("served", async () => {
     const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
     // Defer LangChain patching so the CDS model is fully loaded before patches land.
-    // opt-out via cds.env.agents.trace_langchain = false
-    if (cds.env.agents?.trace_langchain !== false) {
-      await patchLangChain()
-    }
+    await patchLangChain()
   }
 
   if (cds.env.agents?.mlflow) {
