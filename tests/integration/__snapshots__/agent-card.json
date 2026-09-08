@@ -25,6 +25,7 @@
   "skills": [
     {
       "description": "Query data from the service. Available entities: 
+ Authors 
  Books: Book details with author information 
  Currencies: Code list for currencies
 
@@ -32,7 +33,7 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
  Genres: Hierarchically organized Code List for Genres 
  ListOfBooks: Browse available books",
       "examples": [
-        "Show me all Books",
+        "Show me all Authors",
       ],
       "id": "query",
       "name": "Data Query",
@@ -40,9 +41,9 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
         "query",
         "data",
         "read",
+        "authors",
         "books",
         "currencies",
-        "genres",
       ],
     },
     {
@@ -67,6 +68,18 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
       "name": "getStock",
       "tags": [
         "getstock",
+        "function",
+      ],
+    },
+    {
+      "description": "Look up author contact details",
+      "examples": [
+        "Look up author contact details",
+      ],
+      "id": "findAuthor",
+      "name": "findAuthor",
+      "tags": [
+        "findauthor",
         "function",
       ],
     },

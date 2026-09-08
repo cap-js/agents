@@ -205,4 +205,72 @@ describe("@cap-js/agents - Task Cleanup", () => {
       })
     })
   }
+
+  describe("cleanupOrphanedPseudonymization", () => {
+    const PSEUDO_STATE = "cap.agent.PseudonymizationState"
+    const PSEUDO_MAPPINGS = "cap.agent.PseudonymizationMappings"
+
+    async function seedPseudo(threadId) {
+      await INSERT.into(PSEUDO_STATE).entries({ threadId, seed: "deadbeef" })
+      await INSERT.into(PSEUDO_MAPPINGS).entries({
+        threadId,
+        hash: "name_abcd1234",
+        original: "Emily Brontë",
+      })
+    }
+
+    afterEach(async () => {
+      await DELETE.from(PSEUDO_STATE)
+      await DELETE.from(TASKS)
+    })
+
+    it("deletes pseudonymization state for a thread with no surviving task", async () => {
+      cds.env.agents.retention = "7d"
+      const contextId = cds.utils.uuid()
+      const threadId = `${SERVICE_NAME}:${contextId}`
+      await seedPseudo(threadId)
+      // no Task exists for this contextId
+
+      await cleanupExpiredTasks(SERVICE_NAME)
+
+      const state = await SELECT.one.from(PSEUDO_STATE).where({ threadId })
+      const mappings = await SELECT.from(PSEUDO_MAPPINGS).where({ threadId })
+      expect(state).toBeUndefined()
+      expect(mappings.length).toBe(0) // composition cascade
+    })
+
+    it("keeps pseudonymization state while a task for the same thread still exists", async () => {
+      cds.env.agents.retention = "7d"
+      const contextId = cds.utils.uuid()
+      const threadId = `${SERVICE_NAME}:${contextId}`
+      await seedPseudo(threadId)
+      // a recent task keeps the thread alive
+      await INSERT.into(TASKS).entries({
+        taskId: cds.utils.uuid(),
+        contextId,
+        state: "completed",
+        data: "{}",
+        agentService: SERVICE_NAME,
+        modifiedAt: pastDate(1),
+        createdAt: pastDate(1),
+      })
+
+      await cleanupExpiredTasks(SERVICE_NAME)
+
+      const state = await SELECT.one.from(PSEUDO_STATE).where({ threadId })
+      expect(state).toBeDefined()
+    })
+
+    it("does not delete pseudonymization state of another service", async () => {
+      cds.env.agents.retention = "7d"
+      const contextId = cds.utils.uuid()
+      const threadId = `OtherService:${contextId}`
+      await seedPseudo(threadId)
+
+      await cleanupExpiredTasks(SERVICE_NAME)
+
+      const state = await SELECT.one.from(PSEUDO_STATE).where({ threadId })
+      expect(state).toBeDefined()
+    })
+  })
 })
