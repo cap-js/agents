@@ -955,6 +955,7 @@ class GraphExecutor {
             serviceName,
             "quota exceeded",
           )
+          const quotaSummary = cds.i18n.messages.at("AGENT_QUOTA_EXCEEDED_SUMMARY", [summary])
 
           audit("AgentTaskFailed", {
             data: {
@@ -973,7 +974,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "canceled",
-              message: agentMessage(summary),
+              message: agentMessage(quotaSummary),
               timestamp: new Date().toISOString(),
             },
             final: true,
