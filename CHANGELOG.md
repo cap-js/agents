@@ -6,6 +6,10 @@
 
 ## Version 0.9.4 - ...
 
+### Changed
+
+- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+
 ### Fixed
 
 - Multiple tools with HITL needed in the same round no longer cause an error
