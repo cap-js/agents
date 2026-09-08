@@ -45,12 +45,11 @@ describe("timeout summary", () => {
       getModel: () => agent.send("buildModel"),
     })
 
-    const judgement = await new Judge({
-      criteria: `Judge this timeout summary for the user request: ${prompt}
-Pass only when it summarizes current progress, asks no question except one final continuation question, and that final question asks whether to continue or stop. Fail if it asks for any kind of further information.`,
-      assessmentName: "ANSWER_RELEVANCE_PROMPT",
-      continuous: false,
-    }).evaluate({ query: prompt, text: summary })
+    const judgement = await new Judge()
+      .criteria(
+        "Judge this timeout summary for the user request. Pass only when it summarizes current progress, asks no question except one final continuation question, and that final question asks whether to continue or stop. Fail if it asks for any kind of further information.",
+      )
+      .evaluate({ query: prompt, text: summary })
 
     expect(judgement.pass, `${judgement.comment}\nSummary: ${summary}`).toBe(true)
   })
