@@ -66,4 +66,11 @@ service CatalogService {
     name  : String;
     email : String;
   };
+  /**
+   * Validate an order — always rejects with two field-level errors.
+   * Used to test that err.details from multi-error CAP responses are
+   * forwarded to the LLM via toolWrapMiddleware.
+   */
+  @description: 'Validate an order (always fails with two errors for testing)'
+  action validateOrder(book: Books:ID, quantity: Integer) returns {};
 }

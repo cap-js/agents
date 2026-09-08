@@ -81,3 +81,22 @@ describe("@cap-js/agents - Production error sanitization", () => {
     })
   })
 })
+
+describe("@cap-js/agents - toolWrapMiddleware error handling", () => {
+  it("includes err.details from a CAP multi-error action in the ToolMessage content", async () => {
+    const { ToolMessage } = await import("@langchain/core/messages")
+    const { toolWrapMiddleware } = await import("../../lib/agents/middleware/tool-wrap.js")
+
+    const srv = cds.services.CatalogService
+    const mw = toolWrapMiddleware()
+    const result = await mw.wrapToolCall(
+      { toolCall: { name: "validateOrder", id: "test-call-1" } },
+      async () => srv.send("validateOrder", { book: 1, quantity: 1 }),
+    )
+
+    expect(ToolMessage.isInstance(result)).toBe(true)
+    expect(result.status).toBe("error")
+    expect(result.content).toContain("book is required")
+    expect(result.content).toContain("quantity must be positive")
+  })
+})

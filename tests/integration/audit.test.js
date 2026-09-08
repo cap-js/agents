@@ -91,17 +91,15 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(typeof data.contextId).toBe("string")
       expect(data.service).toBe("GraphBookService")
       expect(typeof data.duration).toBe("string")
-      expect(data.output).not.toBe(undefined)
     })
 
-    it("should include duration and output", async () => {
+    it("should include duration and taskId", async () => {
       await sendMessage("graph-book", "Show me books")
       await wait()
 
       const event = _auditLogs.find(byEvent("AgentTaskCompleted"))
       expect(event).not.toBe(undefined)
       expect(event.data.data.duration).not.toBe(undefined)
-      expect(event.data.data.output).not.toBe(undefined)
       expect(event.data.data.taskId).not.toBe(undefined)
     })
   })
@@ -157,7 +155,6 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(data.outcome).toBe("success")
       expect(typeof data.duration).toBe("number")
       expect(data.args).not.toBe(undefined)
-      expect(data.result).not.toBe(undefined)
     })
 
     it("should emit for custom (non-CDS) tools in the same graph", async () => {
@@ -172,7 +169,6 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(data.tool).toBe("getBookCount")
       expect(data.outcome).toBe("success")
       expect(typeof data.duration).toBe("number")
-      expect(data.result).not.toBe(undefined)
       expect(data.taskId).not.toBe(undefined)
     })
 

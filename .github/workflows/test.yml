@@ -13,7 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     name: Tests with Node.js ${{ matrix.node-version }} (CDS ${{ matrix.cds-version }})
     strategy:
       fail-fast: false

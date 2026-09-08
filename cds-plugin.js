@@ -4,7 +4,7 @@ const LOG = cds.log("agents")
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import cds_compile_to_a2a from "./lib/compile.js"
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
-import { slugified } from "./lib/utils/markdown.js"
+import { slugified } from "./lib/utils/utils.js"
 
 cds.compile.to.a2a = cds_compile_to_a2a
 
@@ -96,7 +96,7 @@ cds.on("served", async () => {
   }
 
   if (cds.env.agents?.mlflow) {
-    const { setupMlflowExporter } = await import("./lib/telemetry/mlflow.js")
+    const { setupMlflowExporter } = await import("./lib/telemetry/mlflow/index.js")
     setupMlflowExporter()
   }
 })

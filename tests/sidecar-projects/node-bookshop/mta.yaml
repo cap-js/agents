@@ -53,7 +53,7 @@ modules:
           url: ~{srv-url}/hcql
           forwardAuthToken: true
       - name: agent-node-bookshop-auth
-      - name: agent-java-bookshop-aicore
+      - name: agent-node-bookshop-aicore
       - name: agent-node-bookshop-db
 
   - name: agent-node-bookshop-sidecar-db-deployer
@@ -93,7 +93,7 @@ resources:
             - "binding-secret"
             - "x509"
 
-  - name: agent-java-bookshop-aicore
+  - name: agent-node-bookshop-aicore
     type: org.cloudfoundry.existing-service
     parameters:
       service-name: test-aicore-client
