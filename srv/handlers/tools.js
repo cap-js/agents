@@ -211,9 +211,15 @@ export function generateTools(srv) {
     }
   }
 
-  // emit_data_part: stateless structured-output emitter; not file I/O, so always
-  // available (independent of the fileIO gate below).
-  tools.push(createEmitDataPartTool())
+  // DataPart emission is deliberately NOT auto-wired. Emitting a DataPart is a
+  // contract with a specific A2A client (the shape/semantics must be understood
+  // on the other end), so the plugin does not impose a generic emit tool on every
+  // agent. Instead it exposes the `dataPart()` wire helper (below): an app defines
+  // its OWN tool tailored to its client — register it via a `buildTools` handler
+  // and return `dataPart(obj)` as the tool result. The outbound scanner is
+  // name-agnostic and republishes any `{kind:"data"}` tool result as a `data-*`
+  // artifact. The zero-config route for a single terminal object stays available
+  // via structured output (`responseFormat` → structuredResponse → DataPart).
 
   // File tools — only when fileIO is enabled
   // emit_file_part: stateless protocol emitter; safe to tools.push once at startup.
@@ -293,29 +299,32 @@ export function createEmitFilePartTool() {
 }
 
 /**
- * Create a tool that emits a structured object as a DataPart of the A2A response.
- * Pure protocol emitter — the executor's toolResults collection loop parses the
- * `kind:'data'` JSON from this tool and republishes it as a `data-*` artifact.
+ * Wire helper for emitting an A2A DataPart from inside a tool.
+ *
+ * Returns the exact string an agent tool must produce so the executor's outbound
+ * scanner recognizes it and republishes it as a `data-*` artifact (alongside the
+ * TextPart). The scanner is name-agnostic — it matches on the `{kind:"data"}`
+ * marker, not on the tool's name — so ANY app-defined tool can use this.
+ *
+ * The plugin intentionally does not ship a generic emit tool: a DataPart is a
+ * contract with a specific client, so the emission tool is the app's to define
+ * and tailor (schema, semantics). Build a LangChain tool that returns
+ * `dataPart(yourObject)`, then register it via a `buildTools` handler. Example:
+ *
+ *   import { dataPart } from "@cap-js/agents/srv/handlers/tools.js"
+ *   const emitStructuredReport = tool(
+ *     async ({ report }) => dataPart(report),
+ *     { name: "emit_structured_report", description: "...", schema: z.object({ report: z.record(z.any()) }) },
+ *   )
+ *
+ * @param {object} data - A JSON object to return to the caller as structured data.
+ * @returns {string} JSON string `{"kind":"data","data":<data>}` for the tool to return.
  */
-export function createEmitDataPartTool() {
-  return tool(
-    async ({ data }) => {
-      LOG.info("emit_data_part", {
-        keys: data && typeof data === "object" ? Object.keys(data) : [],
-      })
-      return JSON.stringify({ kind: "data", data })
-    },
-    {
-      name: "emit_data_part",
-      description:
-        "Emit a structured object as a DataPart of the A2A response, so a calling agent receives machine-readable data (not just text). Use for structured results the caller should consume programmatically.",
-      schema: z.object({
-        data: z
-          .record(z.any())
-          .describe("A JSON object to return to the caller as structured data"),
-      }),
-    },
-  )
+export function dataPart(data) {
+  LOG.info("dataPart", {
+    keys: data && typeof data === "object" ? Object.keys(data) : [],
+  })
+  return JSON.stringify({ kind: "data", data })
 }
 
 /**

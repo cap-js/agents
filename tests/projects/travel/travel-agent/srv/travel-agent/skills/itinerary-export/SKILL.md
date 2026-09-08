@@ -73,15 +73,17 @@ programmatically, without parsing English.
    }
    ```
 
-3. Emit it as a DataPart with the `emit_data_part` tool:
+3. Emit it as a DataPart with this agent's `export_itinerary` tool:
 
    ```
-   emit_data_part({ data: <the object above> })
+   export_itinerary({ itinerary: <the object above> })
    ```
 
-   The executor republishes this as a `data-*` artifact on the A2A response, so a
-   calling agent recovers the original object with the plugin's inbound
-   `firstDataPart(parts)` utility — closing the agent-to-agent round-trip.
+   `export_itinerary` is defined by this sample in `srv/travel-agent-service.js`
+   (a tool the app tailors to its own data, built on the plugin's `dataPart()`
+   helper). The executor republishes its result as a `data-*` artifact on the A2A
+   response, so a calling agent recovers the original object with the plugin's
+   inbound `firstDataPart(parts)` utility — closing the agent-to-agent round-trip.
 
 4. **Also give a short text summary.** The DataPart rides *alongside* the
    TextPart — it does not replace it. A human on the other end still gets a
@@ -91,7 +93,7 @@ programmatically, without parsing English.
 
 ## Notes
 
-- Prefer this over `emit_file_part` when the caller wants to *use* the data
+- Prefer this over the file skill when the caller wants to *use* the data
   in-memory, not download a document. Use `file-based-planning` (FilePart) when the
   deliverable is a file for a human to open.
 - Only include fields you actually have. Omit unknowns rather than inventing

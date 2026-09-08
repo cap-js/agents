@@ -10,7 +10,7 @@ const {
   composeEditNote,
 } = await import("../../srv/handlers/graph-executor.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
-const { createEmitDataPartTool } = await import("../../srv/handlers/tools.js")
+const { dataPart } = await import("../../srv/handlers/tools.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
 
@@ -614,10 +614,13 @@ describe("GraphExecutor - tool-result DataParts surface as artifact-update event
   )
 })
 
-describe("emit_data_part tool", () => {
-  it("returns a {kind:'data', data} JSON string the scanner can parse", async () => {
-    const tool = createEmitDataPartTool()
-    const raw = await tool.invoke({ data: { foo: 1, bar: ["x"] } })
+describe("dataPart() wire helper", () => {
+  it("returns a {kind:'data', data} JSON string the scanner can parse", () => {
+    // The plugin ships no generic emit tool. Consumers build their OWN tailored
+    // tool and return dataPart(obj) from it; the scanner (tested above) then
+    // republishes the {kind:'data'} marker as a data-* artifact, name-agnostic.
+    const raw = dataPart({ foo: 1, bar: ["x"] })
+    expect(typeof raw).toBe("string")
     expect(JSON.parse(raw)).toEqual({ kind: "data", data: { foo: 1, bar: ["x"] } })
   })
 })

@@ -937,7 +937,8 @@ class GraphExecutor {
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
         const fileArtifacts = []
-        // DataParts embedded in tool-result content (e.g. emit_data_part). Structured,
+        // DataParts embedded in tool-result content (any tool returning the
+        // dataPart() marker). Structured,
         // opaque objects — no byte cap, no /uploads re-persist. Published as their own
         // `data-*` artifact-update events below.
         const dataArtifacts = []
