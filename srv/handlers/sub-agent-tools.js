@@ -4,8 +4,9 @@ import { z } from "zod"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { short, toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agents:sub-agents")
+const LOG = cds.log("agents:sub-agents|agents|sub-agents")
 
+import { inspect } from "util"
 /**
  * Extract text and file parts from an A2A response (task or message).
  */
@@ -23,8 +24,8 @@ function extractResult(result) {
   }
 
   if (result.kind === "task") {
-    processParts(result.status?.message?.parts)
-    for (const artifact of result.artifacts || []) processParts(artifact.parts)
+    if (result.status?.message) processParts(result.status.message.parts)
+    else if (result.artifacts) for (let artifact of result.artifacts) processParts(artifact.parts)
     if (text.length === 0 && files.length === 0) {
       return { text: `Task ${result.id}: ${result.status?.state || "unknown"}`, files: [] }
     }
@@ -71,21 +72,27 @@ function formatToolResult({ text, files }) {
  * Wrap an A2A client as a LangChain tool the agent can call.
  */
 function createA2ATool(client, agentCard) {
+  const subagent = agentCard.name
   return tool(
     async ({ message }) => {
       try {
+        const messageId = cds.utils.uuid()
+        LOG.info(`Sending message to ${subagent}`, { messageId }, '\n\n'+ message +'\n')
         const result = await client.sendMessage({
           message: {
             kind: "message",
             role: "user",
-            messageId: cds.utils.uuid(),
+            messageId,
             parts: [{ kind: "text", text: message }],
           },
         })
-        return formatToolResult(extractResult(result))
+        if (LOG._debug) LOG.trace (`Raw results from ${subagent}`, inspect (result, { depth: null, colors: true }))
+        let response = formatToolResult(extractResult(result))
+        if (response) LOG.info (`Got response from ${subagent}`, { messageId }, '\n\n'+ response +'\n')
+        return response
       } catch (err) {
-        LOG.warn("Sub-agent tool error", { agent: agentCard.name, error: err.message })
-        return `Error communicating with ${agentCard.name}: ${err.message}`
+        LOG.warn("Sub agent tool error", { subagent, error: err.message })
+        return `Error communicating with ${subagent}: ${err.message}`
       }
     },
     {
