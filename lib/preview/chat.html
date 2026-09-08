@@ -616,7 +616,7 @@
       function flushPendingThinkingUpdate() {
         const pending = pendingThinkingUpdate
         clearPendingThinkingUpdate()
-        if (pending) renderThinkingStep(pending.artifactId, pending.text, pending.lastChunk)
+        if (pending) renderThinkingStep(pending)
       }
 
       function prefersReducedMotion() {
@@ -642,10 +642,17 @@
         else expandThinkingSummary(el)
       }
 
-      function renderThinkingStep(artifactId, text, lastChunk) {
+      function renderThinkingStep(update) {
+        const { artifactId, text, lastChunk, append } = update
         const panel = ensureThinkingSummary()
-        const isNewStep = artifactId !== currentThinkingArtifactId || currentThinkingClosed
-        if (isNewStep) {
+        const idx = thinkingStepEls.findIndex((step) => step._artifactId === artifactId)
+        if (append && idx >= 0) {
+          thinkingTexts[idx] += text
+          thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
+        } else if (artifactId === currentThinkingArtifactId && !currentThinkingClosed) {
+          thinkingTexts[idx] += "\n" + text
+          thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
+        } else {
           const step = document.createElement("div")
           step.className = "thinking-step"
           step._artifactId = artifactId
@@ -657,17 +664,12 @@
           updateThinkingSummaryLabel()
           currentThinkingArtifactId = artifactId
           currentThinkingClosed = false
-        } else {
-          // Append to current open step for this artifactId
-          const idx = thinkingStepEls.length - 1
-          thinkingTexts[idx] += text
-          thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
         }
         if (lastChunk) currentThinkingClosed = true
         messages.scrollTop = messages.scrollHeight
       }
 
-      function addThinkingStep(artifactId, text, lastChunk) {
+      function addThinkingStep(artifactId, text, lastChunk, append) {
         if (
           pendingThinkingUpdate &&
           pendingThinkingUpdate.artifactId === artifactId &&
@@ -677,7 +679,7 @@
           pendingThinkingUpdate.lastChunk = lastChunk
         } else {
           flushPendingThinkingUpdate()
-          pendingThinkingUpdate = { artifactId, text, lastChunk }
+          pendingThinkingUpdate = { artifactId, text, lastChunk, append }
         }
 
         if (pendingThinkingTimer) clearTimeout(pendingThinkingTimer)
@@ -1100,7 +1102,8 @@
 
           if (event.artifact?.artifactId?.startsWith("thinking")) {
             const lastChunk = event.lastChunk ?? false
-            if (text) addThinkingStep(event.artifact.artifactId, text, lastChunk)
+            if (text)
+              addThinkingStep(event.artifact.artifactId, text, lastChunk, event.append ?? false)
             return null
           }
 
