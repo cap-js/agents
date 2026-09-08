@@ -317,7 +317,7 @@ describe("GraphExecutor - graceful timeout", () => {
         inputRequiredEvent.status.message.metadata["sap.cds.agents.input-required"].options,
         [
           { value: "continue", label: "Continue" },
-          { value: "reject", label: "Reject" },
+          { value: "reject", label: "Stop" },
         ],
       )
       // Should NOT have a failed event

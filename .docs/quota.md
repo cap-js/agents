@@ -29,7 +29,6 @@ All limits are configured via `cds.env.agents.pool` (defaults provided by the pl
         "maxLLMTokensPerTask": 200000,
         "maxLLMCallTimeout": "120s",
         "maxExecutionTimePerTask": "5min",
-        "timeoutGrace": "15s",
         "maxIncomingMessageLength": 5000
       }
     }
@@ -67,13 +66,17 @@ Content-Type: application/json
 <details>
 <summary>Per-Task Limits (Task Failed)</summary>
 
-| Limit                      | Checked at          | Effect                       |
-| -------------------------- | ------------------- | ---------------------------- |
-| `maxLLMInvocationsPerTask` | After each LLM call | Graph throws → task `failed` |
-| `maxLLMTokensPerTask`      | After each LLM call | Same                         |
-| `maxToolCallsPerTask`      | After each LLM call | Same                         |
-| `maxLLMCallTimeout`        | Per LLM HTTP call   | Request aborted → error      |
-| `maxExecutionTimePerTask`  | Timeout wrapper     | Graph throws → task `failed` |
+| Limit                      | Checked at          | Effect                                  |
+| -------------------------- | ------------------- | --------------------------------------- |
+| `maxLLMInvocationsPerTask` | After each LLM call | Graph throws → task `failed`            |
+| `maxLLMTokensPerTask`      | After each LLM call | Same                                    |
+| `maxToolCallsPerTask`      | After each LLM call | Same                                    |
+| `maxLLMCallTimeout`        | Per LLM HTTP call   | Request aborted → error                 |
+| `maxExecutionTimePerTask`  | Timeout wrapper     | Graph asks via HITL whether to continue |
+
+On all errors the plugin will summarize the progress till that point. The summary is the status message of the cancelation.
+
+On execution timeouts the graph does not fail but instead interrupts and sends a HITL message asking the user whether to continue, including the summary about the progress.
 
 </details>
 
