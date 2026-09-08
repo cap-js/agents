@@ -8,15 +8,19 @@ export const HITL_METADATA_KEY = "sap.cds.agents.hitl"
 export const TIMEOUT_HITL_METADATA_KEY = "sap.cds.agents.timeout-hitl"
 export const INPUT_REQUIRED_METADATA_KEY = "sap.cds.agents.input-required"
 
-const APPROVAL_OPTIONS = [
-  { value: "approve", label: "Approve" },
-  { value: "reject", label: "Reject" },
-]
+function approvalOptions() {
+  return [
+    { value: "approve", label: cds.i18n.messages.at("HITL_APPROVE") },
+    { value: "reject", label: cds.i18n.messages.at("HITL_REJECT") },
+  ]
+}
 
-const TIMEOUT_OPTIONS = [
-  { value: "continue", label: "Continue" },
-  { value: "reject", label: "Stop" },
-]
+function timeoutOptions() {
+  return [
+    { value: "continue", label: cds.i18n.messages.at("HITL_CONTINUE") },
+    { value: "reject", label: cds.i18n.messages.at("HITL_STOP") },
+  ]
+}
 export const requiresHitl = (result) =>
   result?.__interrupt__?.length > 0 || result?.interrupts?.length > 0
 
@@ -168,7 +172,7 @@ function publishInputRequired({ requestContext, eventBus, description, interrupt
       state: "input-required",
       message: agentMessage(description, interruptData, {
         [HITL_METADATA_KEY]: pending,
-        [INPUT_REQUIRED_METADATA_KEY]: { options: APPROVAL_OPTIONS },
+        [INPUT_REQUIRED_METADATA_KEY]: { options: approvalOptions() },
       }),
       timestamp: new Date().toISOString(),
     },
@@ -195,7 +199,7 @@ export function publishTimeoutHitl({ requestContext, eventBus, description, serv
       state: "input-required",
       message: agentMessage(description, undefined, {
         [TIMEOUT_HITL_METADATA_KEY]: true,
-        [INPUT_REQUIRED_METADATA_KEY]: { options: TIMEOUT_OPTIONS },
+        [INPUT_REQUIRED_METADATA_KEY]: { options: timeoutOptions() },
       }),
       timestamp: new Date().toISOString(),
     },
