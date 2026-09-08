@@ -24,8 +24,10 @@ function extractResult(result) {
   }
 
   if (result.kind === "task") {
-    if (result.status?.message) processParts(result.status.message.parts)
-    else if (result.artifacts) for (let artifact of result.artifacts) processParts(artifact.parts)
+    if (result.artifacts) for (let artifact of result.artifacts) {
+      if (!artifact.artifactId.startsWith('thinking')) processParts(artifact.parts)
+    }
+    else if (result.status?.message) processParts(result.status.message.parts)
     if (text.length === 0 && files.length === 0) {
       return { text: `Task ${result.id}: ${result.status?.state || "unknown"}`, files: [] }
     }
