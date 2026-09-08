@@ -106,7 +106,7 @@ export async function buildSubAgentToolLocally(serviceName) {
 
   const { generateAgentCard } = await import("../../lib/protocol/agent-card.js")
   const agentCard = generateAgentCard(srv)
-  LOG.info(`Wired local sub-agent "${agentCard.name}" (${serviceName})`)
+  LOG.info(`Connecting to sub agent ${serviceName}`, '(local)')
 
   const { RequestContext, DefaultExecutionEventBus } = await import("@a2a-js/sdk/server")
 
@@ -280,7 +280,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
 
   const path = typeof credentials === "object" ? credentials?.path : null
   const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
-  LOG.info(`Connecting to sub-agent at ${base}`)
+  LOG.info(`Connecting to sub agent ${serviceName}`, { at: base })
 
   // revisit: a2a agents may be tenant specific, card per tenant?
   const initialHeaders = await resolveHeaders()
@@ -294,7 +294,6 @@ export async function buildSubAgentToolFromConnection(serviceName) {
     )
   }
   const agentCard = await cardRes.json()
-  LOG.info(`Connected to sub-agent "${agentCard.name}" (${serviceName})`)
 
   const { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory, RestTransportFactory } =
     await import("@a2a-js/sdk/client")
