@@ -376,6 +376,68 @@ describe("requiresHitl", () => {
 
 describe("GraphExecutor - HITL DataPart resume", () => {
   it(
+    "resumes checkpointed work when timeout continuation is approved",
+    withCtx(async () => {
+      let capturedInput
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-timeout-resume-1",
+          contextId: "ctx-timeout-resume-1",
+          userMessage: { parts: [{ kind: "text", text: "continue" }] },
+          task: {
+            status: {
+              state: "input-required",
+              message: { metadata: { "sap.cds.agents.timeout-hitl": true } },
+            },
+          },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput).toBe(null)
+    }),
+  )
+
+  it(
+    "cancels when timeout continuation is declined",
+    withCtx(async () => {
+      const publishedEvents = []
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => ({ messages: [{ content: "done" }] }),
+      }
+      const eventBus = { publish: (event) => publishedEvents.push(event), finished: () => {} }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-timeout-stop-1",
+          contextId: "ctx-timeout-stop-1",
+          userMessage: { parts: [{ kind: "text", text: "stop" }] },
+          task: {
+            status: {
+              state: "input-required",
+              message: { metadata: { "sap.cds.agents.timeout-hitl": true } },
+            },
+          },
+        },
+        eventBus,
+      )
+
+      expect(publishedEvents.find((event) => event.status?.state === "canceled")).toBeTruthy()
+    }),
+  )
+
+  it(
     "passes an inbound DataPart's data opaquely into Command({ resume })",
     withCtx(async () => {
       let capturedInput
@@ -481,6 +543,12 @@ describe("GraphExecutor - HITL suspend carries a DataPart", () => {
       const parts = inputRequired.status.message.parts
       expect(parts.find((p) => p.kind === "text")?.text).toBe("Approve order?")
       expect(parts.find((p) => p.kind === "data")?.data).toEqual(payload)
+      expect(
+        inputRequired.status.message.metadata["sap.cds.agents.input-required"].options,
+      ).toEqual([
+        { value: "approve", label: "Approve" },
+        { value: "reject", label: "Reject" },
+      ])
     }),
   )
 })

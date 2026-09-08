@@ -9,7 +9,14 @@ import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
-import { handleHitlInterrupt, requiresHitl, resumeHitl } from "./graph-executor/hitl.js"
+import {
+  handleHitlInterrupt,
+  isTimeoutHitl,
+  publishTimeoutHitl,
+  requiresHitl,
+  resumeHitl,
+  resumeTimeoutHitl,
+} from "./graph-executor/hitl.js"
 
 const LOG = cds.log("agents")
 
@@ -175,11 +182,9 @@ class GraphExecutor {
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
     const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
-    const grace = this._getGrace()
-    const softTimeout = Math.max(maxExecution - grace, 1000)
 
     const controller = new AbortController()
-    const timeoutHandle = setTimeout(() => controller.abort(), softTimeout)
+    const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
     const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
 
     let tokenCount = 0
@@ -271,8 +276,8 @@ class GraphExecutor {
         if (signal?.aborted) {
           throw new AbortError("Task execution aborted")
         }
-        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
-          timeout: softTimeout,
+        throw new TimeoutError(`Graph execution timed out after ${maxExecution / 1000}s`, {
+          timeout: maxExecution,
         })
       }
       throw err
@@ -312,23 +317,13 @@ class GraphExecutor {
 
     return { state: finalState, tokenCount }
   }
-  /**
-   * Parse configured timeout grace period.
-   */
-  _getGrace() {
-    return ms4(cds.env.agents?.pool?.timeoutGrace ?? "15s")
-  }
-
   async _invokeWithTimeout(graph, input, config, signal) {
     const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
-    const grace = this._getGrace()
-    // Soft timeout fires early to allow graceful summarization
-    const softTimeout = Math.max(maxExecution - grace, 1000)
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
     const timeoutController = new AbortController()
-    const timer = setTimeout(() => timeoutController.abort(), softTimeout)
+    const timer = setTimeout(() => timeoutController.abort(), maxExecution)
 
     // Combine caller-provided abort signal with timeout
     const combinedSignal = signal
@@ -344,8 +339,8 @@ class GraphExecutor {
         if (signal?.aborted) {
           throw new AbortError("Task execution aborted")
         }
-        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
-          timeout: softTimeout,
+        throw new TimeoutError(`Graph execution timed out after ${maxExecution / 1000}s`, {
+          timeout: maxExecution,
         })
       }
       throw err
@@ -357,9 +352,8 @@ class GraphExecutor {
   /**
    * Summarize partial work after forced interruption (timeout, quota, etc.).
    */
-  async _summarizePartialWork(taskId, contextId, serviceName, reason) {
+  async _summarizePartialWork(taskId, contextId, serviceName, reason, approval = false) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
-    const grace = this._getGrace()
     return summarizePartialWork({
       taskId,
       contextId,
@@ -367,7 +361,9 @@ class GraphExecutor {
       reason,
       checkpointer: this._graph?.checkpointer,
       getModel: () => this._srv.send("buildModel"),
-      timeout: Math.max(grace - 2000, grace * 0.8, 500),
+      // Summary runs after graph abort, so no execution-time grace is needed.
+      timeout: 10_000,
+      approval,
     })
   }
 
@@ -564,7 +560,8 @@ class GraphExecutor {
         const t0 = Date.now()
 
         if (isResume) {
-          result = await resumeHitl({
+          const resume = isTimeoutHitl(requestContext.task) ? resumeTimeoutHitl : resumeHitl
+          result = await resume({
             requestContext,
             graph,
             config,
@@ -892,42 +889,21 @@ class GraphExecutor {
           return
         }
 
-        // Timeout — attempt graceful summary of work-in-progress before reporting
+        // Timeout — pause at checkpoint. User decides whether to resume graph.
         if (err.name === "TimeoutError") {
           LOG.warn("timeout", { conversation: short(contextId), service: serviceName })
 
-          if (wfSpan) wfSpan.setAttribute("agent.outcome", "timeout")
-          metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "timeout" })
+          if (wfSpan) wfSpan.setAttribute("agent.outcome", "input-required")
 
           const summary = await this._summarizePartialWork(
             taskId,
             contextId,
             serviceName,
             "timed out",
+            true,
           )
 
-          audit("AgentTaskFailed", {
-            data: {
-              taskId,
-              contextId,
-              service: serviceName,
-              error: err.message,
-              errorCode: "timeout",
-              task: requestContext.task,
-            },
-          })
-
-          eventBus.publish({
-            kind: "status-update",
-            taskId,
-            contextId,
-            status: {
-              state: "canceled",
-              message: agentMessage(summary),
-              timestamp: new Date().toISOString(),
-            },
-            final: true,
-          })
+          publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
           return
         }
 

@@ -5,6 +5,18 @@ import { audit, short } from "../../../lib/utils/utils.js"
 const LOG = cds.log("agents")
 
 export const HITL_METADATA_KEY = "sap.cds.agents.hitl"
+export const TIMEOUT_HITL_METADATA_KEY = "sap.cds.agents.timeout-hitl"
+export const INPUT_REQUIRED_METADATA_KEY = "sap.cds.agents.input-required"
+
+const APPROVAL_OPTIONS = [
+  { value: "approve", label: "Approve" },
+  { value: "reject", label: "Reject" },
+]
+
+const TIMEOUT_OPTIONS = [
+  { value: "continue", label: "Continue" },
+  { value: "reject", label: "Stop" },
+]
 export const requiresHitl = (result) =>
   result?.__interrupt__?.length > 0 || result?.interrupts?.length > 0
 
@@ -154,12 +166,73 @@ function publishInputRequired({ requestContext, eventBus, description, interrupt
     contextId,
     status: {
       state: "input-required",
-      message: agentMessage(description, interruptData, { [HITL_METADATA_KEY]: pending }),
+      message: agentMessage(description, interruptData, {
+        [HITL_METADATA_KEY]: pending,
+        [INPUT_REQUIRED_METADATA_KEY]: { options: APPROVAL_OPTIONS },
+      }),
       timestamp: new Date().toISOString(),
     },
     final: true,
   })
   eventBus.finished()
+}
+
+export function isTimeoutHitl(task) {
+  return task?.status?.message?.metadata?.[TIMEOUT_HITL_METADATA_KEY] === true
+}
+
+export function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
+  const { taskId, contextId } = requestContext
+  LOG.info("timeout awaiting decision", { conversation: short(contextId), service: serviceName })
+  audit("AgentInputRequired", {
+    data: { taskId, contextId, service: serviceName, reason: "timeout", description },
+  })
+  eventBus.publish({
+    kind: "status-update",
+    taskId,
+    contextId,
+    status: {
+      state: "input-required",
+      message: agentMessage(description, undefined, {
+        [TIMEOUT_HITL_METADATA_KEY]: true,
+        [INPUT_REQUIRED_METADATA_KEY]: { options: TIMEOUT_OPTIONS },
+      }),
+      timestamp: new Date().toISOString(),
+    },
+    final: true,
+  })
+}
+
+export async function resumeTimeoutHitl({ requestContext, eventBus, stream, signal }) {
+  const { taskId, contextId } = requestContext
+  const decision = partsToText(requestContext.userMessage?.parts).trim()
+  if (!decision) throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
+
+  if (/^(continue|approve|yes|confirm|ok)$/i.test(decision)) {
+    LOG.info("timeout continuation approved", { conversation: short(contextId) })
+    audit("AgentTaskResumed", {
+      data: { taskId, contextId, service: cds.context?.["agent.service"], reason: "timeout" },
+    })
+    const resumed = await stream(null, signal)
+    return resumed.state
+  }
+
+  LOG.info("timeout continuation declined", { conversation: short(contextId) })
+  audit("AgentTaskCanceled", {
+    data: { taskId, contextId, service: cds.context?.["agent.service"], reason: "timeout" },
+  })
+  eventBus.publish({
+    kind: "status-update",
+    taskId,
+    contextId,
+    status: {
+      state: "canceled",
+      message: agentMessage("Task stopped by user after timeout."),
+      timestamp: new Date().toISOString(),
+    },
+    final: true,
+  })
+  return undefined
 }
 
 export async function resumeHitl({ requestContext, graph, config, eventBus, stream, signal }) {

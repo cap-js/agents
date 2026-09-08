@@ -810,31 +810,31 @@
         setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
       }
 
-      function addApprovalPrompt(description) {
+      function addApprovalPrompt(description, options) {
         const el = document.createElement("div")
         el.className = "msg approval"
         el.innerHTML = md(description || "The agent requires your approval to continue.")
         const actions = document.createElement("div")
         actions.className = "approval-actions"
 
-        const approveBtn = document.createElement("button")
-        approveBtn.className = "btn-approve"
-        approveBtn.textContent = "Approve"
-        approveBtn.addEventListener("click", () => {
-          removeApprovalPrompt(el)
-          resume("approve")
-        })
-
-        const rejectBtn = document.createElement("button")
-        rejectBtn.className = "btn-reject"
-        rejectBtn.textContent = "Reject"
-        rejectBtn.addEventListener("click", () => {
-          removeApprovalPrompt(el)
-          resume("reject")
-        })
-
-        actions.appendChild(approveBtn)
-        actions.appendChild(rejectBtn)
+        const choices =
+          Array.isArray(options) && options.length
+            ? options
+            : [
+                { value: "approve", label: "Approve" },
+                { value: "reject", label: "Reject" },
+              ]
+        for (const option of choices) {
+          if (typeof option?.value !== "string" || typeof option?.label !== "string") continue
+          const button = document.createElement("button")
+          button.className = option.value === "reject" ? "btn-reject" : "btn-approve"
+          button.textContent = option.label
+          button.addEventListener("click", () => {
+            removeApprovalPrompt(el)
+            resume(option.value)
+          })
+          actions.appendChild(button)
+        }
         el.appendChild(actions)
         messages.insertBefore(el, typing.parentElement === messages ? typing : statusText)
         messages.scrollTop = messages.scrollHeight
@@ -926,8 +926,10 @@
           pendingTaskId = taskId
           const msgParts = result?.status?.message?.parts ?? []
           const description = partsToText(msgParts)
+          const options =
+            result?.status?.message?.metadata?.["sap.cds.agents.input-required"]?.options
           flushPendingThinkingUpdate()
-          addApprovalPrompt(description)
+          addApprovalPrompt(description, options)
           return
         }
 
