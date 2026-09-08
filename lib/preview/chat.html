@@ -660,7 +660,7 @@
         } else {
           // Append to current open step for this artifactId
           const idx = thinkingStepEls.length - 1
-          thinkingTexts[idx] += text
+          thinkingTexts[idx] += '\n' + text
           thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
         }
         if (lastChunk) currentThinkingClosed = true
