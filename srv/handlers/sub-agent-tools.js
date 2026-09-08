@@ -15,7 +15,7 @@ function extractResult(result) {
   const text = []
   const files = []
 
-  const processParts = (parts = []) => {
+  const processParts = (parts) => {
     for (const part of parts) {
       if (part.kind === "text") text.push(part.text)
       else if (part.kind === "file") files.push(part)
