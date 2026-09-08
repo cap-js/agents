@@ -3,7 +3,7 @@ import cds from "@sap/cds"
 const { GraphExecutor, messageText, defaultOutputMapper } =
   await import("../../srv/handlers/graph-executor.js")
 const { agentMessage } = await import("../../lib/utils/message-handling.js")
-const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote } =
+const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote, requiresHitl } =
   await import("../../srv/handlers/graph-executor/hitl.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
 
@@ -332,6 +332,45 @@ describe("composeHitlDecisionNote", () => {
     expect(note).toContain("User edited")
     expect(note).toContain('"quantity":4')
     expect(composeHitlDecisionNote([originalCall], { foo: 1 })).toBeUndefined()
+  })
+
+  it("does not inject a note for approval-only decisions", () => {
+    expect(
+      composeHitlDecisionNote([originalCall], { decisions: [{ type: "approve" }] }),
+    ).toBeUndefined()
+  })
+
+  it("matches edits by action name when non-HITL calls precede them", () => {
+    const note = composeHitlDecisionNote(
+      [
+        { id: "tc-1", name: "listBooks", args: {} },
+        originalCall,
+        { id: "tc-3", name: "refund", args: { orderId: 99 } },
+      ],
+      {
+        decisions: [
+          {
+            type: "edit",
+            editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } },
+          },
+          { type: "edit", editedAction: { name: "refund", args: { orderId: 100 } } },
+        ],
+      },
+    )
+    expect(note).toContain("submitOrder")
+    expect(note).toContain("refund")
+    expect(note).not.toContain("listBooks")
+    expect(note).toContain('"quantity":4')
+    expect(note).toContain('"orderId":100')
+  })
+})
+
+describe("requiresHitl", () => {
+  it("accepts both LangGraph interrupt result shapes", () => {
+    expect(requiresHitl({ __interrupt__: [{ value: "approval" }] })).toBe(true)
+    expect(requiresHitl({ interrupts: [{ value: "approval" }] })).toBe(true)
+    expect(requiresHitl({ __interrupt__: [], interrupts: [{ value: "approval" }] })).toBe(true)
+    expect(requiresHitl({})).toBe(false)
   })
 })
 

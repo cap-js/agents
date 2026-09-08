@@ -5,7 +5,8 @@ import { audit, short } from "../../../lib/utils/utils.js"
 const LOG = cds.log("agents")
 
 export const HITL_METADATA_KEY = "sap.cds.agents.hitl"
-export const requiresHitl = (result) => result?.__interrupt__?.length > 0
+export const requiresHitl = (result) =>
+  result?.__interrupt__?.length > 0 || result?.interrupts?.length > 0
 
 export function parseResumeDecision(userText) {
   const t = userText.trim()
@@ -44,7 +45,7 @@ export function extractInterruptData(resultOrErr) {
 function interruptActionCount(resultOrErr) {
   const interrupts = resultOrErr.__interrupt__ || resultOrErr.interrupts || []
   return interrupts.reduce(
-    (count, interrupt) => count + (interrupt?.value?.actionRequests?.length || 1),
+    (count, interrupt) => count + (interrupt?.value?.actionRequests?.length || 0),
     0,
   )
 }
@@ -57,20 +58,38 @@ function interruptActionRequests(resultOrErr) {
 export function composeHitlDecisionNote(actionRequests, resume) {
   const decisions = resume?.decisions
   if (!Array.isArray(decisions) || decisions.length === 0) return undefined
+  if (decisions.every((decision) => decision?.type === "approve")) return undefined
+  const consumed = new Set()
+  const takeByName = (name) => {
+    for (let index = 0; index < actionRequests.length; index++) {
+      if (!consumed.has(index) && actionRequests[index]?.name === name) {
+        consumed.add(index)
+        return actionRequests[index]
+      }
+    }
+    return undefined
+  }
   const action = (request) =>
     "`" + (request?.name ?? "unknown action") + "(" + JSON.stringify(request?.args ?? {}) + ")`"
-  const lines = decisions.map((decision, index) => {
+  const lines = []
+  for (const [index, decision] of decisions.entries()) {
     const original = actionRequests[index]
-    if (decision?.type === "approve") return "- User approved " + action(original) + "."
+    if (decision?.type === "approve") {
+      lines.push("- User approved " + action(original) + ".")
+      continue
+    }
     if (decision?.type === "reject") {
       const reason = decision.message ? " Reason: " + JSON.stringify(decision.message) + "." : ""
-      return "- User rejected " + action(original) + "." + reason
+      lines.push("- User rejected " + action(original) + "." + reason)
+      continue
     }
     if (decision?.type === "edit") {
-      return "- User edited " + action(original) + " to " + action(decision.editedAction) + "."
+      const matched = takeByName(decision.editedAction?.name) ?? original
+      lines.push("- User edited " + action(matched) + " to " + action(decision.editedAction) + ".")
+      continue
     }
-    return "- User decision for " + action(original) + ": " + JSON.stringify(decision) + "."
-  })
+    lines.push("- User decision for " + action(original) + ": " + JSON.stringify(decision) + ".")
+  }
   return ["User HITL decisions (not tool failures):", ...lines].join("\n")
 }
 
@@ -180,7 +199,9 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
 
   const decisions = decisionsForAudit(resume, actionRequests)
   LOG.debug("resuming", { conversation: short(contextId), decisions })
-  audit("AgentTaskResumed", { data: { taskId, contextId, decisions } })
+  audit("AgentTaskResumed", {
+    data: { taskId, contextId, service: cds.context?.["agent.service"], decisions },
+  })
 
   const originalActions = actionRequests.length
     ? actionRequests
