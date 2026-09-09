@@ -88,61 +88,31 @@ function messageText(content) {
 }
 
 /**
- * Default output mapper: derive the agent's final answer from the graph result.
- * Returns either a plain string (TextPart only) or `{ text, data }` when the
- * result carries structured data (emitted as a TextPart + DataPart). Structured
- * data is recognized so it is no longer silently JSON-stringified into a TextPart.
- * Priority: structuredResponse > last AI message text > result.output > JSON fallback.
+ * Default output mapper: extracts response text from graph result.
+ * Priority: last AI message content > result.output > JSON stringified result.
  */
 function defaultOutputMapper(result) {
-  // Text from the last message (standard LangChain pattern), if any.
-  let text = ""
+  // 1. Messages-based: last message content (standard LangChain pattern)
   if (result.messages?.length > 0) {
-    text = messageText(result.messages[result.messages.length - 1]?.content) || ""
+    const lastMsg = result.messages[result.messages.length - 1]
+    const text = messageText(lastMsg?.content)
+    if (text) return text
   }
-
-  // 1. LangGraph structured output (responseFormat) → DataPart, plus text when present.
-  if (result.structuredResponse && typeof result.structuredResponse === "object") {
-    return { text, data: result.structuredResponse }
-  }
-
-  // 2. Messages-based text.
-  if (text) return text
-
-  // 3. `output` field: a legacy AgentExecutor result or a custom StateGraph channel
-  //    named `output`. Legacy AgentExecutor and every graph we ship write a string
-  //    here → TextPart. A plain object is not a first-party LangChain/LangGraph
-  //    default (canonical structured output arrives via structuredResponse, case 1),
-  //    but a user-defined `output` channel could carry one — so handle it defensively
-  //    as a DataPart (previously it was stuffed into a TextPart as an object — malformed).
-  if (result.output) {
-    if (typeof result.output === "object" && !Array.isArray(result.output)) {
-      return { text: "", data: result.output }
-    }
-    return result.output
-  }
-
-  // 4. Fallback — truly-unknown result, not agent-intended structured output.
+  // 2. Output field (e.g. travel-sample pattern)
+  if (result.output) return result.output
+  // 3. Fallback
   return JSON.stringify(result)
-}
-
-// Build A2A message parts: always a TextPart; append a DataPart when `data` is a
-// plain object (arrays/strings/null carry on the TextPart alone). Shared so the
-// completed status message and the "response" artifact build identical parts from
-// one place — keeping the single v0.3 `{kind:"data"}` emit branch DRY.
-function messageParts(text, data) {
-  const parts = [{ kind: "text", text }]
-  if (data && typeof data === "object" && !Array.isArray(data)) parts.push({ kind: "data", data })
-  return parts
 }
 
 // Construct a spec-compliant A2A Message; when `data` is a plain object, append it as a DataPart.
 function agentMessage(text, data) {
+  const parts = [{ kind: "text", text }]
+  if (data && typeof data === "object") parts.push({ kind: "data", data })
   return {
     kind: "message",
     messageId: cds.utils.uuid(),
     role: "agent",
-    parts: messageParts(text, data),
+    parts,
   }
 }
 
@@ -861,13 +831,7 @@ class GraphExecutor {
 
         const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         const outputMapper = this._outputMapper || defaultOutputMapper
-        // The mapper may return a string (TextPart only) or { text, data } (TextPart +
-        // DataPart). Normalize: `output` stays a string for spans/audit/artifact text;
-        // `outputData`, when present, rides a DataPart on the completed message + artifact.
-        const mapped = outputMapper(result)
-        const output =
-          (typeof mapped === "string" ? mapped : mapped?.text) || "I could not generate a response."
-        const outputData = mapped && typeof mapped === "object" ? mapped.data : undefined
+        const output = outputMapper(result) || "I could not generate a response."
 
         LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
 
@@ -919,7 +883,7 @@ class GraphExecutor {
           lastChunk: true,
           artifact: {
             artifactId: "response",
-            parts: messageParts(output, outputData),
+            parts: [{ kind: "text", text: output }],
           },
         })
 
@@ -1151,7 +1115,7 @@ class GraphExecutor {
           contextId,
           status: {
             state: "completed",
-            message: agentMessage(output, outputData),
+            message: agentMessage(output),
             timestamp: new Date().toISOString(),
           },
           final: true,
