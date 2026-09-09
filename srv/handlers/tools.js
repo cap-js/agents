@@ -395,7 +395,7 @@ export function createEmitDataPartTool() {
       schema: z.object({
         // A2A DataPart is specified to be an object in A2A 0.3
         // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object
-        data: z.object().describe("Structured object"),
+        data: z.looseObject().describe("Structured object"),
       }),
     },
   )

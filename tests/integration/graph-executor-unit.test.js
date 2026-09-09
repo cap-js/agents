@@ -10,7 +10,7 @@ const {
   composeEditNote,
 } = await import("../../srv/handlers/graph-executor.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
-const { dataPart } = await import("../../srv/handlers/tools.js")
+const { createEmitDataPartTool } = await import("../../srv/handlers/tools.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
 
@@ -614,13 +614,47 @@ describe("GraphExecutor - tool-result DataParts surface as artifact-update event
   )
 })
 
-describe("dataPart() wire helper", () => {
-  it("returns a {kind:'data', data} JSON string the scanner can parse", () => {
-    // The plugin ships no generic emit tool. Consumers build their OWN tailored
-    // tool and return dataPart(obj) from it; the scanner (tested above) then
-    // republishes the {kind:'data'} marker as a data-* artifact, name-agnostic.
-    const raw = dataPart({ foo: 1, bar: ["x"] })
-    expect(typeof raw).toBe("string")
-    expect(JSON.parse(raw)).toEqual({ kind: "data", data: { foo: 1, bar: ["x"] } })
-  })
+describe("emit_data_part tool", () => {
+  it(
+    "a tool-result containing emit_data_part output surfaces as a data-* artifact-update event",
+    withCtx(async () => {
+      const tool = createEmitDataPartTool()
+      const data = { orderId: 99, status: "confirmed" }
+
+      const publishedEvents = []
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => {
+          // Simulate the LangGraph tool node: the AI calls emit_data_part, LangGraph
+          // invokes it and stores the return value (stringified) as ToolMessage.content.
+          const toolResult = await tool.invoke({ data })
+          return {
+            messages: [
+              { content: "here is your order", tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }] },
+              { content: JSON.stringify(toolResult), tool_call_id: "tc-emit-1" },
+              { content: "Order confirmed." },
+            ],
+          }
+        },
+      }
+      const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-emit-data-1",
+          contextId: "ctx-emit-data-1",
+          userMessage: { parts: [{ kind: "text", text: "place order" }] },
+          task: { status: { state: "working" } },
+        },
+        capturingEventBus,
+      )
+
+      const dataArtifact = publishedEvents.find(
+        (e) => e.kind === "artifact-update" && e.artifact?.artifactId?.startsWith("data-"),
+      )
+      expect(dataArtifact, "a data-* artifact-update must have been published").toBeTruthy()
+      expect(dataArtifact.artifact.parts[0]).toEqual({ kind: "data", data })
+    }),
+  )
 })
