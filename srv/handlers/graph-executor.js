@@ -892,6 +892,9 @@ class GraphExecutor {
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
         const fileArtifacts = []
+        // DataParts embedded in tool-result content.
+        // Published as their own `data-*` artifact-update events below.
+        const dataArtifacts = []
         const maxFileBytes = cds.env.agents.fileIO.maxOutputFileSizeBytes
 
         // Artifacts from emit_file_part are this agent's own outputs — they must be
@@ -915,7 +918,10 @@ class GraphExecutor {
           const content = typeof msg.content === "string" ? msg.content : ""
           let pos = 0
           while (pos < content.length) {
-            const start = content.indexOf('{"kind":"file"', pos)
+            // Find the earliest next FilePart or DataPart marker.
+            const fileAt = content.indexOf('{"kind":"file"', pos)
+            const dataAt = content.indexOf('{"kind":"data"', pos)
+            const start = fileAt === -1 ? dataAt : dataAt === -1 ? fileAt : Math.min(fileAt, dataAt)
             if (start === -1) break
             // Walk forward tracking depth and quoted strings so that '}' inside
             // a string value (e.g. a filename like "result_{final}.csv") does not
@@ -944,6 +950,11 @@ class GraphExecutor {
             const raw = content.slice(start, i + 1)
             try {
               const artifact = JSON.parse(raw)
+              if (artifact.kind === "data") {
+                dataArtifacts.push(artifact)
+                pos = i + 1
+                continue
+              }
               // Apply the same per-file size cap as Source 2. Decode-length is
               // computed by Buffer.byteLength (zero allocation — pure formula
               // over string length + padding) so an oversized blob never pins
@@ -1063,6 +1074,26 @@ class GraphExecutor {
             },
           })
         }
+
+        dataArtifacts.forEach((artifact, i) => {
+          if (artifact.data == null || typeof artifact.data !== "object") {
+            LOG.warn("skipping malformed data artifact", {
+              conversation: short(contextId),
+              service: serviceName,
+            })
+            return
+          }
+          LOG.info("data emitted", { conversation: short(contextId), service: serviceName })
+          eventBus.publish({
+            kind: "artifact-update",
+            taskId,
+            contextId,
+            artifact: {
+              artifactId: `data-${i}`,
+              parts: [{ kind: "data", data: artifact.data }],
+            },
+          })
+        })
 
         // Programmatic .chat() path: stash graph result on eventBus so chat.js
         // can read messages without an extra checkpoint roundtrip.

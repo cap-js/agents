@@ -10,6 +10,7 @@ const {
   composeEditNote,
 } = await import("../../srv/handlers/graph-executor.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
+const { createEmitDataPartTool } = await import("../../srv/handlers/tools.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
 
@@ -469,6 +470,146 @@ describe("GraphExecutor - HITL suspend carries a DataPart", () => {
       const parts = inputRequired.status.message.parts
       expect(parts.find((p) => p.kind === "text")?.text).toBe("Approve order?")
       expect(parts.find((p) => p.kind === "data")?.data).toEqual(payload)
+    }),
+  )
+})
+
+describe("GraphExecutor - completion carries a DataPart", () => {
+  const runToCompletion = async (options) => {
+    const publishedEvents = []
+    const fakeGraph = {
+      checkpointer: {},
+      invoke: async () => ({ messages: [{ content: "here is your data" }] }),
+    }
+    const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
+    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, options)
+    await executor.execute(
+      {
+        taskId: "task-complete-1",
+        contextId: "ctx-complete-1",
+        userMessage: { parts: [{ kind: "text", text: "give me data" }] },
+        task: { status: { state: "working" } },
+      },
+      capturingEventBus,
+    )
+    return publishedEvents
+  }
+
+  it(
+    "default text-only result yields a single TextPart, no DataPart (backward compatible)",
+    withCtx(async () => {
+      const events = await runToCompletion({}) // defaultOutputMapper → string
+      const completed = events.find((e) => e.status?.state === "completed")
+      const parts = completed.status.message.parts
+      expect(parts).toHaveLength(1)
+      expect(parts[0]).toMatchObject({ kind: "text", text: "here is your data" })
+      expect(firstDataPart(parts)).toBeUndefined()
+    }),
+  )
+})
+
+describe("GraphExecutor - tool-result DataParts surface as artifact-update events", () => {
+  const runWithToolContent = async (content) => {
+    const publishedEvents = []
+    const fakeGraph = {
+      checkpointer: {},
+      invoke: async () => ({
+        messages: [
+          { content: "final answer" },
+          { content, tool_call_id: "tc-1" }, // a ToolMessage carrying embedded parts
+        ],
+      }),
+    }
+    const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
+    const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+    await executor.execute(
+      {
+        taskId: "task-scan-1",
+        contextId: "ctx-scan-1",
+        userMessage: { parts: [{ kind: "text", text: "go" }] },
+        task: { status: { state: "working" } },
+      },
+      capturingEventBus,
+    )
+    return publishedEvents
+  }
+
+  it(
+    "publishes a data-* artifact for a {kind:'data'} object embedded in tool-result content",
+    withCtx(async () => {
+      const data = { rows: [{ id: 1 }, { id: 2 }], meta: { source: "db" } }
+      const events = await runWithToolContent(JSON.stringify({ kind: "data", data }))
+      const dataArtifact = events.find(
+        (e) => e.kind === "artifact-update" && e.artifact?.artifactId?.startsWith("data-"),
+      )
+      expect(dataArtifact, "a data-* artifact-update must have been published").toBeTruthy()
+      expect(dataArtifact.artifact.parts[0]).toEqual({ kind: "data", data })
+    }),
+  )
+
+  it(
+    "surfaces both a file-* and a data-* artifact from mixed tool-result content",
+    withCtx(async () => {
+      const data = { ok: true }
+      const filePart = {
+        kind: "file",
+        file: { name: "r.csv", mimeType: "text/csv", bytes: "YQ==" },
+      }
+      const content = `prefix ${JSON.stringify(filePart)} middle ${JSON.stringify({ kind: "data", data })} suffix`
+      const events = await runWithToolContent(content)
+      const artifactIds = events
+        .filter((e) => e.kind === "artifact-update")
+        .map((e) => e.artifact?.artifactId)
+      expect(artifactIds).toContain("file-r.csv")
+      expect(artifactIds.some((id) => id?.startsWith("data-"))).toBe(true)
+    }),
+  )
+})
+
+describe("emit_data_part tool", () => {
+  it(
+    "a tool-result containing emit_data_part output surfaces as a data-* artifact-update event",
+    withCtx(async () => {
+      const tool = createEmitDataPartTool()
+      const data = { orderId: 99, status: "confirmed" }
+
+      const publishedEvents = []
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => {
+          // Simulate the LangGraph tool node: the AI calls emit_data_part, LangGraph
+          // invokes it and stores the return value (stringified) as ToolMessage.content.
+          const toolResult = await tool.invoke({ data })
+          return {
+            messages: [
+              {
+                content: "here is your order",
+                tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }],
+              },
+              { content: JSON.stringify(toolResult), tool_call_id: "tc-emit-1" },
+              { content: "Order confirmed." },
+            ],
+          }
+        },
+      }
+      const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-emit-data-1",
+          contextId: "ctx-emit-data-1",
+          userMessage: { parts: [{ kind: "text", text: "place order" }] },
+          task: { status: { state: "working" } },
+        },
+        capturingEventBus,
+      )
+
+      const dataArtifact = publishedEvents.find(
+        (e) => e.kind === "artifact-update" && e.artifact?.artifactId?.startsWith("data-"),
+      )
+      expect(dataArtifact, "a data-* artifact-update must have been published").toBeTruthy()
+      expect(dataArtifact.artifact.parts[0]).toEqual({ kind: "data", data })
     }),
   )
 })

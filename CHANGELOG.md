@@ -6,6 +6,10 @@
 
 ## Version 0.9.4 - tbd
 
+### Added
+
+- Data parts can now be emitted based on tool output
+
 ### Fixed
 
 - Remote A2A response does not yield duplicate content
