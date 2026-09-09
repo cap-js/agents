@@ -216,6 +216,9 @@
           "_javaHcqlCompat": true
         }
       }
+    },
+    "folders": {
+      "srvs": "srv/*"
     }
   },
   "workspaces": [
