@@ -115,12 +115,7 @@ describe("@cap-js/agents - Travel Sample E2E", () => {
     expect(
       skillIds,
       `expected five skills from skills/ scan, got: ${JSON.stringify(skillIds)}`,
-    ).toEqual([
-      "file-based-planning",
-      "flight-booking",
-      "itinerary-summary",
-      "trip-planning",
-    ])
+    ).toEqual(["file-based-planning", "flight-booking", "itinerary-summary", "trip-planning"])
 
     const trip = card.skills.find((s) => s.id === "trip-planning")
     expect(trip.name).toMatch(/Trip Planning/i)

@@ -384,13 +384,12 @@ export function createEmitDataPartTool() {
       return {
         kind: "data",
         data,
-        mediaType: mediaType ?? 'application/json'
+        mediaType: mediaType ?? "application/json",
       }
     },
     {
       name: "emit_data_part",
-      description:
-        'Emit a structured A2A DataPart. Only use when instructed.',
+      description: "Emit a structured A2A DataPart. Only use when instructed.",
       schema: z.object({
         // A2A DataPart is specified to be an object in A2A 0.3
         // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object
@@ -399,4 +398,3 @@ export function createEmitDataPartTool() {
     },
   )
 }
-

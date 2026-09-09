@@ -582,7 +582,10 @@ describe("emit_data_part tool", () => {
           const toolResult = await tool.invoke({ data })
           return {
             messages: [
-              { content: "here is your order", tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }] },
+              {
+                content: "here is your order",
+                tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }],
+              },
               { content: JSON.stringify(toolResult), tool_call_id: "tc-emit-1" },
               { content: "Order confirmed." },
             ],
