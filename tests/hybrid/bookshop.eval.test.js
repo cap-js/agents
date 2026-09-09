@@ -154,6 +154,24 @@ describe("bookshop CatalogService — conversation-level judges", () => {
   })
 
   describe("bookshop CatalogService — HITL order flow", () => {
+    test.concurrent("rejected order can be retried after an explicit new request", async () => {
+      const agent = await cds.connect.to("CatalogService")
+
+      const requested = await agent.chat("Submit order for 1 copy of book 201 hitl")
+      expect(requested.status).toBe("input-required")
+
+      const rejected = await agent.chat("No, do not place this order.", requested)
+      expect(rejected.status).toBe("completed")
+
+      const judgement = await judge
+        .criteria("Response confirms order was not placed.")
+        .evaluate(rejected)
+      expect(judgement.score).toBeGreaterThanOrEqual(PASS)
+
+      const retried = await agent.chat("Please place that order now.", rejected)
+      expect(retried.status).toBe("input-required")
+    })
+
     test.concurrent(
       "submitOrder triggers HITL, approve completes order and reduces stock",
       async () => {

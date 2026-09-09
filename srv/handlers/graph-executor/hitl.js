@@ -99,7 +99,13 @@ export function composeHitlDecisionNote(actionRequests, resume) {
     }
     if (decision?.type === "reject") {
       const reason = decision.message ? " Reason: " + JSON.stringify(decision.message) + "." : ""
-      lines.push("- User rejected " + action(original) + "." + reason)
+      lines.push(
+        "- User rejected " +
+          action(original) +
+          "." +
+          reason +
+          " The action was not executed. It can be retried only after an explicit new user request.",
+      )
       continue
     }
     if (decision?.type === "edit") {

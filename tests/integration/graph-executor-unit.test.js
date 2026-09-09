@@ -345,6 +345,8 @@ describe("composeHitlDecisionNote", () => {
     expect(note).toContain('"book":201')
     expect(note).toContain('"book":207')
     expect(note).toContain('Reason: "reject"')
+    expect(note).toContain("The action was not executed.")
+    expect(note).toContain("retried only after an explicit new user request")
     expect(note).toContain("not tool failures")
   })
 
