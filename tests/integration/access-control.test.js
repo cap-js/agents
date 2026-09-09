@@ -70,6 +70,29 @@ describe("@cap-js/agents - Access Control", () => {
       expect(aliceGet.data.result).not.toBe(undefined)
       expect(aliceGet.data.result.status.message.parts[0].text).not.toMatch(/Override/)
     })
+
+    it("bob cannot cancel alice task", async () => {
+      const contextId = cds.utils.uuid()
+      const aliceRes = await sendMessageAs("deterministic-hitl", "start", ALICE, { contextId })
+      expect(aliceRes.data.result.status.state).toBe("input-required")
+      const aliceTaskId = aliceRes.data.result.id
+
+      const bobCancel = await jsonrpcAs(
+        "deterministic-hitl",
+        "tasks/cancel",
+        { id: aliceTaskId },
+        BOB,
+      )
+      expect(bobCancel.data.error.message).toMatch(/Task not found/)
+
+      const aliceGet = await jsonrpcAs(
+        "deterministic-hitl",
+        "tasks/get",
+        { id: aliceTaskId },
+        ALICE,
+      )
+      expect(aliceGet.data.result.status.state).toBe("input-required")
+    })
   })
 
   // ─── @requires enforcement on A2A endpoint ───────────────────────────
