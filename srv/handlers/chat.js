@@ -73,7 +73,7 @@ function toolCallsFromMessages(messages) {
   for (const msg of messages) {
     if (msg.tool_call_id && msg.type === "tool") {
       const content = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)
-      resultById.set(msg.tool_call_id, content)
+      resultById.set(msg.tool_call_id, { content, ...msg })
     }
   }
 
@@ -84,14 +84,14 @@ function toolCallsFromMessages(messages) {
       const raw = resultById.get(tc.id)
       let toolResult
       try {
-        toolResult = raw !== undefined ? JSON.parse(raw) : undefined
+        toolResult = raw?.content !== undefined ? JSON.parse(raw.content) : undefined
       } catch {
-        toolResult = raw
+        toolResult = raw?.content
       }
       const entry = {
         tool: tc.name,
         args: tc.args ?? {},
-        outcome: "success",
+        outcome: raw.status,
         ...(toolResult !== undefined && { result: toolResult }),
       }
       attachCqn(entry)
