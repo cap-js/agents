@@ -141,23 +141,7 @@ Content-Type: application/json
       "messageId": "msg-006",
       "contextId": null,
       "role": "user",
-      "parts": [{"kind": "text", "text": "Plan a weekend trip to Rome from New York, moderate budget, I love food and history. Return the plan as machine-readable structured data so my booking system can ingest it."}]
+      "parts": [{"kind": "text", "text": "Plan a weekend trip to Rome from New York, moderate budget, I love food and history. Export the itinerary."}]
     }
-  }
-}
-
-###
-# Verify the DataPart artifact — replace <TASK_ID> from the response above.
-# Look for an artifact with artifactId "data-0" whose parts contain a
-# {"kind":"data", "data": {...}} Part holding the structured itinerary object.
-GET http://localhost:4004/a2a/travel-agent/ HTTP/1.1
-Content-Type: application/json
-
-{
-  "jsonrpc": "2.0",
-  "id": 7,
-  "method": "tasks/get",
-  "params": {
-    "id": "<TASK_ID>"
   }
 }

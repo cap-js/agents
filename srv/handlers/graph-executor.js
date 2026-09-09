@@ -892,10 +892,8 @@ class GraphExecutor {
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
         const fileArtifacts = []
-        // DataParts embedded in tool-result content (any tool returning the
-        // dataPart() marker). Structured,
-        // opaque objects — no byte cap, no /uploads re-persist. Published as their own
-        // `data-*` artifact-update events below.
+        // DataParts embedded in tool-result content.
+        // Published as their own `data-*` artifact-update events below.
         const dataArtifacts = []
         const maxFileBytes = cds.env.agents.fileIO.maxOutputFileSizeBytes
 
@@ -920,8 +918,7 @@ class GraphExecutor {
           const content = typeof msg.content === "string" ? msg.content : ""
           let pos = 0
           while (pos < content.length) {
-            // Find the earliest next FilePart or DataPart marker. The walker below is
-            // kind-agnostic; routing happens after JSON.parse via `artifact.kind`.
+            // Find the earliest next FilePart or DataPart marker.
             const fileAt = content.indexOf('{"kind":"file"', pos)
             const dataAt = content.indexOf('{"kind":"data"', pos)
             const start = fileAt === -1 ? dataAt : dataAt === -1 ? fileAt : Math.min(fileAt, dataAt)
@@ -954,7 +951,6 @@ class GraphExecutor {
             try {
               const artifact = JSON.parse(raw)
               if (artifact.kind === "data") {
-                // Opaque structured payload — surfaced verbatim as a DataPart artifact.
                 dataArtifacts.push(artifact)
                 pos = i + 1
                 continue
@@ -1079,10 +1075,6 @@ class GraphExecutor {
           })
         }
 
-        // Publish DataParts collected from tool-result content as their own
-        // artifact-update events, so structured tool output surfaces to A2A clients
-        // (mirrors the FilePart path above; the completed message carries the agent's
-        // final-answer DataPart separately).
         dataArtifacts.forEach((artifact, i) => {
           if (artifact.data == null || typeof artifact.data !== "object") {
             LOG.warn("skipping malformed data artifact", {

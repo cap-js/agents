@@ -222,7 +222,6 @@ export function generateTools(srv) {
     tools.push(createEmitFilePartTool())
   }
 
-  // DataPart tool - only when exportDataParts is enabled
   if (cds.env.agents?.emitDataParts) {
     tools.push(createEmitDataPartTool())
   }
@@ -376,8 +375,8 @@ export function createReadFileTool(fileStore, contextId, userId) {
 
 /**
  * Create a tool that emits a DataPart in the A2A response.
- * Pure protocol emitter — caller provides the bytes, no generation, no placeholders.
- * The executor's toolResults collection loop parses `kind:'data'` JSON from this tool.
+ * The executor's toolResults collection detects `kind: "data"`
+ * and emits the tool result as a data part.
  */
 export function createEmitDataPartTool() {
   return tool(
@@ -391,7 +390,7 @@ export function createEmitDataPartTool() {
     {
       name: "emit_data_part",
       description:
-        'Emit a structured A2A DataPart. Only use when instructed',
+        'Emit a structured A2A DataPart. Only use when instructed.',
       schema: z.object({
         // A2A DataPart is specified to be an object in A2A 0.3
         // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object

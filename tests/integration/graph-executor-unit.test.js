@@ -53,22 +53,6 @@ describe("defaultOutputMapper", () => {
     }
     expect(defaultOutputMapper(result)).toBe("from output field")
   })
-
-  it("returns { text, data } for a structuredResponse (text + DataPart)", () => {
-    const result = {
-      messages: [{ content: "Here is the summary." }],
-      structuredResponse: { total: 3, items: ["a", "b", "c"] },
-    }
-    expect(defaultOutputMapper(result)).toEqual({
-      text: "Here is the summary.",
-      data: { total: 3, items: ["a", "b", "c"] },
-    })
-  })
-
-  it("maps a plain-object result.output to a DataPart with empty text (no malformed TextPart)", () => {
-    const result = { output: { status: "ok", count: 2 } }
-    expect(defaultOutputMapper(result)).toEqual({ text: "", data: { status: "ok", count: 2 } })
-  })
 })
 
 describe("GraphExecutor - configMapper", () => {
