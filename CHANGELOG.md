@@ -6,6 +6,10 @@
 
 ## Version 0.9.4 - ...
 
+### Added
+
+- Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+
 ### Changed
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
