@@ -6,6 +6,10 @@
 
 ## Version 0.9.4 - tbd
 
+### Added
+
+- Data parts can now be emitted based on tool output
+
 ### Fixed
 
 - Multiple tools with HITL needed in the same round no longer cause an error
