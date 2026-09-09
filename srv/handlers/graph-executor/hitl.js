@@ -39,7 +39,26 @@ export function extractInterruptData(resultOrErr) {
   const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
   const payload = interrupt?.value
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined
-  return payload
+  const actionRequests = mergeReviewConfigs(payload.actionRequests, payload.reviewConfigs)
+  return actionRequests === payload.actionRequests ? payload : { ...payload, actionRequests }
+}
+
+function mergeReviewConfigs(actionRequests, reviewConfigs) {
+  if (!Array.isArray(actionRequests) || !Array.isArray(reviewConfigs)) return actionRequests
+  const configsByAction = new Map(reviewConfigs.map((config) => [config.actionName, config]))
+  let changed = false
+  const requests = actionRequests.map((request) => {
+    const config = configsByAction.get(request.name)
+    if (!config) return request
+    changed = true
+    const { allowedDecisions, argsSchema } = config
+    return {
+      ...request,
+      ...(allowedDecisions === undefined ? {} : { allowedDecisions }),
+      ...(argsSchema === undefined ? {} : { argsSchema }),
+    }
+  })
+  return changed ? requests : actionRequests
 }
 
 function interruptActionCount(resultOrErr) {
@@ -237,7 +256,7 @@ export function handleHitlInterrupt({
     pending: {
       actionCount: interruptActionCount(result),
       decisions: [],
-      actionRequests: interruptActionRequests(result),
+      actionRequests: interruptData?.actionRequests || interruptActionRequests(result),
     },
   })
   return true

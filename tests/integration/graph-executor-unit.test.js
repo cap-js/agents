@@ -281,6 +281,31 @@ describe("extractInterruptData", () => {
     expect(extractInterruptData({ __interrupt__: [{ value: payload }] })).toBe(payload)
   })
 
+  it("merges review config fields into matching action requests", () => {
+    const payload = {
+      actionRequests: [{ name: "submitOrder", args: { bookId: 42 } }],
+      reviewConfigs: [
+        {
+          actionName: "submitOrder",
+          allowedDecisions: ["approve", "edit", "reject"],
+          argsSchema: { type: "object" },
+        },
+      ],
+    }
+
+    expect(extractInterruptData({ __interrupt__: [{ value: payload }] })).toEqual({
+      ...payload,
+      actionRequests: [
+        {
+          name: "submitOrder",
+          args: { bookId: 42 },
+          allowedDecisions: ["approve", "edit", "reject"],
+          argsSchema: { type: "object" },
+        },
+      ],
+    })
+  })
+
   it("returns undefined for string, array, or missing interrupt values", () => {
     expect(extractInterruptData({ __interrupt__: [{ value: "approve?" }] })).toBeUndefined()
     expect(extractInterruptData({ __interrupt__: [{ value: ["a", "b"] }] })).toBeUndefined()
