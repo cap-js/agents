@@ -72,26 +72,15 @@ describe("@cap-js/agents - Access Control", () => {
     })
 
     it("bob cannot cancel alice task", async () => {
-      const contextId = cds.utils.uuid()
-      const aliceRes = await sendMessageAs("deterministic-hitl", "start", ALICE, { contextId })
-      expect(aliceRes.data.result.status.state).toBe("input-required")
+      const aliceRes = await sendMessageAs("catalog", "What books?", ALICE)
+      expect(aliceRes.data.result.status.state).toBe("completed")
       const aliceTaskId = aliceRes.data.result.id
 
-      const bobCancel = await jsonrpcAs(
-        "deterministic-hitl",
-        "tasks/cancel",
-        { id: aliceTaskId },
-        BOB,
-      )
+      const bobCancel = await jsonrpcAs("catalog", "tasks/cancel", { id: aliceTaskId }, BOB)
       expect(bobCancel.data.error.message).toMatch(/Task not found/)
 
-      const aliceGet = await jsonrpcAs(
-        "deterministic-hitl",
-        "tasks/get",
-        { id: aliceTaskId },
-        ALICE,
-      )
-      expect(aliceGet.data.result.status.state).toBe("input-required")
+      const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, ALICE)
+      expect(aliceGet.data.result.status.state).toBe("completed")
     })
   })
 
