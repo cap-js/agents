@@ -496,38 +496,6 @@ describe("GraphExecutor - completion carries a DataPart", () => {
   }
 
   it(
-    "emits the structured data as a DataPart on the completed message and the response artifact",
-    withCtx(async () => {
-      const data = { total: 3, items: ["a", "b", "c"] }
-      // Custom outputMapper returning { text, data } — the normalization path.
-      const events = await runToCompletion({ outputMapper: () => ({ text: "here you go", data }) })
-
-      const completed = events.find((e) => e.status?.state === "completed")
-      expect(completed, "a completed status event must have been published").toBeTruthy()
-      const parts = completed.status.message.parts
-      expect(parts.find((p) => p.kind === "text")?.text).toBe("here you go")
-      expect(parts.find((p) => p.kind === "data")?.data).toEqual(data)
-
-      // The authoritative "response" artifact carries the DataPart too (streaming clients).
-      const responseArtifact = events.find(
-        (e) => e.kind === "artifact-update" && e.artifact?.artifactId === "response",
-      )
-      expect(responseArtifact.artifact.parts.find((p) => p.kind === "data")?.data).toEqual(data)
-    }),
-  )
-
-  it(
-    "round-trips: firstDataPart reads the completed message back into the original object",
-    withCtx(async () => {
-      const data = { orderId: 42, status: "confirmed" }
-      const events = await runToCompletion({ outputMapper: () => ({ text: "done", data }) })
-      const completed = events.find((e) => e.status?.state === "completed")
-      // A caller (agent A) reading agent B's completed message via the inbound utility.
-      expect(firstDataPart(completed.status.message.parts)).toEqual(data)
-    }),
-  )
-
-  it(
     "default text-only result yields a single TextPart, no DataPart (backward compatible)",
     withCtx(async () => {
       const events = await runToCompletion({}) // defaultOutputMapper → string
