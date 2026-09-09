@@ -137,6 +137,19 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(res.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
     })
 
+    it("resets quota counters for a new task in an existing conversation", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+      const contextId = cds.utils.uuid()
+
+      const limited = await sendMessage("looping", "trigger loop", { contextId })
+      expect(limited.data.result.status.state).toBe("canceled")
+      expect(limited.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
+
+      const nextTask = await sendMessage("looping", "single response", { contextId })
+      expect(nextTask.data.result.status.state).toBe("completed")
+      expect(nextTask.data.result.status.message.parts[0].text).not.toMatch(/quota exceeded/i)
+    })
+
     it("should cancel task when maxToolCallsPerTask exceeded during graph execution", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
       cds.env.agents.pool.maxToolCallsPerTask = 1
@@ -268,33 +281,6 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(result.runModelCallCount).toBe(1)
       expect(result.runTokenCount).toBe(15)
       expect(result.runToolCallCount).toBe(1)
-    })
-
-    it("resets counters when a new task reuses persisted graph state", async () => {
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
-      cds.env.agents.pool.maxLLMTokensPerTask = 100000
-      cds.env.agents.pool.maxToolCallsPerTask = 100
-      const [mw] = await quotaEnforcerMiddleware()
-      const { AIMessage } = await import("@langchain/core/messages")
-      const state = {
-        quotaTaskId: "task-a",
-        runModelCallCount: 9,
-        runTokenCount: 900,
-        runToolCallCount: 9,
-        messages: [
-          new AIMessage({
-            content: "test",
-            tool_calls: [{ name: "query" }],
-            usage_metadata: { input_tokens: 10, output_tokens: 5 },
-          }),
-        ],
-      }
-
-      const result = await cds._with({ "agent.task.id": "task-b" }, () => mw.afterModel.hook(state))
-      expect(result.runModelCallCount).toBe(1)
-      expect(result.runTokenCount).toBe(15)
-      expect(result.runToolCallCount).toBe(1)
-      expect(result.quotaTaskId).toBe("task-b")
     })
   })
 
