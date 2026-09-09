@@ -269,6 +269,33 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(result.runTokenCount).toBe(15)
       expect(result.runToolCallCount).toBe(1)
     })
+
+    it("resets counters when a new task reuses persisted graph state", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 100
+      cds.env.agents.pool.maxLLMTokensPerTask = 100000
+      cds.env.agents.pool.maxToolCallsPerTask = 100
+      const [mw] = await quotaEnforcerMiddleware()
+      const { AIMessage } = await import("@langchain/core/messages")
+      const state = {
+        quotaTaskId: "task-a",
+        runModelCallCount: 9,
+        runTokenCount: 900,
+        runToolCallCount: 9,
+        messages: [
+          new AIMessage({
+            content: "test",
+            tool_calls: [{ name: "query" }],
+            usage_metadata: { input_tokens: 10, output_tokens: 5 },
+          }),
+        ],
+      }
+
+      const result = await cds._with({ "agent.task.id": "task-b" }, () => mw.afterModel.hook(state))
+      expect(result.runModelCallCount).toBe(1)
+      expect(result.runTokenCount).toBe(15)
+      expect(result.runToolCallCount).toBe(1)
+      expect(result.quotaTaskId).toBe("task-b")
+    })
   })
 
   describe("usage tracking on task record", () => {
