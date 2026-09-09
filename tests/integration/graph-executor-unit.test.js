@@ -325,9 +325,14 @@ describe("parseResumeDecision", () => {
     expect(parseResumeDecision("EDIT")).toEqual({ decisions: [{ type: "edit" }] })
   })
 
-  it("maps arbitrary text to a reject decision carrying the message", () => {
+  it("maps arbitrary text to a reject decision explaining its scope", () => {
     expect(parseResumeDecision("no thanks")).toEqual({
-      decisions: [{ type: "reject", message: "no thanks" }],
+      decisions: [
+        {
+          type: "reject",
+          message: "The user rejected this particular tool invocation with the reason: no thanks",
+        },
+      ],
     })
   })
 })
@@ -335,19 +340,12 @@ describe("parseResumeDecision", () => {
 describe("composeHitlDecisionNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
-  it("describes mixed user approval and rejection with action arguments", () => {
+  it("does not inject a note for approval or rejection", () => {
     const note = composeHitlDecisionNote(
       [originalCall, { name: "submitOrder", args: { book: 207, quantity: 1 } }],
       { decisions: [{ type: "approve" }, { type: "reject", message: "reject" }] },
     )
-    expect(note).toContain("User approved")
-    expect(note).toContain("User rejected")
-    expect(note).toContain('"book":201')
-    expect(note).toContain('"book":207')
-    expect(note).toContain('Reason: "reject"')
-    expect(note).toContain("The action was not executed.")
-    expect(note).toContain("retried only after an explicit new user request")
-    expect(note).toContain("not tool failures")
+    expect(note).toBeUndefined()
   })
 
   it("describes user edits and ignores opaque resumes", () => {
