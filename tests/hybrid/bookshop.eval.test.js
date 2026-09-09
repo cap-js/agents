@@ -168,7 +168,10 @@ describe("bookshop CatalogService — conversation-level judges", () => {
         .evaluate(rejected)
       expect(judgement.score).toBeGreaterThanOrEqual(PASS)
 
-      const retried = await agent.chat("Please place that order now.", rejected)
+      const retried = await agent.chat(
+        "Please place that order now. I explicitly request it.",
+        rejected,
+      )
       expect(retried.status).toBe("input-required")
     })
 
