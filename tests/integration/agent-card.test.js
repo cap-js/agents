@@ -80,6 +80,27 @@ describe("@cap-js/agents - Agent Card Generation", () => {
     })
   })
 
+  // ── X-Forwarded-Proto (cloud proxy protocol) ────────────────────────────
+
+  describe("X-Forwarded-Proto header", () => {
+    it("agent card URL uses https when X-Forwarded-Proto: https is set", async () => {
+      const res = await GET("/a2a/catalog/.well-known/agent-card.json", {
+        headers: { "x-forwarded-proto": "https" },
+      })
+      const card = res.data
+      expect(card.url.startsWith("https://")).toBeTruthy()
+      expect(card.supportedInterfaces[0].url.startsWith("https://")).toBeTruthy()
+    })
+
+    it("agent card URL handles multi-value X-Forwarded-Proto", async () => {
+      const res = await GET("/a2a/catalog/.well-known/agent-card.json", {
+        headers: { "x-forwarded-proto": "https, http" },
+      })
+      const card = res.data
+      expect(card.url.startsWith("https://")).toBeTruthy()
+    })
+  })
+
   // ── Proxy URL from @Core.Links rel=via ──────────────────────────────────
 
   describe("Proxy URL from @Core.Links rel=via", () => {

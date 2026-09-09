@@ -33,6 +33,12 @@ export default class CatalogService extends cds.ApplicationService {
       return book.stock
     })
 
+    this.before("validateOrder", (req) => {
+      req.error(400, "book is required", "book")
+      req.error(400, "quantity must be positive", "quantity")
+    })
+    this.on("validateOrder", () => {})
+
     return super.init()
   }
 }

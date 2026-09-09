@@ -126,19 +126,23 @@ export function createSendMessageWithParts(POST) {
  * @returns {Function} sendMessage(service, text)
  */
 export function createSendMessage(POST) {
-  return function sendMessage(service, text) {
-    return POST(`/a2a/${service}/`, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "message/send",
-      params: {
-        message: {
-          kind: "message",
-          messageId: cds.utils.uuid(),
-          role: "user",
-          parts: [{ kind: "text", text }],
+  return function sendMessage(service, text, opts) {
+    return POST(
+      `/a2a/${service}/`,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "message/send",
+        params: {
+          message: {
+            kind: "message",
+            messageId: cds.utils.uuid(),
+            role: "user",
+            parts: [{ kind: "text", text }],
+          },
         },
       },
-    })
+      opts,
+    )
   }
 }

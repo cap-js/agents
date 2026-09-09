@@ -50,12 +50,23 @@ entity Tasks : managed {
        * Files written by agent via /outputs/ path for this task.
        */
       outputFiles    : Composition of many Attachments;
+
+      /** LangGraph checkpoints created by this task. Cascade-deleted. */
+      checkpoints    : Composition of many Checkpoints
+                         on checkpoints.task_id = taskId;
+
+      /** LangGraph checkpoint writes tied to this task. Cascade-deleted. */
+      checkpointWrites : Composition of many CheckpointWrites
+                           on checkpointWrites.task_id = taskId;
 }
 
 entity Checkpoints : managed {
   key thread_id            : String;
   key checkpoint_ns        : String default '';
   key checkpoint_id        : String;
+      task_id              : String;
+      task                 : Association to one Tasks
+                               on task.taskId = task_id;
       parent_checkpoint_id : String;
       parent               : Association to one Checkpoints
                                on parent.checkpoint_id = parent_checkpoint_id;

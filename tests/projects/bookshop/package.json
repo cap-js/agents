@@ -9,8 +9,8 @@
     "@cap-js/hana": ">=1",
     "@cap-js/mcp": "^1",
     "@cap-js/telemetry": "^2",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
-    "@sap/cds": ">=8",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+    "@sap/cds": "^10.0.6",
     "@sap/xssec": "^4",
     "zod": "^4.3.6"
   },
@@ -27,8 +27,16 @@
       "fileIO": {
         "enabled": true
       },
-      "contentFilter": false,
       "activeUsersInterval": "1s",
+      "[test]": {
+        "pool": {
+          "maxTasksPerHour": 10000,
+          "maxTasksPerHourPerUser": 10000
+        },
+        "circuitBreaker": {
+          "volumeThreshold": 2
+        }
+      },
       "[tracing]": {
         "mlflow": true
       },
@@ -36,7 +44,6 @@
         "mlflow": true
       },
       "[hybrid]": {
-        "contentFilter": true,
         "activeUsersInterval": "24h"
       }
     },
@@ -99,6 +106,21 @@
           "credentials": {
             "MLFLOW_HOST": "http://localhost:5678",
             "MLFLOW_EXPERIMENT_ID": "0"
+          }
+        }
+      },
+      "[hybrid]": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "alice": {
+              "features": [
+                "experimental"
+              ]
+            },
+            "bob": {
+              "features": []
+            }
           }
         }
       },

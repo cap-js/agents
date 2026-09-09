@@ -14,7 +14,7 @@ export default [
     },
   },
   {
-    files: ["tests/**", "scripts/**"],
+    files: ["tests/**", ".scripts/**"],
     rules: {
       "no-console": "off",
       "no-undef": "off",

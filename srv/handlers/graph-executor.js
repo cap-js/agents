@@ -2,10 +2,13 @@ import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
 import { partsToText, buildChatMessages, firstDataPart } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
-import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow.js"
+import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
+import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
+import { COLLECT_RESULT } from "./chat.js"
+import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
 
 const LOG = cds.log("agents")
 
@@ -363,16 +366,14 @@ class GraphExecutor {
 
     let tokenCount = 0
     let finalState = null
-    // Track the current turn (langchain message id) and whether it has emitted a
-    // tool call. Anthropic-style turns can stream a text preamble BEFORE their
-    // tool_use block ("Let me first look up …"); we can't tell in advance that
-    // such a turn is planning rather than the final answer, so we stream those
-    // tokens optimistically. Once we see tool_call_chunks for the same turn, we
-    // know retrospectively that the preamble was planning — emit an authoritative
-    // event-level replace with empty text to wipe the leaked preamble, then skip
-    // all further text from this turn.
+    // Track the current turn (langchain message id). Each new turn opens a fresh
+    // bubble on the client via `append:false`; subsequent tokens of the same turn
+    // are `append:true` (accumulate). Anthropic-style turns can stream a text
+    // preamble BEFORE their tool_use block ("Let me first look up …") — we let
+    // that reasoning text stream normally; the client is responsible for the
+    // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
-    let turnHasToolCall = false
+    let thinkingCount = 0
 
     try {
       if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
@@ -408,30 +409,11 @@ class GraphExecutor {
 
           if (msgChunk.id && msgChunk.id !== currentMsgId) {
             currentMsgId = msgChunk.id
-            turnHasToolCall = false
             tokenCount = 0
           }
 
-          // Retroactively invalidate a leaked planning preamble. In a ReAct loop
-          // the model can emit "Let me look this up …" before its tool_use block
-          if (msgChunk.tool_call_chunks?.length && !turnHasToolCall) {
-            turnHasToolCall = true
-            if (tokenCount > 0) {
-              eventBus.publish({
-                kind: "artifact-update",
-                taskId,
-                contextId,
-                append: false,
-                lastChunk: false,
-                artifact: {
-                  artifactId: "response",
-                  parts: [{ kind: "text", text: "" }],
-                },
-              })
-              tokenCount = 0
-            }
-          }
-          if (turnHasToolCall) continue
+          const lastChunk =
+            !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
           const text = messageText(msgChunk?.content)
           if (!text) continue
@@ -444,12 +426,13 @@ class GraphExecutor {
             taskId,
             contextId,
             append: tokenCount > 0,
-            lastChunk: false,
+            lastChunk: lastChunk,
             artifact: {
-              artifactId: "response",
+              artifactId: `thinking-${thinkingCount}`,
               parts: [{ kind: "text", text }],
             },
           })
+          if (lastChunk) thinkingCount++
           tokenCount++
         } else if (mode === "updates") {
           // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
@@ -619,6 +602,10 @@ class GraphExecutor {
       audit("AgentTaskStarted", {
         data: { taskId, contextId, service: serviceName, userMessage: requestContext.userMessage },
       })
+      // Lazy scheduling task deletion
+      cds.spawn({}, async () => {
+        await triggerCleanup(serviceName)
+      })
     }
 
     // ── File I/O: persist incoming FileParts to cap.agent.Tasks.inputFiles ──
@@ -724,6 +711,12 @@ class GraphExecutor {
           }),
         )
         setSpanAttrs(rootSpan, mlflowTraceAttrs())
+        // Required for MLFLow run linking
+        const evalRunId = cds.context?.["_mlflow.evalRunId"]
+        if (evalRunId) {
+          rootSpan.setAttribute("mlflow.sourceRun", evalRunId)
+          wfSpan.setAttribute("mlflow.sourceRun", evalRunId)
+        }
       }
 
       let usageData
@@ -778,7 +771,6 @@ class GraphExecutor {
               contextId,
               service: serviceName,
               decision,
-              userMessage: requestContext.userMessage,
             },
           })
           // On edit, stash a diff note in state; the injector middleware prepends it next turn.
@@ -848,7 +840,7 @@ class GraphExecutor {
               contextId,
               service: serviceName,
               description,
-              userMessage: requestContext.userMessage,
+              interruptData,
             },
           })
 
@@ -909,8 +901,7 @@ class GraphExecutor {
             service: serviceName,
             duration,
             tokenUsage: usageData,
-            toolCalls: totalToolCalls(result.messages),
-            output: output?.slice(0, 2000),
+            toolCalls: toolCallsShortened(result.messages),
             task: requestContext.task,
           },
         })
@@ -1148,6 +1139,12 @@ class GraphExecutor {
           })
         })
 
+        // Programmatic .chat() path: stash graph result on eventBus so chat.js
+        // can read messages without an extra checkpoint roundtrip.
+        if (eventBus[COLLECT_RESULT]) {
+          eventBus._graphResult = { messages: result.messages || [] }
+        }
+
         eventBus.publish({
           kind: "status-update",
           taskId,
@@ -1315,6 +1312,10 @@ class GraphExecutor {
           final: true,
         })
       } finally {
+        // setSpanAttrs must happen at the end for the linking as else prompt might not yet have been created
+        const rootSpan = cds.context["_mlflow.rootSpan"]
+        setSpanAttrs(rootSpan, linkTraceToPrompt())
+
         this._abortControllers.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 
@@ -1441,4 +1442,14 @@ function totalToolCalls(messages) {
     if (val.type === "tool") acc++
     return acc
   }, 0)
+}
+
+/**
+ * @param {[import('@langchain/core/messages').Message]} messages
+ */
+function toolCallsShortened(messages) {
+  return messages.reduce((acc, val) => {
+    if (val.type === "tool") acc.push(val.name)
+    return acc
+  }, [])
 }

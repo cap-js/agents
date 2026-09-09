@@ -7,9 +7,9 @@
     "start": "cds-serve"
   },
   "dependencies": {
-    "@sap/cds": ">=9",
-    "@sap/xssec": "^4",
-    "@cap-js/hana": ">=1"
+    "@cap-js/hana": ">=1",
+    "@sap/cds": "^10.0.6",
+    "@sap/xssec": "^4"
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1",

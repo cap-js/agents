@@ -70,6 +70,19 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
         "function",
       ],
     },
+    {
+      "description": "Validate an order (always fails with two errors for testing)",
+      "examples": [
+        "Validate an order (always fails with two errors for testing)",
+      ],
+      "id": "validateOrder",
+      "name": "validateOrder",
+      "tags": [
+        "validateorder",
+        "action",
+        "hitl",
+      ],
+    },
   ],
   "supportedInterfaces": [
     {

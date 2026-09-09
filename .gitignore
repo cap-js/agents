@@ -20,3 +20,4 @@ proposal.md
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+.playwright-mcp

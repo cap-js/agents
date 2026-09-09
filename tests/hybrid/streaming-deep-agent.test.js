@@ -39,7 +39,7 @@ describe("@cap-js/agents - Token streaming, deep agent (hybrid)", () => {
     // append / lastChunk are A2A event-level fields (siblings of `artifact`).
     // First frame: append:false (new artifact)
     const firstArtifact = artifactFrames[0]
-    expect(firstArtifact.result.artifact.artifactId).toBe("response")
+    expect(firstArtifact.result.artifact.artifactId).toBe("thinking-0")
     expect(firstArtifact.result.artifact.parts[0].kind).toBe("text")
     expect(firstArtifact.result.artifact.parts[0].text.length).toBeGreaterThan(0)
     expect(firstArtifact.result.append ?? false).toBe(false)
