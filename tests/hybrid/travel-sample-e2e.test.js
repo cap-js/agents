@@ -118,7 +118,6 @@ describe("@cap-js/agents - Travel Sample E2E", () => {
     ).toEqual([
       "file-based-planning",
       "flight-booking",
-      "itinerary-export",
       "itinerary-summary",
       "trip-planning",
     ])

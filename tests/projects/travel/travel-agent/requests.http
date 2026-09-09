@@ -129,21 +129,6 @@ Content-Type: application/json
 
 ###
 # DataPart scenario — return the itinerary as machine-readable structured data.
-#
-# What this exercises end-to-end (the itinerary-export skill):
-#   1. Agent plans the trip (flights + hotel + activities) as usual
-#   2. Agent assembles a structured itinerary object and calls export_itinerary({ itinerary })
-#      (export_itinerary is a tailored tool this sample defines in
-#       srv/travel-agent-service.js, built on the plugin's dataPart() helper)
-#   3. export_itinerary returns {"kind":"data", data} as its tool-result content
-#   4. After graph.invoke(), the executor's tool-result scanner finds the
-#      {"kind":"data"} marker and republishes it as a "data-0" artifact-update
-#   5. The completed message carries a TextPart (human recap) AND — when the graph
-#      surfaces structured data — a {"kind":"data"} Part alongside it
-#
-# A calling agent recovers the object with firstDataPart(parts) — the B→A hand-off.
-# Requires an LLM (run leisure-services with --profile hybrid); dev-mode mocks won't
-# trigger the emission, same as the FilePart scenario above.
 POST http://localhost:4004/a2a/travel-agent/ HTTP/1.1
 Content-Type: application/json
 
