@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- Multiple tools with HITL needed in the same round no longer cause an error
 - Remote A2A response does not yield duplicate content
 - Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
 

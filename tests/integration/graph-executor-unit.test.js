@@ -1,14 +1,10 @@
 import cds from "@sap/cds"
 
-const {
-  GraphExecutor,
-  messageText,
-  defaultOutputMapper,
-  agentMessage,
-  parseResumeDecision,
-  extractInterruptData,
-  composeEditNote,
-} = await import("../../srv/handlers/graph-executor.js")
+const { GraphExecutor, messageText, defaultOutputMapper } =
+  await import("../../srv/handlers/graph-executor.js")
+const { agentMessage } = await import("../../lib/utils/message-handling.js")
+const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote, requiresHitl } =
+  await import("../../srv/handlers/graph-executor/hitl.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
 const { createEmitDataPartTool } = await import("../../srv/handlers/tools.js")
 
@@ -286,6 +282,31 @@ describe("extractInterruptData", () => {
     expect(extractInterruptData({ __interrupt__: [{ value: payload }] })).toBe(payload)
   })
 
+  it("merges review config fields into matching action requests", () => {
+    const payload = {
+      actionRequests: [{ name: "submitOrder", args: { bookId: 42 } }],
+      reviewConfigs: [
+        {
+          actionName: "submitOrder",
+          allowedDecisions: ["approve", "edit", "reject"],
+          argsSchema: { type: "object" },
+        },
+      ],
+    }
+
+    expect(extractInterruptData({ __interrupt__: [{ value: payload }] })).toEqual({
+      ...payload,
+      actionRequests: [
+        {
+          name: "submitOrder",
+          args: { bookId: 42 },
+          allowedDecisions: ["approve", "edit", "reject"],
+          argsSchema: { type: "object" },
+        },
+      ],
+    })
+  })
+
   it("returns undefined for string, array, or missing interrupt values", () => {
     expect(extractInterruptData({ __interrupt__: [{ value: "approve?" }] })).toBeUndefined()
     expect(extractInterruptData({ __interrupt__: [{ value: ["a", "b"] }] })).toBeUndefined()
@@ -305,70 +326,77 @@ describe("parseResumeDecision", () => {
     expect(parseResumeDecision("EDIT")).toEqual({ decisions: [{ type: "edit" }] })
   })
 
-  it("maps arbitrary text to a reject decision carrying the message", () => {
+  it("maps arbitrary text to a reject decision explaining its scope", () => {
     expect(parseResumeDecision("no thanks")).toEqual({
-      decisions: [{ type: "reject", message: "no thanks" }],
+      decisions: [
+        {
+          type: "reject",
+          message: "The user rejected this particular tool invocation with the reason: no thanks",
+        },
+      ],
     })
   })
 })
 
-describe("composeEditNote", () => {
+describe("composeHitlDecisionNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
-  it("returns undefined for non-edit or opaque resumes", () => {
-    expect(composeEditNote([originalCall], { decisions: [{ type: "approve" }] })).toBeUndefined()
-    expect(
-      composeEditNote([originalCall], { decisions: [{ type: "reject", message: "no" }] }),
-    ).toBeUndefined()
-    expect(composeEditNote([originalCall], { foo: 1 })).toBeUndefined()
-    expect(composeEditNote([originalCall], undefined)).toBeUndefined()
+  it("does not inject a note for approval or rejection", () => {
+    const note = composeHitlDecisionNote(
+      [originalCall, { name: "submitOrder", args: { book: 207, quantity: 1 } }],
+      { decisions: [{ type: "approve" }, { type: "reject", message: "reject" }] },
+    )
+    expect(note).toBeUndefined()
   })
 
-  it("returns undefined for a no-op edit (edited args structurally equal to originals)", () => {
-    const noopEdit = {
-      decisions: [
-        { type: "edit", editedAction: { name: "submitOrder", args: { quantity: 3, book: 201 } } },
-      ],
-    }
-    expect(composeEditNote([originalCall], noopEdit)).toBeUndefined()
-  })
-
-  it("produces a firm, prescriptive note when args changed", () => {
-    const edit = {
+  it("describes user edits and ignores opaque resumes", () => {
+    const note = composeHitlDecisionNote([originalCall], {
       decisions: [
         { type: "edit", editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } } },
       ],
-    }
-    const note = composeEditNote([originalCall], edit)
-    expect(note).toBeTypeOf("string")
-    expect(note).toMatch(/intentional user action/i)
-    expect(note).toMatch(/do not apologize/i)
-    expect(note).toContain('"quantity":3')
+    })
+    expect(note).toContain("User edited")
     expect(note).toContain('"quantity":4')
-    expect(note).toContain("submitOrder")
+    expect(composeHitlDecisionNote([originalCall], { foo: 1 })).toBeUndefined()
   })
 
-  it("matches decisions to originals by name — auto-approved tool_calls don't misalign", () => {
-    // AI proposed 3 tool_calls; only submitOrder + refund are HITL. listBooks was
-    // auto-approved and isn't in the resume decisions. Naive positional matching
-    // would pair edit(submitOrder) with listBooks — wrong.
-    const originals = [
-      { id: "tc-1", name: "listBooks", args: {} },
-      { id: "tc-2", name: "submitOrder", args: { book: 201, quantity: 3 } },
-      { id: "tc-3", name: "refund", args: { orderId: 99 } },
-    ]
-    const resume = {
-      decisions: [
-        { type: "edit", editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } } },
-        { type: "edit", editedAction: { name: "refund", args: { orderId: 100 } } },
+  it("does not inject a note for approval-only decisions", () => {
+    expect(
+      composeHitlDecisionNote([originalCall], { decisions: [{ type: "approve" }] }),
+    ).toBeUndefined()
+  })
+
+  it("matches edits by action name when non-HITL calls precede them", () => {
+    const note = composeHitlDecisionNote(
+      [
+        { id: "tc-1", name: "listBooks", args: {} },
+        originalCall,
+        { id: "tc-3", name: "refund", args: { orderId: 99 } },
       ],
-    }
-    const note = composeEditNote(originals, resume)
+      {
+        decisions: [
+          {
+            type: "edit",
+            editedAction: { name: "submitOrder", args: { book: 201, quantity: 4 } },
+          },
+          { type: "edit", editedAction: { name: "refund", args: { orderId: 100 } } },
+        ],
+      },
+    )
     expect(note).toContain("submitOrder")
     expect(note).toContain("refund")
     expect(note).not.toContain("listBooks")
     expect(note).toContain('"quantity":4')
     expect(note).toContain('"orderId":100')
+  })
+})
+
+describe("requiresHitl", () => {
+  it("accepts both LangGraph interrupt result shapes", () => {
+    expect(requiresHitl({ __interrupt__: [{ value: "approval" }] })).toBe(true)
+    expect(requiresHitl({ interrupts: [{ value: "approval" }] })).toBe(true)
+    expect(requiresHitl({ __interrupt__: [], interrupts: [{ value: "approval" }] })).toBe(true)
+    expect(requiresHitl({})).toBe(false)
   })
 })
 
@@ -392,7 +420,16 @@ describe("GraphExecutor - HITL DataPart resume", () => {
           taskId: "task-hitl-1",
           contextId: "ctx-hitl-1",
           userMessage: { parts: [{ kind: "data", data: { decisions: [{ type: "approve" }] } }] },
-          task: { status: { state: "input-required" } },
+          task: {
+            status: {
+              state: "input-required",
+              message: {
+                metadata: {
+                  "sap.cds.agents.hitl": { actionCount: 1, decisions: [] },
+                },
+              },
+            },
+          },
         },
         fakeEventBus,
       )
