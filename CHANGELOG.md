@@ -10,7 +10,6 @@
 
 - Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
 
-
 ## Version 0.9.4 - 2026-09-10
 
 ### Added
