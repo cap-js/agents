@@ -70,6 +70,18 @@ describe("@cap-js/agents - Access Control", () => {
       expect(aliceGet.data.result).not.toBe(undefined)
       expect(aliceGet.data.result.status.message.parts[0].text).not.toMatch(/Override/)
     })
+
+    it("bob cannot cancel alice task", async () => {
+      const aliceRes = await sendMessageAs("catalog", "What books?", ALICE)
+      expect(aliceRes.data.result.status.state).toBe("completed")
+      const aliceTaskId = aliceRes.data.result.id
+
+      const bobCancel = await jsonrpcAs("catalog", "tasks/cancel", { id: aliceTaskId }, BOB)
+      expect(bobCancel.data.error.message).toMatch(/Task not found/)
+
+      const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, ALICE)
+      expect(aliceGet.data.result.status.state).toBe("completed")
+    })
   })
 
   // ─── @requires enforcement on A2A endpoint ───────────────────────────
