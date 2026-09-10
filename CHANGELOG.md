@@ -9,9 +9,6 @@
 ### Added
 
 - Data parts can now be emitted based on tool output
-
-### Added
-
 - Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
 
 ### Changed
