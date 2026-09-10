@@ -9,9 +9,10 @@ import cds from "@sap/cds"
 import InstrumentedOrchestrationClient from "../../lib/models/aicore.js"
 import {
   buildPromptCacheKey,
+  withPromptCachingMessages,
   withPromptCachingOptions,
   withPromptCachingParams,
-} from "../../lib/models/aicore-caching.js"
+} from "../../lib/utils/caching.js"
 
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
@@ -121,22 +122,6 @@ describe("@cap-js/agents - AICore Destination Connectivity", () => {
   })
 
   describe("prompt caching", () => {
-    let previousContext
-
-    beforeEach(() => {
-      previousContext = cds.context
-      cds.context = {
-        tenant: "tenant-1",
-        user: { id: "user-1" },
-        "agent.service": "CatalogService",
-        "agent.context.id": "ctx-1",
-      }
-    })
-
-    afterEach(() => {
-      cds.context = previousContext
-    })
-
     it("adds GPT-5.5 retention params", () => {
       expect(withPromptCachingParams("gpt-5.5", { temperature: 0 })).toEqual({
         temperature: 0,
@@ -163,34 +148,49 @@ describe("@cap-js/agents - AICore Destination Connectivity", () => {
       })
     })
 
-    it("sets SDK cache_control for Claude and Nova models", () => {
-      expect(withPromptCachingOptions("anthropic--claude-4.6-sonnet", {}).cache_control).toEqual({
-        type: "ephemeral",
-      })
+    it("sets SDK cache_control for Nova models", () => {
       expect(withPromptCachingOptions("amazon--nova-pro", {}).cache_control).toEqual({
         type: "ephemeral",
       })
     })
 
-    it("merges a generated prompt_cache_key into GPT model params per request", () => {
-      const model = new InstrumentedOrchestrationClient("llm", {
-        model: "gpt-5.5",
-        params: { temperature: 0 },
-        contentFilter: false,
-      })
+    it("adds Claude cache breakpoints to messages and last tool", () => {
+      const messages = [
+        { type: "system", content: "system" },
+        { type: "ai", content: "assistant" },
+        { type: "human", content: "user" },
+      ]
+      const opts = { tools: [{ name: "first" }, { name: "last" }] }
+      const cached = withPromptCachingMessages("anthropic--claude-4.6-sonnet", messages, opts)
 
-      const opts = withPromptCachingOptions("gpt-5.5", {
-        configurable: { _service: "CatalogService", _userId: "user-1", thread_id: "svc:ctx-1" },
-      })
-      const merged = model.mergeOrchestrationConfig(model.orchestrationConfig, opts)
+      expect(cached.opts).not.toHaveProperty("cache_control")
+      expect(cached.opts.tools[1].cache_control).toEqual({ type: "ephemeral" })
+      expect(cached.messages.map((m) => m.content[0].cache_control)).toEqual([
+        { type: "ephemeral" },
+        { type: "ephemeral" },
+        { type: "ephemeral" },
+      ])
+    })
 
-      expect(merged.promptTemplating.model.params).toMatchObject({
-        temperature: 0,
-        prompt_cache_retention: "24h",
+    it("merges tenant cache key into GPT model params per request", async () => {
+      await cds.tx({ tenant: "tenant-1" }, async () => {
+        const model = new InstrumentedOrchestrationClient("llm", {
+          model: "gpt-5.5",
+          params: { temperature: 0 },
+          contentFilter: false,
+        })
+
+        const opts = withPromptCachingOptions("gpt-5.5", {
+          configurable: { _service: "CatalogService", _userId: "user-1", thread_id: "svc:ctx-1" },
+        })
+        const merged = model.mergeOrchestrationConfig(model.orchestrationConfig, opts)
+
+        expect(merged.promptTemplating.model.params).toMatchObject({
+          temperature: 0,
+          prompt_cache_retention: "24h",
+        })
+        expect(merged.promptTemplating.model.params.prompt_cache_key).toBe("tenant-1")
       })
-      expect(merged.promptTemplating.model.params.prompt_cache_key).toMatch(
-        /^cap-agents:catalogservice:gpt-5\.5:[a-f0-9]{16}$/,
-      )
     })
 
     it("preserves caller-provided prompt_cache_key", () => {
@@ -207,17 +207,23 @@ describe("@cap-js/agents - AICore Destination Connectivity", () => {
       expect(merged.promptTemplating.model.params.prompt_cache_key).toBe("custom-key")
     })
 
-    it("builds stable non-secret cache keys", () => {
-      const key1 = buildPromptCacheKey("gpt-5.5", {
-        configurable: { _service: "CatalogService", _userId: "user-1" },
-      })
-      const key2 = buildPromptCacheKey("gpt-5.5", {
-        configurable: { _service: "CatalogService", _userId: "user-1" },
-      })
+    it("uses tenant, not model, service, user, or thread", async () => {
+      await cds.tx({ tenant: "tenant-1" }, async () => {
+        const key1 = buildPromptCacheKey("gpt-5.5", {
+          configurable: { _service: "CatalogService", _userId: "user-1" },
+        })
+        const key2 = buildPromptCacheKey("gpt-5.5", {
+          configurable: { _service: "OtherService", _userId: "user-2", thread_id: "other" },
+        })
 
-      expect(key1).toBe(key2)
-      expect(key1).toMatch(/^cap-agents:catalogservice:gpt-5\.5:[a-f0-9]{16}$/)
-      expect(key1).not.toContain("user-1")
+        expect(key1).toBe(key2)
+        expect(key1).toBe("tenant-1")
+      })
+    })
+
+    it("uses empty cache key without tenant", () => {
+      cds.context = {}
+      expect(buildPromptCacheKey()).toBe("")
     })
   })
 })
