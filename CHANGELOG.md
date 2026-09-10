@@ -13,6 +13,7 @@
 ### Fixed
 
 - Multiple tools with HITL needed in the same round no longer cause an error
+- Better message to the LLM on HITL rejection
 - Remote A2A response does not yield duplicate content
 - Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
 - Resets quota counter correctly between tasks for task related quota

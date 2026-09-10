@@ -831,7 +831,7 @@
         rejectBtn.textContent = "Reject"
         rejectBtn.addEventListener("click", () => {
           removeApprovalPrompt(el)
-          resume("reject")
+          resume({ decisions: [{ type: "reject", message: "no" }] })
         })
 
         actions.appendChild(approveBtn)
@@ -892,7 +892,10 @@
                   messageId: crypto.randomUUID(),
                   taskId,
                   contextId,
-                  parts: [{ kind: "text", text: decision }],
+                  parts:
+                    typeof decision === "string"
+                      ? [{ kind: "text", text: decision }]
+                      : [{ kind: "data", data: decision }],
                 },
               },
             }),

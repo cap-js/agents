@@ -338,6 +338,19 @@ describe("parseResumeDecision", () => {
   })
 })
 
+describe("patchRejectMessage", () => {
+  it("adds the rejection context to DataPart decisions", () => {
+    expect(patchRejectMessage({ decisions: [{ type: "reject", message: "no" }] })).toEqual({
+      decisions: [
+        {
+          type: "reject",
+          message: "The user rejected this particular tool invocation with the reason: no",
+        },
+      ],
+    })
+  })
+})
+
 describe("composeHitlDecisionNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
@@ -436,6 +449,52 @@ describe("GraphExecutor - HITL DataPart resume", () => {
 
       // `.resume` is a documented public field on Command (@langchain/langgraph).
       expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
+    }),
+  )
+
+  it(
+    "adds rejection context to an inbound DataPart before resuming",
+    withCtx(async () => {
+      let capturedInput
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
+
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-hitl-reject-1",
+          contextId: "ctx-hitl-reject-1",
+          userMessage: {
+            parts: [{ kind: "data", data: { decisions: [{ type: "reject", message: "no" }] } }],
+          },
+          task: {
+            status: {
+              state: "input-required",
+              message: {
+                metadata: {
+                  "sap.cds.agents.hitl": { actionCount: 1, decisions: [] },
+                },
+              },
+            },
+          },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput?.resume).toEqual({
+        decisions: [
+          {
+            type: "reject",
+            message: "The user rejected this particular tool invocation with the reason: no",
+          },
+        ],
+      })
     }),
   )
 
