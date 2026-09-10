@@ -79,7 +79,7 @@ cds.on("bootstrap", (app) => {
 
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
-  if (!srv.definition?.["@agent"]) return
+  if (!srv.definition?.protocols?.agent) return
   registerDefaultAgentHandlers(srv)
 })
 
