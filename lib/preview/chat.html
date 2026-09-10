@@ -115,7 +115,6 @@
         color: #1d3e5a;
         border-bottom-left-radius: 3px;
         border-left: 3px solid #537492;
-        white-space: pre-wrap;
       }
       .msg.approval::before {
         content: "Action Required";
@@ -814,7 +813,14 @@
       function addApprovalPrompt(description, options) {
         const el = document.createElement("div")
         el.className = "msg approval"
-        el.textContent = description || "The agent requires your approval to continue."
+        const argsIdx = description.indexOf("Args:")
+        if (argsIdx >= 0) {
+          const txt = description.substring(0, description.indexOf("Args:") + 6)
+          const args = description.substring(description.indexOf("Args:") + 6)
+          el.innerHTML = md(txt) + `<pre>${args}</pre>`
+        } else {
+          el.innerHTML = md(description || "The agent requires your approval to continue.")
+        }
         const actions = document.createElement("div")
         actions.className = "approval-actions"
 
