@@ -6,6 +6,10 @@
 
 ## Version 0.9.4 - tbd
 
+### Added
+
+- Data parts can now be emitted based on tool output
+
 ### Changed
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue

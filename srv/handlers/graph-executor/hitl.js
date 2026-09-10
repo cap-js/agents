@@ -28,7 +28,14 @@ export function parseResumeDecision(userText) {
   const t = userText.trim()
   if (/^(approve|yes|confirm|ok)$/i.test(t)) return { decisions: [{ type: "approve" }] }
   if (/^edit$/i.test(t)) return { decisions: [{ type: "edit" }] }
-  return { decisions: [{ type: "reject", message: userText }] }
+  return {
+    decisions: [
+      {
+        type: "reject",
+        message: `The user rejected this particular tool invocation with the reason: ${userText}`,
+      },
+    ],
+  }
 }
 
 function decisionsForAudit(resume, actionRequests = []) {
@@ -109,27 +116,14 @@ export function composeHitlDecisionNote(actionRequests, resume) {
   const lines = []
   for (const [index, decision] of decisions.entries()) {
     const original = actionRequests[index]
-    if (decision?.type === "approve") {
-      lines.push("- User approved " + action(original) + ".")
-      continue
-    }
-    if (decision?.type === "reject") {
-      const reason = decision.message ? " Reason: " + JSON.stringify(decision.message) + "." : ""
-      lines.push(
-        "- User rejected " +
-          action(original) +
-          "." +
-          reason +
-          " The action was not executed. It can be retried only after an explicit new user request.",
-      )
-      continue
-    }
     if (decision?.type === "edit") {
       const matched = takeByName(decision.editedAction?.name) ?? original
       lines.push("- User edited " + action(matched) + " to " + action(decision.editedAction) + ".")
       continue
     }
-    lines.push("- User decision for " + action(original) + ": " + JSON.stringify(decision) + ".")
+  }
+  if (!lines.length) {
+    return undefined
   }
   return ["User HITL decisions (not tool failures):", ...lines].join("\n")
 }
