@@ -15,6 +15,7 @@
 - Multiple tools with HITL needed in the same round no longer cause an error
 - Remote A2A response does not yield duplicate content
 - Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
+- Resets quota counter correctly between tasks for task related quota
 
 ## Version 0.9.3 - 2026-09-04
 
