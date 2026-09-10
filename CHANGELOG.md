@@ -4,12 +4,18 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.5 - tbd.
+
+### Added
+
+- Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+
+
 ## Version 0.9.4 - 2026-09-10
 
 ### Added
 
 - Data parts can now be emitted based on tool output
-- Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
 
 ### Changed
 
