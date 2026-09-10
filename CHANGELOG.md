@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.5 - tbd
+
+### Changed
+
+- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+
 ## Version 0.9.4 - 2026-09-10
 
 ### Added
