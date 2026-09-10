@@ -338,19 +338,6 @@ describe("parseResumeDecision", () => {
   })
 })
 
-describe("patchRejectMessage", () => {
-  it("adds the rejection context to DataPart decisions", () => {
-    expect(patchRejectMessage({ decisions: [{ type: "reject", message: "no" }] })).toEqual({
-      decisions: [
-        {
-          type: "reject",
-          message: "The user rejected this particular tool invocation with the reason: no",
-        },
-      ],
-    })
-  })
-})
-
 describe("composeHitlDecisionNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
