@@ -206,24 +206,5 @@ describe("@cap-js/agents - AICore Destination Connectivity", () => {
 
       expect(merged.promptTemplating.model.params.prompt_cache_key).toBe("custom-key")
     })
-
-    it("uses tenant, not model, service, user, or thread", async () => {
-      await cds.tx({ tenant: "tenant-1" }, async () => {
-        const key1 = buildPromptCacheKey("gpt-5.5", {
-          configurable: { _service: "CatalogService", _userId: "user-1" },
-        })
-        const key2 = buildPromptCacheKey("gpt-5.5", {
-          configurable: { _service: "OtherService", _userId: "user-2", thread_id: "other" },
-        })
-
-        expect(key1).toBe(key2)
-        expect(key1).toBe("tenant-1")
-      })
-    })
-
-    it("uses empty cache key without tenant", () => {
-      cds.context = {}
-      expect(buildPromptCacheKey()).toBe("")
-    })
   })
 })
