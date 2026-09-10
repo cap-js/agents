@@ -3,6 +3,7 @@ import cds from "@sap/cds"
 const { GraphExecutor, messageText, defaultOutputMapper } =
   await import("../../srv/handlers/graph-executor.js")
 const { agentMessage } = await import("../../lib/utils/message-handling.js")
+const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
 const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote, requiresHitl } =
   await import("../../srv/handlers/graph-executor/hitl.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
@@ -48,6 +49,53 @@ describe("defaultOutputMapper", () => {
       output: "from output field",
     }
     expect(defaultOutputMapper(result)).toBe("from output field")
+  })
+})
+
+describe("summarizePartialWork", () => {
+  it("includes summary instructions and conversation history in one prompt", async () => {
+    let messages
+    const summary = await summarizePartialWork({
+      contextId: "summary-context",
+      serviceName: "TestService",
+      reason: "timed out",
+      approval: true,
+      checkpointer: {
+        getTuple: async () => ({
+          checkpoint: {
+            channel_values: {
+              messages: [
+                { _getType: () => "human", content: "Which books are on offer?" },
+                { _getType: () => "ai", content: "I am checking the catalog." },
+              ],
+            },
+          },
+        }),
+      },
+      getModel: async () => ({
+        invoke: async (input) => {
+          messages = input
+          return { content: [{ text: "Catalog checked. Continue running or stop?" }] }
+        },
+      }),
+    })
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]._getType()).toBe("human")
+    expect(messages[0].content).toContain("within its time limit")
+    expect(messages[0].content).toContain("Which books are on offer?")
+    expect(summary).toBe("Catalog checked. Continue running or stop?")
+  })
+
+  it("uses translated timeout fallback", async () => {
+    const fallback = await summarizePartialWork({
+      contextId: "summary-fallback",
+      serviceName: "TestService",
+      reason: "timed out",
+      approval: true,
+    })
+
+    expect(fallback).toBe(cds.i18n.messages.at("AGENT_SUMMARY_TIMEOUT_FALLBACK", ["timed out"]))
   })
 })
 
@@ -402,6 +450,68 @@ describe("requiresHitl", () => {
 
 describe("GraphExecutor - HITL DataPart resume", () => {
   it(
+    "resumes checkpointed work when timeout continuation is approved",
+    withCtx(async () => {
+      let capturedInput
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-timeout-resume-1",
+          contextId: "ctx-timeout-resume-1",
+          userMessage: { parts: [{ kind: "text", text: "continue" }] },
+          task: {
+            status: {
+              state: "input-required",
+              message: { metadata: { "sap.cds.agents.timeout-hitl": true } },
+            },
+          },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput).toBe(null)
+    }),
+  )
+
+  it(
+    "cancels when timeout continuation is declined",
+    withCtx(async () => {
+      const publishedEvents = []
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async () => ({ messages: [{ content: "done" }] }),
+      }
+      const eventBus = { publish: (event) => publishedEvents.push(event), finished: () => {} }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-timeout-stop-1",
+          contextId: "ctx-timeout-stop-1",
+          userMessage: { parts: [{ kind: "text", text: "stop" }] },
+          task: {
+            status: {
+              state: "input-required",
+              message: { metadata: { "sap.cds.agents.timeout-hitl": true } },
+            },
+          },
+        },
+        eventBus,
+      )
+
+      expect(publishedEvents.find((event) => event.status?.state === "canceled")).toBeTruthy()
+    }),
+  )
+
+  it(
     "passes an inbound DataPart's data opaquely into Command({ resume })",
     withCtx(async () => {
       let capturedInput
@@ -507,6 +617,12 @@ describe("GraphExecutor - HITL suspend carries a DataPart", () => {
       const parts = inputRequired.status.message.parts
       expect(parts.find((p) => p.kind === "text")?.text).toBe("Approve order?")
       expect(parts.find((p) => p.kind === "data")?.data).toEqual(payload)
+      expect(
+        inputRequired.status.message.metadata["sap.cds.agents.input-required"].options,
+      ).toEqual([
+        { value: "approve", label: "Approve" },
+        { value: "reject", label: "Reject" },
+      ])
     }),
   )
 })
