@@ -4,7 +4,20 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.3 - tbd
+## Version 0.9.4 - 2026-09-10
+
+### Added
+
+- Data parts can now be emitted based on tool output
+
+### Fixed
+
+- Multiple tools with HITL needed in the same round no longer cause an error
+- Remote A2A response does not yield duplicate content
+- Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
+- Resets quota counter correctly between tasks for task related quota
+
+## Version 0.9.3 - 2026-09-04
 
 ### Added
 

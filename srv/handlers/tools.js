@@ -11,7 +11,7 @@ import {
   executeCallActionTool,
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
-import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
+import { getFilteredEntities, getFilteredActions, getAgentLogger } from "../../lib/utils/utils.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 
@@ -31,6 +31,7 @@ function cachedAuth(srv) {
 
 class GenericReadTool extends DynamicStructuredTool {
   constructor(srv, entities) {
+    const log = getAgentLogger(srv)
     const def = createGenericReadToolDefinition(Object.keys(entities), srv.name, "")
     super({
       name: def.name,
@@ -38,7 +39,7 @@ class GenericReadTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
+        return unwrap(await executeGenericReadTool(srv, entities, args, { log }))
       },
     })
     this.srv = srv
@@ -67,6 +68,7 @@ class GenericReadTool extends DynamicStructuredTool {
 
 class DescribeTool extends DynamicStructuredTool {
   constructor(srv, entities, actions) {
+    const log = getAgentLogger(srv)
     const def = createDescribeToolDefinition(
       Object.keys(entities),
       Object.keys(actions),
@@ -79,7 +81,7 @@ class DescribeTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
+        return unwrap(await executeDescribe(srv, entities, actions, args, { log }))
       },
     })
     this.srv = srv
@@ -119,6 +121,7 @@ class DescribeTool extends DynamicStructuredTool {
 
 class PerActionTool extends DynamicStructuredTool {
   constructor(srv, actionName, action) {
+    const log = getAgentLogger(srv)
     const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
     super({
       name: def.name,
@@ -126,7 +129,7 @@ class PerActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executePerActionTool(srv, actionName, action, args, { log: LOG }))
+        return unwrap(await executePerActionTool(srv, actionName, action, args, { log }))
       },
     })
     this.srv = srv
@@ -142,6 +145,7 @@ class PerActionTool extends DynamicStructuredTool {
 
 class CallActionTool extends DynamicStructuredTool {
   constructor(srv, actions) {
+    const log = getAgentLogger(srv)
     const def = createCallActionToolDefinition(Object.keys(actions), srv.name, "")
     super({
       name: def.name,
@@ -149,7 +153,7 @@ class CallActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
+        return unwrap(await executeCallActionTool(srv, actions, args, { log }))
       },
     })
     this.srv = srv
@@ -216,6 +220,10 @@ export function generateTools(srv) {
   // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
   if (cds.env.agents?.fileIO?.enabled) {
     tools.push(createEmitFilePartTool())
+  }
+
+  if (cds.env.agents?.emitDataParts) {
+    tools.push(createEmitDataPartTool())
   }
 
   return tools
@@ -360,6 +368,32 @@ export function createReadFileTool(fileStore, contextId, userId) {
         "Read the contents of an uploaded file. Use the /uploads/<filename> path from the file manifest. Returns file content for text-based formats.",
       schema: z.object({
         path: z.string().describe("File path, e.g. /uploads/report.csv"),
+      }),
+    },
+  )
+}
+
+/**
+ * Create a tool that emits a DataPart in the A2A response.
+ * The executor's toolResults collection detects `kind: "data"`
+ * and emits the tool result as a data part.
+ */
+export function createEmitDataPartTool() {
+  return tool(
+    async ({ data, mediaType }) => {
+      return {
+        kind: "data",
+        data,
+        mediaType: mediaType ?? "application/json",
+      }
+    },
+    {
+      name: "emit_data_part",
+      description: "Emit a structured A2A DataPart. Only use when instructed.",
+      schema: z.object({
+        // A2A DataPart is specified to be an object in A2A 0.3
+        // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object
+        data: z.looseObject().describe("Structured object"),
       }),
     },
   )
