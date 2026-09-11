@@ -77,7 +77,7 @@ cds.on("bootstrap", (app) => {
   })
 })
 
-if (cds.env.profiles.includes("development") && cds.requires.llm === "auto") {
+if (cds.env.profiles.includes("development") && cds.env.requires.llm === "auto") {
   cds.on("served", async () => {
     const { resolve_config } = await import("./lib/config/local.js")
     const config = resolve_config()
