@@ -4,7 +4,7 @@ import { z } from "zod"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { short, toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agents|subagents")
+const LOG = cds.log("subagents|agents")
 
 import { inspect } from "util"
 /**
