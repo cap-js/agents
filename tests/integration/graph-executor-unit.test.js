@@ -6,6 +6,7 @@ const { agentMessage } = await import("../../lib/utils/message-handling.js")
 const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
 const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote, requiresHitl } =
   await import("../../srv/handlers/graph-executor/hitl.js")
+const { buildHitlInterruptMap } = await import("../../lib/agents/middleware/hitl.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
 const { createEmitDataPartTool } = await import("../../srv/handlers/tools.js")
 
@@ -369,6 +370,13 @@ describe("parseResumeDecision", () => {
     }
   })
 
+  it("maps approve-session to an approval that persists for one tool", () => {
+    expect(parseResumeDecision("approve-session")).toEqual({
+      decisions: [{ type: "approve" }],
+      approveForSession: true,
+    })
+  })
+
   it("maps 'edit' to a distinct edit decision (not reject)", () => {
     expect(parseResumeDecision("edit")).toEqual({ decisions: [{ type: "edit" }] })
     expect(parseResumeDecision("EDIT")).toEqual({ decisions: [{ type: "edit" }] })
@@ -383,6 +391,30 @@ describe("parseResumeDecision", () => {
         },
       ],
     })
+  })
+})
+
+describe("HITL session approval", () => {
+  it("skips only the approved tool's future HITL gates", () => {
+    const interruptOn = buildHitlInterruptMap(
+      { actions: { submitOrder: { "@agent.hitl": true } } },
+      [{ name: "submitOrder" }],
+    )
+    expect(
+      interruptOn.submitOrder.when({ toolCall: { name: "submitOrder" }, state: {} }),
+    ).toBe(true)
+    expect(
+      interruptOn.submitOrder.when({
+        toolCall: { name: "submitOrder" },
+        state: { _hitlApprovedTools: ["submitOrder"] },
+      }),
+    ).toBe(false)
+    expect(
+      interruptOn.submitOrder.when({
+        toolCall: { name: "otherAction" },
+        state: { _hitlApprovedTools: ["submitOrder"] },
+      }),
+    ).toBe(true)
   })
 })
 
@@ -550,6 +582,48 @@ describe("GraphExecutor - HITL DataPart resume", () => {
   )
 
   it(
+    "stores a tool-specific session approval in graph state",
+    withCtx(async () => {
+      let capturedInput
+      const fakeGraph = {
+        checkpointer: {},
+        getState: async () => ({ values: {} }),
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-hitl-session",
+          contextId: "ctx-hitl-session",
+          userMessage: { parts: [{ kind: "text", text: "approve-session" }] },
+          task: {
+            status: {
+              state: "input-required",
+              message: {
+                metadata: {
+                  "sap.cds.agents.hitl": {
+                    actionCount: 1,
+                    actionRequests: [{ name: "submitOrder" }],
+                    decisions: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput?.resume).toEqual({ decisions: [{ type: "approve" }] })
+      expect(capturedInput?.update).toEqual({ _hitlApprovedTools: ["submitOrder"] })
+    }),
+  )
+
+  it(
     "fails the task when a resume has neither text nor a DataPart",
     withCtx(async () => {
       let publishedEvents = []
@@ -621,6 +695,7 @@ describe("GraphExecutor - HITL suspend carries a DataPart", () => {
         inputRequired.status.message.metadata["sap.cds.agents.input-required"].options,
       ).toEqual([
         { value: "approve", label: "Approve" },
+        { value: "approve-session", label: "Approve for this session" },
         { value: "reject", label: "Reject" },
       ])
     }),

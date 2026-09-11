@@ -107,6 +107,8 @@ Annotate a CDS action with `@agent.hitl` to require human approval before the ag
 annotate CatalogService.submitOrder with @agent.hitl;
 ```
 
+Select **Approve for this session** to approve this tool's later HITL calls in the current conversation. Other HITL tools still require approval. A new conversation requires approval again.
+
 ## Configuration
 
 The LLM used by an agent is configured via `cds.requires.llm`. You can provide a `kind` as with [any required service](https://cap.cloud.sap/docs/node.js/core-services#required-services).

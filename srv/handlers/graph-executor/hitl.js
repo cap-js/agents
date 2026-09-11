@@ -12,6 +12,10 @@ export const INPUT_REQUIRED_METADATA_KEY = "sap.cds.agents.input-required"
 function approvalOptions() {
   return [
     { value: "approve", label: cds.i18n.messages.at("HITL_APPROVE") },
+    {
+      value: "approve-session",
+      label: cds.i18n.messages.at("HITL_APPROVE_FOR_SESSION"),
+    },
     { value: "reject", label: cds.i18n.messages.at("HITL_REJECT") },
   ]
 }
@@ -27,6 +31,9 @@ export const requiresHitl = (result) =>
 
 export function parseResumeDecision(userText) {
   const t = userText.trim()
+  if (/^approve-session$/i.test(t)) {
+    return { decisions: [{ type: "approve" }], approveForSession: true }
+  }
   if (/^(approve|yes|confirm|ok)$/i.test(t)) return { decisions: [{ type: "approve" }] }
   if (/^edit$/i.test(t)) return { decisions: [{ type: "edit" }] }
   return {
@@ -294,11 +301,31 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     const actionCount = pending?.actionCount ?? (await getPendingHitlActionCount(graph, config))
     actionRequests = pendingActionRequests(requestContext.task, pending)
     const priorDecisionCount = pending?.decisions?.length || 0
-    const decisions = [...(pending?.decisions || []), ...resume.decisions]
-    recordHitlDecisions(cds.context?.["agent.service"], actionRequests, resume, priorDecisionCount)
+    const sessionApproval = resume.approveForSession === true
+    const pendingApprovedTools = Array.isArray(pending?.approvedTools)
+      ? pending.approvedTools.filter((tool) => typeof tool === "string")
+      : []
+    const approvedTool = actionRequests[priorDecisionCount]?.name
+    const sessionApprovedTools =
+      sessionApproval && approvedTool
+        ? [...new Set([...pendingApprovedTools, approvedTool])]
+        : pendingApprovedTools
+    const currentDecisions = resume.decisions
+    const decisions = [...(pending?.decisions || []), ...currentDecisions]
+    recordHitlDecisions(
+      cds.context?.["agent.service"],
+      actionRequests,
+      { decisions: currentDecisions },
+      priorDecisionCount,
+    )
     if (decisions.length < actionCount) {
       const interruptData = firstDataPart(requestContext.task?.status?.message?.parts)
-      const nextPending = { ...pending, actionCount, decisions }
+      const nextPending = {
+        ...pending,
+        actionCount,
+        approvedTools: sessionApprovedTools,
+        decisions,
+      }
       publishInputRequired({
         requestContext,
         eventBus,
@@ -306,13 +333,18 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
         interruptData,
         pending: {
           actionCount,
+          approvedTools: sessionApprovedTools,
           decisions,
           actionRequests: pendingActionRequests(requestContext.task, nextPending),
         },
       })
       return undefined
     }
-    resume = { ...resume, decisions }
+    resume = { decisions }
+    if (sessionApprovedTools.length) {
+      const approvedTools = await getSessionApprovedTools(graph, config)
+      resume.approveForSession = [...new Set([...approvedTools, ...sessionApprovedTools])]
+    }
   }
 
   const decisions = decisionsForAudit(resume, actionRequests)
@@ -326,9 +358,27 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     : await getPreInterruptToolCalls(graph, config)
   const decisionNote = composeHitlDecisionNote(originalActions, resume)
   const commandArgs = { resume }
-  if (decisionNote) commandArgs.update = { _hitlDecisionNote: decisionNote }
+  if (decisionNote || resume.approveForSession) {
+    commandArgs.update = {
+      ...(decisionNote && { _hitlDecisionNote: decisionNote }),
+      ...(resume.approveForSession && { _hitlApprovedTools: resume.approveForSession }),
+    }
+  }
+  delete resume.approveForSession
   const resumed = await stream(new Command(commandArgs), signal)
   return resumed.state
+}
+
+async function getSessionApprovedTools(graph, config) {
+  if (typeof graph.getState !== "function") return []
+  try {
+    const state = await graph.getState(config)
+    return Array.isArray(state?.values?._hitlApprovedTools)
+      ? state.values._hitlApprovedTools.filter((tool) => typeof tool === "string")
+      : []
+  } catch {
+    return []
+  }
 }
 
 export function handleHitlInterrupt({
