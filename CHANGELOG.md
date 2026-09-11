@@ -9,6 +9,7 @@
 ### Added
 
 - Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+- Remote MCP connections support `mcp.tools` in `cds.requires` to restrict which tools are exposed to the agent
 
 ### Changed
 
@@ -17,6 +18,7 @@
 ### Fixed
 
 - Services with `@protocol: 'agent'` now also register `@agent` specific handlers
+- Mask apiKey in debug logs read from claude / opencode settings
 
 ## Version 0.9.4 - 2026-09-10
 
