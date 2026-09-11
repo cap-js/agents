@@ -550,6 +550,52 @@ describe("GraphExecutor - HITL DataPart resume", () => {
   )
 
   it(
+    "adds rejection context to an inbound DataPart before resuming",
+    withCtx(async () => {
+      let capturedInput
+      const fakeGraph = {
+        checkpointer: {},
+        invoke: async (input) => {
+          capturedInput = input
+          return { messages: [{ content: "done" }] }
+        },
+      }
+
+      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
+
+      await executor.execute(
+        {
+          taskId: "task-hitl-reject-1",
+          contextId: "ctx-hitl-reject-1",
+          userMessage: {
+            parts: [{ kind: "data", data: { decisions: [{ type: "reject", message: "no" }] } }],
+          },
+          task: {
+            status: {
+              state: "input-required",
+              message: {
+                metadata: {
+                  "sap.cds.agents.hitl": { actionCount: 1, decisions: [] },
+                },
+              },
+            },
+          },
+        },
+        fakeEventBus,
+      )
+
+      expect(capturedInput?.resume).toEqual({
+        decisions: [
+          {
+            type: "reject",
+            message: "The user rejected this particular tool invocation with the reason: no",
+          },
+        ],
+      })
+    }),
+  )
+
+  it(
     "fails the task when a resume has neither text nor a DataPart",
     withCtx(async () => {
       let publishedEvents = []

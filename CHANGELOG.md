@@ -10,19 +10,20 @@
 
 - Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
 
+### Changed
+
+- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+
 ## Version 0.9.4 - 2026-09-10
 
 ### Added
 
 - Data parts can now be emitted based on tool output
 
-### Changed
-
-- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
-
 ### Fixed
 
 - Multiple tools with HITL needed in the same round no longer cause an error
+- Better message to the LLM on HITL rejection
 - Remote A2A response does not yield duplicate content
 - Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
 - Resets quota counter correctly between tasks for task related quota
