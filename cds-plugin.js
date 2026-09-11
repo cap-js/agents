@@ -79,7 +79,7 @@ cds.on("bootstrap", (app) => {
   })
 })
 
-if (cds.env.profiles.includes("development") && (!cds.requires.llm || !cds.requires.llm?.model)) {
+if (cds.env.profiles.includes("development") && (!cds.requires.llm)) {
   cds.on("served", async () => {
     console.log() // eslint-disable-line no-console
     const { resolve_config } = await import("./lib/config/local.js")
