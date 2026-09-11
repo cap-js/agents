@@ -6,6 +6,7 @@ import cds_compile_to_a2a from "./lib/compile.js"
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
 import { slugified } from "./lib/utils/utils.js"
 
+
 cds.compile.to.a2a = cds_compile_to_a2a
 
 // Detect optional peer plugins (@cap-js/telemetry, @cap-js/audit-logging)
@@ -30,6 +31,7 @@ cds.env.log ??= {}
 const cls_fields = (cds.env.log.cls_custom_fields ??= [])
 if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
 if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
+
 
 cds.on("bootstrap", (app) => {
   const providers = {
@@ -77,6 +79,14 @@ cds.on("bootstrap", (app) => {
   })
 })
 
+if (cds.env.profiles.includes("development") && (!cds.requires.llm || !cds.requires.llm?.model)) {
+  cds.on("served", async () => {
+    console.log() // eslint-disable-line no-console
+    const { resolve_config } = await import("./lib/config/local.js")
+    cds.env.requires.llm = resolve_config()
+  })
+}
+
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.["@agent"]) return
@@ -85,6 +95,17 @@ cds.on("serving", (srv) => {
 
 // Schedule active_users metric computation + MLflow exporter
 cds.on("served", async () => {
+
+  const config = cds.requires.llm
+  const { apiKey, ...credentials } = config?.credentials || {}
+  LOG.info (`cds.connect.to 'llm' with:`, {
+    ...config,
+    credentials: {
+      ...credentials,
+      apiKey: apiKey ? '***' : undefined
+    }
+  })
+
   if (hasTelemetry) {
     const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
