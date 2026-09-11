@@ -80,7 +80,9 @@ cds.on("bootstrap", (app) => {
 if (cds.requires.llm === "auto" || cds.requires.llm?.kind === "auto") {
   cds.on("served", async () => {
     const { resolve_config } = await import("./lib/config/local.js")
-    cds.env.requires.llm = resolve_config()
+    let options = cds.requires.llm
+    if (options === "auto") options = { kind: "auto" }
+    cds.env.requires.llm = resolve_config (options)
   })
 }
 
