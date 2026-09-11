@@ -795,7 +795,7 @@ class GraphExecutor {
           // Exclude emit_file_part outputs — those are this agent's own artifacts, not
           // downstream files, and re-persisting them would create spurious /uploads/ entries.
           // Enforce the same size + MIME guard as inbound uploads so a malicious
-          // sub-agent cannot bypass the cap by echoing an oversized FilePart.
+          // subagent cannot bypass the cap by echoing an oversized FilePart.
           await Promise.all(
             fileArtifacts
               .slice(0, source1Count)

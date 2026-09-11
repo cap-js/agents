@@ -77,6 +77,15 @@ cds.on("bootstrap", (app) => {
   })
 })
 
+if (cds.requires.llm === "auto" || cds.requires.llm?.kind === "auto") {
+  cds.on("served", async () => {
+    const { resolve_config } = await import("./lib/config/local.js")
+    let options = cds.requires.llm
+    if (options === "auto") options = { kind: "auto" }
+    cds.env.requires.llm = resolve_config (options)
+  })
+}
+
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
   if (!srv.definition?.protocols?.agent) return
@@ -85,6 +94,14 @@ cds.on("serving", (srv) => {
 
 // Schedule active_users metric computation + MLflow exporter
 cds.on("served", async () => {
+
+  const config = cds.requires.llm, credentials = {}
+  const { url, destination, anthropicApiUrl } = config?.credentials || {}
+  if (url) credentials.url = url
+  if (destination) credentials.destination = destination
+  if (anthropicApiUrl) credentials.anthropicApiUrl = anthropicApiUrl
+  LOG.info (`cds.connect.to 'llm' with:`, { ...config, credentials })
+
   if (hasTelemetry) {
     const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
