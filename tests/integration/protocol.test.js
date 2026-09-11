@@ -172,11 +172,6 @@ describe("@cap-js/agents - @protocol enabled agent", () => {
 
   it("registers the default buildGraph handler so A2A execution resolves", async () => {
     const srv = cds.services.ProtocolAgentService
-    // THIS is the exact failing path from issue #106: without the fix,
-    // srv.send("buildGraph", {}) resolves to undefined and
-    // LangGraphExecutor._buildExecutor throws
-    //   "buildGraph handler for service \"ProtocolAgentService\" must return a
-    //    compiled LangGraph (with invoke()) or a GraphExecutor (with execute()). Got: undefined"
     const graph = await srv.send("buildGraph", {})
     expect(graph).toBeTruthy()
     expect(
