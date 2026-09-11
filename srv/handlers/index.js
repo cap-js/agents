@@ -67,7 +67,7 @@ export default function registerDefaultAgentHandlers(srv) {
     }
 
     const { buildMcpTools } = await import("./mcp-tools.js")
-    const { buildSubAgentTool } = await import("./sub-agent-tools.js")
+    const { buildSubAgentTool } = await import("./subagent-tools.js")
 
     const results = await Promise.allSettled([
       ...mcpEntries.map((e) => buildMcpTools(e.service ?? e)),
@@ -76,7 +76,7 @@ export default function registerDefaultAgentHandlers(srv) {
 
     const extraTools = []
     for (const r of results) {
-      // MCP connections yield an array of tools; sub-agent connections yield a
+      // MCP connections yield an array of tools; subagent connections yield a
       // single tool. Normalize both so instrumentTools sees a flat tool list.
       if (r.status === "fulfilled") {
         if (Array.isArray(r.value)) extraTools.push(...r.value.filter(Boolean))

@@ -122,8 +122,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
 
     it("compile to agent uses @Core.Links via href as URL", () => {
       const card = cds.compile.to.a2a(cds.model, {
-        service: "CircuitBreakerService",
-        as: "object",
+        service: "CircuitBreakerService"
       })
 
       expect(card.url).toBe("https://example.com/agent/circuit-breaker")
@@ -132,8 +131,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
 
     it("compile to agent without @Core.Links via uses default HOST URL", () => {
       const card = cds.compile.to.a2a(cds.model, {
-        service: "CatalogService",
-        as: "object",
+        service: "CatalogService"
       })
 
       expect(card.url.includes("HOST"), "URL should contain HOST placeholder").toBeTruthy()

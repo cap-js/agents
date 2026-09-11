@@ -1,5 +1,5 @@
 /**
- * Integration tests for declarative MCP server and sub-agent wiring.
+ * Integration tests for declarative MCP server and subagent wiring.
  *
  * Uses the real travel sample services — no mock HTTP servers:
  *   - xflights  (port 4005) — real MCP server via @cap-js/mcp
@@ -11,7 +11,7 @@
  *
  * Tests verify:
  *   - Remote MCP connection is represented as a dynamic placeholder in buildTools
- *   - Sub-agent tools are returned with names derived from real agent cards
+ *   - Subagent tools are returned with names derived from real agent cards
  *   - No tool name collisions (regression guard for the deepagents bug)
  *   - Remote MCP tool invocation returns real data (via full agent graph)
  *   - Deduplication and graceful-failure paths
@@ -113,20 +113,20 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       expect(typeof placeholder.resolveHeaders).toBe("function")
     })
 
-    it("sub-agent tools present for hotel and activity services", () => {
+    it("subagent tools present for hotel and activity services", () => {
       const names = new Set(tools.filter((t) => t.name).map((t) => t.name))
       // Tool names come from agent card names (HotelService / ActivityService → lowercased)
       expect(
         names.has("hotelservice"),
-        `expected 'hotelservice' sub-agent tool — got: ${[...names].sort().join(", ")}`,
+        `expected 'hotelservice' subagent tool — got: ${[...names].sort().join(", ")}`,
       ).toBe(true)
       expect(
         names.has("activityservice"),
-        `expected 'activityservice' sub-agent tool — got: ${[...names].sort().join(", ")}`,
+        `expected 'activityservice' subagent tool — got: ${[...names].sort().join(", ")}`,
       ).toBe(true)
     })
 
-    it("sub-agent tool descriptions reference the real agent card content", () => {
+    it("subagent tool descriptions reference the real agent card content", () => {
       const hotelTool = tools.find((t) => t.name === "hotelservice")
       expect(hotelTool?.description?.length > 0).toBe(true)
       expect(hotelTool.description).toMatch(/hotel/i)
@@ -279,9 +279,9 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
     })
   })
 
-  // ── Sub-agent invocation ───────────────────────────────────────────────
+  // ── Subagent invocation ───────────────────────────────────────────────
 
-  describe("sub-agent tool invocation (hotelservice against real leisure-services)", () => {
+  describe("subagent tool invocation (hotelservice against real leisure-services)", () => {
     it("hotelservice tool sends a message and returns a response string", async () => {
       const srv = cds.services.TravelAgentService
       const tools = await srv.send("buildTools")
