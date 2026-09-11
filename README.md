@@ -48,6 +48,9 @@ cds w --profile hybrid
 
 See [SAP AI Core → Create a Service Instance](https://help.sap.com/docs/sap-ai-core/sap-ai-core-service-guide/create-service-instance) for how to create an instance.
 
+> [!IMPORTANT]
+> In case you use @cap-js/attachments, you must use a version >=4, because the plugin has a dependency on it as well for the fileIO feature.
+
 ## Ways to Build Agents
 
 Both approaches start from a CDS service annotated with `@agent` (as shown in [Requirements and Setup](#requirements-and-setup)). They differ only in how the agent's behaviour is defined.
