@@ -116,6 +116,7 @@
         }
       },
       "[hybrid]": {
+        "llm": "aicore",
         "auth": {
           "kind": "mocked",
           "users": {
