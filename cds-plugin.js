@@ -79,11 +79,21 @@ cds.on("bootstrap", (app) => {
   })
 })
 
-if (cds.env.profiles.includes("development") && (!cds.requires.llm)) {
+if (cds.env.profiles.includes("development") && (cds.requires.llm === 'auto')) {
   cds.on("served", async () => {
-    console.log() // eslint-disable-line no-console
     const { resolve_config } = await import("./lib/config/local.js")
-    cds.env.requires.llm = resolve_config()
+    const config = resolve_config()
+    cds.env.requires.llm = config
+    
+    function sanitize(config) {
+      const copy = {...config}
+      for (const key in copy) {
+        if (/key|token|secret/i.test(key)) copy[key] = '***'
+      }
+      if (copy.credentials) copy.credentials = sanitize(copy.credentials)
+      return copy
+    }
+    LOG.info (`cds.connect.to 'llm' with:`, sanitize(config))
   })
 }
 
@@ -95,17 +105,6 @@ cds.on("serving", (srv) => {
 
 // Schedule active_users metric computation + MLflow exporter
 cds.on("served", async () => {
-
-  const config = cds.requires.llm
-  const { apiKey, ...credentials } = config?.credentials || {}
-  LOG.info (`cds.connect.to 'llm' with:`, {
-    ...config,
-    credentials: {
-      ...credentials,
-      apiKey: apiKey ? '***' : undefined
-    }
-  })
-
   if (hasTelemetry) {
     const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
     setupActiveUsersMetric()
