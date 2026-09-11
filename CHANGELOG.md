@@ -14,6 +14,10 @@
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
 
+### Fixed
+
+- Services with `@protocol: 'agent'` now also register `@agent` specific handlers
+
 ## Version 0.9.4 - 2026-09-10
 
 ### Added
