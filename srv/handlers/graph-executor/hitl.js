@@ -1,6 +1,7 @@
 import cds from "@sap/cds"
 import { agentMessage, firstDataPart, partsToText } from "../../../lib/utils/message-handling.js"
 import { audit, short } from "../../../lib/utils/utils.js"
+import * as metrics from "../../../lib/telemetry/metrics.js"
 
 const LOG = cds.log("agents")
 
@@ -59,6 +60,25 @@ function decisionsForAudit(resume, actionRequests = []) {
     action: actionRequests[index] ?? { index: index + 1 },
     decision,
   }))
+}
+
+function hitlMetricAttrs(serviceName, action, decision) {
+  return {
+    ...metrics.attrs(serviceName),
+    "agent.hitl.action": action?.name,
+    ...(decision && { "agent.hitl.decision": decision }),
+  }
+}
+
+function recordHitlDecisions(serviceName, actionRequests, resume, actionOffset = 0) {
+  if (!Array.isArray(resume?.decisions)) return
+  for (const [index, decision] of resume.decisions.entries()) {
+    if (!decision?.type) continue
+    metrics.hitlDecisions.add(
+      1,
+      hitlMetricAttrs(serviceName, actionRequests[index + actionOffset], decision.type),
+    )
+  }
 }
 
 function extractInterruptDescription(resultOrErr) {
@@ -288,7 +308,9 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     const pending = pendingHitlFromTask(requestContext.task)
     const actionCount = pending?.actionCount ?? (await getPendingHitlActionCount(graph, config))
     actionRequests = pendingActionRequests(requestContext.task, pending)
+    const priorDecisionCount = pending?.decisions?.length || 0
     const decisions = [...(pending?.decisions || []), ...resume.decisions]
+    recordHitlDecisions(cds.context?.["agent.service"], actionRequests, resume, priorDecisionCount)
     if (decisions.length < actionCount) {
       const interruptData = firstDataPart(requestContext.task?.status?.message?.parts)
       const nextPending = { ...pending, actionCount, decisions }
@@ -335,6 +357,10 @@ export function handleHitlInterrupt({
   const { taskId, contextId } = requestContext
   const description = extractInterruptDescription(result)
   const interruptData = extractInterruptData(result)
+  const actionRequests = interruptData?.actionRequests || interruptActionRequests(result)
+  for (const action of actionRequests) {
+    metrics.hitlGates.add(1, hitlMetricAttrs(serviceName, action))
+  }
   LOG.info("input-required", { conversation: short(contextId), service: serviceName, duration })
   onInputRequired?.(description)
   audit("AgentInputRequired", {
