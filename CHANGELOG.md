@@ -9,6 +9,7 @@
 ### Added
 
 - Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+- Remote MCP connections support `mcp.tools` in `cds.requires` to restrict which tools are exposed to the agent
 
 ### Changed
 
