@@ -189,7 +189,7 @@
         }
       },
       "[development]": {
-        "llm": "mock"
+        "llm": "auto"
       },
       "[with-claude]": {
         "llm": "anthropic"
