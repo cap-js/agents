@@ -41,7 +41,6 @@
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
-    "@cap-js/attachments": "^4",
     "@cap-js/mcp": "^1.4",
     "@langchain/anthropic": "^1.5.1",
     "@langchain/core": "^1",
@@ -68,6 +67,7 @@
     "@cap-js/audit-logging": ">=1",
     "@cap-js/telemetry": ">=1",
     "@sap/cds": ">=9",
+    "@cap-js/attachments": "^4",
     "openevals": ">=0.2"
   },
   "peerDependenciesMeta": {
