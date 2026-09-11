@@ -38,6 +38,21 @@ export function parseResumeDecision(userText) {
   }
 }
 
+export function patchRejectMessage(dataPart) {
+  if (!Array.isArray(dataPart?.decisions)) return dataPart
+  return {
+    ...dataPart,
+    decisions: dataPart.decisions.map((decision) =>
+      decision?.type === "reject"
+        ? {
+            ...decision,
+            message: `The user rejected this particular tool invocation with the reason: ${decision.message ?? ""}`,
+          }
+        : decision,
+    ),
+  }
+}
+
 function decisionsForAudit(resume, actionRequests = []) {
   if (!Array.isArray(resume?.decisions)) return [{ action: null, decision: resume }]
   return resume.decisions.map((decision, index) => ({
@@ -266,7 +281,7 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
   }
   const { Command } = await import("@langchain/langgraph")
-  let resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
+  let resume = dataPart !== undefined ? patchRejectMessage(dataPart) : parseResumeDecision(userText)
   let actionRequests = []
 
   if (Array.isArray(resume?.decisions)) {
