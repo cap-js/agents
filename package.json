@@ -159,7 +159,6 @@
         "maxLLMTokensPerTask": 200000,
         "maxLLMCallTimeout": "120s",
         "maxExecutionTimePerTask": "5min",
-        "timeoutGrace": "15s",
         "maxIncomingMessageLength": 5000
       }
     },

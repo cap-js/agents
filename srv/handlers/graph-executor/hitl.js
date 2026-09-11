@@ -1,10 +1,27 @@
 import cds from "@sap/cds"
 import { agentMessage, firstDataPart, partsToText } from "../../../lib/utils/message-handling.js"
 import { audit, short } from "../../../lib/utils/utils.js"
+import * as metrics from "../../../lib/telemetry/metrics.js"
 
 const LOG = cds.log("agents")
 
 export const HITL_METADATA_KEY = "sap.cds.agents.hitl"
+export const TIMEOUT_HITL_METADATA_KEY = "sap.cds.agents.timeout-hitl"
+export const INPUT_REQUIRED_METADATA_KEY = "sap.cds.agents.input-required"
+
+function approvalOptions() {
+  return [
+    { value: "approve", label: cds.i18n.messages.at("HITL_APPROVE") },
+    { value: "reject", label: cds.i18n.messages.at("HITL_REJECT") },
+  ]
+}
+
+function timeoutOptions() {
+  return [
+    { value: "continue", label: cds.i18n.messages.at("HITL_CONTINUE") },
+    { value: "reject", label: cds.i18n.messages.at("HITL_STOP") },
+  ]
+}
 export const requiresHitl = (result) =>
   result?.__interrupt__?.length > 0 || result?.interrupts?.length > 0
 
@@ -22,12 +39,46 @@ export function parseResumeDecision(userText) {
   }
 }
 
+export function patchRejectMessage(dataPart) {
+  if (!Array.isArray(dataPart?.decisions)) return dataPart
+  return {
+    ...dataPart,
+    decisions: dataPart.decisions.map((decision) =>
+      decision?.type === "reject"
+        ? {
+            ...decision,
+            message: `The user rejected this particular tool invocation with the reason: ${decision.message ?? ""}`,
+          }
+        : decision,
+    ),
+  }
+}
+
 function decisionsForAudit(resume, actionRequests = []) {
   if (!Array.isArray(resume?.decisions)) return [{ action: null, decision: resume }]
   return resume.decisions.map((decision, index) => ({
     action: actionRequests[index] ?? { index: index + 1 },
     decision,
   }))
+}
+
+function hitlMetricAttrs(serviceName, action, decision) {
+  return {
+    ...metrics.attrs(serviceName),
+    "agent.hitl.action": action?.name,
+    ...(decision && { "agent.hitl.decision": decision }),
+  }
+}
+
+function recordHitlDecisions(serviceName, actionRequests, resume, actionOffset = 0) {
+  if (!Array.isArray(resume?.decisions)) return
+  for (const [index, decision] of resume.decisions.entries()) {
+    if (!decision?.type) continue
+    metrics.hitlDecisions.add(
+      1,
+      hitlMetricAttrs(serviceName, actionRequests[index + actionOffset], decision.type),
+    )
+  }
 }
 
 function extractInterruptDescription(resultOrErr) {
@@ -173,12 +224,73 @@ function publishInputRequired({ requestContext, eventBus, description, interrupt
     contextId,
     status: {
       state: "input-required",
-      message: agentMessage(description, interruptData, { [HITL_METADATA_KEY]: pending }),
+      message: agentMessage(description, interruptData, {
+        [HITL_METADATA_KEY]: pending,
+        [INPUT_REQUIRED_METADATA_KEY]: { options: approvalOptions() },
+      }),
       timestamp: new Date().toISOString(),
     },
     final: true,
   })
   eventBus.finished()
+}
+
+export function isTimeoutHitl(task) {
+  return task?.status?.message?.metadata?.[TIMEOUT_HITL_METADATA_KEY] === true
+}
+
+export function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
+  const { taskId, contextId } = requestContext
+  LOG.info("timeout awaiting decision", { conversation: short(contextId), service: serviceName })
+  audit("AgentInputRequired", {
+    data: { taskId, contextId, service: serviceName, reason: "timeout", description },
+  })
+  eventBus.publish({
+    kind: "status-update",
+    taskId,
+    contextId,
+    status: {
+      state: "input-required",
+      message: agentMessage(description, undefined, {
+        [TIMEOUT_HITL_METADATA_KEY]: true,
+        [INPUT_REQUIRED_METADATA_KEY]: { options: timeoutOptions() },
+      }),
+      timestamp: new Date().toISOString(),
+    },
+    final: true,
+  })
+}
+
+export async function resumeTimeoutHitl({ requestContext, eventBus, stream, signal }) {
+  const { taskId, contextId } = requestContext
+  const decision = partsToText(requestContext.userMessage?.parts).trim()
+  if (!decision) throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
+
+  if (/^(continue|approve|yes|confirm|ok)$/i.test(decision)) {
+    LOG.info("timeout continuation approved", { conversation: short(contextId) })
+    audit("AgentTaskResumed", {
+      data: { taskId, contextId, service: cds.context?.["agent.service"], reason: "timeout" },
+    })
+    const resumed = await stream(null, signal)
+    return resumed.state
+  }
+
+  LOG.info("timeout continuation declined", { conversation: short(contextId) })
+  audit("AgentTaskCanceled", {
+    data: { taskId, contextId, service: cds.context?.["agent.service"], reason: "timeout" },
+  })
+  eventBus.publish({
+    kind: "status-update",
+    taskId,
+    contextId,
+    status: {
+      state: "canceled",
+      message: agentMessage("Task stopped by user after timeout."),
+      timestamp: new Date().toISOString(),
+    },
+    final: true,
+  })
+  return undefined
 }
 
 export async function resumeHitl({ requestContext, graph, config, eventBus, stream, signal }) {
@@ -189,14 +301,16 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
   }
   const { Command } = await import("@langchain/langgraph")
-  let resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
+  let resume = dataPart !== undefined ? patchRejectMessage(dataPart) : parseResumeDecision(userText)
   let actionRequests = []
 
   if (Array.isArray(resume?.decisions)) {
     const pending = pendingHitlFromTask(requestContext.task)
     const actionCount = pending?.actionCount ?? (await getPendingHitlActionCount(graph, config))
     actionRequests = pendingActionRequests(requestContext.task, pending)
+    const priorDecisionCount = pending?.decisions?.length || 0
     const decisions = [...(pending?.decisions || []), ...resume.decisions]
+    recordHitlDecisions(cds.context?.["agent.service"], actionRequests, resume, priorDecisionCount)
     if (decisions.length < actionCount) {
       const interruptData = firstDataPart(requestContext.task?.status?.message?.parts)
       const nextPending = { ...pending, actionCount, decisions }
@@ -243,6 +357,10 @@ export function handleHitlInterrupt({
   const { taskId, contextId } = requestContext
   const description = extractInterruptDescription(result)
   const interruptData = extractInterruptData(result)
+  const actionRequests = interruptData?.actionRequests || interruptActionRequests(result)
+  for (const action of actionRequests) {
+    metrics.hitlGates.add(1, hitlMetricAttrs(serviceName, action))
+  }
   LOG.info("input-required", { conversation: short(contextId), service: serviceName, duration })
   onInputRequired?.(description)
   audit("AgentInputRequired", {

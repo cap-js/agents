@@ -160,3 +160,23 @@ describeMock("@cap-js/agents - SSE Streaming (message/stream)", () => {
     expect(getRes.data.result.status.state).toBe("completed")
   })
 })
+
+describe("@cap-js/agents - @protocol enabled agent", () => {
+  it("serves an agent endpoint for a service enabled via @protocol (no @agent)", () => {
+    const srv = cds.services.ProtocolAgentService
+    expect(srv, "ProtocolAgentService must be running").toBeTruthy()
+    const endpoints = cds.service.endpoints4({ name: srv.name, definition: srv.definition })
+    const agentEndpoint = endpoints.find((ep) => ep.kind === "agent")
+    expect(agentEndpoint, "expected an agent endpoint").not.toBe(undefined)
+  })
+
+  it("registers the default buildGraph handler so A2A execution resolves", async () => {
+    const srv = cds.services.ProtocolAgentService
+    const graph = await srv.send("buildGraph", {})
+    expect(graph).toBeTruthy()
+    expect(
+      typeof graph.invoke === "function" || typeof graph.execute === "function",
+      "buildGraph must return a compiled LangGraph (invoke) or GraphExecutor (execute)",
+    ).toBe(true)
+  })
+})

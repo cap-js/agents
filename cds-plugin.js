@@ -89,7 +89,7 @@ if (cds.env.profiles.includes("development") && (!cds.requires.llm || !cds.requi
 
 cds.on("serving", (srv) => {
   if (!(srv instanceof cds.ApplicationService)) return
-  if (!srv.definition?.["@agent"]) return
+  if (!srv.definition?.protocols?.agent) return
   registerDefaultAgentHandlers(srv)
 })
 

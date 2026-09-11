@@ -4,6 +4,20 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.5 - tbd.
+
+### Added
+
+- Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+
+### Changed
+
+- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+
+### Fixed
+
+- Services with `@protocol: 'agent'` now also register `@agent` specific handlers
+
 ## Version 0.9.4 - 2026-09-10
 
 ### Added
@@ -13,6 +27,7 @@
 ### Fixed
 
 - Multiple tools with HITL needed in the same round no longer cause an error
+- Better message to the LLM on HITL rejection
 - Remote A2A response does not yield duplicate content
 - Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
 - Resets quota counter correctly between tasks for task related quota
