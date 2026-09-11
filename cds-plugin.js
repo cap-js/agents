@@ -80,11 +80,11 @@ cds.on("bootstrap", (app) => {
 })
 
 if (cds.env.profiles.includes("development") && (cds.requires.llm === 'auto')) {
-  cds.on("bootstrap", async () => {
+  cds.on("served", async () => {
     const { resolve_config } = await import("./lib/config/local.js")
     const config = resolve_config()
     cds.env.requires.llm = config
-    
+
     function sanitize(config) {
       const copy = {...config}
       for (const key in copy) {
@@ -93,7 +93,7 @@ if (cds.env.profiles.includes("development") && (cds.requires.llm === 'auto')) {
       if (copy.credentials) copy.credentials = sanitize(copy.credentials)
       return copy
     }
-    LOG.info (`cds.connect.to 'llm' with:`, sanitize(config))
+    LOG.info (`using llm`, sanitize(config))
   })
 }
 
