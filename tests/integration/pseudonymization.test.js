@@ -318,7 +318,7 @@ describe("pseudonymization", () => {
     let pseudonymizeMiddleware, encode, HumanMessage, AIMessage, ToolMessage
     const srvName = "CatalogService"
     const contextId = `e2e-${Date.now()}`
-    const threadId = `${srvName}:${contextId}`
+    const threadId = () => pseudo.pseudonymizationThreadId(srvName, contextId)
 
     const runInContext = (fn) =>
       cds.context
@@ -339,7 +339,7 @@ describe("pseudonymization", () => {
       ;({ HumanMessage, AIMessage, ToolMessage } = await import("@langchain/core/messages"))
     })
 
-    afterEach(() => PseudoSession.evict(threadId))
+    afterEach(() => PseudoSession.evict(threadId()))
 
     async function setupContext() {
       const srv = cds.services[srvName]
@@ -386,8 +386,8 @@ describe("pseudonymization", () => {
       expect(content).toContain("1")
 
       // mapping persisted so a fresh session resolves it
-      PseudoSession.evict(threadId)
-      const reloaded = await PseudoSession.loadOrCreate(threadId)
+      PseudoSession.evict(threadId())
+      const reloaded = await PseudoSession.loadOrCreate(threadId())
       const emilyHash = [...reloaded._hashToOriginal].find(([, o]) => o === "Emily Brontë")?.[0]
       expect(emilyHash).toBeDefined()
     })
@@ -395,7 +395,7 @@ describe("pseudonymization", () => {
     it("wrapModelCall scrubs originals to hashes in the messages sent to the model", async () => {
       const { mw } = await setupContext()
       // seed a mapping via a tool call first
-      const session = await PseudoSession.loadOrCreate(threadId)
+      const session = cds.context._pseudoSession
       const hash = session.pseudonymize("Emily Brontë", "name")
 
       let seenByModel

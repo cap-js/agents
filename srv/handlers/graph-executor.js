@@ -8,7 +8,8 @@ import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { scrubForTrace } from "../../lib/pseudonymize/index.js"
 import { SESSION_KEY } from "../../lib/pseudonymize/helpers.js"
-import { anonymizeUserMessage } from "../../lib/pseudonymize/unstructuredText-dpi.js"
+import { anonymizeUserMessage as anonymizeUserMessageWithHana } from "../../lib/pseudonymize/unstructuredText-hana.js"
+import { anonymizeUserMessage as anonymizeUserMessageWithDpi } from "../../lib/pseudonymize/unstructuredText-dpi.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -550,7 +551,8 @@ class GraphExecutor {
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
 
-    await anonymizeUserMessage(requestContext, serviceName, contextId)
+    await anonymizeUserMessageWithHana(requestContext, serviceName, contextId)
+    await anonymizeUserMessageWithDpi(requestContext, serviceName, contextId)
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
