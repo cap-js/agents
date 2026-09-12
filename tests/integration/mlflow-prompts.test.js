@@ -18,15 +18,20 @@ describe("resolvePromptName", () => {
     expect(resolvePromptName({})).toBe("")
   })
 
-  it("returns a relative path ending in AGENTS.md when agent dir exists", async () => {
+  it("returns an MLflow-safe relative AGENTS.md path when agent dir exists", async () => {
     const path = await import("node:path")
     const fs = await import("node:fs")
     const agentDir = path.resolve("tests/projects/deep-agent")
     if (!fs.existsSync(path.join(agentDir.default ?? agentDir, "AGENTS.md"))) return
     const stubSrv = { name: "TestDeepService", definition: { "@agent.directory": agentDir } }
     const name = resolvePromptName(stubSrv)
-    expect(name).toMatch(/AGENTS\.md$/)
-    expect(name).not.toMatch(/^\//)
+    expect(name).toMatch(/AGENTS_md$/)
+    expect(name).not.toMatch(/[\\/.:]/)
+  })
+
+  it("replaces MLflow-invalid characters in service names", () => {
+    const srv = { name: "my.ns:Catalog/Service", definition: {} }
+    expect(resolvePromptName(srv)).toBe("my_ns_Catalog_Service")
   })
 })
 
