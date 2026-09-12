@@ -56,6 +56,13 @@ describe("pseudonymization", () => {
       expect(session.scrubText("The author is Emily Brontë")).toBe(`The author is ${hash}`)
     })
 
+    it("remember stores externally generated pseudonyms", async () => {
+      const session = await PseudoSession.loadOrCreate(threadId)
+      session.remember("Emily Brontë", "person_1")
+      expect(session.scrubText("The author is Emily Brontë")).toBe("The author is person_1")
+      expect(session.resolveText("The author is person_1")).toBe("The author is Emily Brontë")
+    })
+
     it("different threadIds produce different hashes for same value", async () => {
       const tid2 = `CatalogService:test-context-other-${Date.now()}`
       try {
