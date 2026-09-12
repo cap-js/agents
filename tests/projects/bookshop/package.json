@@ -120,6 +120,41 @@
             },
             "bob": {
               "features": []
+            },
+            "prompt-cache-52": {
+              "features": [
+                "prompt-cache-52"
+              ]
+            },
+            "prompt-cache-55": {
+              "features": [
+                "prompt-cache-55"
+              ]
+            },
+            "prompt-cache-56-sol": {
+              "features": [
+                "prompt-cache-56-sol"
+              ]
+            },
+            "prompt-cache-56-terra": {
+              "features": [
+                "prompt-cache-56-terra"
+              ]
+            },
+            "prompt-cache-56-luna": {
+              "features": [
+                "prompt-cache-56-luna"
+              ]
+            },
+            "prompt-cache-54": {
+              "features": [
+                "prompt-cache-54"
+              ]
+            },
+            "prompt-cache-54-nano": {
+              "features": [
+                "prompt-cache-54-nano"
+              ]
             }
           }
         }
