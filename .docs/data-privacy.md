@@ -21,7 +21,7 @@ The TTL can be configured via `cds.agents.retention`. The default is 30 days and
 
 For all tasks created within a 24h window for a specific Agent service, a single deletion is scheduled via `srv.schedule("cleanupTasks").after(TTL)`.
 
-## Pseudonymization of Personal Data
+## Pseudonymization of Personal Data in tool calls
 
 When your CDS entities carry `@PersonalData` annotations, the plugin automatically pseudonymizes those fields before they reach the LLM — and before they are written to OTel traces. Users always see real values in the final response.
 
@@ -85,7 +85,13 @@ Set `resolveInTraces: true` to see original values in OTel spans during developm
 { "cds": { "agents": { "masking": { "resolveInTraces": true } } } }
 ```
 
-## DPI Data Anonymization for incoming user messages
+## Pseudonymization of Personal Data in incoming user messages
+
+While CDS annotations can be leveraged to mask PII in structured data returned from tools, incoming user messages are unstructured data about which no metadata exists to easily mask PII.
+
+To identify and mask PII in unstructured data, [SAP DPI Data Anonymization](https://help.sap.com/docs/data-privacy-integration/development-for-data-privacy-integration/data-privacy-integration-nextgen-data-anonymization?ai=true) and [SAP HANA Cloud Named Entity Recognition](https://help.sap.com/docs/hana-cloud-database/sap-hana-cloud-sap-hana-database-predictive-analysis-library/named-entity-recognition-ner) can be leveraged.
+
+### DPI Data Anonymization
 
 The plugin can call SAP Data Privacy Integration (DPI) through a BTP Destination before the agent model runs. It pseudonymizes only incoming human messages in the current turn; tool output, system prompts, and model responses are not sent to DPI.
 
@@ -120,3 +126,26 @@ The following profiles are configued to be pseudonymized:
 - "profile-credit-card-number",
 - "profile-passport",
 - "profile-driverlicense",
+
+### HANA Cloud Named Entity Recognition
+
+HANA Cloud Named Entity Recognition is used to pseudonymize PII in incoming user messages when HANA Cloud is used as the database and the ScriptServer as well as the NLP feature are enabled.
+
+The Script Server and NLP can be enabled in HANA Cloud Cockpit.
+
+Furthermore the database administrator should run
+
+```sql
+GRANT "AFL__SYS_AFL_AFLPAL_NLP_EXECUTE_WITH_GRANT_OPTION" TO "_SYS_DI_OO_DEFAULTS" WITH ADMIN OPTION;
+```
+
+in order for the HDI container to have access to the PAL function used for detecting PII.
+
+In particular the following categories from NER are pseudonymized:
+
+- "PERSON"
+- "URI:EMAIL"
+- "PHONE"
+- "ADDRESS"
+- "URI:URL"
+- "URI:IP"
