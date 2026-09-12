@@ -84,3 +84,39 @@ Set `resolveInTraces: true` to see original values in OTel spans during developm
 ```json
 { "cds": { "agents": { "masking": { "resolveInTraces": true } } } }
 ```
+
+## DPI Data Anonymization for incoming user messages
+
+The plugin can call SAP Data Privacy Integration (DPI) through a BTP Destination before the agent model runs. It pseudonymizes only incoming human messages in the current turn; tool output, system prompts, and model responses are not sent to DPI.
+
+Bind the Destination service to the application and configure the DPI destination name in CAP. When this required-service entry exists, DPI pseudonymization is always active.
+
+```jsonc
+{
+  "cds": {
+    "requires": {
+      "data-anonymization": {
+        "credentials": { "destination": "data-anonymization" },
+      },
+    },
+  },
+}
+```
+
+In the BTP Destination service, create a matching destination with certificate-based authentication.
+
+The destination URL must be the anonymization service base URL from the service key and follows the pattern `https://service.{region}.anonymization.dpp.cloud.sap` (for example `https://service.eu10.anonymization.dpp.cloud.sap`).
+
+The following profiles are configued to be pseudonymized:
+
+- "profile-person",
+- "profile-email",
+- "profile-phone",
+- "profile-address",
+- "profile-username-password",
+- "profile-nationalid",
+- "profile-iban",
+- "profile-ssn",
+- "profile-credit-card-number",
+- "profile-passport",
+- "profile-driverlicense",

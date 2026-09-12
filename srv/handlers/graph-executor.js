@@ -7,6 +7,8 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { scrubForTrace } from "../../lib/pseudonymize/index.js"
+import { SESSION_KEY } from "../../lib/pseudonymize/helpers.js"
+import { anonymizeUserMessage } from "../../lib/pseudonymize/unstructuredText-dpi.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -122,6 +124,11 @@ function agentMessage(text, data) {
  */
 function extractText(requestContext) {
   return partsToText(requestContext.userMessage?.parts)
+}
+
+function resolvePseudonyms(text) {
+  if (typeof text !== "string") return text
+  return cds.context?.[SESSION_KEY]?.resolveText(text) ?? text
 }
 
 // Extract the first inbound DataPart's opaque `data` object, or undefined if none.
@@ -386,7 +393,7 @@ class GraphExecutor {
           const lastChunk =
             !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
-          const text = messageText(msgChunk?.content)
+          const text = resolvePseudonyms(messageText(msgChunk?.content))
           if (!text) continue
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
@@ -542,6 +549,8 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+
+    await anonymizeUserMessage(requestContext, serviceName, contextId)
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
@@ -782,7 +791,7 @@ class GraphExecutor {
         usageData = aggregateUsageData(result.messages || [])
 
         if (result?.__interrupt__?.length > 0) {
-          const description = extractInterruptDescription(result)
+          const description = resolvePseudonyms(extractInterruptDescription(result))
           const interruptData = extractInterruptData(result)
 
           const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
@@ -832,7 +841,7 @@ class GraphExecutor {
 
         const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = outputMapper(result) || "I could not generate a response."
+        const output = resolvePseudonyms(outputMapper(result) || "I could not generate a response.")
 
         LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
 
@@ -1118,11 +1127,8 @@ class GraphExecutor {
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "timeout")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "timeout" })
 
-          const summary = await this._summarizePartialWork(
-            taskId,
-            contextId,
-            serviceName,
-            "timed out",
+          const summary = resolvePseudonyms(
+            await this._summarizePartialWork(taskId, contextId, serviceName, "timed out"),
           )
 
           audit("AgentTaskFailed", {
@@ -1161,11 +1167,8 @@ class GraphExecutor {
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "quota_exceeded")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "quota_exceeded" })
 
-          const summary = await this._summarizePartialWork(
-            taskId,
-            contextId,
-            serviceName,
-            "quota exceeded",
+          const summary = resolvePseudonyms(
+            await this._summarizePartialWork(taskId, contextId, serviceName, "quota exceeded"),
           )
 
           audit("AgentTaskFailed", {

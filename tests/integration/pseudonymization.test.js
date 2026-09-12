@@ -56,6 +56,13 @@ describe("pseudonymization", () => {
       expect(session.scrubText("The author is Emily Brontë")).toBe(`The author is ${hash}`)
     })
 
+    it("remember stores externally generated pseudonyms", async () => {
+      const session = await PseudoSession.loadOrCreate(threadId)
+      session.remember("Emily Brontë", "person_1")
+      expect(session.scrubText("The author is Emily Brontë")).toBe("The author is person_1")
+      expect(session.resolveText("The author is person_1")).toBe("The author is Emily Brontë")
+    })
+
     it("different threadIds produce different hashes for same value", async () => {
       const tid2 = `CatalogService:test-context-other-${Date.now()}`
       try {
@@ -303,8 +310,8 @@ describe("pseudonymization", () => {
   })
 
   // ─── E2E: full middleware hook flow ───────────────────────────────────────
-  // Drives the real pseudonymizeMiddleware hooks (wrapToolCall → wrapModelCall
-  // → afterAgent) against the CatalogService model with real @PersonalData
+  // Drives the real pseudonymizeMiddleware hooks (wrapToolCall → wrapModelCall)
+  // against the CatalogService model with real @PersonalData
   // annotations, real TOON encoding, and real LangChain message classes.
   // No LLM: the model handler is a deterministic fake.
   describe("middleware E2E", () => {
@@ -406,21 +413,7 @@ describe("pseudonymization", () => {
       expect(HumanMessage.isInstance(seenByModel[0])).toBe(true)
     })
 
-    it("afterAgent resolves hashes back to originals in the final AI message", async () => {
-      const { mw } = await setupContext()
-      const session = await PseudoSession.loadOrCreate(threadId)
-      const hash = session.pseudonymize("Emily Brontë", "name")
-
-      const state = {
-        messages: [new HumanMessage("q"), new AIMessage(`The author is ${hash}.`)],
-      }
-      const out = await mw.afterAgent(state)
-      const last = out.messages[out.messages.length - 1]
-      expect(last.content).toBe("The author is Emily Brontë.")
-      expect(AIMessage.isInstance(last)).toBe(true)
-    })
-
-    it("round-trip: hash in tool result survives model call and resolves for user", async () => {
+    it("round-trip: hash in tool result survives model call and can resolve for user", async () => {
       const { mw } = await setupContext()
 
       const rawContent = encode({ data: [{ ID: 1, name: "Emily Brontë" }] })
@@ -438,18 +431,17 @@ describe("pseudonymization", () => {
       )
       const hash = toolMsg.content.match(/name_[0-9a-f]{8}/)[0]
 
-      // model would echo the hash; afterAgent resolves it back
-      const state = { messages: [new AIMessage(`Author: ${hash}`)] }
-      const out = await mw.afterAgent(state)
-      expect(out.messages[0].content).toBe("Author: Emily Brontë")
+      // model may echo the hash; GraphExecutor resolves it back before publishing.
+      const session = cds.context._pseudoSession
+      expect(session.resolveText(`Author: ${hash}`)).toBe("Author: Emily Brontë")
     })
 
     it("wrapToolCall pseudonymizes annotated fields in an action/function result", async () => {
       const { mw } = await setupContext()
 
-      // findAuthor returns a struct { name (@PersonalData), email }
+      // findAuthor returns a struct { name (@PersonalData), dateOfBirth }
       const rawContent = encode({
-        data: { name: "Emily Brontë", email: "emily@moors.example" },
+        data: { name: "Emily Brontë", dateOfBirth: "1818-07-30" },
       })
       const request = {
         toolCall: { name: "findAuthor", id: "tc1", args: { id: 1 } },
@@ -465,7 +457,7 @@ describe("pseudonymization", () => {
       // annotated name → hashed; unannotated email → untouched
       expect(content).not.toContain("Emily Brontë")
       expect(content).toContain("name_")
-      expect(content).toContain("emily@moors.example")
+      expect(content).toContain("1818-07-30")
 
       // hash resolves back to the original
       const session = cds.context["_pseudoSession"]
