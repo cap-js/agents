@@ -2,7 +2,7 @@ import cds from "@sap/cds"
 
 export default class CatalogService extends cds.ApplicationService {
   init() {
-    const { Books, ListOfBooks } = this.entities
+    const { Books, ListOfBooks, Authors } = this.entities
 
     // Add some discount for overstocked books
     this.after("each", ListOfBooks, (book) => {
@@ -31,6 +31,12 @@ export default class CatalogService extends cds.ApplicationService {
       const book = await SELECT.one.from(Books, id, (b) => b.stock)
       if (!book) return req.error(404, `Book #${id} doesn't exist`)
       return book.stock
+    })
+
+    this.on("findAuthor", async (req) => {
+      const cqn = SELECT.from(Authors).columns("ID", "name", "dateOfBirth")
+      cqn.SELECT.search = [{ val: req.data.searchTerm }]
+      return await cqn
     })
 
     this.before("validateOrder", (req) => {
