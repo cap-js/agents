@@ -28,6 +28,11 @@
         "enabled": true
       },
       "activeUsersInterval": "1s",
+      "[testTimeout]": {
+        "pool": {
+          "maxExecutionTimePerTask": "10s"
+        }
+      },
       "[test]": {
         "pool": {
           "maxTasksPerHour": 10000,

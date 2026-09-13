@@ -29,3 +29,4 @@ metadata:
 4. Present options to the user with prices and details
 5. When the user decides, make all bookings (flights via MCP `flights_bookFlight`, hotels/activities via A2A agents)
 6. Summarize the complete itinerary at the end
+7. Export a machine-readable itinerary via export_itinerary

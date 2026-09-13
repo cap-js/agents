@@ -113,7 +113,8 @@ export async function buildMcpToolsFromConnection(serviceName) {
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
-  return { _mcpDynamic: true, mcpUrl, serviceName, resolveHeaders }
+  const toolFilter = cds.requires[serviceName]?.mcp?.tools
+  return { _mcpDynamic: true, mcpUrl, serviceName, resolveHeaders, toolFilter }
 }
 
 export async function buildMcpTools(serviceName) {

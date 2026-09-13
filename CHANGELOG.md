@@ -4,11 +4,37 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.4 - 2026-09-11
+## Version 0.9.5 - tbd.
 
 ### Added
 
+- Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+- Remote MCP connections support `mcp.tools` in `cds.requires` to restrict which tools are exposed to the agent
 - CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
+
+### Changed
+
+- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+
+### Fixed
+
+- Services with `@protocol: 'agent'` now also register `@agent` specific handlers
+- Mask apiKey in debug logs read from claude / opencode settings
+- Prompts are now correctly uploaded to MLFlow for markdown-based agents
+
+## Version 0.9.4 - 2026-09-10
+
+### Added
+
+- Data parts can now be emitted based on tool output
+
+### Fixed
+
+- Multiple tools with HITL needed in the same round no longer cause an error
+- Better message to the LLM on HITL rejection
+- Remote A2A response does not yield duplicate content
+- Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
+- Resets quota counter correctly between tasks for task related quota
 
 ## Version 0.9.3 - 2026-09-04
 

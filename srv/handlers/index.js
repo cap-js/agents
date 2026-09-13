@@ -92,7 +92,8 @@ export default function registerDefaultAgentHandlers(srv) {
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
     const name = srv?.options?.agent?.llm || srv?.definition?.["@agent.llm"] || "llm"
-    let { kind, impl, ...options } = cds.requires[name] ?? {}
+    const options = cds.requires[name] ?? {}
+    let { kind, impl } = options
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)

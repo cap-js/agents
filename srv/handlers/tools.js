@@ -222,6 +222,10 @@ export function generateTools(srv) {
     tools.push(createEmitFilePartTool())
   }
 
+  if (cds.env.agents?.emitDataParts) {
+    tools.push(createEmitDataPartTool())
+  }
+
   return tools
 }
 
@@ -364,6 +368,32 @@ export function createReadFileTool(fileStore, contextId, userId) {
         "Read the contents of an uploaded file. Use the /uploads/<filename> path from the file manifest. Returns file content for text-based formats.",
       schema: z.object({
         path: z.string().describe("File path, e.g. /uploads/report.csv"),
+      }),
+    },
+  )
+}
+
+/**
+ * Create a tool that emits a DataPart in the A2A response.
+ * The executor's toolResults collection detects `kind: "data"`
+ * and emits the tool result as a data part.
+ */
+export function createEmitDataPartTool() {
+  return tool(
+    async ({ data, mediaType }) => {
+      return {
+        kind: "data",
+        data,
+        mediaType: mediaType ?? "application/json",
+      }
+    },
+    {
+      name: "emit_data_part",
+      description: "Emit a structured A2A DataPart. Only use when instructed.",
+      schema: z.object({
+        // A2A DataPart is specified to be an object in A2A 0.3
+        // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object
+        data: z.looseObject().describe("Structured object"),
       }),
     },
   )
