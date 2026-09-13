@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { short, audit, ms4 } from "../../lib/utils/utils.js"
-import { partsToText, buildChatMessages, firstDataPart } from "../../lib/utils/message-handling.js"
+import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
@@ -13,6 +13,14 @@ import { anonymizeUserMessage as anonymizeUserMessageWithDpi } from "../../lib/p
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
+import {
+  handleHitlInterrupt,
+  isTimeoutHitl,
+  publishTimeoutHitl,
+  requiresHitl,
+  resumeHitl,
+  resumeTimeoutHitl,
+} from "./graph-executor/hitl.js"
 
 const LOG = cds.log("agents")
 
@@ -108,18 +116,6 @@ function defaultOutputMapper(result) {
   return JSON.stringify(result)
 }
 
-// Construct a spec-compliant A2A Message; when `data` is a plain object, append it as a DataPart.
-function agentMessage(text, data) {
-  const parts = [{ kind: "text", text }]
-  if (data && typeof data === "object") parts.push({ kind: "data", data })
-  return {
-    kind: "message",
-    messageId: cds.utils.uuid(),
-    role: "agent",
-    parts,
-  }
-}
-
 /**
  * Extract user text from A2A message parts.
  */
@@ -130,147 +126,6 @@ function extractText(requestContext) {
 function resolvePseudonyms(text) {
   if (typeof text !== "string") return text
   return cds.context?.[SESSION_KEY]?.resolveText(text) ?? text
-}
-
-// Extract the first inbound DataPart's opaque `data` object, or undefined if none.
-function extractData(requestContext) {
-  return firstDataPart(requestContext.userMessage?.parts)
-}
-
-/**
- * Parse user's resume text into a HITL decision.
- * Maps to the format expected by deepagents' humanInTheLoopMiddleware.
- */
-function parseResumeDecision(userText) {
-  const t = userText.trim()
-  if (/^(approve|yes|confirm|ok)$/i.test(t)) {
-    return { decisions: [{ type: "approve" }] }
-  }
-  if (/^edit$/i.test(t)) {
-    // Bare edit — structured edits (with args) arrive via the DataPart path.
-    return { decisions: [{ type: "edit" }] }
-  }
-  return { decisions: [{ type: "reject", message: userText }] }
-}
-
-// Best-effort decision label for logging/audit; opaque DataPart resumes fall back to "data".
-function decisionTypeOf(resume) {
-  return resume?.decisions?.[0]?.type ?? "data"
-}
-
-/**
- * Extract the human-readable description from an interrupt payload.
- * Accepts either a graph result (with __interrupt__) or a GraphInterrupt error (with .interrupts).
- * Handles both deepagents' humanInTheLoopMiddleware format and raw interrupt() calls.
- */
-function extractInterruptDescription(resultOrErr) {
-  const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
-  const payload = interrupt?.value
-  if (!payload) return "This action requires your approval. Reply 'approve' or 'reject'."
-
-  // deepagents' humanInTheLoopMiddleware: { actionRequests: [{ description }], reviewConfigs }
-  if (payload.actionRequests?.length > 0) {
-    return (
-      payload.actionRequests[0].description || `Approve action: ${payload.actionRequests[0].name}?`
-    )
-  }
-
-  // Raw interrupt(value) - value is a string or object
-  if (typeof payload === "string") return payload
-  return JSON.stringify(payload)
-}
-
-/**
- * Extract the raw structured interrupt payload for opaque carry on a DataPart.
- * Returns the payload ONLY when it is a plain object; arrays and strings are
- * carried by the TextPart alone. Payload is app-defined; the plugin never
- * interprets it.
- */
-function extractInterruptData(resultOrErr) {
-  const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
-  const payload = interrupt?.value
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined
-  return payload
-}
-
-// Order-invariant JSON serializer for structural arg comparison.
-function canonicalJSON(value) {
-  if (value === null || typeof value !== "object") return JSON.stringify(value)
-  if (Array.isArray(value)) return "[" + value.map(canonicalJSON).join(",") + "]"
-  const keys = Object.keys(value).sort()
-  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJSON(value[k])).join(",") + "}"
-}
-
-// Firm note describing HITL edits so the model doesn't apologize on the next turn.
-function composeEditNote(originals, resume) {
-  const decisions = resume?.decisions
-  if (!Array.isArray(decisions) || decisions.length === 0) return undefined
-
-  const consumed = new Set()
-  const takeByName = (name) => {
-    for (let j = 0; j < originals.length; j++) {
-      if (!consumed.has(j) && originals[j]?.name === name) {
-        consumed.add(j)
-        return originals[j]
-      }
-    }
-    return undefined
-  }
-  const takeNextUnconsumed = () => {
-    for (let j = 0; j < originals.length; j++) {
-      if (!consumed.has(j)) {
-        consumed.add(j)
-        return originals[j]
-      }
-    }
-    return undefined
-  }
-
-  const changes = []
-  for (const d of decisions) {
-    if (d?.type !== "edit" || !d.editedAction) continue
-    const editedName = d.editedAction.name
-    const editedArgs = d.editedAction.args
-    const orig = takeByName(editedName) ?? takeNextUnconsumed()
-    if (!orig) continue
-    if (orig.name === editedName && canonicalJSON(orig.args) === canonicalJSON(editedArgs)) continue
-    changes.push({
-      from: { name: orig.name, args: orig.args },
-      to: { name: editedName, args: editedArgs },
-    })
-  }
-  if (changes.length === 0) return undefined
-
-  const lines = changes.map(
-    (c) =>
-      `- \`${c.from.name}(${JSON.stringify(c.from.args)})\` → \`${c.to.name}(${JSON.stringify(c.to.args)})\``,
-  )
-  return [
-    "The user reviewed your proposed tool call(s) in the human-in-the-loop approval flow and edited them before execution. This is intentional user action, NOT a mistake on your part. Do NOT apologize or say you made an error.",
-    "",
-    "Edits applied:",
-    ...lines,
-    "",
-    "Proceed as if the edited values are what the user actually wants. Describe the outcome of the executed call accurately.",
-  ].join("\n")
-}
-
-// Reads the pre-interrupt AI's tool_calls from the checkpointer (still un-mutated at resume time).
-async function getPreInterruptToolCalls(graph, config) {
-  try {
-    if (typeof graph.getState !== "function") return []
-    const state = await graph.getState(config)
-    const messages = state?.values?.messages ?? []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i]
-      if (m?.tool_calls?.length) {
-        return m.tool_calls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args }))
-      }
-    }
-    return []
-  } catch {
-    return []
-  }
 }
 
 /**
@@ -336,11 +191,9 @@ class GraphExecutor {
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
     const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
-    const grace = this._getGrace()
-    const softTimeout = Math.max(maxExecution - grace, 1000)
 
     const controller = new AbortController()
-    const timeoutHandle = setTimeout(() => controller.abort(), softTimeout)
+    const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
     const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
 
     let tokenCount = 0
@@ -432,8 +285,8 @@ class GraphExecutor {
         if (signal?.aborted) {
           throw new AbortError("Task execution aborted")
         }
-        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
-          timeout: softTimeout,
+        throw new TimeoutError(`Graph execution timed out after ${maxExecution / 1000}s`, {
+          timeout: maxExecution,
         })
       }
       throw err
@@ -473,23 +326,13 @@ class GraphExecutor {
 
     return { state: finalState, tokenCount }
   }
-  /**
-   * Parse configured timeout grace period.
-   */
-  _getGrace() {
-    return ms4(cds.env.agents?.pool?.timeoutGrace ?? "15s")
-  }
-
   async _invokeWithTimeout(graph, input, config, signal) {
     const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
-    const grace = this._getGrace()
-    // Soft timeout fires early to allow graceful summarization
-    const softTimeout = Math.max(maxExecution - grace, 1000)
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
     const timeoutController = new AbortController()
-    const timer = setTimeout(() => timeoutController.abort(), softTimeout)
+    const timer = setTimeout(() => timeoutController.abort(), maxExecution)
 
     // Combine caller-provided abort signal with timeout
     const combinedSignal = signal
@@ -505,8 +348,8 @@ class GraphExecutor {
         if (signal?.aborted) {
           throw new AbortError("Task execution aborted")
         }
-        throw new TimeoutError(`Graph execution timed out after ${softTimeout / 1000}s`, {
-          timeout: softTimeout,
+        throw new TimeoutError(`Graph execution timed out after ${maxExecution / 1000}s`, {
+          timeout: maxExecution,
         })
       }
       throw err
@@ -518,18 +361,19 @@ class GraphExecutor {
   /**
    * Summarize partial work after forced interruption (timeout, quota, etc.).
    */
-  async _summarizePartialWork(taskId, contextId, serviceName, reason) {
+  async _summarizePartialWork(taskId, contextId, serviceName, reason, approval = false) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
-    const grace = this._getGrace()
-    return summarizePartialWork({
+    return resolvePseudonyms(await summarizePartialWork({
       taskId,
       contextId,
       serviceName,
       reason,
       checkpointer: this._graph?.checkpointer,
       getModel: () => this._srv.send("buildModel"),
-      timeout: Math.max(grace - 2000, grace * 0.8, 500),
-    })
+      // Summary runs after graph abort, so no execution-time grace is needed.
+      timeout: 10_000,
+      approval,
+    }))
   }
 
   async execute(requestContext, eventBus) {
@@ -728,50 +572,17 @@ class GraphExecutor {
         const t0 = Date.now()
 
         if (isResume) {
-          const dataPart = extractData(requestContext)
-          const userText = extractText(requestContext)
-          // Relaxed guard: accept a DataPart-only resume OR non-empty text.
-          if (dataPart === undefined && !userText.trim()) {
-            throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
-          }
-          const { Command } = await import("@langchain/langgraph")
-          // DataPart wins over text — a structured resume is self-describing and any
-          // accompanying text is treated as incidental (e.g. a human-readable echo).
-          const resume = dataPart !== undefined ? dataPart : parseResumeDecision(userText)
-          const decision = decisionTypeOf(resume)
-
-          LOG.debug("resuming", {
-            conversation: short(contextId),
-            service: serviceName,
-            decision,
-          })
-
-          // Audit: task resumed with HITL decision
-          audit("AgentTaskResumed", {
-            data: {
-              taskId,
-              contextId,
-              service: serviceName,
-              decision,
-            },
-          })
-          // On edit, stash a diff note in state; the injector middleware prepends it next turn.
-          const commandArgs = { resume }
-          if (decision === "edit") {
-            const originals = await getPreInterruptToolCalls(graph, config)
-            const editNote = composeEditNote(originals, resume)
-            if (editNote) commandArgs.update = { _hitlEditNote: editNote }
-          }
-          const resumed = await this._streamWithPublish(
+          const resume = isTimeoutHitl(requestContext.task) ? resumeTimeoutHitl : resumeHitl
+          result = await resume({
+            requestContext,
             graph,
-            new Command(commandArgs),
             config,
             eventBus,
-            taskId,
-            contextId,
-            controller.signal,
-          )
-          result = resumed.state
+            signal: controller.signal,
+            stream: (input, signal) =>
+              this._streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal),
+          })
+          if (!result) return
         } else {
           const inputMapper = this._inputMapper || defaultInputMapper
           const rawInput = await inputMapper(requestContext)
@@ -792,56 +603,28 @@ class GraphExecutor {
         // (interrupt-only results may have no `messages` — treat as empty)
         usageData = aggregateUsageData(result.messages || [])
 
-        if (result?.__interrupt__?.length > 0) {
-          const description = resolvePseudonyms(extractInterruptDescription(result))
-          const interruptData = extractInterruptData(result)
-
-          const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
-          LOG.info("input-required", {
-            conversation: short(contextId),
-            service: serviceName,
+        const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
+        if (requiresHitl(result)) {
+          handleHitlInterrupt({
+            result,
+            requestContext,
+            eventBus,
+            serviceName,
             duration,
-          })
-
-          if (wfSpan) {
-            wfSpan.setAttribute("agent.outcome", "input-required")
-            const outputs = {
-              choices: [{ message: { role: "assistant", content: description } }],
-            }
-            setSpanAttrs(wfSpan, mlflowAttrs("AGENT", { outputs }))
-            const rootSpan = cds.context?.["_mlflow.rootSpan"]
-            if (rootSpan) {
-              setSpanAttrs(rootSpan, mlflowAttrs("CHAIN", { outputs }))
-            }
-          }
-
-          // Audit: agent requires human input
-          audit("AgentInputRequired", {
-            data: {
-              taskId,
-              contextId,
-              service: serviceName,
-              description,
-              interruptData,
+            onInputRequired: (description) => {
+              if (!wfSpan) return
+              wfSpan.setAttribute("agent.outcome", "input-required")
+              const outputs = {
+                choices: [{ message: { role: "assistant", content: description } }],
+              }
+              setSpanAttrs(wfSpan, mlflowAttrs("AGENT", { outputs }))
+              const rootSpan = cds.context?.["_mlflow.rootSpan"]
+              if (rootSpan) setSpanAttrs(rootSpan, mlflowAttrs("CHAIN", { outputs }))
             },
           })
-
-          eventBus.publish({
-            kind: "status-update",
-            taskId,
-            contextId,
-            status: {
-              state: "input-required",
-              message: agentMessage(description, interruptData),
-              timestamp: new Date().toISOString(),
-            },
-            final: true,
-          })
-          eventBus.finished()
           return
         }
 
-        const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         const outputMapper = this._outputMapper || defaultOutputMapper
         const output = resolvePseudonyms(outputMapper(result) || "I could not generate a response.")
 
@@ -908,6 +691,9 @@ class GraphExecutor {
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
         const fileArtifacts = []
+        // DataParts embedded in tool-result content.
+        // Published as their own `data-*` artifact-update events below.
+        const dataArtifacts = []
         const maxFileBytes = cds.env.agents.fileIO.maxOutputFileSizeBytes
 
         // Artifacts from emit_file_part are this agent's own outputs — they must be
@@ -931,7 +717,10 @@ class GraphExecutor {
           const content = typeof msg.content === "string" ? msg.content : ""
           let pos = 0
           while (pos < content.length) {
-            const start = content.indexOf('{"kind":"file"', pos)
+            // Find the earliest next FilePart or DataPart marker.
+            const fileAt = content.indexOf('{"kind":"file"', pos)
+            const dataAt = content.indexOf('{"kind":"data"', pos)
+            const start = fileAt === -1 ? dataAt : dataAt === -1 ? fileAt : Math.min(fileAt, dataAt)
             if (start === -1) break
             // Walk forward tracking depth and quoted strings so that '}' inside
             // a string value (e.g. a filename like "result_{final}.csv") does not
@@ -960,6 +749,11 @@ class GraphExecutor {
             const raw = content.slice(start, i + 1)
             try {
               const artifact = JSON.parse(raw)
+              if (artifact.kind === "data") {
+                dataArtifacts.push(artifact)
+                pos = i + 1
+                continue
+              }
               // Apply the same per-file size cap as Source 2. Decode-length is
               // computed by Buffer.byteLength (zero allocation — pure formula
               // over string length + padding) so an oversized blob never pins
@@ -1080,6 +874,26 @@ class GraphExecutor {
           })
         }
 
+        dataArtifacts.forEach((artifact, i) => {
+          if (artifact.data == null || typeof artifact.data !== "object") {
+            LOG.warn("skipping malformed data artifact", {
+              conversation: short(contextId),
+              service: serviceName,
+            })
+            return
+          }
+          LOG.info("data emitted", { conversation: short(contextId), service: serviceName })
+          eventBus.publish({
+            kind: "artifact-update",
+            taskId,
+            contextId,
+            artifact: {
+              artifactId: `data-${i}`,
+              parts: [{ kind: "data", data: artifact.data }],
+            },
+          })
+        })
+
         // Programmatic .chat() path: stash graph result on eventBus so chat.js
         // can read messages without an extra checkpoint roundtrip.
         if (eventBus[COLLECT_RESULT]) {
@@ -1122,39 +936,21 @@ class GraphExecutor {
           return
         }
 
-        // Timeout — attempt graceful summary of work-in-progress before reporting
+        // Timeout — pause at checkpoint. User decides whether to resume graph.
         if (err.name === "TimeoutError") {
           LOG.warn("timeout", { conversation: short(contextId), service: serviceName })
 
-          if (wfSpan) wfSpan.setAttribute("agent.outcome", "timeout")
-          metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "timeout" })
+          if (wfSpan) wfSpan.setAttribute("agent.outcome", "input-required")
 
-          const summary = resolvePseudonyms(
-            await this._summarizePartialWork(taskId, contextId, serviceName, "timed out"),
-          )
-
-          audit("AgentTaskFailed", {
-            data: {
-              taskId,
-              contextId,
-              service: serviceName,
-              error: err.message,
-              errorCode: "timeout",
-              task: requestContext.task,
-            },
-          })
-
-          eventBus.publish({
-            kind: "status-update",
+          const summary = await this._summarizePartialWork(
             taskId,
             contextId,
-            status: {
-              state: "canceled",
-              message: agentMessage(summary),
-              timestamp: new Date().toISOString(),
-            },
-            final: true,
-          })
+            serviceName,
+            "timed out",
+            true,
+          )
+
+          publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
           return
         }
 
@@ -1169,9 +965,9 @@ class GraphExecutor {
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "quota_exceeded")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "quota_exceeded" })
 
-          const summary = resolvePseudonyms(
-            await this._summarizePartialWork(taskId, contextId, serviceName, "quota exceeded"),
-          )
+          const summary = await this._summarizePartialWork(taskId, contextId, serviceName, "quota exceeded")
+          
+          const quotaSummary = cds.i18n.messages.at("AGENT_QUOTA_EXCEEDED_SUMMARY", [summary])
 
           audit("AgentTaskFailed", {
             data: {
@@ -1190,7 +986,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "canceled",
-              message: agentMessage(summary),
+              message: agentMessage(quotaSummary),
               timestamp: new Date().toISOString(),
             },
             final: true,
@@ -1336,16 +1132,7 @@ class GraphExecutor {
   }
 }
 
-export {
-  GraphExecutor,
-  messageText,
-  defaultOutputMapper,
-  agentMessage,
-  parseResumeDecision,
-  decisionTypeOf,
-  extractInterruptData,
-  composeEditNote,
-}
+export { GraphExecutor, messageText, defaultOutputMapper, agentMessage }
 
 /**
  * @param {[import('@langchain/core/messages').Message]} messages

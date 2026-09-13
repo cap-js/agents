@@ -137,6 +137,19 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(res.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
     })
 
+    it("resets quota counters for a new task in an existing conversation", async () => {
+      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+      const contextId = cds.utils.uuid()
+
+      const limited = await sendMessage("looping", "trigger loop", { contextId })
+      expect(limited.data.result.status.state).toBe("canceled")
+      expect(limited.data.result.status.message.parts[0].text).toMatch(/quota exceeded/i)
+
+      const nextTask = await sendMessage("looping", "single response", { contextId })
+      expect(nextTask.data.result.status.state).toBe("completed")
+      expect(nextTask.data.result.status.message.parts[0].text).not.toMatch(/quota exceeded/i)
+    })
+
     it("should cancel task when maxToolCallsPerTask exceeded during graph execution", async () => {
       cds.env.agents.pool.maxLLMInvocationsPerTask = 100 // high — won't trigger
       cds.env.agents.pool.maxToolCallsPerTask = 1
