@@ -176,7 +176,6 @@ export async function buildSubAgentToolLocally(serviceName) {
         taskId,
         contextId,
       )
-      const truncated = message?.length > 80 ? message.slice(0, 80) + "..." : message
 
       try {
         // Run the subagent detached from the calling agent, in its own root
@@ -185,10 +184,9 @@ export async function buildSubAgentToolLocally(serviceName) {
         await new Promise((resolve, reject) => {
           cds
             .spawn({ user: cds.context?.user, tenant: cds.context?.tenant }, async () => {
-              LOG.info("request", {
+              LOG.info(srv.name, "-", "request", {
                 conversation: short(contextId),
-                service: srv.name,
-                text: truncated,
+                text: message,
               })
 
               await executor.execute(requestContext, eventBus)
