@@ -10,54 +10,56 @@ entity Tasks : managed {
       /**
        * A2A task ID (server-generated UUID)
        */
-  key taskId         : String;
+  key taskId           : String;
       /**
        * Groups related tasks into conversations
        */
-      contextId      : String;
+      contextId        : String;
       /**
        * Current task state (submitted, working, completed, failed, etc.)
        */
-      state          : String;
+      state            : String;
       /**
        * Full serialized A2A Task JSON
        */
-      data           : LargeString;
+      data             : LargeString;
       /**
        * Fully qualified CDS service name
        */
-      agentService   : String;
+      agentService     : String;
       /**
        * Combined LLM Input and Output tokens used for this task
        */
-      usageLlmTokens : Integer64 default 0;
+      usageLlmTokens   : Integer64 default 0;
       /**
        * Amount of tool calls made by this task
        */
-      usageToolCalls : Integer default 0;
+      usageToolCalls   : Integer default 0;
 
       /** Push notification (webhook) configs for this task. Cascade-deleted. */
-      pushConfigs    : Composition of many PushNotificationConfigs
-                         on pushConfigs.taskId = taskId;
+      pushConfigs      : Composition of many PushNotificationConfigs
+                           on pushConfigs.taskId = taskId;
 
       /**
        * Files received from user or downstream agents for this task.
        * Conversation-scoped reads use up_.contextId path expression.
        */
-      inputFiles     : Composition of many Attachments;
+      inputFiles       : Composition of many Attachments;
 
       /**
        * Files written by agent via /outputs/ path for this task.
        */
-      outputFiles    : Composition of many Attachments;
+      outputFiles      : Composition of many Attachments;
 
       /** LangGraph checkpoints created by this task. Cascade-deleted. */
-      checkpoints    : Composition of many Checkpoints
-                         on checkpoints.task_id = taskId;
+      checkpoints      : Composition of many Checkpoints
+                           on checkpoints.task_id = taskId;
 
       /** LangGraph checkpoint writes tied to this task. Cascade-deleted. */
       checkpointWrites : Composition of many CheckpointWrites
                            on checkpointWrites.task_id = taskId;
+
+      textAnalysis : Composition of many TextAnalysisResults on textAnalysis.taskId = taskId;
 }
 
 entity Checkpoints : managed {
@@ -109,14 +111,15 @@ entity CheckpointWrites {
  *    and `X-A2A-Notification-Token` header from token field
  */
 entity PushNotificationConfigs : managed {
-  key taskId    : String;
-  key configId  : String;
-      task      : Association to one Tasks on task.taskId = taskId;
-      url       : String(2048);
+  key taskId   : String;
+  key configId : String;
+      task     : Association to one Tasks
+                   on task.taskId = taskId;
+      url      : String(2048);
 }
 
 entity PseudonymizationState : managed {
-  key threadId : String;     // "serviceName:contextId"
+  key threadId : String; // "serviceName:contextId"
       seed     : String(64); // 32-char hex seed
       mappings : Composition of many PseudonymizationMappings
                    on mappings.threadId = threadId;
@@ -124,6 +127,17 @@ entity PseudonymizationState : managed {
 
 entity PseudonymizationMappings {
   key threadId : String;
-  key hash     : String(128);  // "propertyName_xxxxxxxx"
+  key hash     : String(128); // "propertyName_xxxxxxxx"
       original : LargeString;
+}
+
+entity TextAnalysisResults {
+  key ID            : UUID;
+      taskId        : String;
+      type          : String(3);
+      SENTENCE_ID   : Integer;
+      TOKEN         : String(5000);
+      ENTITY        : String(1000);
+      OFFSET        : Integer;
+      GLOBAL_OFFSET : Integer;
 }

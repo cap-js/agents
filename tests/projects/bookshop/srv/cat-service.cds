@@ -5,7 +5,7 @@ using {sap.capire.bookshop as my} from '../db/schema';
  */
 @agent  @odata
 @Core.SchemaVersion: '0'
-@description: 'Browse and order books from the catalog'
+@description: 'Browse and order books from the catalog.'
 service CatalogService {
 
   /**
@@ -61,10 +61,11 @@ service CatalogService {
 
   // used for pseudonymization tests
   @description: 'Look up author contact details'
-  function findAuthor(@description: 'The author ID' id : Integer) returns {
+  function findAuthor(searchTerm : String) returns {
+    ID: String;
     @PersonalData.IsPotentiallyPersonal
     name  : String;
-    email : String;
+    dateOfBirth : Date;
   };
   /**
    * Validate an order — always rejects with two field-level errors.

@@ -11,6 +11,7 @@
 - Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
 - Remote MCP connections support `mcp.tools` in `cds.requires` to restrict which tools are exposed to the agent
 - CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
+- Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP
 
 ### Changed
 
