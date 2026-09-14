@@ -19,7 +19,7 @@
 
 - Services with `@protocol: 'agent'` now also register `@agent` specific handlers
 - Mask apiKey in debug logs read from claude / opencode settings
-- Adjusted error message to be more accurate and translatable
+- Adjusted error message to be more accurate
 - Prompts are now correctly uploaded to MLFlow for markdown-based agents
 
 ## Version 0.9.4 - 2026-09-10
