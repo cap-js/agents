@@ -20,6 +20,7 @@
 - Services with `@protocol: 'agent'` now also register `@agent` specific handlers
 - Mask apiKey in debug logs read from claude / opencode settings
 - Prompts are now correctly uploaded to MLFlow for markdown-based agents
+- `Judge.evaluate()` assessments now appear in Databricks UC MLflow: fixed a wrong `tr-` prefix in the assessment URL (Databricks UC uses raw OTel hex trace IDs, unlike OSS MLflow) and a null `source_id` that caused Databricks to reject the POST with 400
 
 ## Version 0.9.4 - 2026-09-10
 
