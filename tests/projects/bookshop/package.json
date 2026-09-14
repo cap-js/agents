@@ -68,6 +68,9 @@
       },
       "[test]": {
         "llm": "mock",
+        "[hybrid]": {
+          "llm": "aicore"
+        },
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"
@@ -116,7 +119,6 @@
         }
       },
       "[hybrid]": {
-        "llm": "aicore",
         "auth": {
           "kind": "mocked",
           "users": {
