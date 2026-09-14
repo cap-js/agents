@@ -53,6 +53,7 @@
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@langchain/mcp-adapters": "^1.1.3",
+    "@langchain/openai": "^1.5.12",
     "@sap-ai-sdk/langchain": "^2.13.0",
     "@sap-ai-sdk/orchestration": "^2.11.0",
     "@sap-cloud-sdk/connectivity": "^4.7.0",
@@ -180,8 +181,14 @@
         "anthropic": {
           "impl": "@cap-js/agents/lib/models/anthropic"
         },
+        "openai": {
+          "impl": "@cap-js/agents/lib/models/openai"
+        },
         "pi-anthropic": {
           "impl": "@cap-js/agents/lib/models/pi-anthropic"
+        },
+        "pi-openai": {
+          "impl": "@cap-js/agents/lib/models/pi-openai"
         },
         "pi-mock": {
           "impl": "@cap-js/agents/lib/models/pi-mock"
