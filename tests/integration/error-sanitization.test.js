@@ -87,8 +87,8 @@ describe("@cap-js/agents - toolWrapMiddleware error handling", () => {
     const { ToolMessage } = await import("@langchain/core/messages")
     const { toolWrapMiddleware } = await import("../../lib/agents/middleware/tool-wrap.js")
 
-    const srv = cds.services.CatalogService
-    const mw = toolWrapMiddleware()
+    const srv = await cds.connect.to('CatalogService')
+    const mw = toolWrapMiddleware(srv)
     const result = await mw.wrapToolCall(
       { toolCall: { name: "validateOrder", id: "test-call-1" } },
       async () => srv.send("validateOrder", { book: 1, quantity: 1 }),
