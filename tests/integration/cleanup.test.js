@@ -214,7 +214,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
       await INSERT.into(PSEUDO_STATE).entries({ threadId, seed: "deadbeef" })
       await INSERT.into(PSEUDO_MAPPINGS).entries({
         threadId,
-        hash: "name_abcd1234",
+        hash: "<<name>:abcd1234>",
         original: "Emily Brontë",
       })
     }

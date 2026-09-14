@@ -27,7 +27,7 @@ describe("pseudonymization", () => {
     it("hashes a string value with property name prefix", async () => {
       const session = await PseudoSession.loadOrCreate(threadId)
       const hash = session.pseudonymize("Emily Brontë", "name")
-      expect(hash).toMatch(/^name_[0-9a-f]{8}$/)
+      expect(hash).toMatch(/^<<name>:[0-9a-f]{8}$/)
     })
 
     it("same value produces same hash within session (idempotent)", async () => {
@@ -191,7 +191,7 @@ describe("pseudonymization", () => {
         { name: "Charlotte", ID: 2 },
       ]
       _pseudonymizeData(rows, new Set(["name"]), session)
-      expect(rows[0].name).toMatch(/^name_[0-9a-f]{8}$/)
+      expect(rows[0].name).toMatch(/^<<name>:[0-9a-f]{8}$/)
       expect(rows[0].ID).toBe(1) // untouched
       expect(session.resolve(rows[0].name)).toBe("Emily")
     })
@@ -200,7 +200,7 @@ describe("pseudonymization", () => {
       const session = await PseudoSession.loadOrCreate(threadId)
       const row = { name: "Emily", nick: null }
       _pseudonymizeData(row, new Set(["name", "nick"]), session)
-      expect(row.name).toMatch(/^name_/)
+      expect(row.name).toMatch(/^<<name>:/)
       expect(row.nick).toBeNull() // null skipped
     })
 
@@ -379,7 +379,7 @@ describe("pseudonymization", () => {
 
       // originals must not appear; hashes must
       expect(content).not.toContain("Emily Brontë")
-      expect(content).toContain("name_")
+      expect(content).toContain("<<name>:")
       expect(content).toContain("placeOfBirth_")
       // ID is a key Integer → not annotated with @PersonalData → untouched
       expect(content).toContain("1")
@@ -428,7 +428,7 @@ describe("pseudonymization", () => {
         toolReq,
         async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "query" }),
       )
-      const hash = toolMsg.content.match(/name_[0-9a-f]{8}/)[0]
+      const hash = toolMsg.content.match(/<<name>:[0-9a-f]{8}/)[0]
 
       // model may echo the hash; GraphExecutor resolves it back before publishing.
       const session = cds.context._pseudoSession
@@ -455,12 +455,12 @@ describe("pseudonymization", () => {
 
       // annotated name → hashed; unannotated email → untouched
       expect(content).not.toContain("Emily Brontë")
-      expect(content).toContain("name_")
+      expect(content).toContain("<<name>:")
       expect(content).toContain("1818-07-30")
 
       // hash resolves back to the original
       const session = cds.context["_pseudoSession"]
-      const hash = content.match(/name_[0-9a-f]{8}/)[0]
+      const hash = content.match(/<<name>:[0-9a-f]{8}/)[0]
       expect(session.resolve(hash)).toBe("Emily Brontë")
     })
 
@@ -491,10 +491,10 @@ describe("pseudonymization", () => {
       // aliased personal-data column must still be hashed (no PII leak)
       expect(content).not.toContain(author)
       // hash prefix uses the alias (the result key)
-      expect(content).toMatch(/authorName_[0-9a-f]{8}/)
+      expect(content).toMatch(/author<<name>:[0-9a-f]{8}/)
 
       const session = cds.context["_pseudoSession"]
-      const hash = content.match(/authorName_[0-9a-f]{8}/)[0]
+      const hash = content.match(/author<<name>:[0-9a-f]{8}/)[0]
       expect(session.resolve(hash)).toBe(author)
     })
 
@@ -527,10 +527,10 @@ describe("pseudonymization", () => {
       // annotated joined column hashed; non-personal title untouched
       expect(content).not.toContain(author)
       expect(content).toContain("Wuthering Heights")
-      expect(content).toMatch(/name_[0-9a-f]{8}/)
+      expect(content).toMatch(/<<name>:[0-9a-f]{8}/)
 
       const session = cds.context["_pseudoSession"]
-      const hash = content.match(/name_[0-9a-f]{8}/)[0]
+      const hash = content.match(/<<name>:[0-9a-f]{8}/)[0]
       expect(session.resolve(hash)).toBe(author)
     })
   })
@@ -566,7 +566,7 @@ describe("pseudonymization OTel leak check", () => {
     let sawHash = false
     for (const span of spans) {
       for (const s of collectSpanStrings(span)) {
-        if (/name_[0-9a-f]{8}/.test(s)) sawHash = true
+        if (/<<name>:[0-9a-f]{8}/.test(s)) sawHash = true
         for (const pii of authors) {
           if (s.includes(pii)) {
             offenders.push({ span: span.name, pii, snippet: s.slice(0, 160) })
@@ -585,7 +585,7 @@ describe("pseudonymization OTel leak check", () => {
     expect(res.status).toBe(200)
     const text = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""
     expect(text).toMatch(/Brontë|Poe|Carpenter/)
-    expect(text).not.toMatch(/name_[0-9a-f]{8}/)
+    expect(text).not.toMatch(/<<name>:[0-9a-f]{8}/)
   })
 })
 

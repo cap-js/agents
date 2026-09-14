@@ -124,6 +124,6 @@ entity PseudonymizationState : managed {
 
 entity PseudonymizationMappings {
   key threadId : String;
-  key hash     : String(128);  // "propertyName_xxxxxxxx"
+  key hash     : String(128);  // "<<propertyName>:xxxxxxxx>"
       original : LargeString;
 }
