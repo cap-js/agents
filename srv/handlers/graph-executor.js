@@ -181,7 +181,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
@@ -318,7 +318,7 @@ class GraphExecutor {
     return { state: finalState, tokenCount }
   }
   async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
@@ -973,14 +973,9 @@ class GraphExecutor {
           return
         }
 
-        LOG.error(serviceName, "-", "failed", {
+        LOG.error(Object.assign(err, {
           conversation: short(contextId),
-          error: err.message,
-        })
-        LOG.debug(serviceName, "-", "failed stack", {
-          conversation: short(contextId),
-          stack: err.stack,
-        })
+        }))
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")

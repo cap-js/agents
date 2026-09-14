@@ -147,7 +147,7 @@
           "image/jpeg"
         ]
       },
-      "pool": {
+      "quotas": {
         "maxConcurrentTasks": 10,
         "maxConcurrentTasksPerUser": 4,
         "maxTasksPerHour": 100,

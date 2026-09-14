@@ -34,11 +34,11 @@
       "node"
     ],
     "agents": {
-      "pool": null
+      "quotas": null
     },
     "requires": {
       "db": {
-        "pool": {
+        "quotas": {
           "acquireTimeoutMillis": 30000
         }
       },

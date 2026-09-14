@@ -19,18 +19,18 @@ describe("@cap-js/agents - patch-tool-calls middleware (hybrid)", () => {
 
   before(() => {
     cds.env.agents ??= {}
-    cds.env.agents.pool ??= {}
-    origTokensPerTask = cds.env.agents.pool.maxLLMTokensPerTask
+    cds.env.agents.quotas ??= {}
+    origTokensPerTask = cds.env.agents.quotas.maxLLMTokensPerTask
   })
 
   afterEach(() => {
-    cds.env.agents.pool.maxLLMTokensPerTask = origTokensPerTask
+    cds.env.agents.quotas.maxLLMTokensPerTask = origTokensPerTask
   })
 
   it("follow-up message succeeds after first turn was canceled due to quota exceeded", async () => {
     const contextId = `patch-tool-calls-${Date.now()}`
 
-    cds.env.agents.pool.maxLLMTokensPerTask = 20
+    cds.env.agents.quotas.maxLLMTokensPerTask = 20
     const res1 = await sendMessage("catalog", "Show me all books", { contextId })
     assert.strictEqual(
       res1.data.result.status.state,
@@ -38,7 +38,7 @@ describe("@cap-js/agents - patch-tool-calls middleware (hybrid)", () => {
       "expected first turn to be canceled by quota",
     )
 
-    cds.env.agents.pool.maxLLMTokensPerTask = origTokensPerTask
+    cds.env.agents.quotas.maxLLMTokensPerTask = origTokensPerTask
     const res2 = await sendMessage("catalog", "Just say hello", { contextId })
     assert.notStrictEqual(
       res2.data.result.status.state,

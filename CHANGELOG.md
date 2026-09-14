@@ -14,6 +14,7 @@
 ### Changed
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+- Renamed config option `cds.agents.pool` to `cds.agents.quotas`
 
 ### Fixed
 
