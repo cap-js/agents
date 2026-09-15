@@ -96,7 +96,7 @@ function createA2ATool(client, agentCard) {
           LOG.trace(`Raw results from ${subagent}`, inspect(result, { depth: null, colors: true }))
         let response = formatToolResult(extractResult(result))
         if (response)
-          LOG.info(`Got response from ${subagent}`, { messageId }, "\n\n" + response + "\n")
+          LOG.info(`Got response from ${subagent}`, { messageId }, "\n\n" + truncated(response) + "\n")
         return response
       } catch (err) {
         LOG.warn("Subagent tool error", { subagent, error: err.message })
