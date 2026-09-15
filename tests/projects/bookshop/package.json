@@ -129,7 +129,10 @@
           }
         },
         "db": {
-          "kind": "sqlite"
+          "kind": "sqlite",
+          "credentials": {
+            "url": ":memory:"
+          }
         }
       },
       "[production]": {
