@@ -74,7 +74,10 @@ cds.on("bootstrap", (app) => {
 
   cds.on ("served", async () => {
 
-    if (cds.requires.llm === "auto" || cds.requires.llm?.kind === "auto") {
+    if (
+      (cds.requires.llm === "anthropic" || cds.requires.llm?.kind === "anthropic") ||
+      (cds.requires.llm === "auto" || cds.requires.llm?.kind === "auto")
+    ) {
       const { resolve_config } = await import("./lib/config/local.js")
       let options = cds.requires.llm
       if (options === "auto") options = { kind: "auto" }
