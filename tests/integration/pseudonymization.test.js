@@ -539,16 +539,8 @@ describe("pseudonymization", () => {
 // OTel leak check: run agent flow and verify no personal data reaches any agent/LLM/tool span.
 describe("pseudonymization OTel leak check", () => {
   const AGENT_SPAN = /^(chat |execute_tool |workflow |task |invoke_agent)/
-
   axios.defaults.validateStatus = () => true
-  let originalMlflow
-  before(() => {
-    originalMlflow = cds.env.agents?.mlflow
-    cds.env.agents = cds.env.agents || {}
-    cds.env.agents.mlflow = true
-  })
   after(async () => {
-    cds.env.agents.mlflow = originalMlflow
     teardown()
     await mock.stop()
   })
@@ -580,7 +572,6 @@ describe("pseudonymization OTel leak check", () => {
   })
 
   it("resolves pseudonymized names back to originals in the user-facing response", async () => {
-    resetCapture()
     const res = await sendMessage("pseudo-book", "Who wrote these books?")
     expect(res.status).toBe(200)
     const text = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""

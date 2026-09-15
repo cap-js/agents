@@ -25,7 +25,7 @@
   "skills": [
     {
       "description": "Query data from the service. Available entities: 
- Authors 
+ Authors: Pseudonymized authors of the books on offer 
  Books: Book details with author information 
  Currencies: Code list for currencies
 

@@ -32,7 +32,9 @@ service CatalogService {
     excluding {
       descr
     };
-  // used for pseudonymization tests
+  /**
+   * Pseudonymized authors of the books on offer
+   */
   @readonly
   entity Authors     as
     projection on my.Authors
