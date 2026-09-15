@@ -883,16 +883,21 @@ class GraphExecutor {
           eventBus._graphResult = { messages: result.messages || [] }
         }
 
+        const usageMeta =
+          usageData?.total_tokens > 0
+            ? { "sap.cds.agents.token-usage": usageData }
+            : undefined
         eventBus.publish({
           kind: "status-update",
           taskId,
           contextId,
           status: {
             state: "completed",
-            message: agentMessage(output),
+            message: agentMessage(output, undefined, usageMeta),
             timestamp: new Date().toISOString(),
           },
           final: true,
+          metadata: usageMeta,
         })
       } catch (err) {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
