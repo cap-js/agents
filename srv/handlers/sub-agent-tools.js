@@ -184,16 +184,23 @@ export async function buildSubAgentToolLocally(serviceName) {
         // shared transaction breaks the stream.
         await new Promise((resolve, reject) => {
           cds
-            .spawn({ user: cds.context?.user, tenant: cds.context?.tenant, headers: cds.context?.headers }, async () => {
-              LOG.info("request", {
-                conversation: short(contextId),
-                service: srv.name,
-                text: truncated,
-              })
+            .spawn(
+              {
+                user: cds.context?.user,
+                tenant: cds.context?.tenant,
+                headers: cds.context?.headers,
+              },
+              async () => {
+                LOG.info("request", {
+                  conversation: short(contextId),
+                  service: srv.name,
+                  text: truncated,
+                })
 
-              await executor.execute(requestContext, eventBus)
-              await done
-            })
+                await executor.execute(requestContext, eventBus)
+                await done
+              },
+            )
             .on("succeeded", resolve)
             .on("failed", reject)
         })
