@@ -184,7 +184,7 @@ export async function buildSubAgentToolLocally(serviceName) {
         // shared transaction breaks the stream.
         await new Promise((resolve, reject) => {
           cds
-            .spawn({ user: cds.context?.user, tenant: cds.context?.tenant }, async () => {
+            .spawn({ user: cds.context?.user, tenant: cds.context?.tenant, headers: cds.context?.headers }, async () => {
               LOG.info("request", {
                 conversation: short(contextId),
                 service: srv.name,
@@ -247,7 +247,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
         try {
           const { getDestination, buildHeadersForDestination, retrieveJwt } =
             await import("@sap-cloud-sdk/connectivity")
-          const jwt = retrieveJwt(cds.context?.http?.req)
+          const jwt = retrieveJwt(cds.context?.http?.req ?? cds.context)
           const resolvedDest = await getDestination({ destinationName, jwt })
           const rawHeaders = await buildHeadersForDestination(resolvedDest)
           return Object.fromEntries(

@@ -18,7 +18,7 @@ async function resolveDestination(destinationName, dest, localUrl) {
   try {
     const { getDestination, buildHeadersForDestination, retrieveJwt } =
       await import("@sap-cloud-sdk/connectivity")
-    const jwt = retrieveJwt(cds.context?.http?.req)
+    const jwt = retrieveJwt(cds.context?.http?.req ?? cds.context)
     const resolvedDest = await getDestination({ destinationName, jwt })
     if (!resolvedDest) return { url: localUrl, headers: {} }
 

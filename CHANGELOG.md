@@ -22,6 +22,7 @@
 - Adjusted error message to be more accurate
 - Prompts are now correctly uploaded to MLFlow for markdown-based agents
 - `Judge.evaluate()` assessments now also appear in Databricks UC MLflow
+- Propagate headers to local subagents
 
 ## Version 0.9.4 - 2026-09-10
 
