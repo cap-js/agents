@@ -212,6 +212,24 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(output).toMatch(/mock-model-for-testing/)
   })
 
+  it("should record HITL gates and decisions by action", async () => {
+    const contextId = cds.utils.uuid()
+    const initial = await sendMsgHelper("deterministic-hitl", "start", { contextId })
+    const taskId = initial.data.result.id
+    expect(initial.data.result.status.state).toBe("input-required")
+
+    await sendMsgHelper("deterministic-hitl", "approve", { contextId, taskId })
+    await sendMsgHelper("deterministic-hitl", "reject", { contextId, taskId })
+
+    const output = await flushMetrics()
+    expect(output).toMatch(/agent.hitl.gates/)
+    expect(output).toMatch(/agent.hitl.decisions/)
+    expect(output).toMatch(/firstAction/)
+    expect(output).toMatch(/secondAction/)
+    expect(output).toMatch(/approve/)
+    expect(output).toMatch(/reject/)
+  })
+
   // ─── Correlation ────────────────────────────────────────────────────
 
   it("should register cls_custom_fields for A2A correlation", () => {

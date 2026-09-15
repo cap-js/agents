@@ -20,7 +20,7 @@
   "devDependencies": {
     "@cap-js/sqlite": ">=1",
     "@langchain/anthropic": "^1.5.1",
-    "@sap/cds-dk": ">=8"
+    "@sap/cds-dk": "^10.1.1"
   },
   "cds": {
     "agents": {
@@ -28,6 +28,11 @@
         "enabled": true
       },
       "activeUsersInterval": "1s",
+      "[testTimeout]": {
+        "pool": {
+          "maxExecutionTimePerTask": "10s"
+        }
+      },
       "[test]": {
         "pool": {
           "maxTasksPerHour": 10000,

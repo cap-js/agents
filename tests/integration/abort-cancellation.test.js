@@ -259,7 +259,7 @@ describe("GraphExecutor - graceful timeout", () => {
   const withCtx = (fn) => () => cds._with({}, fn)
 
   it(
-    "timeout publishes canceled with summary (falls back when no checkpointer)",
+    "timeout pauses for continuation approval (falls back when no checkpointer)",
     { timeout: 5000 },
     withCtx(async () => {
       const publishedEvents = []
@@ -284,7 +284,6 @@ describe("GraphExecutor - graceful timeout", () => {
       cds.env.agents = cds.env.agents || {}
       cds.env.agents.pool = cds.env.agents.pool || {}
       cds.env.agents.pool.maxExecutionTimePerTask = 200
-      cds.env.agents.pool.timeoutGrace = 100
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
@@ -303,13 +302,23 @@ describe("GraphExecutor - graceful timeout", () => {
 
       // Restore
       cds.env.agents.pool.maxExecutionTimePerTask = "5min"
-      cds.env.agents.pool.timeoutGrace = "15s"
 
-      const canceledEvent = publishedEvents.find((e) => e.status?.state === "canceled")
-      assert.ok(canceledEvent, "timeout should publish canceled status")
+      const inputRequiredEvent = publishedEvents.find((e) => e.status?.state === "input-required")
+      assert.ok(inputRequiredEvent, "timeout should publish input-required status")
       assert.ok(
-        canceledEvent.status.message.parts[0].text.includes("timed out"),
-        "canceled message should mention timeout",
+        inputRequiredEvent.status.message.parts[0].text.includes("Continue running or stop?"),
+        "timeout message should ask whether to continue",
+      )
+      assert.strictEqual(
+        inputRequiredEvent.status.message.metadata["sap.cds.agents.timeout-hitl"],
+        true,
+      )
+      assert.deepStrictEqual(
+        inputRequiredEvent.status.message.metadata["sap.cds.agents.input-required"].options,
+        [
+          { value: "continue", label: "Continue" },
+          { value: "reject", label: "Stop" },
+        ],
       )
       // Should NOT have a failed event
       const failedEvent = publishedEvents.find((e) => e.status?.state === "failed")
@@ -318,7 +327,7 @@ describe("GraphExecutor - graceful timeout", () => {
   )
 
   it(
-    "timeout with checkpointer calls _summarizeOnTimeout",
+    "timeout with checkpointer pauses with an approval summary",
     { timeout: 5000 },
     withCtx(async () => {
       const publishedEvents = []
@@ -355,7 +364,6 @@ describe("GraphExecutor - graceful timeout", () => {
       cds.env.agents = cds.env.agents || {}
       cds.env.agents.pool = cds.env.agents.pool || {}
       cds.env.agents.pool.maxExecutionTimePerTask = 200
-      cds.env.agents.pool.timeoutGrace = 100
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
       // Inject resolved graph directly so checkpointer is accessible
@@ -376,72 +384,18 @@ describe("GraphExecutor - graceful timeout", () => {
 
       // Restore
       cds.env.agents.pool.maxExecutionTimePerTask = "5min"
-      cds.env.agents.pool.timeoutGrace = "15s"
 
-      const canceledEvent = publishedEvents.find((e) => e.status?.state === "canceled")
-      assert.ok(canceledEvent, "timeout with checkpointer should publish canceled status")
-      // The summary either comes from LLM (if createModel works) or fallback
-      const msg = canceledEvent.status.message.parts[0].text
+      const inputRequiredEvent = publishedEvents.find((e) => e.status?.state === "input-required")
       assert.ok(
-        msg.includes("timed out") || msg.includes("Progress summary"),
-        `canceled message should reference timeout or progress, got: "${msg}"`,
+        inputRequiredEvent,
+        "timeout with checkpointer should publish input-required status",
       )
-    }),
-  )
-
-  it(
-    "timeoutGrace is configurable",
-    { timeout: 5000 },
-    withCtx(async () => {
-      const publishedEvents = []
-      let invokeTime
-      const fakeGraph = {
-        checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
-        invoke: async (_input, config) => {
-          invokeTime = Date.now()
-          return new Promise((resolve, reject) => {
-            config.signal.addEventListener("abort", () => {
-              reject(abortError())
-            })
-          })
-        },
-      }
-      const fakeEventBus = {
-        publish: (e) => publishedEvents.push(e),
-        finished: () => {},
-      }
-
-      cds.env.agents = cds.env.agents || {}
-      cds.env.agents.pool = cds.env.agents.pool || {}
-      // 2000ms total, 200ms grace → soft timeout at 1800ms
-      // (must be > 1000ms floor in _invokeWithTimeout)
-      cds.env.agents.pool.maxExecutionTimePerTask = 2000
-      cds.env.agents.pool.timeoutGrace = 200
-
-      const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
-
-      const t0 = Date.now()
-      await executor.execute(
-        {
-          taskId: "task-timeout-3",
-          contextId: "ctx-timeout-3",
-          userMessage: { parts: [{ kind: "text", text: "hello" }] },
-          task: { status: { state: "working" } },
-        },
-        fakeEventBus,
+      // The summary either comes from LLM (if createModel works) or fallback
+      const msg = inputRequiredEvent.status.message.parts[0].text
+      assert.ok(
+        msg.includes("Continue running or stop?"),
+        `approval message should ask whether to continue, got: "${msg}"`,
       )
-      const elapsed = Date.now() - t0
-
-      // Let cds.spawn (usage update in finally) settle
-      await new Promise((r) => setTimeout(r, 50))
-
-      // Restore
-      cds.env.agents.pool.maxExecutionTimePerTask = "5min"
-      cds.env.agents.pool.timeoutGrace = "15s"
-
-      // Should timeout around 1800ms (2000 - 200 grace), not 2000ms
-      assert.ok(elapsed < 1950, `should timeout before hard limit, elapsed: ${elapsed}ms`)
-      assert.ok(elapsed >= 1700, `should not timeout too early, elapsed: ${elapsed}ms`)
     }),
   )
 })
