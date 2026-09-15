@@ -127,6 +127,9 @@
               "features": []
             }
           }
+        },
+        "db": {
+          "kind": "sqlite"
         }
       },
       "[production]": {
