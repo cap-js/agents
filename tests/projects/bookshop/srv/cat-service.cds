@@ -32,6 +32,15 @@ service CatalogService {
     excluding {
       descr
     };
+  /**
+   * Pseudonymized authors of the books on offer
+   */
+  @readonly
+  entity Authors     as
+    projection on my.Authors
+    excluding {
+      books
+    };
 
   /**
    * Submit an order for a book
@@ -52,6 +61,14 @@ service CatalogService {
   @description: 'Get stock level for a specific book'
   function getStock(  @description: 'The book ID'  book: Books:ID  @mandatory  ) returns Integer;
 
+  // used for pseudonymization tests
+  @description: 'Look up author contact details'
+  function findAuthor(searchTerm : String) returns {
+    ID: String;
+    @PersonalData.IsPotentiallyPersonal
+    name  : String;
+    dateOfBirth : Date;
+  };
   /**
    * Validate an order — always rejects with two field-level errors.
    * Used to test that err.details from multi-error CAP responses are

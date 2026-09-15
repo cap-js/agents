@@ -17,11 +17,16 @@ entity Books : managed {
       currency : Currency;
 }
 
+@Core.Description: ''
+@Core.LongDescription : ''
 entity Authors : managed {
   key ID           : Integer;
+      @PersonalData.IsPotentiallyPersonal
       name         : String(111) @mandatory;
+      @PersonalData.IsPotentiallySensitive
       dateOfBirth  : Date;
       dateOfDeath  : Date;
+      @PersonalData.IsPotentiallyPersonal
       placeOfBirth : String;
       placeOfDeath : String;
       books        : Association to many Books

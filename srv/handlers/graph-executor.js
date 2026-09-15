@@ -6,6 +6,7 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
+import { resolvePseudonyms, scrubForTrace } from "../../lib/pseudonymize/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -238,7 +239,7 @@ class GraphExecutor {
           const lastChunk =
             !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
-          const text = messageText(msgChunk?.content)
+          const text = resolvePseudonyms(messageText(msgChunk?.content))
           if (!text) continue
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
@@ -354,16 +355,18 @@ class GraphExecutor {
    */
   async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
-    return summarizePartialWork({
-      taskId,
-      contextId,
-      serviceName,
-      reason,
-      checkpointer: this._graph?.checkpointer,
-      getModel: () => this._srv.send("buildModel"),
-      // Summary runs after graph abort, so no execution-time grace is needed.
-      timeout: 10_000,
-    })
+    return resolvePseudonyms(
+      summarizePartialWork({
+        taskId,
+        contextId,
+        serviceName,
+        reason,
+        checkpointer: this._graph?.checkpointer,
+        getModel: () => this._srv.send("buildModel"),
+        // Summary runs after graph abort, so no execution-time grace is needed.
+        timeout: 10_000,
+      }),
+    )
   }
 
   async execute(requestContext, eventBus) {
@@ -519,7 +522,7 @@ class GraphExecutor {
             functionName: rootSpan.name ?? serviceName,
             inputs:
               userText !== undefined
-                ? { messages: [{ role: "user", content: userText }] }
+                ? { messages: [{ role: "user", content: scrubForTrace(userText) }] }
                 : undefined,
           }),
         )
@@ -613,7 +616,7 @@ class GraphExecutor {
         }
 
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = outputMapper(result) || "I could not generate a response."
+        const output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
 
         LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
 
@@ -622,7 +625,9 @@ class GraphExecutor {
           setSpanAttrs(
             wfSpan,
             mlflowAttrs("AGENT", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+              },
               functionName: serviceName,
             }),
           )
@@ -632,7 +637,9 @@ class GraphExecutor {
           setSpanAttrs(
             rootSpan,
             mlflowAttrs("CHAIN", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+              },
             }),
           )
         }
