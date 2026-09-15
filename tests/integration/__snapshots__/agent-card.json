@@ -26,10 +26,6 @@
     {
       "description": "Query data from the service. Available entities: 
  Books: Book details with author information 
- Currencies: Code list for currencies
-
-See https://cap.cloud.sap/docs/cds/common#entity-currencies 
- Genres: Hierarchically organized Code List for Genres 
  ListOfBooks: Browse available books",
       "examples": [
         "Show me all Books",
@@ -41,8 +37,7 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
         "data",
         "read",
         "books",
-        "currencies",
-        "genres",
+        "listofbooks",
       ],
     },
     {

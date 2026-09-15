@@ -11,7 +11,7 @@ import {
   executeCallActionTool,
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
-import { getFilteredEntities, getFilteredActions, getAgentLogger } from "../../lib/utils/utils.js"
+import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 
@@ -31,7 +31,6 @@ function cachedAuth(srv) {
 
 class GenericReadTool extends DynamicStructuredTool {
   constructor(srv, entities) {
-    const log = getAgentLogger(srv)
     const def = createGenericReadToolDefinition(Object.keys(entities), srv.name, "")
     super({
       name: def.name,
@@ -39,7 +38,7 @@ class GenericReadTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeGenericReadTool(srv, entities, args, { log }))
+        return unwrap(await executeGenericReadTool(srv, entities, args))
       },
     })
     this.srv = srv
@@ -68,7 +67,6 @@ class GenericReadTool extends DynamicStructuredTool {
 
 class DescribeTool extends DynamicStructuredTool {
   constructor(srv, entities, actions) {
-    const log = getAgentLogger(srv)
     const def = createDescribeToolDefinition(
       Object.keys(entities),
       Object.keys(actions),
@@ -81,7 +79,7 @@ class DescribeTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeDescribe(srv, entities, actions, args, { log }))
+        return unwrap(await executeDescribe(srv, entities, actions, args))
       },
     })
     this.srv = srv
@@ -121,7 +119,6 @@ class DescribeTool extends DynamicStructuredTool {
 
 class PerActionTool extends DynamicStructuredTool {
   constructor(srv, actionName, action) {
-    const log = getAgentLogger(srv)
     const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
     super({
       name: def.name,
@@ -129,7 +126,7 @@ class PerActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executePerActionTool(srv, actionName, action, args, { log }))
+        return unwrap(await executePerActionTool(srv, actionName, action, args))
       },
     })
     this.srv = srv
@@ -145,7 +142,6 @@ class PerActionTool extends DynamicStructuredTool {
 
 class CallActionTool extends DynamicStructuredTool {
   constructor(srv, actions) {
-    const log = getAgentLogger(srv)
     const def = createCallActionToolDefinition(Object.keys(actions), srv.name, "")
     super({
       name: def.name,
@@ -153,7 +149,7 @@ class CallActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeCallActionTool(srv, actions, args, { log }))
+        return unwrap(await executeCallActionTool(srv, actions, args))
       },
     })
     this.srv = srv

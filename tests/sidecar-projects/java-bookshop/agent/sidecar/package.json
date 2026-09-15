@@ -18,7 +18,7 @@
       "java"
     ],
     "agents": {
-      "pool": null
+      "quotas": null
     },
     "build": {
       "tasks": [
@@ -35,7 +35,7 @@
     },
     "requires": {
       "db": {
-        "pool": {
+        "quotas": {
           "acquireTimeoutMillis": 30000
         }
       },
