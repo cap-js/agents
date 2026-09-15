@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { context, propagation } from "@opentelemetry/api"
+import { getTracer } from "../../lib/telemetry/metrics.js"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { short, toolName } from "../../lib/utils/utils.js"
 
@@ -313,7 +313,10 @@ export async function buildSubAgentToolFromConnection(serviceName) {
 
   const customFetch = async (url, init = {}) => {
     const headers = await resolveHeaders()
-    propagation.inject(context.active(), headers)
+    if (getTracer()) {
+      const { context, propagation } = await import("@opentelemetry/api")
+      propagation.inject(context.active(), headers)
+    }
     return fetch(url, { ...init, headers: { ...headers, ...(init.headers || {}) } })
   }
   const factory = new ClientFactory(
