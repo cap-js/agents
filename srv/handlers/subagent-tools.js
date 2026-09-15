@@ -6,6 +6,9 @@ import { short, toolName } from "../../lib/utils/utils.js"
 
 const LOG = cds.log("agents:a2a|agents|subagents|a2a")
 
+const TRUNCATE = cds.env.agents?.truncate || 111
+const truncated = msg => msg?.length > TRUNCATE ? msg.slice(0,TRUNCATE) + "..." : msg
+
 import { inspect } from "util"
 /**
  * Extract text and file parts from an A2A response (task or message).
@@ -186,7 +189,7 @@ export async function buildSubAgentToolLocally(serviceName) {
             .spawn({ user: cds.context?.user, tenant: cds.context?.tenant }, async () => {
               LOG.info(srv.name, "-", "request", {
                 conversation: short(contextId),
-                text: message,
+                text: truncated(message),
               })
 
               await executor.execute(requestContext, eventBus)
