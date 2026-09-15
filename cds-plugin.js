@@ -64,6 +64,11 @@ cds.on("bootstrap", (app) => {
 })
 
 
+!function cds_agents_config_compat() {
+  // Also support legacy `cds.agents.pool` configuration by merging it into `cds.agents.quotas`
+  if (cds.env.agents?.pool) cds.env.agents.quotas = { ...cds.env.agents.quotas, ...cds.env.agents.pool }
+}()
+
 
 !function cds_requires_llm() {
 
