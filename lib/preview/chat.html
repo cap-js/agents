@@ -449,6 +449,64 @@
           border-top-color: #333;
         }
       }
+
+      #token-bar {
+        display: none;
+        flex-shrink: 0;
+        background: #eef4fb;
+        border-top: 1px solid #c8d9e8;
+        padding: 5px 16px;
+        font-size: 0.72rem;
+        color: #537492;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      #token-bar.visible {
+        display: flex;
+      }
+      .token-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+      .token-stat .label {
+        color: #6a8fa8;
+      }
+      .token-stat .value {
+        font-weight: 600;
+        color: #2a3d52;
+      }
+      .token-stat .delta {
+        color: #91adc5;
+        font-size: 0.68rem;
+      }
+      .token-divider {
+        width: 1px;
+        height: 12px;
+        background: #c8d9e8;
+        flex-shrink: 0;
+      }
+      @media (prefers-color-scheme: dark) {
+        #token-bar {
+          background: #0d2840;
+          border-top-color: #2a4a63;
+          color: #91adc5;
+        }
+        .token-stat .label {
+          color: #6a8fa8;
+        }
+        .token-stat .value {
+          color: #c8dff0;
+        }
+        .token-stat .delta {
+          color: #537492;
+        }
+        .token-divider {
+          background: #2a4a63;
+        }
+      }
     </style>
     <script src="marked.min.js"></script>
   </head>
@@ -463,6 +521,8 @@
       <div class="typing" id="typing"><span></span><span></span><span></span></div>
       <div class="status-text" id="status-text"></div>
     </div>
+
+    <div id="token-bar"></div>
 
     <div id="input-row">
       <textarea id="prompt" rows="1" placeholder="Message {{agentName}}…" autofocus></textarea>
@@ -523,6 +583,55 @@
       let currentThinkingClosed = false // true once lastChunk seen for current id
       let pendingThinkingUpdate = null
       let pendingThinkingTimer = null
+
+      // Cumulative token usage across the conversation
+      let totalUsage = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, reasoning: 0, total: 0 }
+      const tokenBar = document.getElementById("token-bar")
+
+      function fmt(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + "M"
+        if (n >= 1000) return (n / 1000).toFixed(1) + "k"
+        return String(n)
+      }
+
+      function updateTokenBar(usage) {
+        // usage keys: input_tokens, output_tokens, cache_read_input_tokens,
+        //             cache_creation_input_tokens, reasoning_tokens, total_tokens
+        const deltaIn = usage.input_tokens || 0
+        const deltaOut = usage.output_tokens || 0
+        const deltaCacheRead = usage.cache_read_input_tokens || 0
+        const deltaCacheCreate = usage.cache_creation_input_tokens || 0
+        const deltaReasoning = usage.reasoning_tokens || 0
+        const deltaTotal = usage.total_tokens || (deltaIn + deltaOut)
+
+        totalUsage.input += deltaIn
+        totalUsage.output += deltaOut
+        totalUsage.cacheRead += deltaCacheRead
+        totalUsage.cacheCreation += deltaCacheCreate
+        totalUsage.reasoning += deltaReasoning
+        totalUsage.total += deltaTotal
+
+        const stats = [
+          { label: "Total", value: fmt(totalUsage.total), delta: fmt(deltaTotal) },
+          { label: "In", value: fmt(totalUsage.input), delta: fmt(deltaIn) },
+          { label: "Out", value: fmt(totalUsage.output), delta: fmt(deltaOut) },
+        ]
+        if (totalUsage.cacheRead > 0)
+          stats.push({ label: "Cache read", value: fmt(totalUsage.cacheRead), delta: fmt(deltaCacheRead) })
+        if (totalUsage.cacheCreation > 0)
+          stats.push({ label: "Cache write", value: fmt(totalUsage.cacheCreation), delta: fmt(deltaCacheCreate) })
+        if (totalUsage.reasoning > 0)
+          stats.push({ label: "Reasoning", value: fmt(totalUsage.reasoning), delta: fmt(deltaReasoning) })
+
+        tokenBar.innerHTML = stats
+          .map(
+            (s, i) =>
+              (i > 0 ? '<div class="token-divider"></div>' : "") +
+              `<div class="token-stat"><span class="label">${s.label}</span><span class="value">${s.value}</span><span class="delta">(+${s.delta})</span></div>`,
+          )
+          .join("")
+        tokenBar.classList.add("visible")
+      }
 
       // Auto-enable streaming when agent card advertises streaming capability
       fetch(AGENT_URL + ".well-known/agent-card.json", { headers: authHeaders() })
@@ -957,6 +1066,10 @@
           return
         }
 
+        // Token usage on non-streaming path (embedded in status message metadata)
+        const tokenUsage = result?.status?.message?.metadata?.["sap.cds.agents.token-usage"]
+        if (tokenUsage) updateTokenBar(tokenUsage)
+
         // If streaming already rendered the final text via lastChunk, skip.
         if (useStreaming && streamingText !== "") {
           if (!thinkingFinalized) finalizeThinking(streamingBubble, streamingText)
@@ -1179,6 +1292,8 @@
 
         // Status update with final=true means terminal state
         if (event.kind === "status-update" && event.final) {
+          const tokenUsage = event.metadata?.["sap.cds.agents.token-usage"]
+          if (tokenUsage) updateTokenBar(tokenUsage)
           return {
             id: event.taskId || activeTaskId,
             contextId: event.contextId || contextId,
