@@ -13,7 +13,7 @@
     "install:sidecar": "cd agent/sidecar && npm install"
   },
   "dependencies": {
-    "@cap-js/hana": "*",
+    "@cap-js/hana": "^3.1.0",
     "@cap-js/sqlite": "*"
   }
 }

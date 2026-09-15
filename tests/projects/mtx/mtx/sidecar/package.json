@@ -9,7 +9,7 @@
   "dependencies": {
     "@cap-js/agents": "file:../../../../../.",
     "@cap-js/sqlite": ">=1",
-    "@sap/cds": "^10.0.6",
+    "@sap/cds": "^10.1.0",
     "@sap/cds-mtxs": ">=2"
   }
 }
