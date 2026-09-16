@@ -147,7 +147,7 @@
           "image/jpeg"
         ]
       },
-      "pool": {
+      "quotas": {
         "maxConcurrentTasks": 10,
         "maxConcurrentTasksPerUser": 4,
         "maxTasksPerHour": 100,
@@ -189,7 +189,7 @@
         }
       },
       "[development]": {
-        "llm": "mock"
+        "llm": "auto"
       },
       "[with-claude]": {
         "llm": "anthropic"

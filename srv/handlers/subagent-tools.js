@@ -4,7 +4,10 @@ import { z } from "zod"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { short, toolName } from "../../lib/utils/utils.js"
 
-const LOG = cds.log("agents:sub-agents|agents|sub-agents")
+const LOG = cds.log("agents:a2a|agents|subagents|a2a")
+
+const TRUNCATE = cds.env.agents?.truncate || 111
+const truncated = (msg) => (msg?.length > TRUNCATE ? msg.slice(0, TRUNCATE) + "..." : msg)
 
 import { inspect } from "util"
 /**
@@ -93,10 +96,14 @@ function createA2ATool(client, agentCard) {
           LOG.trace(`Raw results from ${subagent}`, inspect(result, { depth: null, colors: true }))
         let response = formatToolResult(extractResult(result))
         if (response)
-          LOG.info(`Got response from ${subagent}`, { messageId }, "\n\n" + response + "\n")
+          LOG.info(
+            `Got response from ${subagent}`,
+            { messageId },
+            "\n\n" + truncated(response) + "\n",
+          )
         return response
       } catch (err) {
-        LOG.warn("Sub agent tool error", { subagent, error: err.message })
+        LOG.warn("Subagent tool error", { subagent, error: err.message })
         return `Error communicating with ${subagent}: ${err.message}`
       }
     },
@@ -112,13 +119,13 @@ function createA2ATool(client, agentCard) {
 
 export async function buildSubAgentToolLocally(serviceName) {
   const srv = cds.services[serviceName]
-  if (!srv) throw new Error(`[sub-agents] No local service "${serviceName}" found.`)
+  if (!srv) throw new Error(`[subagents] No local service "${serviceName}" found.`)
 
   const executor = LangGraphExecutor.for(srv)
 
   const { generateAgentCard } = await import("../../lib/protocol/agent-card.js")
   const agentCard = generateAgentCard(srv)
-  LOG.info(`Connecting to sub agent ${serviceName}`, "(local)")
+  LOG.info(`Connecting to subagent ${serviceName}`, "(local)")
 
   const { RequestContext, DefaultExecutionEventBus } = await import("@a2a-js/sdk/server")
 
@@ -147,7 +154,7 @@ export async function buildSubAgentToolLocally(serviceName) {
             .map((p) => p.text)
             .join("\n")
           if (text) statusText = text
-          if (state === "failed") failed = text || "Sub-agent execution failed."
+          if (state === "failed") failed = text || "Subagent execution failed."
         } else if (event.kind === "artifact-update") {
           const parts = event.artifact?.parts || []
           if (event.artifact?.artifactId === "response") {
@@ -176,19 +183,17 @@ export async function buildSubAgentToolLocally(serviceName) {
         taskId,
         contextId,
       )
-      const truncated = message?.length > 80 ? message.slice(0, 80) + "..." : message
 
       try {
-        // Run the sub-agent detached from the calling agent, in its own root
+        // Run the subagent detached from the calling agent, in its own root
         // context and transaction (cds.spawn creates + commits a fresh tx). A
         // shared transaction breaks the stream.
         await new Promise((resolve, reject) => {
           cds
             .spawn({ user: cds.context?.user, tenant: cds.context?.tenant }, async () => {
-              LOG.info("request", {
+              LOG.info(srv.name, "-", "request", {
                 conversation: short(contextId),
-                service: srv.name,
-                text: truncated,
+                text: truncated(message),
               })
 
               await executor.execute(requestContext, eventBus)
@@ -198,7 +203,7 @@ export async function buildSubAgentToolLocally(serviceName) {
             .on("failed", reject)
         })
       } catch (err) {
-        LOG.warn("Local sub-agent tool error", { agent: agentCard.name, error: err.message })
+        LOG.warn("Local subagent tool error", { agent: agentCard.name, error: err.message })
         return `Error running ${agentCard.name}: ${err.message}`
       }
 
@@ -238,7 +243,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
 
   if (!localUrl && !destinationName) {
     throw new Error(
-      `[sub-agents] Could not resolve URL or destination name for service "${serviceName}". Check cds.requires config.`,
+      `[subagents] Could not resolve URL or destination name for service "${serviceName}". Check cds.requires config.`,
     )
   }
 
@@ -286,13 +291,13 @@ export async function buildSubAgentToolFromConnection(serviceName) {
 
   if (!agentBaseUrl) {
     throw new Error(
-      `[sub-agents] Could not resolve URL for service "${serviceName}" after destination lookup.`,
+      `[subagents] Could not resolve URL for service "${serviceName}" after destination lookup.`,
     )
   }
 
   const path = typeof credentials === "object" ? credentials?.path : null
   const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
-  LOG.info(`Connecting to sub agent ${serviceName}`, { at: base })
+  LOG.info(`Connecting to subagent ${serviceName}`, { at: base })
 
   // revisit: a2a agents may be tenant specific, card per tenant?
   const initialHeaders = await resolveHeaders()
@@ -302,7 +307,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
   })
   if (!cardRes.ok) {
     throw new Error(
-      `[sub-agents] Agent card fetch failed for "${serviceName}" at ${cardUrl}: HTTP ${cardRes.status}`,
+      `[subagents] Agent card fetch failed for "${serviceName}" at ${cardUrl}: HTTP ${cardRes.status}`,
     )
   }
   const agentCard = await cardRes.json()

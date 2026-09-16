@@ -4,6 +4,7 @@ import { Judge, matchToolCall } from "../../lib/eval/Judge.js"
 import { getActiveRunState, recordEvaluation } from "../../lib/eval/eval-run.js"
 import { installEvalDescribe } from "../../lib/eval/eval-describe.js"
 
+cds.env.requires.llm = { kind: "mock", impl: "@cap-js/agents/lib/models/mock" } // only for cds 8
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
