@@ -10,7 +10,7 @@
   },
   "cds": {
     "agents": {
-      "pool": {
+      "quotas": {
         "maxLLMInvocationsPerTask": 50
       },
       "fileIO": {

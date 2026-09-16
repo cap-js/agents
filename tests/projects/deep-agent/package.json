@@ -34,6 +34,10 @@
         "metrics": false
       },
       "[test]": {
+        "llm": "mock",
+        "[hybrid]": {
+          "llm": "aicore"
+        },
         "audit-log": {
           "kind": "audit-log-to-console",
           "outbox": false

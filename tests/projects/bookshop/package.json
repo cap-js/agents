@@ -29,12 +29,12 @@
       },
       "activeUsersInterval": "1s",
       "[testTimeout]": {
-        "pool": {
+        "quotas": {
           "maxExecutionTimePerTask": "10s"
         }
       },
       "[test]": {
-        "pool": {
+        "quotas": {
           "maxTasksPerHour": 10000,
           "maxTasksPerHourPerUser": 10000
         },
@@ -67,6 +67,10 @@
         "metrics": false
       },
       "[test]": {
+        "llm": "mock",
+        "[hybrid]": {
+          "llm": "aicore"
+        },
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"

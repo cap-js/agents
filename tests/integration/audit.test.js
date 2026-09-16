@@ -106,13 +106,13 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("SecurityEvent (quota breach)", () => {
     it("should emit on quota breach (maxTasksPerHourPerUser)", async () => {
-      const originalMax = cds.env.agents.pool.maxTasksPerHourPerUser
-      cds.env.agents.pool.maxTasksPerHourPerUser = 0
+      const originalMax = cds.env.agents.quotas.maxTasksPerHourPerUser
+      cds.env.agents.quotas.maxTasksPerHourPerUser = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.agents.pool.maxTasksPerHourPerUser = originalMax
+      cds.env.agents.quotas.maxTasksPerHourPerUser = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       expect(events.length).toBe(1)
@@ -125,13 +125,13 @@ describe("@cap-js/agents - Audit Logging", () => {
     })
 
     it("should emit on quota breach (maxConcurrentTasks)", async () => {
-      const originalMax = cds.env.agents.pool.maxConcurrentTasks
-      cds.env.agents.pool.maxConcurrentTasks = 0
+      const originalMax = cds.env.agents.quotas.maxConcurrentTasks
+      cds.env.agents.quotas.maxConcurrentTasks = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.agents.pool.maxConcurrentTasks = originalMax
+      cds.env.agents.quotas.maxConcurrentTasks = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       expect(events.length).toBe(1)
