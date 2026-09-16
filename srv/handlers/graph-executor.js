@@ -442,7 +442,7 @@ class GraphExecutor {
                 cds.env.agents?.fileIO,
               )
               if (rejection) {
-                LOG.warn(serviceName, '-', "input file rejected", {
+                LOG.warn(serviceName, "-", "input file rejected", {
                   conversation: short(contextId),
                   name: safeName,
                   mimeType: safeMime,
@@ -452,7 +452,7 @@ class GraphExecutor {
               }
               const buf = Buffer.from(file.bytes, "base64")
               await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
-              LOG.info(serviceName, '-', "file uploaded", {
+              LOG.info(serviceName, "-", "file uploaded", {
                 conversation: short(contextId),
                 name: safeName,
                 mimeType: safeMime,
@@ -965,9 +965,11 @@ class GraphExecutor {
           return
         }
 
-        LOG.error(Object.assign(err, {
-          conversation: short(contextId),
-        }))
+        LOG.error(
+          Object.assign(err, {
+            conversation: short(contextId),
+          }),
+        )
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")

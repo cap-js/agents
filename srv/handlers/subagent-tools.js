@@ -7,7 +7,7 @@ import { short, toolName } from "../../lib/utils/utils.js"
 const LOG = cds.log("agents:a2a|agents|subagents|a2a")
 
 const TRUNCATE = cds.env.agents?.truncate || 111
-const truncated = msg => msg?.length > TRUNCATE ? msg.slice(0,TRUNCATE) + "..." : msg
+const truncated = (msg) => (msg?.length > TRUNCATE ? msg.slice(0, TRUNCATE) + "..." : msg)
 
 import { inspect } from "util"
 /**
@@ -96,7 +96,11 @@ function createA2ATool(client, agentCard) {
           LOG.trace(`Raw results from ${subagent}`, inspect(result, { depth: null, colors: true }))
         let response = formatToolResult(extractResult(result))
         if (response)
-          LOG.info(`Got response from ${subagent}`, { messageId }, "\n\n" + truncated(response) + "\n")
+          LOG.info(
+            `Got response from ${subagent}`,
+            { messageId },
+            "\n\n" + truncated(response) + "\n",
+          )
         return response
       } catch (err) {
         LOG.warn("Subagent tool error", { subagent, error: err.message })

@@ -424,7 +424,10 @@ describe("@cap-js/agents - Quota enforcement", () => {
     it("should have all expected quotas limits defined", () => {
       const quotas = cds.env.agents.quotas
       expect(cds.env.agents?.quotas).not.toBe(undefined)
-      expect(quotas.maxConcurrentTasks > 0, `expected ${quotas.maxConcurrentTasks} > 0`).toBeTruthy()
+      expect(
+        quotas.maxConcurrentTasks > 0,
+        `expected ${quotas.maxConcurrentTasks} > 0`,
+      ).toBeTruthy()
       expect(
         quotas.maxConcurrentTasksPerUser > 0,
         `expected ${quotas.maxConcurrentTasksPerUser} > 0`,
@@ -434,14 +437,26 @@ describe("@cap-js/agents - Quota enforcement", () => {
         quotas.maxTasksPerHourPerUser > 0,
         `expected ${quotas.maxTasksPerHourPerUser} > 0`,
       ).toBeTruthy()
-      expect(quotas.maxLLMTokensPerDay > 0, `expected ${quotas.maxLLMTokensPerDay} > 0`).toBeTruthy()
-      expect(quotas.maxToolCallsPerHour > 0, `expected ${quotas.maxToolCallsPerHour} > 0`).toBeTruthy()
-      expect(quotas.maxToolCallsPerTask > 0, `expected ${quotas.maxToolCallsPerTask} > 0`).toBeTruthy()
+      expect(
+        quotas.maxLLMTokensPerDay > 0,
+        `expected ${quotas.maxLLMTokensPerDay} > 0`,
+      ).toBeTruthy()
+      expect(
+        quotas.maxToolCallsPerHour > 0,
+        `expected ${quotas.maxToolCallsPerHour} > 0`,
+      ).toBeTruthy()
+      expect(
+        quotas.maxToolCallsPerTask > 0,
+        `expected ${quotas.maxToolCallsPerTask} > 0`,
+      ).toBeTruthy()
       expect(
         quotas.maxLLMInvocationsPerTask > 0,
         `expected ${quotas.maxLLMInvocationsPerTask} > 0`,
       ).toBeTruthy()
-      expect(quotas.maxLLMTokensPerTask > 0, `expected ${quotas.maxLLMTokensPerTask} > 0`).toBeTruthy()
+      expect(
+        quotas.maxLLMTokensPerTask > 0,
+        `expected ${quotas.maxLLMTokensPerTask} > 0`,
+      ).toBeTruthy()
       expect(
         quotas.maxExecutionTimePerTask,
         `expected maxExecutionTimePerTask to be defined`,

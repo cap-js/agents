@@ -11,14 +11,12 @@ cds.compile.to.a2a = cds_compile_to_a2a
 cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
 
 cds.on("bootstrap", (app) => {
-
   // Ensure A2A correlation fields are indexed by SAP Cloud Logging
-  const cls_fields = (cds.env.log ??= {}) .cls_custom_fields ??= []
+  const cls_fields = ((cds.env.log ??= {}).cls_custom_fields ??= [])
   if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")
   if (!cls_fields.includes("agent.context.id")) cls_fields.push("agent.context.id")
 
   const providers = {
-
     ["llm-mock"]: {},
     anthropic: {
       opus: "claude-opus-latest",
@@ -63,110 +61,97 @@ cds.on("bootstrap", (app) => {
   })
 })
 
-
-!function cds_agents_config_compat() {
+!(function cds_agents_config_compat() {
   // Also support legacy `cds.agents.pool` configuration by merging it into `cds.agents.quotas`
-  if (cds.env.agents?.pool) cds.env.agents.quotas = { ...cds.env.agents.quotas, ...cds.env.agents.pool }
-}()
+  if (cds.env.agents?.pool)
+    cds.env.agents.quotas = { ...cds.env.agents.quotas, ...cds.env.agents.pool }
+})()
 
-
-!function cds_requires_llm() {
-
-  cds.on ("served", async () => {
-
+!(function cds_requires_llm() {
+  cds.on("served", async () => {
     if (
-      (cds.requires.llm === "anthropic" || cds.requires.llm?.kind === "anthropic") ||
-      (cds.requires.llm === "auto" || cds.requires.llm?.kind === "auto")
+      cds.requires.llm === "anthropic" ||
+      cds.requires.llm?.kind === "anthropic" ||
+      cds.requires.llm === "auto" ||
+      cds.requires.llm?.kind === "auto"
     ) {
       const { resolve_config } = await import("./lib/config/local.js")
       let options = cds.requires.llm
       if (options === "auto") options = { kind: "auto" }
-      cds.env.requires.llm = resolve_config (options)
+      cds.env.requires.llm = resolve_config(options)
     }
 
-    const config = cds.requires.llm, credentials = {}
+    const config = cds.requires.llm,
+      credentials = {}
     const { url, destination, anthropicApiUrl, apiKey } = config?.credentials || {}
     if (url) credentials.url = url
     if (destination) credentials.destination = destination
     if (anthropicApiUrl) credentials.anthropicApiUrl = anthropicApiUrl
-    if (apiKey) credentials.apiKey = '***'
-    LOG.info (`cds.connect.to 'llm' with:`, { ...config, credentials })
-
+    if (apiKey) credentials.apiKey = "***"
+    LOG.info(`cds.connect.to 'llm' with:`, { ...config, credentials })
   })
+})()
 
-}()
-
-
-
-!function add_agent_handlers() {
-
+!(function add_agent_handlers() {
   cds.on("serving", (srv) => {
-    if (srv.definition?.protocols?.agent)
-      registerDefaultAgentHandlers(srv)
+    if (srv.definition?.protocols?.agent) registerDefaultAgentHandlers(srv)
   })
+})()
 
-}()
+if (cds.env.requires?.telemetry)
+  !(function telemetry() {
+    // Schedule active_users metric computation + MLflow exporter
+    cds.on("served", async () => {
+      const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
+      setupActiveUsersMetric()
+      // Defer LangChain patching so the CDS model is fully loaded before patches land.
+      // opt-out via cds.env.agents.trace_langchain = false
+      if (cds.env.agents?.trace_langchain !== false) {
+        await patchLangChain()
+      }
 
-
-
-if (cds.env.requires?.telemetry) !function telemetry() {
-
-  // Schedule active_users metric computation + MLflow exporter
-  cds.on("served", async () => {
-
-    const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
-    setupActiveUsersMetric()
-    // Defer LangChain patching so the CDS model is fully loaded before patches land.
-    // opt-out via cds.env.agents.trace_langchain = false
-    if (cds.env.agents?.trace_langchain !== false) {
-      await patchLangChain()
-    }
-
-    if (cds.env.agents?.mlflow) {
-      const { setupMlflowExporter } = await import("./lib/telemetry/mlflow/index.js")
-      setupMlflowExporter()
-    }
-  })
-
-}()
-
+      if (cds.env.agents?.mlflow) {
+        const { setupMlflowExporter } = await import("./lib/telemetry/mlflow/index.js")
+        setupMlflowExporter()
+      }
+    })
+  })()
 
 // Bootstrap sidecar mode when the agent-sidecar profile is active
-if (cds.env.profiles?.includes("agent-sidecar")) !function sidecar() {
-
-  // Auto-mark @agent services as external so CDS does not serve them locally.
-  // Auto-mark them as hcql services served externally, they are served from the main app.
-  // This runs after model load but before cds.serve() filters definitions,
-  // so users don't need to add these things manually.
-  cds.on("loaded", (csn) => {
-    const hcql = cds.requires.kinds["hcql"]
-    const agentSidecar = cds.requires.agent || {}
-    const hcqlBase = agentSidecar.url // For local development the base URL is given in the package.json
-    const agentCredentials = agentSidecar.credentials || {}
-    for (const [name, def] of Object.entries(csn.definitions || {})) {
-      if (def.kind !== "service") continue
-      if (!def["@agent"]) continue
-      // Mark as external so CDS does not serve it locally — it will be served via HCQL from the main app.
-      def["@cds.external"] = true
-      // Java main apps use the CDS service name in the HCQL path (/hcql/CatalogService),
-      // Node.js main apps use the slugified path (/hcql/catalog).
-      const isJava = !cds.env.profiles?.includes("node")
-      let n = isJava ? name : slugified(name)
-      if (cds.requires[name]) continue // skip if user provided service-specific config for this service
-      if (cds.requires[n]) continue // skip if user provided service-specific config for possibly the slugified version
-      const newRequiresEntry = { ...hcql, kind: "hcql" }
-      newRequiresEntry.credentials = {
-        ...agentCredentials,
-        ...(hcqlBase && { url: `${hcqlBase}/${n.split(".").pop()}` }),
-        ...(agentCredentials.destination && { path: `/${n.split(".").pop()}` }),
+if (cds.env.profiles?.includes("agent-sidecar"))
+  !(function sidecar() {
+    // Auto-mark @agent services as external so CDS does not serve them locally.
+    // Auto-mark them as hcql services served externally, they are served from the main app.
+    // This runs after model load but before cds.serve() filters definitions,
+    // so users don't need to add these things manually.
+    cds.on("loaded", (csn) => {
+      const hcql = cds.requires.kinds["hcql"]
+      const agentSidecar = cds.requires.agent || {}
+      const hcqlBase = agentSidecar.url // For local development the base URL is given in the package.json
+      const agentCredentials = agentSidecar.credentials || {}
+      for (const [name, def] of Object.entries(csn.definitions || {})) {
+        if (def.kind !== "service") continue
+        if (!def["@agent"]) continue
+        // Mark as external so CDS does not serve it locally — it will be served via HCQL from the main app.
+        def["@cds.external"] = true
+        // Java main apps use the CDS service name in the HCQL path (/hcql/CatalogService),
+        // Node.js main apps use the slugified path (/hcql/catalog).
+        const isJava = !cds.env.profiles?.includes("node")
+        let n = isJava ? name : slugified(name)
+        if (cds.requires[name]) continue // skip if user provided service-specific config for this service
+        if (cds.requires[n]) continue // skip if user provided service-specific config for possibly the slugified version
+        const newRequiresEntry = { ...hcql, kind: "hcql" }
+        newRequiresEntry.credentials = {
+          ...agentCredentials,
+          ...(hcqlBase && { url: `${hcqlBase}/${n.split(".").pop()}` }),
+          ...(agentCredentials.destination && { path: `/${n.split(".").pop()}` }),
+        }
+        cds.requires[n] = newRequiresEntry
       }
-      cds.requires[n] = newRequiresEntry
-    }
-  })
+    })
 
-  cds.on("served", async () => {
-    const { bootstrapSidecar } = await import("./lib/sidecar.js")
-    await bootstrapSidecar()
-  })
-
-}()
+    cds.on("served", async () => {
+      const { bootstrapSidecar } = await import("./lib/sidecar.js")
+      await bootstrapSidecar()
+    })
+  })()
