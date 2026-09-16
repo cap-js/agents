@@ -352,7 +352,7 @@ class GraphExecutor {
   /**
    * Summarize partial work after forced interruption (timeout, quota, etc.).
    */
-  async _summarizePartialWork(taskId, contextId, serviceName, reason, approval = false) {
+  async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
     return summarizePartialWork({
       taskId,
@@ -363,7 +363,6 @@ class GraphExecutor {
       getModel: () => this._srv.send("buildModel"),
       // Summary runs after graph abort, so no execution-time grace is needed.
       timeout: 10_000,
-      approval,
     })
   }
 
@@ -930,8 +929,7 @@ class GraphExecutor {
             taskId,
             contextId,
             serviceName,
-            "timed out",
-            true,
+            "timeOut",
           )
 
           publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
@@ -949,13 +947,7 @@ class GraphExecutor {
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "quota_exceeded")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "quota_exceeded" })
 
-          const summary = await this._summarizePartialWork(
-            taskId,
-            contextId,
-            serviceName,
-            "quota exceeded",
-          )
-          const quotaSummary = cds.i18n.messages.at("AGENT_QUOTA_EXCEEDED_SUMMARY", [summary])
+          const summary = await this._summarizePartialWork(taskId, contextId, serviceName, "quota")
 
           audit("AgentTaskFailed", {
             data: {
@@ -974,7 +966,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "canceled",
-              message: agentMessage(quotaSummary),
+              message: agentMessage(summary),
               timestamp: new Date().toISOString(),
             },
             final: true,
