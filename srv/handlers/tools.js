@@ -78,8 +78,8 @@ class DescribeTool extends DynamicStructuredTool {
       description: def.description,
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
-      func: async (args) => {
-        return unwrap(await executeDescribe(srv, entities, actions, args))
+      func: (args) => {
+        return unwrap(executeDescribe(srv, entities, actions, args))
       },
     })
     this.srv = srv
