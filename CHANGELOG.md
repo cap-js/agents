@@ -20,6 +20,9 @@
 
 - Services with `@protocol: 'agent'` now also register `@agent` specific handlers
 - Mask apiKey in debug logs read from claude / opencode settings
+- Adjusted error message to be more accurate
+- Prompts are now correctly uploaded to MLFlow for markdown-based agents
+- `Judge.evaluate()` assessments now also appear in Databricks UC MLflow
 
 ## Version 0.9.4 - 2026-09-10
 
@@ -46,6 +49,7 @@
 
 - Adjusted agent audit log attributes to follow latest recommendations
 - LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
+- Prompt caching is now applied when GPT models are used (previously it was only applied with anthropic models)
 
 ### Fixed
 
