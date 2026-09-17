@@ -547,6 +547,7 @@ describe("pseudonymization OTel leak check", () => {
   beforeEach(resetCapture)
 
   it("does not leak personal data into any agent/LLM/tool OTel span", async () => {
+    cds.env.agents.mlflow = true
     const allSpans = await getSpansAfterRequest(() =>
       sendMessage("pseudo-book", "Who wrote these books?"),
     )
@@ -569,6 +570,7 @@ describe("pseudonymization OTel leak check", () => {
 
     expect(offenders).toEqual([])
     expect(sawHash).toBe(true)
+    cds.env.agents.mlflow = false
   })
 
   it("resolves pseudonymized names back to originals in the user-facing response", async () => {
