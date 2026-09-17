@@ -15,9 +15,10 @@ service CatalogService {
   entity Books       as
     projection on my.Books {
       *,
-      author.name as author
+      author.name as authorName
     }
     excluding {
+      author,
       createdBy,
       modifiedBy
     };

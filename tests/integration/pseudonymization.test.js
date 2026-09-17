@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { PseudoSession } from "../../lib/pseudonymize/store.js"
+import { PseudoSession, PSEUDONYMIZATION_STATE_CHANNEL } from "../../lib/pseudonymize/store.js"
 import * as pseudo from "../../lib/pseudonymize/helpers.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import {
@@ -77,15 +77,21 @@ describe("pseudonymization", () => {
       }
     })
 
-    it("persists and reloads mappings from DB", async () => {
+    it("loads mappings from graph state", async () => {
+      const previousCheckpointer = cds.context?.["agent.checkpointer"]
+      const previousThreadId = cds.context?.["agent.graph.thread_id"]
+      const graphState = { checkpoint: { channel_values: {} } }
+      cds.context["agent.checkpointer"] = { getTuple: async () => graphState }
+      cds.context["agent.graph.thread_id"] = `graph-${threadId}`
       const session = await PseudoSession.loadOrCreate(threadId)
       const hash = session.pseudonymize("Emily Brontë", "name")
-      await session.flush()
+      graphState.checkpoint.channel_values[PSEUDONYMIZATION_STATE_CHANNEL] = session.state()
 
-      // Evict from cache and reload from DB
       PseudoSession.evict(threadId)
       const reloaded = await PseudoSession.loadOrCreate(threadId)
       expect(reloaded.resolve(hash)).toBe("Emily Brontë")
+      cds.context["agent.checkpointer"] = previousCheckpointer
+      cds.context["agent.graph.thread_id"] = previousThreadId
     })
   })
 
@@ -384,10 +390,9 @@ describe("pseudonymization", () => {
       // ID is a key Integer → not annotated with @PersonalData → untouched
       expect(content).toContain("1")
 
-      // mapping persisted so a fresh session resolves it
-      PseudoSession.evict(threadId())
-      const reloaded = await PseudoSession.loadOrCreate(threadId())
-      const emilyHash = [...reloaded._hashToOriginal].find(([, o]) => o === "Emily Brontë")?.[0]
+      const emilyHash = [...cds.context._pseudoSession._hashToOriginal].find(
+        ([, original]) => original === "Emily Brontë",
+      )?.[0]
       expect(emilyHash).toBeDefined()
     })
 

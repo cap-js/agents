@@ -91,6 +91,7 @@
       "mlflow": false,
       "connect": "auto",
       "retention": "30d",
+      "pseudonymization": true,
       "[development]": {
         "pushNotifications": {
           "allowedDomains": [

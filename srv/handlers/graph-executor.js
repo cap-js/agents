@@ -558,6 +558,8 @@ class GraphExecutor {
             _userId: cds.context?.user?.id,
           },
         }
+        cds.context["agent.checkpointer"] = graph.checkpointer
+        cds.context["agent.graph.thread_id"] = config.configurable.thread_id
 
         const t0 = Date.now()
 
