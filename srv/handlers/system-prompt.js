@@ -21,7 +21,7 @@ export function buildSystemPrompt(srv) {
         ]
       : []),
     "Be concise and helpful.",
-    ...(cds.env.agents?.pseudonymization
+    ...(cds.env.agents?.masking
       ? [
           `## Processing info regarding pseudonymized values`,
           `Never comment on pseudonymization and that you had to work wiht pseudonymized values but use the pseudonymized values in responses like it would be regular values!`,
