@@ -2,13 +2,8 @@ import cds from "@sap/cds"
 import { PseudoSession, PSEUDONYMIZATION_STATE_CHANNEL } from "../../lib/pseudonymize/store.js"
 import * as pseudo from "../../lib/pseudonymize/helpers.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
-import {
-  setup,
-  teardown,
-  resetCapture,
-  getSpansAfterRequest,
-  createSendMessage,
-} from "../utils/telemetry-utils.js"
+import { setup, teardown, resetCapture, getSpansAfterRequest } from "../utils/telemetry-utils.js"
+import createHelpers from "../utils/helpers.js"
 
 const mock = createMockAICore()
 const mockPort = await mock.start()
@@ -16,9 +11,24 @@ process.env.MOCK_AICORE_PORT = String(mockPort)
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
-const sendMessage = createSendMessage(POST)
+const CHECKPOINTS = "cap.agent.Checkpoints"
+
+async function latestPseudonymizationState(threadId) {
+  const row = await SELECT.one
+    .from(CHECKPOINTS)
+    .columns("checkpoint")
+    .where({ thread_id: threadId })
+    .orderBy("checkpoint_id desc")
+  return JSON.parse(row?.checkpoint ?? "{}").channel_values?.[PSEUDONYMIZATION_STATE_CHANNEL]
+}
 
 describe("pseudonymization", () => {
+  let sendMessage
+  before(async () => {
+    const helpers = createHelpers({ POST, axios })
+    sendMessage = helpers.sendMessage
+  })
+
   describe("PseudoSession", () => {
     const threadId = `CatalogService:test-context-${Date.now()}`
 
@@ -78,20 +88,26 @@ describe("pseudonymization", () => {
     })
 
     it("loads mappings from graph state", async () => {
-      const previousCheckpointer = cds.context?.["agent.checkpointer"]
-      const previousThreadId = cds.context?.["agent.graph.thread_id"]
-      const graphState = { checkpoint: { channel_values: {} } }
-      cds.context["agent.checkpointer"] = { getTuple: async () => graphState }
-      cds.context["agent.graph.thread_id"] = `graph-${threadId}`
-      const session = await PseudoSession.loadOrCreate(threadId)
-      const hash = session.pseudonymize("Emily Brontë", "name")
-      graphState.checkpoint.channel_values[PSEUDONYMIZATION_STATE_CHANNEL] = session.state()
+      const first = await sendMessage("pseudo-book", "Who wrote these books?")
+      expect(first.status).toBe(200)
+      const contextId = first.data.result.contextId
+      const graphThreadId = `PseudoBookService:${contextId}`
+      const pseudoThreadId = `PseudoBookService:_:anonymous:${contextId}`
 
-      PseudoSession.evict(threadId)
-      const reloaded = await PseudoSession.loadOrCreate(threadId)
-      expect(reloaded.resolve(hash)).toBe("Emily Brontë")
-      cds.context["agent.checkpointer"] = previousCheckpointer
-      cds.context["agent.graph.thread_id"] = previousThreadId
+      const firstState = await latestPseudonymizationState(graphThreadId)
+      const firstMappings = new Map(firstState?.mappings ?? [])
+      const firstHash = [...firstMappings.entries()].find(
+        ([, value]) => value === "Emily Brontë",
+      )?.[0]
+      expect(firstHash).toMatch(/^<<name>:[0-9a-f]{8}>$/)
+
+      PseudoSession.evict(pseudoThreadId)
+      const second = await sendMessage("pseudo-book", "Who wrote these books?", { contextId })
+      expect(second.status).toBe(200)
+
+      const secondState = await latestPseudonymizationState(graphThreadId)
+      const secondMappings = new Map(secondState?.mappings ?? [])
+      expect(secondMappings.get(firstHash)).toBe("Emily Brontë")
     })
   })
 
@@ -311,7 +327,7 @@ describe("pseudonymization", () => {
           "SELECT * FROM CatalogService.Books as b " +
             "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
         ),
-      ).toEqual(["author", "name", "placeOfBirth"])
+      ).toEqual(["authorName", "name", "placeOfBirth"])
     })
   })
 
@@ -545,6 +561,11 @@ describe("pseudonymization", () => {
 describe("pseudonymization OTel leak check", () => {
   const AGENT_SPAN = /^(chat |execute_tool |workflow |task |invoke_agent)/
   axios.defaults.validateStatus = () => true
+  let sendMessage
+  before(async () => {
+    const helpers = createHelpers({ POST, axios })
+    sendMessage = helpers.sendMessage
+  })
   after(async () => {
     teardown()
     await mock.stop()
