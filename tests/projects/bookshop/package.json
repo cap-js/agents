@@ -5,12 +5,12 @@
   "description": "Sample CAP bookshop for @cap-js/agents tests",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
-    "@cap-js/audit-logging": ">=1",
-    "@cap-js/hana": ">=1",
+    "@cap-js/audit-logging": "^1.3.0",
+    "@cap-js/hana": "^3.1.0",
     "@cap-js/mcp": "^1",
     "@cap-js/telemetry": "^2",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
-    "@sap/cds": "^10.0.6",
+    "@sap/cds": "^10.1.0",
     "@sap/xssec": "^4",
     "zod": "^4.3.6"
   },
@@ -29,12 +29,12 @@
       },
       "activeUsersInterval": "1s",
       "[testTimeout]": {
-        "pool": {
+        "quotas": {
           "maxExecutionTimePerTask": "10s"
         }
       },
       "[test]": {
-        "pool": {
+        "quotas": {
           "maxTasksPerHour": 10000,
           "maxTasksPerHourPerUser": 10000
         },
@@ -67,6 +67,10 @@
         "metrics": false
       },
       "[test]": {
+        "llm": "mock",
+        "[hybrid]": {
+          "llm": "aicore"
+        },
         "audit-log": {
           "outbox": false,
           "kind": "audit-log-to-console"
@@ -161,6 +165,12 @@
                 "prompt-cache-54-nano"
               ]
             }
+          }
+        },
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "url": ":memory:"
           }
         }
       },

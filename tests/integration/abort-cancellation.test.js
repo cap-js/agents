@@ -282,8 +282,8 @@ describe("GraphExecutor - graceful timeout", () => {
 
       // Use very short timeout for test speed
       cds.env.agents = cds.env.agents || {}
-      cds.env.agents.pool = cds.env.agents.pool || {}
-      cds.env.agents.pool.maxExecutionTimePerTask = 200
+      cds.env.agents.quotas = cds.env.agents.quotas || {}
+      cds.env.agents.quotas.maxExecutionTimePerTask = 200
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
@@ -301,7 +301,7 @@ describe("GraphExecutor - graceful timeout", () => {
       await new Promise((r) => setTimeout(r, 50))
 
       // Restore
-      cds.env.agents.pool.maxExecutionTimePerTask = "5min"
+      cds.env.agents.quotas.maxExecutionTimePerTask = "5min"
 
       const inputRequiredEvent = publishedEvents.find((e) => e.status?.state === "input-required")
       assert.ok(inputRequiredEvent, "timeout should publish input-required status")
@@ -362,8 +362,8 @@ describe("GraphExecutor - graceful timeout", () => {
       }
 
       cds.env.agents = cds.env.agents || {}
-      cds.env.agents.pool = cds.env.agents.pool || {}
-      cds.env.agents.pool.maxExecutionTimePerTask = 200
+      cds.env.agents.quotas = cds.env.agents.quotas || {}
+      cds.env.agents.quotas.maxExecutionTimePerTask = 200
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
       // Inject resolved graph directly so checkpointer is accessible
@@ -383,7 +383,7 @@ describe("GraphExecutor - graceful timeout", () => {
       await new Promise((r) => setTimeout(r, 50))
 
       // Restore
-      cds.env.agents.pool.maxExecutionTimePerTask = "5min"
+      cds.env.agents.quotas.maxExecutionTimePerTask = "5min"
 
       const inputRequiredEvent = publishedEvents.find((e) => e.status?.state === "input-required")
       assert.ok(

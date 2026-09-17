@@ -4,7 +4,7 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.5 - tbd.
+## Version 0.9.5 - 2026-09-16
 
 ### Added
 
@@ -15,6 +15,7 @@
 ### Changed
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+- Renamed config option `cds.agents.pool` to `cds.agents.quotas`
 
 ### Fixed
 
@@ -23,6 +24,7 @@
 - Adjusted error message to be more accurate
 - Prompts are now correctly uploaded to MLFlow for markdown-based agents
 - `Judge.evaluate()` assessments now also appear in Databricks UC MLflow
+- Propagate opentelemetry traceparent to subagents
 
 ## Version 0.9.4 - 2026-09-10
 

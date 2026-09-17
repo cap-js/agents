@@ -36,8 +36,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
   let originalQuota
 
   before(async () => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
+    originalQuota = cds.env.agents.quotas.maxTasksPerHourPerUser
+    cds.env.agents.quotas.maxTasksPerHourPerUser = 200
 
     // Wire audit capture
     if (!cds.env.requires?.["audit-log"]?.kind)
@@ -50,7 +50,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
   })
 
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
+    cds.env.agents.quotas.maxTasksPerHourPerUser = originalQuota
     teardown()
     mock.stop()
   })

@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "CDS plugin for building agents",
   "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
@@ -148,7 +148,7 @@
           "image/jpeg"
         ]
       },
-      "pool": {
+      "quotas": {
         "maxConcurrentTasks": 10,
         "maxConcurrentTasksPerUser": 4,
         "maxTasksPerHour": 100,
@@ -190,7 +190,7 @@
         }
       },
       "[development]": {
-        "llm": "mock"
+        "llm": "auto"
       },
       "[with-claude]": {
         "llm": "anthropic"

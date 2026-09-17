@@ -11,13 +11,13 @@ The plugin enforces configurable rate limits and resource quotas at two levels:
 <details>
 <summary>Configuration</summary>
 
-All limits are configured via `cds.env.agents.pool` (defaults provided by the plugin):
+All limits are configured via `cds.env.agents.quotas` (defaults provided by the plugin):
 
 ```json
 {
   "cds": {
     "agents": {
-      "pool": {
+      "quotas": {
         "maxConcurrentTasks": 10,
         "maxConcurrentTasksPerUser": 4,
         "maxTasksPerHour": 100,

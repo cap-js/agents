@@ -27,10 +27,6 @@
       "description": "Query data from the service. Available entities: 
  Authors: Pseudonymized authors of the books on offer 
  Books: Book details with author information 
- Currencies: Code list for currencies
-
-See https://cap.cloud.sap/docs/cds/common#entity-currencies 
- Genres: Hierarchically organized Code List for Genres 
  ListOfBooks: Browse available books",
       "examples": [
         "Show me all Authors",
@@ -43,7 +39,7 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
         "read",
         "authors",
         "books",
-        "currencies",
+        "listofbooks",
       ],
     },
     {
