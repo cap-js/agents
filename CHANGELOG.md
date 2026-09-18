@@ -9,6 +9,7 @@
 ### Fixed
 
 - Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
+- `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
 
 ## Version 0.9.5 - 2026-09-16
 
