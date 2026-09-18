@@ -9,6 +9,7 @@
 ### Fixed
 
 - Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
 
 ## Version 0.9.5 - 2026-09-16
 
