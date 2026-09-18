@@ -1,6 +1,7 @@
 import cds from "@sap/cds"
 cds.test(import.meta.dirname + "/../projects/bookshop")
 import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
+import { PseudoSession, PSEUDONYMIZATION_STATE_CHANNEL } from "../../lib/pseudonymize/store.js"
 
 const CHECKPOINTS = "cap.agent.Checkpoints"
 const WRITES = "cap.agent.CheckpointWrites"
@@ -38,6 +39,25 @@ async function seedCheckpoints(userId, threadId, count) {
 
 describe("CdsCheckpointSaver", () => {
   const saver = new CdsCheckpointSaver()
+
+  it("stores pseudonymization mappings in checkpoint state", async () => {
+    const thread = `pseudo-state-${cds.utils.uuid()}`
+    await runAs("alice", async () => {
+      const session = new PseudoSession("pseudo-session", "seed")
+      const hash = session.pseudonymize("Emily Brontë", "name")
+      cds.context._pseudoSession = session
+      await saver.put(
+        { configurable: { thread_id: thread, checkpoint_ns: "" } },
+        makeCheckpoint(`cp-${cds.utils.uuid()}`),
+        { step: 0, source: "input" },
+      )
+      delete cds.context._pseudoSession
+
+      const tuple = await saver.getTuple({ configurable: { thread_id: thread } })
+      const state = tuple.checkpoint.channel_values[PSEUDONYMIZATION_STATE_CHANNEL]
+      expect(new Map(state.mappings).get(hash)).toBe("Emily Brontë")
+    })
+  })
 
   describe("list()", () => {
     it("returns checkpoints in descending order", async () => {

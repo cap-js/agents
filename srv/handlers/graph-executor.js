@@ -6,6 +6,7 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
+import { resolvePseudonyms } from "../../lib/pseudonymize/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -197,6 +198,9 @@ class GraphExecutor {
     // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
     let thinkingCount = 0
+    // Holds a trailing fragment of the previous chunk that is a prefix of a known
+    // pseudonym hash. Prepended to the next chunk so split hashes are resolved correctly.
+    let pendingPrefix = ""
 
     try {
       if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
@@ -238,8 +242,23 @@ class GraphExecutor {
           const lastChunk =
             !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
-          const text = messageText(msgChunk?.content)
-          if (!text) continue
+          const raw = pendingPrefix + (messageText(msgChunk?.content) ?? "")
+          pendingPrefix = ""
+          if (!raw) continue
+
+          // Hashes look like <<prefix>:8hexchars> and never contain spaces.
+          // On non-last chunks, slice last token and append to next chunk
+          // to avoid unresolved boundaries
+          let toEmit = raw
+          if (!lastChunk) {
+            const lastSpace = raw.lastIndexOf(" ")
+            if (lastSpace !== -1 && lastSpace < raw.length - 1) {
+              pendingPrefix = raw.slice(lastSpace + 1)
+              toEmit = raw.slice(0, lastSpace + 1)
+            }
+          }
+
+          const text = resolvePseudonyms(toEmit)
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
           // ResultManager reads event.append; nesting them leaves it undefined and
@@ -354,16 +373,18 @@ class GraphExecutor {
    */
   async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
-    return summarizePartialWork({
-      taskId,
-      contextId,
-      serviceName,
-      reason,
-      checkpointer: this._graph?.checkpointer,
-      getModel: () => this._srv.send("buildModel"),
-      // Summary runs after graph abort, so no execution-time grace is needed.
-      timeout: 10_000,
-    })
+    return resolvePseudonyms(
+      summarizePartialWork({
+        taskId,
+        contextId,
+        serviceName,
+        reason,
+        checkpointer: this._graph?.checkpointer,
+        getModel: () => this._srv.send("buildModel"),
+        // Summary runs after graph abort, so no execution-time grace is needed.
+        timeout: 10_000,
+      }),
+    )
   }
 
   async execute(requestContext, eventBus) {
@@ -553,6 +574,8 @@ class GraphExecutor {
             _userId: cds.context?.user?.id,
           },
         }
+        cds.context["agent.checkpointer"] = graph.checkpointer
+        cds.context["agent.graph.thread_id"] = config.configurable.thread_id
 
         const t0 = Date.now()
 
@@ -611,7 +634,7 @@ class GraphExecutor {
         }
 
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = outputMapper(result) || "I could not generate a response."
+        const output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
 
         LOG.info(serviceName, "completed", { conversation: short(contextId), duration })
 
@@ -620,7 +643,9 @@ class GraphExecutor {
           setSpanAttrs(
             wfSpan,
             mlflowAttrs("AGENT", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: output } }],
+              },
               functionName: serviceName,
             }),
           )
@@ -630,7 +655,9 @@ class GraphExecutor {
           setSpanAttrs(
             rootSpan,
             mlflowAttrs("CHAIN", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: output } }],
+              },
             }),
           )
         }

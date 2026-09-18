@@ -26,7 +26,8 @@
     {
       "description": "Query data from the service. Available entities: 
  Books: Book details with author information 
- ListOfBooks: Browse available books",
+ ListOfBooks: Browse available books 
+ Authors: Pseudonymized authors of the books on offer",
       "examples": [
         "Show me all Books",
       ],
@@ -38,6 +39,7 @@
         "read",
         "books",
         "listofbooks",
+        "authors",
       ],
     },
     {
@@ -62,6 +64,18 @@
       "name": "getStock",
       "tags": [
         "getstock",
+        "function",
+      ],
+    },
+    {
+      "description": "Look up author contact details",
+      "examples": [
+        "Look up author contact details",
+      ],
+      "id": "findAuthor",
+      "name": "findAuthor",
+      "tags": [
+        "findauthor",
         "function",
       ],
     },
