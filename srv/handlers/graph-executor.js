@@ -396,8 +396,10 @@ class GraphExecutor {
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
 
-    await anonymizeUserMessageWithHana(requestContext, serviceName, contextId)
-    await anonymizeUserMessageWithDpi(requestContext, serviceName, contextId)
+    if (cds.env.agents.masking) {
+      await anonymizeUserMessageWithHana(requestContext, serviceName, contextId)
+      await anonymizeUserMessageWithDpi(requestContext, serviceName, contextId)
+    }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
