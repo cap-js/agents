@@ -258,10 +258,10 @@ describe("pseudonymization", () => {
     })
   })
 
-  describe("queryEntityElements (alias handling)", () => {
-    const { queryEntityElements } = pseudo
+  describe("discoverElementsToBeMasked (alias handling)", () => {
+    const { discoverElementsToBeMasked } = pseudo
     const srv = { name: "CatalogService" }
-    const fields = (cql) => [...queryEntityElements(cds.model, srv, cql, true)].sort()
+    const fields = (cql) => [...discoverElementsToBeMasked(cds.model, srv, cql, true)].sort()
 
     it("returns element names for plain columns", () => {
       expect(fields("SELECT ID, name, placeOfBirth FROM CatalogService.Authors")).toEqual([
@@ -284,12 +284,32 @@ describe("pseudonymization", () => {
       // dateOfBirth is a Date → never hashed, even when aliased
       expect(fields("SELECT ID, dateOfBirth as dob FROM CatalogService.Authors")).toEqual([])
     })
+
+    it("hashes a navigation path column (association.element as alias)", () => {
+      // SELECT author.name as author FROM Books: ref is ["author","name"], alias "author"
+      // ref[0] is an association name, not a table alias — must resolve through the association.
+      // AdminService.Books keeps the author association (CatalogService.Books excludes it).
+      const adminSrv = { name: "AdminService" }
+      const adminFields = (cql) =>
+        [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
+      expect(
+        adminFields("SELECT title, author.name as author, price FROM AdminService.Books"),
+      ).toEqual(["author"])
+    })
+
+    it("hashes a navigation path column without alias", () => {
+      // Without alias the result key is the element name "name"
+      const adminSrv = { name: "AdminService" }
+      const adminFields = (cql) =>
+        [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
+      expect(adminFields("SELECT title, author.name FROM AdminService.Books")).toEqual(["name"])
+    })
   })
 
-  describe("queryEntityElements (joins)", () => {
-    const { queryEntityElements } = pseudo
+  describe("discoverElementsToBeMasked (joins)", () => {
+    const { discoverElementsToBeMasked } = pseudo
     const srv = { name: "CatalogService" }
-    const fields = (cql) => [...queryEntityElements(cds.model, srv, cql, true)].sort()
+    const fields = (cql) => [...discoverElementsToBeMasked(cds.model, srv, cql, true)].sort()
 
     it("hashes an annotated column from a joined entity (inner join)", () => {
       expect(
