@@ -25,11 +25,11 @@
   "skills": [
     {
       "description": "Query data from the service. Available entities: 
- Authors: Pseudonymized authors of the books on offer 
- Books: Book details with author information 
- ListOfBooks: Browse available books",
+      Books: Book details with author information 
+      ListOfBooks: Browse available books
+      Authors: Pseudonymized authors of the books on offer",
       "examples": [
-        "Show me all Authors",
+         "Show me all Books",
       ],
       "id": "query",
       "name": "Data Query",
@@ -40,6 +40,7 @@
         "authors",
         "books",
         "listofbooks",
+        "authors",
       ],
     },
     {
