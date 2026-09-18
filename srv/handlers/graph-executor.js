@@ -7,7 +7,6 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/pseudonymize/index.js"
-import { SESSION_KEY } from "../../lib/pseudonymize/helpers.js"
 import { anonymizeUserMessage as anonymizeUserMessageWithHana } from "../../lib/pseudonymize/unstructuredText-hana.js"
 import { anonymizeUserMessage as anonymizeUserMessageWithDpi } from "../../lib/pseudonymize/unstructuredText-dpi.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
@@ -121,11 +120,6 @@ function defaultOutputMapper(result) {
  */
 function extractText(requestContext) {
   return partsToText(requestContext.userMessage?.parts)
-}
-
-function resolvePseudonyms(text) {
-  if (typeof text !== "string") return text
-  return cds.context?.[SESSION_KEY]?.resolveText(text) ?? text
 }
 
 /**
