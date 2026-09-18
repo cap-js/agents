@@ -6,6 +6,10 @@
 
 ## Version 0.9.6 - 2026-09-17
 
+### Added
+
+- `createAutoDeepAgent` now accepts an optional `options` parameter to pass `responseFormat` through to `createDeepAgent`, enabling structured output enforcement for markdown-based agents
+
 ### Fixed
 
 - Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
