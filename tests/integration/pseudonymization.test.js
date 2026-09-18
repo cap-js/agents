@@ -1,14 +1,9 @@
 import cds from "@sap/cds"
-import { PseudoSession } from "../../lib/pseudonymize/store.js"
+import { PseudoSession, PSEUDONYMIZATION_STATE_CHANNEL } from "../../lib/pseudonymize/store.js"
 import * as pseudo from "../../lib/pseudonymize/helpers.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
-import {
-  setup,
-  teardown,
-  resetCapture,
-  getSpansAfterRequest,
-  createSendMessage,
-} from "../utils/telemetry-utils.js"
+import { setup, teardown, resetCapture, getSpansAfterRequest } from "../utils/telemetry-utils.js"
+import createHelpers from "../utils/helpers.js"
 
 const mock = createMockAICore()
 const mockPort = await mock.start()
@@ -16,9 +11,24 @@ process.env.MOCK_AICORE_PORT = String(mockPort)
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
-const sendMessage = createSendMessage(POST)
+const CHECKPOINTS = "cap.agent.Checkpoints"
+
+async function latestPseudonymizationState(threadId) {
+  const row = await SELECT.one
+    .from(CHECKPOINTS)
+    .columns("checkpoint")
+    .where({ thread_id: threadId })
+    .orderBy("checkpoint_id desc")
+  return JSON.parse(row?.checkpoint ?? "{}").channel_values?.[PSEUDONYMIZATION_STATE_CHANNEL]
+}
 
 describe("pseudonymization", () => {
+  let sendMessage
+  before(async () => {
+    const helpers = createHelpers({ POST, axios })
+    sendMessage = helpers.sendMessage
+  })
+
   describe("PseudoSession", () => {
     const threadId = `CatalogService:test-context-${Date.now()}`
 
@@ -27,7 +37,7 @@ describe("pseudonymization", () => {
     it("hashes a string value with property name prefix", async () => {
       const session = await PseudoSession.loadOrCreate(threadId)
       const hash = session.pseudonymize("Emily Brontë", "name")
-      expect(hash).toMatch(/^name_[0-9a-f]{8}$/)
+      expect(hash).toMatch(/^<<name>:[0-9a-f]{8}>$/)
     })
 
     it("same value produces same hash within session (idempotent)", async () => {
@@ -77,15 +87,27 @@ describe("pseudonymization", () => {
       }
     })
 
-    it("persists and reloads mappings from DB", async () => {
-      const session = await PseudoSession.loadOrCreate(threadId)
-      const hash = session.pseudonymize("Emily Brontë", "name")
-      await session.flush()
+    it("loads mappings from graph state", async () => {
+      const first = await sendMessage("pseudo-book", "Who wrote these books?")
+      expect(first.status).toBe(200)
+      const contextId = first.data.result.contextId
+      const graphThreadId = `PseudoBookService:${contextId}`
+      const pseudoThreadId = `PseudoBookService:_:anonymous:${contextId}`
 
-      // Evict from cache and reload from DB
-      PseudoSession.evict(threadId)
-      const reloaded = await PseudoSession.loadOrCreate(threadId)
-      expect(reloaded.resolve(hash)).toBe("Emily Brontë")
+      const firstState = await latestPseudonymizationState(graphThreadId)
+      const firstMappings = new Map(firstState?.mappings ?? [])
+      const firstHash = [...firstMappings.entries()].find(
+        ([, value]) => value === "Emily Brontë",
+      )?.[0]
+      expect(firstHash).toMatch(/^<<name>:[0-9a-f]{8}>$/)
+
+      PseudoSession.evict(pseudoThreadId)
+      const second = await sendMessage("pseudo-book", "Who wrote these books?", { contextId })
+      expect(second.status).toBe(200)
+
+      const secondState = await latestPseudonymizationState(graphThreadId)
+      const secondMappings = new Map(secondState?.mappings ?? [])
+      expect(secondMappings.get(firstHash)).toBe("Emily Brontë")
     })
   })
 
@@ -191,7 +213,7 @@ describe("pseudonymization", () => {
         { name: "Charlotte", ID: 2 },
       ]
       _pseudonymizeData(rows, new Set(["name"]), session)
-      expect(rows[0].name).toMatch(/^name_[0-9a-f]{8}$/)
+      expect(rows[0].name).toMatch(/^<<name>:[0-9a-f]{8}>$/)
       expect(rows[0].ID).toBe(1) // untouched
       expect(session.resolve(rows[0].name)).toBe("Emily")
     })
@@ -200,7 +222,7 @@ describe("pseudonymization", () => {
       const session = await PseudoSession.loadOrCreate(threadId)
       const row = { name: "Emily", nick: null }
       _pseudonymizeData(row, new Set(["name", "nick"]), session)
-      expect(row.name).toMatch(/^name_/)
+      expect(row.name).toMatch(/^<<name>:/)
       expect(row.nick).toBeNull() // null skipped
     })
 
@@ -305,13 +327,12 @@ describe("pseudonymization", () => {
           "SELECT * FROM CatalogService.Books as b " +
             "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
         ),
-      ).toEqual(["author", "name", "placeOfBirth"])
+      ).toEqual(["authorName", "name", "placeOfBirth"])
     })
   })
 
   // ─── E2E: full middleware hook flow ───────────────────────────────────────
-  // Drives the real pseudonymizeMiddleware hooks (wrapToolCall → wrapModelCall)
-  // against the CatalogService model with real @PersonalData
+  // Drives the real pseudonymizeMiddleware hooks (wrapToolCall → wrapModelCall
   // annotations, real TOON encoding, and real LangChain message classes.
   // No LLM: the model handler is a deterministic fake.
   describe("middleware E2E", () => {
@@ -380,15 +401,14 @@ describe("pseudonymization", () => {
 
       // originals must not appear; hashes must
       expect(content).not.toContain("Emily Brontë")
-      expect(content).toContain("name_")
-      expect(content).toContain("placeOfBirth_")
+      expect(content).toContain("<<name>:")
+      expect(content).toContain("<<placeOfBirth>:")
       // ID is a key Integer → not annotated with @PersonalData → untouched
       expect(content).toContain("1")
 
-      // mapping persisted so a fresh session resolves it
-      PseudoSession.evict(threadId())
-      const reloaded = await PseudoSession.loadOrCreate(threadId())
-      const emilyHash = [...reloaded._hashToOriginal].find(([, o]) => o === "Emily Brontë")?.[0]
+      const emilyHash = [...cds.context._pseudoSession._hashToOriginal].find(
+        ([, original]) => original === "Emily Brontë",
+      )?.[0]
       expect(emilyHash).toBeDefined()
     })
 
@@ -429,7 +449,7 @@ describe("pseudonymization", () => {
         toolReq,
         async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "query" }),
       )
-      const hash = toolMsg.content.match(/name_[0-9a-f]{8}/)[0]
+      const hash = toolMsg.content.match(/<<name>:[0-9a-f]{8}>/)[0]
 
       // model may echo the hash; GraphExecutor resolves it back before publishing.
       const session = cds.context._pseudoSession
@@ -456,12 +476,12 @@ describe("pseudonymization", () => {
 
       // annotated name → hashed; unannotated email → untouched
       expect(content).not.toContain("Emily Brontë")
-      expect(content).toContain("name_")
+      expect(content).toContain("<<name>:")
       expect(content).toContain("1818-07-30")
 
       // hash resolves back to the original
       const session = cds.context["_pseudoSession"]
-      const hash = content.match(/name_[0-9a-f]{8}/)[0]
+      const hash = content.match(/<<name>:[0-9a-f]{8}>/)[0]
       expect(session.resolve(hash)).toBe("Emily Brontë")
     })
 
@@ -492,10 +512,10 @@ describe("pseudonymization", () => {
       // aliased personal-data column must still be hashed (no PII leak)
       expect(content).not.toContain(author)
       // hash prefix uses the alias (the result key)
-      expect(content).toMatch(/authorName_[0-9a-f]{8}/)
+      expect(content).toMatch(/<<authorName>:[0-9a-f]{8}>/)
 
       const session = cds.context["_pseudoSession"]
-      const hash = content.match(/authorName_[0-9a-f]{8}/)[0]
+      const hash = content.match(/<<authorName>:[0-9a-f]{8}>/)[0]
       expect(session.resolve(hash)).toBe(author)
     })
 
@@ -528,28 +548,31 @@ describe("pseudonymization", () => {
       // annotated joined column hashed; non-personal title untouched
       expect(content).not.toContain(author)
       expect(content).toContain("Wuthering Heights")
-      expect(content).toMatch(/name_[0-9a-f]{8}/)
+      expect(content).toMatch(/<<name>:[0-9a-f]{8}>/)
 
       const session = cds.context["_pseudoSession"]
-      const hash = content.match(/name_[0-9a-f]{8}/)[0]
+      const hash = content.match(/<<name>:[0-9a-f]{8}>/)[0]
       expect(session.resolve(hash)).toBe(author)
     })
   })
 })
 
-// OTel leak check: run agent flow and verify no personal data reaches any agent/LLM/tool span.
+// ─── OTel leak check: run agent flow, verify no PII in any agent/LLM/tool span ─
 describe("pseudonymization OTel leak check", () => {
   const AGENT_SPAN = /^(chat |execute_tool |workflow |task |invoke_agent)/
-
   axios.defaults.validateStatus = () => true
-  let originalMlflow
-  before(() => {
-    originalMlflow = cds.env.agents?.mlflow
-    cds.env.agents = cds.env.agents || {}
+  let sendMessage
+  before(async () => {
+    const helpers = createHelpers({ POST, axios })
+    sendMessage = helpers.sendMessage
+    // Enable debug logging so gen_ai.tool.call.arguments and gen_ai.tool.call.result
+    // attrs fire — these carry resolved (real) PII and must be scrubbed by the span processor.
+    cds.log("agents", { level: "debug" })
     cds.env.agents.mlflow = true
   })
   after(async () => {
-    cds.env.agents.mlflow = originalMlflow
+    cds.log("agents", { level: "warn" })
+    cds.env.agents.mlflow = false
     teardown()
     await mock.stop()
   })
@@ -562,12 +585,18 @@ describe("pseudonymization OTel leak check", () => {
     const spans = allSpans.filter((s) => AGENT_SPAN.test(s.name))
     expect(spans.length).toBeGreaterThan(0)
 
+    // Confirm debug attrs are present — ensures the test covers the JSON-string PII path.
+    // gen_ai.tool.call.arguments carries resolved (real) args going into the tool.
+    const toolSpans = allSpans.filter((s) => s.name.startsWith("execute_tool"))
+    const hasDebugAttr = toolSpans.some((s) => "gen_ai.tool.call.arguments" in (s.attributes ?? {}))
+    expect(hasDebugAttr).toBe(true)
+
     const authors = (await SELECT.from("CatalogService.Authors")).map((a) => a.name)
     const offenders = []
     let sawHash = false
     for (const span of spans) {
       for (const s of collectSpanStrings(span)) {
-        if (/name_[0-9a-f]{8}/.test(s)) sawHash = true
+        if (/<<name>:[0-9a-f]{8}>/.test(s)) sawHash = true
         for (const pii of authors) {
           if (s.includes(pii)) {
             offenders.push({ span: span.name, pii, snippet: s.slice(0, 160) })
@@ -581,12 +610,11 @@ describe("pseudonymization OTel leak check", () => {
   })
 
   it("resolves pseudonymized names back to originals in the user-facing response", async () => {
-    resetCapture()
     const res = await sendMessage("pseudo-book", "Who wrote these books?")
     expect(res.status).toBe(200)
     const text = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""
     expect(text).toMatch(/Brontë|Poe|Carpenter/)
-    expect(text).not.toMatch(/name_[0-9a-f]{8}/)
+    expect(text).not.toMatch(/<<name>/)
   })
 })
 

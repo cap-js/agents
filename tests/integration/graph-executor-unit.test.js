@@ -58,7 +58,7 @@ describe("summarizePartialWork", () => {
     const summary = await summarizePartialWork({
       contextId: "summary-context",
       serviceName: "TestService",
-      reason: "timed out",
+      reason: "timeOut",
       approval: true,
       checkpointer: {
         getTuple: async () => ({
@@ -91,11 +91,11 @@ describe("summarizePartialWork", () => {
     const fallback = await summarizePartialWork({
       contextId: "summary-fallback",
       serviceName: "TestService",
-      reason: "timed out",
+      reason: "timeOut",
       approval: true,
     })
 
-    expect(fallback).toBe(cds.i18n.messages.at("AGENT_SUMMARY_TIMEOUT_FALLBACK", ["timed out"]))
+    expect(fallback).toBe(cds.i18n.messages.at("AGENT_SUMMARY_TIMEOUT_FALLBACK"))
   })
 })
 

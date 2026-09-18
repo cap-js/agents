@@ -15,9 +15,10 @@ service CatalogService {
   entity Books       as
     projection on my.Books {
       *,
-      author.name as author
+      author.name as authorName
     }
     excluding {
+      author,
       createdBy,
       modifiedBy
     };
@@ -32,7 +33,9 @@ service CatalogService {
     excluding {
       descr
     };
-  // used for pseudonymization tests
+  /**
+   * Pseudonymized authors of the books on offer
+   */
   @readonly
   entity Authors     as
     projection on my.Authors

@@ -1,14 +1,14 @@
 /**
- * Local (in-process) sub-agent delegation — hybrid executor (real LLM via AI Core).
+ * Local (in-process) subagent delegation — hybrid executor (real LLM via AI Core).
  * Run with: npm run test:hybrid
  *
  * Exercises buildSubAgentToolLocally: CatalogService (a standard ReAct agent)
  * delegates to GraphBookService, a peer @agent in the SAME CDS model with no
- * cds.requires credentials. The sub-agent is driven in its own detached
+ * cds.requires credentials. The subagent is driven in its own detached
  * transaction (cds.spawn), independent of the calling agent's tx.
  *
  * Regression guard for two coupled bugs:
- *   1. A nested sub-agent sharing the parent's tx wrote checkpoints not yet
+ *   1. A nested subagent sharing the parent's tx wrote checkpoints not yet
  *      visible to the executor's post-stream recovery read → null final state.
  *   2. GraphBookService's custom StateGraph persists its reduced state under a
  *      nested checkpoint_ns ("tools:…"), which the executor's recovery (default
@@ -20,22 +20,22 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { streamMessage, parseSSEFrames } = createHelpers({ POST, axios })
 
-describe("@cap-js/agents - local sub-agent delegation (hybrid)", () => {
-  it("CatalogService delegates to the GraphBookService sub-agent without a null-state error", async () => {
+describe("@cap-js/agents - local subagent delegation (hybrid)", () => {
+  it("CatalogService delegates to the GraphBookService subagent without a null-state error", async () => {
     const res = await streamMessage(
       "catalog",
-      "Use the graphbookservice sub-agent to list books, then tell me what it returned.",
+      "Use the graphbookservice subagent to list books, then tell me what it returned.",
     )
     const frames = parseSSEFrames(res.data)
 
-    // The sub-agent's null-state crash surfaced as this exact tool/agent error.
+    // The subagent's null-state crash surfaced as this exact tool/agent error.
     const nullStateError = frames.find((f) => JSON.stringify(f).includes("reading 'messages'"))
-    expect(nullStateError, "sub-agent must not fail with a null-state error").toBeFalsy()
+    expect(nullStateError, "subagent must not fail with a null-state error").toBeFalsy()
 
     const final = frames.find((f) => ["completed", "failed"].includes(f.result?.status?.state))
     expect(final?.result?.status?.state, "task should complete, not fail").toBe("completed")
 
-    // The parent's answer should reflect real book data the sub-agent queried.
+    // The parent's answer should reflect real book data the subagent queried.
     const text = final?.result?.status?.message?.parts
       ?.filter((p) => p.kind === "text")
       .map((p) => p.text)

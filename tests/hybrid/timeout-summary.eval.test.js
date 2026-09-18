@@ -31,8 +31,7 @@ describe("timeout summary", () => {
     const summary = await summarizePartialWork({
       contextId: "timeout-summary-eval",
       serviceName: "CatalogService",
-      reason: "timed out",
-      approval: true,
+      reason: "timeOut",
       checkpointer: {
         getTuple: async () => ({
           checkpoint: {

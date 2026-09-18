@@ -6,7 +6,7 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
-import { scrubForTrace } from "../../lib/pseudonymize/index.js"
+import { resolvePseudonyms } from "../../lib/pseudonymize/index.js"
 import { SESSION_KEY } from "../../lib/pseudonymize/helpers.js"
 import { anonymizeUserMessage as anonymizeUserMessageWithHana } from "../../lib/pseudonymize/unstructuredText-hana.js"
 import { anonymizeUserMessage as anonymizeUserMessageWithDpi } from "../../lib/pseudonymize/unstructuredText-dpi.js"
@@ -161,7 +161,7 @@ class GraphExecutor {
   abort(taskId) {
     const controller = this._abortControllers.get(taskId)
     if (controller && !controller.signal.aborted) {
-      LOG.info("aborting", { task: short(taskId), service: this._srv.name })
+      LOG.info(this._srv.name, "aborting", { task: short(taskId) })
       controller.abort()
     }
   }
@@ -179,7 +179,7 @@ class GraphExecutor {
       const { CdsCheckpointSaver } =
         await import("../../lib/protocol/persistence/checkpoint-saver.js")
       resolved.checkpointer = new CdsCheckpointSaver()
-      LOG.debug("Auto-injected CdsCheckpointSaver", { service: this._srv.name })
+      LOG.debug(this._srv.name, "- auto-injected CdsCheckpointSaver")
     }
     this._graph = resolved
     return this._graph
@@ -190,7 +190,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
@@ -327,7 +327,7 @@ class GraphExecutor {
     return { state: finalState, tokenCount }
   }
   async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
@@ -361,10 +361,10 @@ class GraphExecutor {
   /**
    * Summarize partial work after forced interruption (timeout, quota, etc.).
    */
-  async _summarizePartialWork(taskId, contextId, serviceName, reason, approval = false) {
+  async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
     return resolvePseudonyms(
-      await summarizePartialWork({
+      summarizePartialWork({
         taskId,
         contextId,
         serviceName,
@@ -373,7 +373,6 @@ class GraphExecutor {
         getModel: () => this._srv.send("buildModel"),
         // Summary runs after graph abort, so no execution-time grace is needed.
         timeout: 10_000,
-        approval,
       }),
     )
   }
@@ -457,9 +456,8 @@ class GraphExecutor {
                 cds.env.agents?.fileIO,
               )
               if (rejection) {
-                LOG.warn("input file rejected", {
+                LOG.warn(serviceName, "-", "input file rejected", {
                   conversation: short(contextId),
-                  service: serviceName,
                   name: safeName,
                   mimeType: safeMime,
                   reason: rejection,
@@ -468,9 +466,8 @@ class GraphExecutor {
               }
               const buf = Buffer.from(file.bytes, "base64")
               await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
-              LOG.info("file uploaded", {
+              LOG.info(serviceName, "-", "file uploaded", {
                 conversation: short(contextId),
-                service: serviceName,
                 name: safeName,
                 mimeType: safeMime,
                 size: buf.length,
@@ -534,7 +531,7 @@ class GraphExecutor {
             functionName: rootSpan.name ?? serviceName,
             inputs:
               userText !== undefined
-                ? { messages: [{ role: "user", content: scrubForTrace(userText) }] }
+                ? { messages: [{ role: "user", content: userText }] }
                 : undefined,
           }),
         )
@@ -570,6 +567,8 @@ class GraphExecutor {
             _userId: cds.context?.user?.id,
           },
         }
+        cds.context["agent.checkpointer"] = graph.checkpointer
+        cds.context["agent.graph.thread_id"] = config.configurable.thread_id
 
         const t0 = Date.now()
 
@@ -628,9 +627,9 @@ class GraphExecutor {
         }
 
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = resolvePseudonyms(outputMapper(result) || "I could not generate a response.")
+        const output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
 
-        LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
+        LOG.info(serviceName, "completed", { conversation: short(contextId), duration })
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "completed")
@@ -638,7 +637,7 @@ class GraphExecutor {
             wfSpan,
             mlflowAttrs("AGENT", {
               outputs: {
-                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+                choices: [{ message: { role: "assistant", content: output } }],
               },
               functionName: serviceName,
             }),
@@ -650,7 +649,7 @@ class GraphExecutor {
             rootSpan,
             mlflowAttrs("CHAIN", {
               outputs: {
-                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+                choices: [{ message: { role: "assistant", content: output } }],
               },
             }),
           )
@@ -765,9 +764,8 @@ class GraphExecutor {
                   ? Buffer.byteLength(artifact.file.bytes, "base64")
                   : 0
               if (declaredBytes > maxFileBytes) {
-                LOG.warn("emit_file_part artifact exceeds cap; skipping", {
+                LOG.warn(serviceName, "-", "emit_file_part artifact exceeds cap; skipping", {
                   conversation: short(contextId),
-                  service: serviceName,
                   name: artifact.file?.name,
                   size: declaredBytes,
                   cap: maxFileBytes,
@@ -792,9 +790,8 @@ class GraphExecutor {
           const outputMeta = await fileStore.listOutputFilesMeta(taskId)
           for (const meta of outputMeta) {
             if (meta.size > maxFileBytes) {
-              LOG.warn("output file exceeds cap; skipping", {
+              LOG.warn(serviceName, "-", "output file exceeds cap; skipping", {
                 conversation: short(contextId),
-                service: serviceName,
                 name: meta.name,
                 size: meta.size,
                 cap: maxFileBytes,
@@ -813,7 +810,7 @@ class GraphExecutor {
           // Exclude emit_file_part outputs — those are this agent's own artifacts, not
           // downstream files, and re-persisting them would create spurious /uploads/ entries.
           // Enforce the same size + MIME guard as inbound uploads so a malicious
-          // sub-agent cannot bypass the cap by echoing an oversized FilePart.
+          // subagent cannot bypass the cap by echoing an oversized FilePart.
           await Promise.all(
             fileArtifacts
               .slice(0, source1Count)
@@ -821,9 +818,8 @@ class GraphExecutor {
                 if (!fa.file?.bytes || !fa.file?.name || fa._fromEmitFilePart) return false
                 const rejection = checkInputFile(fa.file, cds.env.agents?.fileIO)
                 if (rejection) {
-                  LOG.warn("downstream file re-persist rejected", {
+                  LOG.warn(serviceName, "-", "downstream file re-persist rejected", {
                     conversation: short(contextId),
-                    service: serviceName,
                     name: fa.file.name,
                     reason: rejection,
                   })
@@ -843,9 +839,8 @@ class GraphExecutor {
         // Capture source classification for the log line below.
         for (const filePart of fileArtifacts) {
           if (!filePart.file?.name) {
-            LOG.warn("skipping malformed file artifact", {
+            LOG.warn(serviceName, "-", "skipping malformed file artifact", {
               conversation: short(contextId),
-              service: serviceName,
             })
             continue
           }
@@ -856,9 +851,8 @@ class GraphExecutor {
             typeof filePart.file?.bytes === "string"
               ? Buffer.byteLength(filePart.file.bytes, "base64")
               : 0
-          LOG.info("file emitted", {
+          LOG.info(serviceName, "-", "file emitted", {
             conversation: short(contextId),
-            service: serviceName,
             name: safeName,
             mimeType: filePart.file?.mimeType,
             bytes: decodedSize,
@@ -878,13 +872,12 @@ class GraphExecutor {
 
         dataArtifacts.forEach((artifact, i) => {
           if (artifact.data == null || typeof artifact.data !== "object") {
-            LOG.warn("skipping malformed data artifact", {
+            LOG.warn(serviceName, "-", "skipping malformed data artifact", {
               conversation: short(contextId),
-              service: serviceName,
             })
             return
           }
-          LOG.info("data emitted", { conversation: short(contextId), service: serviceName })
+          LOG.info(serviceName, "-", "data emitted", { conversation: short(contextId) })
           eventBus.publish({
             kind: "artifact-update",
             taskId,
@@ -917,7 +910,7 @@ class GraphExecutor {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
         // Use name check (not instanceof) to also catch native DOMException AbortError from LangGraph
         if (err.name === "AbortError") {
-          LOG.info("canceled", { conversation: short(contextId), service: serviceName })
+          LOG.info(serviceName, "-", "canceled", { conversation: short(contextId) })
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "canceled")
 
           audit("AgentTaskCanceled", {
@@ -940,7 +933,7 @@ class GraphExecutor {
 
         // Timeout — pause at checkpoint. User decides whether to resume graph.
         if (err.name === "TimeoutError") {
-          LOG.warn("timeout", { conversation: short(contextId), service: serviceName })
+          LOG.warn(serviceName, "-", "timeout", { conversation: short(contextId) })
 
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "input-required")
 
@@ -948,8 +941,7 @@ class GraphExecutor {
             taskId,
             contextId,
             serviceName,
-            "timed out",
-            true,
+            "timeOut",
           )
 
           publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
@@ -958,23 +950,15 @@ class GraphExecutor {
 
         // Quota exceeded — summarize partial work instead of raw error
         if (err.quotaExceeded) {
-          LOG.warn("quota exceeded", {
+          LOG.warn(serviceName, "-", "quota exceeded", {
             conversation: short(contextId),
-            service: serviceName,
             error: err.message,
           })
 
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "quota_exceeded")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "quota_exceeded" })
 
-          const summary = await this._summarizePartialWork(
-            taskId,
-            contextId,
-            serviceName,
-            "quota exceeded",
-          )
-
-          const quotaSummary = cds.i18n.messages.at("AGENT_QUOTA_EXCEEDED_SUMMARY", [summary])
+          const summary = await this._summarizePartialWork(taskId, contextId, serviceName, "quota")
 
           audit("AgentTaskFailed", {
             data: {
@@ -993,7 +977,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "canceled",
-              message: agentMessage(quotaSummary),
+              message: agentMessage(summary),
               timestamp: new Date().toISOString(),
             },
             final: true,
@@ -1001,16 +985,11 @@ class GraphExecutor {
           return
         }
 
-        LOG.error("failed", {
-          conversation: short(contextId),
-          service: serviceName,
-          error: err.message,
-        })
-        LOG.debug("failed stack", {
-          conversation: short(contextId),
-          service: serviceName,
-          stack: err.stack,
-        })
+        LOG.error(
+          Object.assign(err, {
+            conversation: short(contextId),
+          }),
+        )
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")

@@ -101,7 +101,7 @@ export async function buildMcpToolsFromConnection(serviceName) {
 
   const path = typeof credentials === "object" ? credentials?.path : null
   const mcpUrl = url.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
-  LOG.info(`Connecting to MCP server at ${mcpUrl}`)
+  LOG.info(`Connecting to MCP service ${serviceName}`, { at: mcpUrl })
 
   const resolveHeaders = async () => {
     if (destinationName) {

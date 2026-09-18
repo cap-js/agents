@@ -118,19 +118,6 @@ entity PushNotificationConfigs : managed {
       url      : String(2048);
 }
 
-entity PseudonymizationState : managed {
-  key threadId : String; // "serviceName:contextId"
-      seed     : String(64); // 32-char hex seed
-      mappings : Composition of many PseudonymizationMappings
-                   on mappings.threadId = threadId;
-}
-
-entity PseudonymizationMappings {
-  key threadId : String;
-  key hash     : String(128); // "propertyName_xxxxxxxx"
-      original : LargeString;
-}
-
 entity TextAnalysisResults {
   key ID            : UUID;
       taskId        : String;

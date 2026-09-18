@@ -7,7 +7,7 @@ using {travel.local as my} from '../db/schema';
  * service) and has NO cds.requires credentials. TravelAgentService therefore
  * discovers it via availableMcp auto-discovery and wires its tools through
  * buildMcpToolsLocally — driven in-process, with no HTTP round-trip (the
- * mirror image of the local sub-agent path). Contrast with FlightsService,
+ * mirror image of the local subagent path). Contrast with FlightsService,
  * which is reached remotely over HTTP via cds.requires.
  */
 @mcp

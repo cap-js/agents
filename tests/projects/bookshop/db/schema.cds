@@ -17,6 +17,8 @@ entity Books : managed {
       currency : Currency;
 }
 
+@Core.Description: ''
+@Core.LongDescription : ''
 entity Authors : managed {
   key ID           : Integer;
       @PersonalData.IsPotentiallyPersonal

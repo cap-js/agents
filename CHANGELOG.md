@@ -4,7 +4,13 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.5 - tbd.
+## Version 0.9.6 - 2026-09-17
+
+### Fixed
+
+- Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
+
+## Version 0.9.5 - 2026-09-16
 
 ### Added
 
@@ -16,12 +22,16 @@
 ### Changed
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+- Renamed config option `cds.agents.pool` to `cds.agents.quotas`
 
 ### Fixed
 
 - Services with `@protocol: 'agent'` now also register `@agent` specific handlers
 - Mask apiKey in debug logs read from claude / opencode settings
+- Adjusted error message to be more accurate
 - Prompts are now correctly uploaded to MLFlow for markdown-based agents
+- `Judge.evaluate()` assessments now also appear in Databricks UC MLflow
+- Propagate opentelemetry traceparent to subagents
 
 ## Version 0.9.4 - 2026-09-10
 
@@ -48,6 +58,7 @@
 
 - Adjusted agent audit log attributes to follow latest recommendations
 - LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
+- Prompt caching is now applied when GPT models are used (previously it was only applied with anthropic models)
 
 ### Fixed
 
