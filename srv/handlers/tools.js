@@ -11,7 +11,8 @@ import {
   executeCallActionTool,
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
-import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
+
+import { getFilteredEntities, getFilteredActions } from "@cap-js/mcp/lib/utils/tools-shared.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 
@@ -78,8 +79,8 @@ class DescribeTool extends DynamicStructuredTool {
       description: def.description,
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
-      func: async (args) => {
-        return unwrap(await executeDescribe(srv, entities, actions, args))
+      func: (args) => {
+        return unwrap(executeDescribe(srv, entities, actions, args))
       },
     })
     this.srv = srv

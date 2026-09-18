@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.9.4",
+  "version": "0.9.6",
   "description": "CDS plugin for building agents",
   "author": "SAP SE (https://www.sap.com)",
   "license": "Apache-2.0",
@@ -42,7 +42,7 @@
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
     "@cap-js/attachments": ">=3",
-    "@cap-js/mcp": "^1.4",
+    "@cap-js/mcp": "^1.5",
     "@langchain/anthropic": "^1.5.1",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
