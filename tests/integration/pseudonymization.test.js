@@ -557,7 +557,7 @@ describe("pseudonymization", () => {
   })
 })
 
-// OTel leak check: run agent flow and verify no personal data reaches any agent/LLM/tool span.
+// ─── OTel leak check: run agent flow, verify no PII in any agent/LLM/tool span ─
 describe("pseudonymization OTel leak check", () => {
   const AGENT_SPAN = /^(chat |execute_tool |workflow |task |invoke_agent)/
   axios.defaults.validateStatus = () => true
@@ -565,20 +565,31 @@ describe("pseudonymization OTel leak check", () => {
   before(async () => {
     const helpers = createHelpers({ POST, axios })
     sendMessage = helpers.sendMessage
+    // Enable debug logging so gen_ai.tool.call.arguments and gen_ai.tool.call.result
+    // attrs fire — these carry resolved (real) PII and must be scrubbed by the span processor.
+    cds.log("agents", { level: "debug" })
+    cds.env.agents.mlflow = true
   })
   after(async () => {
+    cds.log("agents", { level: "warn" })
+    cds.env.agents.mlflow = false
     teardown()
     await mock.stop()
   })
   beforeEach(resetCapture)
 
   it("does not leak personal data into any agent/LLM/tool OTel span", async () => {
-    cds.env.agents.mlflow = true
     const allSpans = await getSpansAfterRequest(() =>
       sendMessage("pseudo-book", "Who wrote these books?"),
     )
     const spans = allSpans.filter((s) => AGENT_SPAN.test(s.name))
     expect(spans.length).toBeGreaterThan(0)
+
+    // Confirm debug attrs are present — ensures the test covers the JSON-string PII path.
+    // gen_ai.tool.call.arguments carries resolved (real) args going into the tool.
+    const toolSpans = allSpans.filter((s) => s.name.startsWith("execute_tool"))
+    const hasDebugAttr = toolSpans.some((s) => "gen_ai.tool.call.arguments" in (s.attributes ?? {}))
+    expect(hasDebugAttr).toBe(true)
 
     const authors = (await SELECT.from("CatalogService.Authors")).map((a) => a.name)
     const offenders = []
@@ -596,7 +607,6 @@ describe("pseudonymization OTel leak check", () => {
 
     expect(offenders).toEqual([])
     expect(sawHash).toBe(true)
-    cds.env.agents.mlflow = false
   })
 
   it("resolves pseudonymized names back to originals in the user-facing response", async () => {

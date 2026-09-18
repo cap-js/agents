@@ -103,7 +103,9 @@ if (cds.env.requires?.telemetry)
     // Schedule active_users metric computation + MLflow exporter
     cds.on("served", async () => {
       const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
+      const { setupTraceScrubbing } = await import("./lib/telemetry/span-masking.js")
       setupActiveUsersMetric()
+      await setupTraceScrubbing()
       // Defer LangChain patching so the CDS model is fully loaded before patches land.
       // opt-out via cds.env.agents.trace_langchain = false
       if (cds.env.agents?.trace_langchain !== false) {

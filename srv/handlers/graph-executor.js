@@ -6,7 +6,7 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
-import { resolvePseudonyms, scrubForTrace } from "../../lib/pseudonymize/index.js"
+import { resolvePseudonyms } from "../../lib/pseudonymize/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -520,7 +520,7 @@ class GraphExecutor {
             functionName: rootSpan.name ?? serviceName,
             inputs:
               userText !== undefined
-                ? { messages: [{ role: "user", content: scrubForTrace(userText) }] }
+                ? { messages: [{ role: "user", content: userText }] }
                 : undefined,
           }),
         )
@@ -626,7 +626,7 @@ class GraphExecutor {
             wfSpan,
             mlflowAttrs("AGENT", {
               outputs: {
-                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+                choices: [{ message: { role: "assistant", content: output } }],
               },
               functionName: serviceName,
             }),
@@ -638,7 +638,7 @@ class GraphExecutor {
             rootSpan,
             mlflowAttrs("CHAIN", {
               outputs: {
-                choices: [{ message: { role: "assistant", content: scrubForTrace(output) } }],
+                choices: [{ message: { role: "assistant", content: output } }],
               },
             }),
           )
