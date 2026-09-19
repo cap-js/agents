@@ -7,8 +7,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/pseudonymize/index.js"
-import { anonymizeUserMessage as anonymizeUserMessageWithHana } from "../../lib/pseudonymize/unstructuredText-hana.js"
-import { anonymizeUserMessage as anonymizeUserMessageWithDpi } from "../../lib/pseudonymize/unstructuredText-dpi.js"
+import anonymizeUserMessage from "../../lib/pseudonymize/unstructuredText"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -391,8 +390,7 @@ class GraphExecutor {
     cds.context["agent.eventBus"] = eventBus
 
     if (cds.env.agents.masking) {
-      await anonymizeUserMessageWithHana(requestContext, serviceName, contextId)
-      await anonymizeUserMessageWithDpi(requestContext, serviceName, contextId)
+      await anonymizeUserMessage(requestContext, serviceName)
     }
 
     metrics.concurrentExecutions.add(1, mAttrs)
