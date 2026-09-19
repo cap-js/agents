@@ -7,6 +7,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/pseudonymize/index.js"
+import anonymizeUserMessage from "../../lib/pseudonymize/unstructuredText"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -405,6 +406,10 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+
+    if (cds.env.agents.masking) {
+      await anonymizeUserMessage(requestContext, serviceName)
+    }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
