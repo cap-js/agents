@@ -42,3 +42,17 @@ entity Genres : sap.common.CodeList {
       children : Composition of many Genres
                    on children.parent = $self;
 }
+
+/**
+ * Customers with a numeric FK to Authors (favoriteAuthor_ID).
+ * Used to test that numeric foreign-key properties are pseudonymized
+ * (shouldHash returns true for Integer when key=true or @odata.foreignKey4).
+ */
+entity Customers {
+  @PersonalData.IsPotentiallyPersonal
+  key ID               : Integer;
+      @PersonalData.IsPotentiallyPersonal
+      name             : String(111);
+      @PersonalData.IsPotentiallyPersonal
+      favoriteAuthor   : Association to Authors;
+}

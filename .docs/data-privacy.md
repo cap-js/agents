@@ -57,7 +57,7 @@ The plugin handles the rest automatically:
 | `@PersonalData.FieldSemantics: 'UserID'`        | Field pseudonymized |
 | `@PersonalData.FieldSemantics: 'DataSubjectID'` | Field pseudonymized |
 
-Applies to all field types except `Boolean`, `Date`, `DateTime`, and `Timestamp`.
+Applies to all field types except `Boolean`, `Date`, `DateTime`, and `Timestamp`. Numeric properties are only hashed if they are a key or foreign key property.
 
 ### Opting out
 

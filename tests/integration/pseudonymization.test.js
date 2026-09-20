@@ -304,6 +304,34 @@ describe("pseudonymization", () => {
         [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
       expect(adminFields("SELECT title, author.name FROM AdminService.Books")).toEqual(["name"])
     })
+
+    it("hashes annotated column from a subquery (no alias)", () => {
+      // SELECT name FROM (SELECT ID, name FROM Authors)
+      // Outer ref ["name"] → resolves through subquery identity map → entity element "name"
+      expect(fields("SELECT name FROM (SELECT ID, name FROM CatalogService.Authors)")).toEqual([
+        "name",
+      ])
+    })
+
+    it("hashes annotated column from a subquery (inner alias)", () => {
+      // SELECT ab FROM (SELECT name as ab FROM Authors)
+      // Outer ref ["ab"] → subquery alias map ab→["name"] → entity element "name" → result key "ab"
+      expect(fields("SELECT ab FROM (SELECT name as ab FROM CatalogService.Authors)")).toEqual([
+        "ab",
+      ])
+    })
+
+    it("hashes annotated column from a subquery (inner navigation path alias)", () => {
+      // SELECT ab FROM (SELECT author.name as ab FROM Books)
+      // Outer ref ["ab"] → subquery alias map ab→["author","name"] → nav path resolves through
+      // AdminService.Books.author association → Authors.name annotated → result key "ab"
+      const adminSrv = { name: "AdminService" }
+      const adminFields = (cql) =>
+        [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
+      expect(
+        adminFields("SELECT ab FROM (SELECT author.name as ab FROM AdminService.Books)"),
+      ).toEqual(["ab"])
+    })
   })
 
   describe("discoverElementsToBeMasked (joins)", () => {
@@ -554,6 +582,43 @@ describe("pseudonymization", () => {
       const session = cds.context["_pseudoSession"]
       const hash = content.match(/name-[0-9a-f]{8}/)[0]
       expect(session.resolve(hash)).toBe(author)
+    })
+
+    it("pseudonymizes numeric foreign keys and keys", async () => {
+      // Customers.ID is Integer + key:true + @PersonalData.IsPotentiallyPersonal
+      // shouldHash returns true for numeric when el.key is set, so the ID must be hashed.
+      const { mw } = await setupContext()
+      const rawContent = encode({
+        data: [
+          { ID: 1001, name: "Alice Reader", favoriteAuthor_ID: 101 },
+          { ID: 1002, name: "Bob Bookworm", favoriteAuthor_ID: 107 },
+        ],
+      })
+      const request = {
+        toolCall: {
+          name: "query",
+          id: "tc1",
+          args: { cql: "SELECT ID, name, favoriteAuthor_ID FROM PseudoBookService.Customers" },
+        },
+        tool: {},
+      }
+      const result = await mw.wrapToolCall(
+        request,
+        async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "query" }),
+      )
+      const content = result.content
+
+      // Numeric IDs must be pseudonymized — raw integers must not appear
+      expect(content).not.toContain("1001")
+      expect(content).not.toContain("1002")
+      // Hash tokens for ID and name must be present
+      expect(content).toMatch(/ID-[0-9a-f]{8}/)
+      expect(content).toMatch(/name-[0-9a-f]{8}/)
+
+      // Hashes resolve back to originals
+      const session = cds.context["_pseudoSession"]
+      const idHash = content.match(/ID-[0-9a-f]{8}/)[0]
+      expect(session.resolve(idHash)).toBe("1001")
     })
   })
 })
