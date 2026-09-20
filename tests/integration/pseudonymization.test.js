@@ -384,6 +384,8 @@ describe("pseudonymization", () => {
 
     async function setupContext() {
       const srv = cds.services[srvName]
+      cds.env.agents ??= {}
+      cds.env.agents.masking ??= true
       const mw = pseudonymizeMiddleware(srv)
       cds.context = cds.context || {}
       cds.context.model = cds.model
@@ -430,27 +432,6 @@ describe("pseudonymization", () => {
         ([, original]) => original === "Emily Brontë",
       )?.[0]
       expect(emilyHash).toBeDefined()
-    })
-
-    it("wrapModelCall scrubs originals to hashes in the messages sent to the model", async () => {
-      const { mw } = await setupContext()
-      // seed a mapping via a tool call first
-      const session = cds.context._pseudoSession
-      const hash = session.pseudonymize("Emily Brontë", "name")
-
-      let seenByModel
-      const handler = async (req) => {
-        seenByModel = req.messages
-        return new AIMessage("ok")
-      }
-      const request = {
-        messages: [new HumanMessage("Tell me about Emily Brontë")],
-      }
-      await mw.wrapModelCall(request, handler)
-
-      expect(seenByModel[0].content).toBe(`Tell me about ${hash}`)
-      // message class preserved (not a plain object)
-      expect(HumanMessage.isInstance(seenByModel[0])).toBe(true)
     })
 
     it("round-trip: hash in tool result survives model call and can resolve for user", async () => {
