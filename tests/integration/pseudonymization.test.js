@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { PseudoSession, PSEUDONYMIZATION_STATE_CHANNEL } from "../../lib/pseudonymize/store.js"
-import * as pseudo from "../../lib/pseudonymize/structured/helpers.js"
+import * as pseudo from "../../lib/pseudonymize/structured/index.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import { setup, teardown, resetCapture, getSpansAfterRequest } from "../utils/telemetry-utils.js"
 import createHelpers from "../utils/helpers.js"
@@ -258,103 +258,209 @@ describe("pseudonymization", () => {
     })
   })
 
-
   describe("discoverElementsToBeMasked", () => {
     const { discoverElementsToBeMasked } = pseudo
     const fields = (cql, service = "CatalogService") =>
-      [...discoverElementsToBeMasked(cds.model, { name: service }, cql, true)]
-        .sort((a, b) => String(a).localeCompare(String(b)))
+      [...discoverElementsToBeMasked(cds.model, { name: service }, cql, true)].sort((a, b) =>
+        String(a).localeCompare(String(b)),
+      )
 
     // [label, cql, expectedFields, service?]
     const cases = [
       // ── plain columns ──────────────────────────────────────────────────────
-      ["plain columns",
+      [
+        "plain columns",
         "SELECT ID, name, placeOfBirth FROM CatalogService.Authors",
-        ["name", "placeOfBirth"]],
-      ["alias replaces element name in result",
+        ["name", "placeOfBirth"],
+      ],
+      [
+        "alias replaces element name in result",
         "SELECT ID, name as authorName FROM CatalogService.Authors",
-        ["authorName"]],
-      ["SELECT *",
-        "SELECT * FROM CatalogService.Authors",
-        ["name", "placeOfBirth"]],
-      ["non-hashable Date column ignored even when aliased",
+        ["authorName"],
+      ],
+      ["SELECT *", "SELECT * FROM CatalogService.Authors", ["name", "placeOfBirth"]],
+      [
+        "non-hashable Date column ignored even when aliased",
         "SELECT ID, dateOfBirth as dob FROM CatalogService.Authors",
-        []],
+        [],
+      ],
       // ── navigation paths ───────────────────────────────────────────────────
-      ["navigation path with alias (author.name as author)",
+      [
+        "navigation path with alias (author.name as author)",
         "SELECT title, author.name as author, price FROM AdminService.Books",
-        ["author"], "AdminService"],
-      ["navigation path without alias",
+        ["author"],
+        "AdminService",
+      ],
+      [
+        "navigation path without alias",
         "SELECT title, author.name FROM AdminService.Books",
-        ["name"], "AdminService"],
+        ["name"],
+        "AdminService",
+      ],
       // ── subqueries ─────────────────────────────────────────────────────────
-      ["subquery: outer name matches inner element name directly",
+      [
+        "subquery: outer name matches inner element name directly",
         "SELECT name FROM (SELECT ID, name FROM CatalogService.Authors)",
-        ["name"]],
-      ["subquery: outer name matches inner alias",
+        ["name"],
+      ],
+      [
+        "subquery: outer name matches inner alias",
         "SELECT ab FROM (SELECT name as ab FROM CatalogService.Authors)",
-        ["ab"]],
-      ["subquery: outer name matches inner navigation-path alias",
+        ["ab"],
+      ],
+      [
+        "subquery: outer name matches inner navigation-path alias",
         "SELECT ab FROM (SELECT author.name as ab FROM AdminService.Books)",
-        ["ab"], "AdminService"],
+        ["ab"],
+        "AdminService",
+      ],
       // ── joins ──────────────────────────────────────────────────────────────
-      ["join: annotated column from joined entity (inner join)",
+      [
+        "join: annotated column from joined entity (inner join)",
         "SELECT b.title, a.name FROM CatalogService.Books as b " +
           "INNER JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ["name"]],
-      ["join: alias on joined column (left join)",
+        ["name"],
+      ],
+      [
+        "join: alias on joined column (left join)",
         "SELECT a.name as writer FROM CatalogService.Books as b " +
           "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ["writer"]],
-      ["join: annotated columns across 3-way join (PII in last join)",
+        ["writer"],
+      ],
+      [
+        "join: unqualified column binds to the source that has it",
+        "SELECT title, name FROM CatalogService.Books as b " +
+          "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["name"],
+      ],
+      [
+        "join: annotated columns across 3-way join (PII in last join)",
         "SELECT b.title, g.code, a.name FROM CatalogService.Books as b " +
           "LEFT JOIN CatalogService.Genres as g ON b.genre_code = g.code " +
           "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ["name"]],
-      ["join: annotated columns across 3-way join (PII in first join)",
+        ["name"],
+      ],
+      [
+        "join: annotated columns across 3-way join (PII in first join)",
         "SELECT a.name, a.placeOfBirth FROM CatalogService.Books as b " +
           "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID " +
           "LEFT JOIN CatalogService.Genres as g ON b.genre_code = g.code",
-        ["name", "placeOfBirth"]],
-      ["join: SELECT * collects annotated elements from all joined entities",
+        ["name", "placeOfBirth"],
+      ],
+      [
+        "join: SELECT * collects annotated elements from all joined entities",
         "SELECT * FROM CatalogService.Books as b " +
           "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ["authorName", "name", "placeOfBirth"]],
+        ["authorName", "name", "placeOfBirth"],
+      ],
       // ── union ──────────────────────────────────────────────────────────────
-      ["union: name is PII because Authors branch has @PersonalData on name",
+      [
+        "union: name is PII because Authors branch has @PersonalData on name",
         "SELECT name FROM CatalogService.Books UNION SELECT name FROM CatalogService.Authors",
-        ["name"]],
-      ["union: only the PII branch column is returned even when columns differ",
+        ["name"],
+      ],
+      [
+        "union: only the PII branch column is returned even when columns differ",
         "SELECT title FROM CatalogService.Books UNION SELECT name FROM CatalogService.Authors",
-        ["name"]],
+        ["name"],
+      ],
       // ── join in subselect ──────────────────────────────────────────────────
-      ["subquery with inner join: alias resolves through join to annotated element",
+      [
+        "subquery with inner join: alias resolves through join to annotated element",
         "SELECT ab FROM (SELECT a.name as ab FROM CatalogService.Books as b " +
           "JOIN CatalogService.Authors as a ON b.author_ID = a.ID)",
-        ["ab"]],
+        ["ab"],
+      ],
       // ── expand ─────────────────────────────────────────────────────────────
-      ["expand: author { name } — path array [\"author\",\"name\"] returned",
+      [
+        'expand: author { name } — path array ["author","name"] returned',
         "SELECT author { name } FROM AdminService.Books",
-        [["author", "name"]], "AdminService"],
-      ["expand in expand: author { name, books { title } } — only author.name is PII",
+        [["author", "name"]],
+        "AdminService",
+      ],
+      [
+        "expand in expand: author { name, books { title } } — only author.name is PII",
         "SELECT author { name, books { title } } FROM AdminService.Books",
-        [["author", "name"]], "AdminService"],
-      ["expand in expand: author { contact { email } } — inner expand has PII",
+        [["author", "name"]],
+        "AdminService",
+      ],
+      [
+        "expand in expand: author { contact { email } } — inner expand has PII",
         "SELECT author { contact { email } } FROM AdminService.Books",
-        [["author", "contact", "email"]], "AdminService"],
+        [["author", "contact", "email"]],
+        "AdminService",
+      ],
+      [
+        "expand 3 levels deep: author { books { author { name } } }",
+        "SELECT author { books { author { name } } } FROM AdminService.Books",
+        [["author", "books", "author", "name"]],
+        "AdminService",
+      ],
+      // scalar subselect with inner join — cds.ql resolves element but loses PII;
+      // must fall back to _discoverFromCqn on the subselect
+      [
+        "scalar subselect with inner join: name from Authors via join is PII",
+        "SELECT (SELECT a.name FROM CatalogService.Books as b " +
+          "JOIN CatalogService.Authors as a ON b.author_ID = a.ID WHERE b.ID = ID) as authorName " +
+          "FROM CatalogService.Books",
+        ["authorName"],
+      ],
       // ── Special cases ─────────────────────────────────
-      ["union within subquery: name is PII via Authors branch",
+      [
+        "union within subquery: name is PII via Authors branch",
         "SELECT name FROM (SELECT name FROM CatalogService.Books UNION SELECT name FROM CatalogService.Authors)",
-        ["name"]],
-      ["scalar subselect in column list: name selected from Authors is PII",
-        "SELECT ID, (SELECT name FROM CatalogService.Authors as a WHERE a.ID = author_ID) FROM CatalogService.Books",
-        ["name"]],
-      ["nested subselect (subselect of subselect): alias ab resolves to name in Authors",
+        ["name"],
+      ],
+      // scalar subselect as a column expression with alias: result key is the outer alias
+      [
+        "scalar subselect in column list: name selected from Authors is PII",
+        "SELECT ID, (SELECT name FROM CatalogService.Authors as a WHERE a.ID = author_ID) as authorName FROM CatalogService.Books",
+        ["authorName"],
+      ],
+      [
+        "nested subselect (subselect of subselect): alias ab resolves to name in Authors",
         "SELECT ab FROM (SELECT name as ab FROM (SELECT name FROM CatalogService.Authors))",
-        ["ab"]],
-      ["subselect inside expand: scalar subselect with alias selecting PII field",
+        ["ab"],
+      ],
+      [
+        "subselect inside expand: scalar subselect with alias selecting PII field",
         "SELECT author { (SELECT name FROM CatalogService.Authors as a WHERE a.ID = ID) as ab } FROM AdminService.Books",
-        [["author", "ab"]], "AdminService"],
+        [["author", "ab"]],
+        "AdminService",
+      ],
+      // ── expressions and functions (not yet supported — document gaps) ───────
+      // xpr: (name || '123') as ab — ref inside xpr array carries PII field
+      [
+        "xpr: string concat expression with PII field → result key is alias",
+        "SELECT (name || '123') as ab FROM CatalogService.Authors",
+        ["ab"],
+      ],
+      // func: min(name) — aggregate function wrapping a PII field
+      [
+        "func: aggregate min(name) as minName → result key is alias",
+        "SELECT min(name) as minName FROM CatalogService.Authors",
+        ["minName"],
+      ],
+      // func wrapping a subselect that selects a PII field
+      [
+        "func wrapping subselect: upper((SELECT name FROM Authors)) as ab",
+        "SELECT upper((SELECT name FROM CatalogService.Authors as a WHERE a.ID = author_ID)) as ab FROM CatalogService.Books",
+        ["ab"],
+      ],
+      // func with a joined prop: upper(a.name) — ref inside func.args has table alias + element
+      [
+        "func with joined prop: upper(a.name) as ab",
+        "SELECT upper(a.name) as ab FROM CatalogService.Books as b " +
+          "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["ab"],
+      ],
+      // nested funcs with joined prop: upper(lower(a.name)) — ref inside inner func.args
+      [
+        "nested funcs with joined prop: upper(lower(a.name)) as ab",
+        "SELECT upper(lower(a.name)) as ab FROM CatalogService.Books as b " +
+          "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["ab"],
+      ],
     ]
 
     it.each(cases)("%s", (label, cql, expected, service) => {
