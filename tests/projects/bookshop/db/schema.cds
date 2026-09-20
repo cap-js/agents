@@ -28,6 +28,8 @@ entity Authors : managed {
       dateOfDeath  : Date;
       @PersonalData.IsPotentiallyPersonal
       placeOfBirth : String;
+      @PersonalData.IsPotentiallyPersonal
+      @Common.Masked: false
       placeOfDeath : String;
       books        : Association to many Books
                        on books.author = $self;

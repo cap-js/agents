@@ -636,6 +636,100 @@ describe("pseudonymization OTel leak check", () => {
     expect(text).toMatch(/Brontë|Poe|Carpenter/)
     expect(text).not.toMatch(/[a-z]+-[0-9a-f]{8}\b/)
   })
+
+  it("@Common.Masked:false field is still masked in spans by default (forLlm=false in scrubToolOutputs)", async () => {
+    const allSpans = await getSpansAfterRequest(() =>
+      sendMessage("pseudo-book", "Who wrote these books?"),
+    )
+    const toolSpans = allSpans.filter((s) => s.name.startsWith("execute_tool"))
+    expect(toolSpans.length).toBeGreaterThan(0)
+
+    const placeOfDeathValues = (await SELECT.from("CatalogService.Authors"))
+      .map((a) => a.placeOfDeath)
+      .filter(Boolean)
+
+    const offenders = []
+    for (const span of toolSpans) {
+      for (const s of collectSpanStrings(span)) {
+        for (const pii of placeOfDeathValues) {
+          if (s.includes(pii)) offenders.push({ span: span.name, pii, snippet: s.slice(0, 160) })
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+
+    const hasPlaceHash = toolSpans.some((s) =>
+      collectSpanStrings(s).some((str) => /placeOfDeath-[0-9a-f]{8}/.test(str)),
+    )
+    expect(hasPlaceHash).toBe(true)
+  })
+
+  it("resolveInTraces: pseudonym tokens resolved back to originals in spans", async () => {
+    cds.env.agents.masking = { ...cds.env.agents.masking, resolveInTraces: true }
+    try {
+      const allSpans = await getSpansAfterRequest(() =>
+        sendMessage("pseudo-book", "Who wrote these books?"),
+      )
+      const spans = allSpans.filter((s) => AGENT_SPAN.test(s.name))
+      expect(spans.length).toBeGreaterThan(0)
+
+      // In resolveInTraces mode, spans must contain the real author names (resolved from hashes)
+      const authors = (await SELECT.from("CatalogService.Authors")).map((a) => a.name)
+      const resolved = []
+      for (const span of spans) {
+        for (const s of collectSpanStrings(span)) {
+          for (const name of authors) {
+            if (s.includes(name)) resolved.push(name)
+          }
+        }
+      }
+      // At least one author name must appear resolved in the spans
+      expect(resolved.length).toBeGreaterThan(0)
+
+      // No unresolved hash tokens must remain in spans
+      const hasUnresolvedHash = spans.some((s) =>
+        collectSpanStrings(s).some((str) => /name-[0-9a-f]{8}/.test(str)),
+      )
+      expect(hasUnresolvedHash).toBe(false)
+    } finally {
+      const { resolveInTraces: _, ...rest } = cds.env.agents.masking
+      cds.env.agents.masking = rest
+    }
+  })
+
+  it("resolveInTraces: @Common.Masked:false field also resolved back in spans", async () => {
+    cds.env.agents.masking = { ...cds.env.agents.masking, resolveInTraces: true }
+    try {
+      const allSpans = await getSpansAfterRequest(() =>
+        sendMessage("pseudo-book", "Who wrote these books?"),
+      )
+      const toolSpans = allSpans.filter((s) => s.name.startsWith("execute_tool"))
+      expect(toolSpans.length).toBeGreaterThan(0)
+
+      // placeOfDeath values must appear resolved in spans (not as hash tokens)
+      const placeOfDeathValues = (await SELECT.from("CatalogService.Authors"))
+        .map((a) => a.placeOfDeath)
+        .filter(Boolean)
+      const resolved = []
+      for (const span of toolSpans) {
+        for (const s of collectSpanStrings(span)) {
+          for (const val of placeOfDeathValues) {
+            if (s.includes(val)) resolved.push(val)
+          }
+        }
+      }
+      expect(resolved.length).toBeGreaterThan(0)
+
+      // No placeOfDeath hash tokens must remain
+      const hasUnresolvedPlaceHash = toolSpans.some((s) =>
+        collectSpanStrings(s).some((str) => /placeOfDeath-[0-9a-f]{8}/.test(str)),
+      )
+      expect(hasUnresolvedPlaceHash).toBe(false)
+    } finally {
+      const { resolveInTraces: _, ...rest } = cds.env.agents.masking
+      cds.env.agents.masking = rest
+    }
+  })
 })
 
 function collectSpanStrings(span) {
