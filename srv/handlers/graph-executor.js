@@ -246,7 +246,7 @@ class GraphExecutor {
           pendingPrefix = ""
           if (!raw) continue
 
-          // Hashes look like <<prefix>:8hexchars> and never contain spaces.
+          // Hashes look like name-8hexchars and never contain spaces.
           // On non-last chunks, slice last token and append to next chunk
           // to avoid unresolved boundaries
           let toEmit = raw
