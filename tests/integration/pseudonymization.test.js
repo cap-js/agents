@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { PseudoSession, PSEUDONYMIZATION_STATE_CHANNEL } from "../../lib/pseudonymize/store.js"
-import * as pseudo from "../../lib/pseudonymize/helpers.js"
+import * as pseudo from "../../lib/pseudonymize/structured/helpers.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import { setup, teardown, resetCapture, getSpansAfterRequest } from "../utils/telemetry-utils.js"
 import createHelpers from "../utils/helpers.js"
@@ -160,7 +160,7 @@ describe("pseudonymization", () => {
     })
     it("hashes numeric only when key or foreign key", () => {
       expect(_shouldHash({ type: "cds.Integer", key: true })).toBe(true)
-      expect(_shouldHash({ type: "cds.Integer", "@odata.foreignKey4": "author" })).toBe(true)
+      expect(_shouldHash({ type: "cds.Integer", _foreignKey4: "author" })).toBe(true)
       expect(_shouldHash({ type: "cds.Integer" })).toBe(false)
     })
   })
@@ -258,124 +258,107 @@ describe("pseudonymization", () => {
     })
   })
 
-  describe("discoverElementsToBeMasked (alias handling)", () => {
+
+  describe("discoverElementsToBeMasked", () => {
     const { discoverElementsToBeMasked } = pseudo
-    const srv = { name: "CatalogService" }
-    const fields = (cql) => [...discoverElementsToBeMasked(cds.model, srv, cql, true)].sort()
+    const fields = (cql, service = "CatalogService") =>
+      [...discoverElementsToBeMasked(cds.model, { name: service }, cql, true)]
+        .sort((a, b) => String(a).localeCompare(String(b)))
 
-    it("returns element names for plain columns", () => {
-      expect(fields("SELECT ID, name, placeOfBirth FROM CatalogService.Authors")).toEqual([
-        "name",
-        "placeOfBirth",
-      ])
-    })
+    // [label, cql, expectedFields, service?]
+    const cases = [
+      // ── plain columns ──────────────────────────────────────────────────────
+      ["plain columns",
+        "SELECT ID, name, placeOfBirth FROM CatalogService.Authors",
+        ["name", "placeOfBirth"]],
+      ["alias replaces element name in result",
+        "SELECT ID, name as authorName FROM CatalogService.Authors",
+        ["authorName"]],
+      ["SELECT *",
+        "SELECT * FROM CatalogService.Authors",
+        ["name", "placeOfBirth"]],
+      ["non-hashable Date column ignored even when aliased",
+        "SELECT ID, dateOfBirth as dob FROM CatalogService.Authors",
+        []],
+      // ── navigation paths ───────────────────────────────────────────────────
+      ["navigation path with alias (author.name as author)",
+        "SELECT title, author.name as author, price FROM AdminService.Books",
+        ["author"], "AdminService"],
+      ["navigation path without alias",
+        "SELECT title, author.name FROM AdminService.Books",
+        ["name"], "AdminService"],
+      // ── subqueries ─────────────────────────────────────────────────────────
+      ["subquery: outer name matches inner element name directly",
+        "SELECT name FROM (SELECT ID, name FROM CatalogService.Authors)",
+        ["name"]],
+      ["subquery: outer name matches inner alias",
+        "SELECT ab FROM (SELECT name as ab FROM CatalogService.Authors)",
+        ["ab"]],
+      ["subquery: outer name matches inner navigation-path alias",
+        "SELECT ab FROM (SELECT author.name as ab FROM AdminService.Books)",
+        ["ab"], "AdminService"],
+      // ── joins ──────────────────────────────────────────────────────────────
+      ["join: annotated column from joined entity (inner join)",
+        "SELECT b.title, a.name FROM CatalogService.Books as b " +
+          "INNER JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["name"]],
+      ["join: alias on joined column (left join)",
+        "SELECT a.name as writer FROM CatalogService.Books as b " +
+          "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["writer"]],
+      ["join: annotated columns across 3-way join (PII in last join)",
+        "SELECT b.title, g.code, a.name FROM CatalogService.Books as b " +
+          "LEFT JOIN CatalogService.Genres as g ON b.genre_code = g.code " +
+          "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["name"]],
+      ["join: annotated columns across 3-way join (PII in first join)",
+        "SELECT a.name, a.placeOfBirth FROM CatalogService.Books as b " +
+          "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID " +
+          "LEFT JOIN CatalogService.Genres as g ON b.genre_code = g.code",
+        ["name", "placeOfBirth"]],
+      ["join: SELECT * collects annotated elements from all joined entities",
+        "SELECT * FROM CatalogService.Books as b " +
+          "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
+        ["authorName", "name", "placeOfBirth"]],
+      // ── union ──────────────────────────────────────────────────────────────
+      ["union: name is PII because Authors branch has @PersonalData on name",
+        "SELECT name FROM CatalogService.Books UNION SELECT name FROM CatalogService.Authors",
+        ["name"]],
+      ["union: only the PII branch column is returned even when columns differ",
+        "SELECT title FROM CatalogService.Books UNION SELECT name FROM CatalogService.Authors",
+        ["name"]],
+      // ── join in subselect ──────────────────────────────────────────────────
+      ["subquery with inner join: alias resolves through join to annotated element",
+        "SELECT ab FROM (SELECT a.name as ab FROM CatalogService.Books as b " +
+          "JOIN CatalogService.Authors as a ON b.author_ID = a.ID)",
+        ["ab"]],
+      // ── expand ─────────────────────────────────────────────────────────────
+      ["expand: author { name } — path array [\"author\",\"name\"] returned",
+        "SELECT author { name } FROM AdminService.Books",
+        [["author", "name"]], "AdminService"],
+      ["expand in expand: author { name, books { title } } — only author.name is PII",
+        "SELECT author { name, books { title } } FROM AdminService.Books",
+        [["author", "name"]], "AdminService"],
+      ["expand in expand: author { contact { email } } — inner expand has PII",
+        "SELECT author { contact { email } } FROM AdminService.Books",
+        [["author", "contact", "email"]], "AdminService"],
+      // ── Special cases ─────────────────────────────────
+      ["union within subquery: name is PII via Authors branch",
+        "SELECT name FROM (SELECT name FROM CatalogService.Books UNION SELECT name FROM CatalogService.Authors)",
+        ["name"]],
+      ["scalar subselect in column list: name selected from Authors is PII",
+        "SELECT ID, (SELECT name FROM CatalogService.Authors as a WHERE a.ID = author_ID) FROM CatalogService.Books",
+        ["name"]],
+      ["nested subselect (subselect of subselect): alias ab resolves to name in Authors",
+        "SELECT ab FROM (SELECT name as ab FROM (SELECT name FROM CatalogService.Authors))",
+        ["ab"]],
+      ["subselect inside expand: scalar subselect with alias selecting PII field",
+        "SELECT author { (SELECT name FROM CatalogService.Authors as a WHERE a.ID = ID) as ab } FROM AdminService.Books",
+        [["author", "ab"]], "AdminService"],
+    ]
 
-    it("returns the alias, not the element name, for aliased columns", () => {
-      expect(fields("SELECT ID, name as authorName FROM CatalogService.Authors")).toEqual([
-        "authorName",
-      ])
-    })
-
-    it("returns element names for SELECT *", () => {
-      expect(fields("SELECT * FROM CatalogService.Authors")).toEqual(["name", "placeOfBirth"])
-    })
-
-    it("ignores aliases on non-hashable columns", () => {
-      // dateOfBirth is a Date → never hashed, even when aliased
-      expect(fields("SELECT ID, dateOfBirth as dob FROM CatalogService.Authors")).toEqual([])
-    })
-
-    it("hashes a navigation path column (association.element as alias)", () => {
-      // SELECT author.name as author FROM Books: ref is ["author","name"], alias "author"
-      // ref[0] is an association name, not a table alias — must resolve through the association.
-      // AdminService.Books keeps the author association (CatalogService.Books excludes it).
-      const adminSrv = { name: "AdminService" }
-      const adminFields = (cql) =>
-        [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
-      expect(
-        adminFields("SELECT title, author.name as author, price FROM AdminService.Books"),
-      ).toEqual(["author"])
-    })
-
-    it("hashes a navigation path column without alias", () => {
-      // Without alias the result key is the element name "name"
-      const adminSrv = { name: "AdminService" }
-      const adminFields = (cql) =>
-        [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
-      expect(adminFields("SELECT title, author.name FROM AdminService.Books")).toEqual(["name"])
-    })
-
-    it("hashes annotated column from a subquery (no alias)", () => {
-      // SELECT name FROM (SELECT ID, name FROM Authors)
-      // Outer ref ["name"] → resolves through subquery identity map → entity element "name"
-      expect(fields("SELECT name FROM (SELECT ID, name FROM CatalogService.Authors)")).toEqual([
-        "name",
-      ])
-    })
-
-    it("hashes annotated column from a subquery (inner alias)", () => {
-      // SELECT ab FROM (SELECT name as ab FROM Authors)
-      // Outer ref ["ab"] → subquery alias map ab→["name"] → entity element "name" → result key "ab"
-      expect(fields("SELECT ab FROM (SELECT name as ab FROM CatalogService.Authors)")).toEqual([
-        "ab",
-      ])
-    })
-
-    it("hashes annotated column from a subquery (inner navigation path alias)", () => {
-      // SELECT ab FROM (SELECT author.name as ab FROM Books)
-      // Outer ref ["ab"] → subquery alias map ab→["author","name"] → nav path resolves through
-      // AdminService.Books.author association → Authors.name annotated → result key "ab"
-      const adminSrv = { name: "AdminService" }
-      const adminFields = (cql) =>
-        [...discoverElementsToBeMasked(cds.model, adminSrv, cql, true)].sort()
-      expect(
-        adminFields("SELECT ab FROM (SELECT author.name as ab FROM AdminService.Books)"),
-      ).toEqual(["ab"])
-    })
-  })
-
-  describe("discoverElementsToBeMasked (joins)", () => {
-    const { discoverElementsToBeMasked } = pseudo
-    const srv = { name: "CatalogService" }
-    const fields = (cql) => [...discoverElementsToBeMasked(cds.model, srv, cql, true)].sort()
-
-    it("hashes an annotated column from a joined entity (inner join)", () => {
-      expect(
-        fields(
-          "SELECT b.title, a.name FROM CatalogService.Books as b " +
-            "INNER JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ),
-      ).toEqual(["name"])
-    })
-
-    it("uses the alias for a joined column (left join)", () => {
-      expect(
-        fields(
-          "SELECT a.name as writer FROM CatalogService.Books as b " +
-            "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ),
-      ).toEqual(["writer"])
-    })
-
-    it("collects annotated columns across a nested 3-way join", () => {
-      expect(
-        fields(
-          "SELECT a.name, a.placeOfBirth FROM CatalogService.Books as b " +
-            "LEFT JOIN CatalogService.Authors as a ON b.author_ID = a.ID " +
-            "LEFT JOIN CatalogService.Genres as g ON b.genre_code = g.code",
-        ),
-      ).toEqual(["name", "placeOfBirth"])
-    })
-
-    it("returns element names of all joined entities for SELECT *", () => {
-      // Books projection exposes author (@PersonalData via author.name),
-      // Authors contributes name + placeOfBirth
-      expect(
-        fields(
-          "SELECT * FROM CatalogService.Books as b " +
-            "JOIN CatalogService.Authors as a ON b.author_ID = a.ID",
-        ),
-      ).toEqual(["authorName", "name", "placeOfBirth"])
+    it.each(cases)("%s", (label, cql, expected, service) => {
+      expect(fields(cql, service)).toEqual(expected)
     })
   })
 

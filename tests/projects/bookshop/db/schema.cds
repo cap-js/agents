@@ -31,8 +31,21 @@ entity Authors : managed {
       @PersonalData.IsPotentiallyPersonal
       @Common.Masked: false
       placeOfDeath : String;
+      contact      : Association to AuthorContacts;
       books        : Association to many Books
                        on books.author = $self;
+}
+
+/**
+ * Contact details for an Author — used to provide a PII-bearing target
+ * reachable via two-level expand (Books → author → contact).
+ */
+entity AuthorContacts {
+  key author    : Association to Authors;
+      @PersonalData.IsPotentiallyPersonal
+      email     : String(255);
+      @PersonalData.IsPotentiallyPersonal
+      phone     : String(50);
 }
 
 /** Hierarchically organized Code List for Genres */
