@@ -1,0 +1,5 @@
+{
+  "name": "@capire/common",
+  "version": "1.0.0",
+  "description": "Stub package for @capire/common — satisfies the dependency for local development"
+}

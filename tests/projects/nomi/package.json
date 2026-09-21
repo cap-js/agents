@@ -1,0 +1,39 @@
+{
+  "name": "nomi",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Nomi",
+  "dependencies": {
+    "@cap-js/agents": "file:../../../.",
+    "@cap-js/hana": ">=1",
+    "@capire/xflights": "*",
+    "@capire/xtravels": "*",
+    "@sap/cds": ">=10",
+    "kokoro-js": "^1.2.1"
+  },
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": ">=1"
+  },
+  "cds": {
+    "requires": {
+      "llm": {
+        "kind": "openai",
+        "x-model": "gpt"
+      },
+      "[hai]": {
+        "llm": {
+          "kind": "anthropic",
+          "x-model": "sonnet"
+        }
+      }
+    },
+    "log": {
+      "levels": {
+        "nomi": "debug"
+      }
+    }
+  }
+}

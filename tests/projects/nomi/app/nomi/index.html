@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nomí</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+
+    :root {
+      --bg:      #0c0c1a;
+      --panel:   #11112a;
+      --card:    #1a1a38;
+      --border:  rgba(150,120,220,0.18);
+      --text:    #d8d0f0;
+      --muted:   #8880b0;
+      --accent:  #a855f7;
+      --accent2: #ec4899;
+      --good:    #34d399;
+      --bad:     #f87171;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    #app {
+      display: grid;
+      grid-template-rows: 44px 1fr 62px;
+      height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    #header {
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+      z-index: 10;
+    }
+    #header .logo {
+      width: 22px; height: 22px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #header h1 {
+      font-size: 15px; font-weight: 600;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    #status-badge {
+      margin-left: auto;
+      font-size: 11px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    #status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.4s;
+    }
+    #status-dot.ready  { background: var(--good); box-shadow: 0 0 6px var(--good) }
+    #status-dot.busy   { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 1s infinite }
+    #status-dot.listen { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); animation: pulse 0.7s infinite }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── Content ─────────────────────────────────────────── */
+    #content-panel {
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    #data-area {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      align-content: start;
+      gap: 10px; padding: 14px 18px;
+      flex: 1 1 0; overflow-y: auto;
+    }
+    #data-area:empty::after {
+      content: 'Data will appear here as Nomí presents it ✦';
+      color: var(--muted); font-size: 12px; opacity: 0.45;
+      grid-column: 1 / -1;
+    }
+
+    .data-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+      min-width: 0; position: relative;
+      animation: card-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      transition: border-color 0.3s, box-shadow 0.3s;
+      cursor: pointer;
+    }
+    .data-card[data-span="2"] { grid-column: span 2; }
+    .data-card[data-span="3"] { grid-column: span 3; }
+    .data-card[data-span="row"] { grid-column: 1 / -1; }
+    .data-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(168,85,247,0.2);
+    }
+    @keyframes card-in {
+      from { opacity:0; transform:translateY(10px) scale(0.92) }
+      to   { opacity:1; transform:translateY(0) scale(1) }
+    }
+    .card-label { font-size: 10px; text-transform: uppercase; letter-spacing:.08em; color: var(--muted); margin-bottom: 4px }
+    .card-value { font-size: 26px; font-weight: 700; line-height: 1.1 }
+    .card-unit  { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 2px }
+    .card-trend { font-size: 12px; font-weight: 600; margin-top: 3px }
+    .card-trend.up   { color: var(--good) }
+    .card-trend.down { color: var(--bad)  }
+    .card-text-val   { font-size: 13px; line-height: 1.5 }
+    .card-detail     { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.4 }
+    .card-prog-bar   { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 6px; overflow: hidden }
+    .card-prog-fill  { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; transition: width 0.8s ease }
+    .card-md         { font-size: 12px; line-height: 1.55; }
+    .card-md h3 { font-size: 12px; font-weight: 700; margin: 10px 0 4px; color: var(--accent); border-bottom: 1px solid rgba(168,85,247,0.2); padding-bottom: 3px; }
+    .card-md h3:first-child { margin-top: 0; }
+    .card-md h4 { font-size: 11px; font-weight: 600; margin: 7px 0 2px; color: var(--muted); }
+    .card-md h4:first-child { margin-top: 0; }
+    .card-md hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+    .card-md p       { margin: 3px 0; }
+    .card-md ul, .card-md ol { margin: 4px 0; padding-left: 16px; }
+    .card-md li      { margin: 2px 0; }
+    .card-md strong  { font-weight: 700; }
+    .card-md em      { font-style: italic; opacity: 0.85; }
+    .card-md code    { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-size: 11px; font-family: monospace; }
+    .card-md pre     { background: rgba(0,0,0,0.25); border-radius: 6px; padding: 8px 10px; margin: 6px 0; overflow-x: auto; }
+    .card-md pre code { background: none; padding: 0; font-size: 11px; }
+    .card-md table   { width: 100%; border-collapse: collapse; margin: 5px 0; font-size: 11px; }
+    .card-md th      { background: rgba(168,85,247,0.15); color: var(--accent); font-weight: 600; padding: 4px 8px; text-align: left; border: 1px solid var(--border); }
+    .card-md td      { padding: 3px 8px; border: 1px solid var(--border); vertical-align: top; }
+    .card-md tr:nth-child(even) td { background: rgba(255,255,255,0.025); }
+
+    /* ── Three-level focus hierarchy — driven by CSS relationships ─────
+       JS only creates/removes <mark class="nomi-highlight">.
+       CSS :has() propagates the highlight up to row and card automatically. */
+
+    /* Level 1a: card glanced at or snapped to by Nomi (no exact text yet) */
+    .data-card.nomi-card-focus {
+      border-color: rgba(168, 85, 247, 0.7);
+      box-shadow: 0 0 28px rgba(168, 85, 247, 0.25);
+    }
+
+    /* Level 1b: card containing an active text highlight */
+    .data-card:has(mark.nomi-highlight) {
+      border-color: rgba(168, 85, 247, 0.85);
+      box-shadow: 0 0 32px rgba(168, 85, 247, 0.35);
+    }
+
+    /* Level 1c: card containing a think-highlight (reasoning phase) */
+    .data-card:has(mark.nomi-think-highlight) {
+      border-color: rgba(168, 85, 247, 0.85);
+      box-shadow: 0 0 32px rgba(168, 85, 247, 0.35);
+    }
+
+    /* Level 2: the block element (cell, list item, paragraph) containing the mark */
+    .card-md td, .card-md th, .card-md li,
+    .card-md p,  .card-md h3, .card-md h4 { transition: background 0.4s ease; }
+    .card-md td:has(mark.nomi-highlight),
+    .card-md th:has(mark.nomi-highlight),
+    .card-md li:has(mark.nomi-highlight),
+    .card-md p:has(mark.nomi-highlight),
+    .card-md h3:has(mark.nomi-highlight),
+    .card-md h4:has(mark.nomi-highlight) { background: rgba(168, 85, 247, 0.22); }
+
+    /* Level 2t: block element containing a think-highlight */
+    .card-md td:has(mark.nomi-think-highlight),
+    .card-md th:has(mark.nomi-think-highlight),
+    .card-md li:has(mark.nomi-think-highlight),
+    .card-md p:has(mark.nomi-think-highlight),
+    .card-md h3:has(mark.nomi-think-highlight),
+    .card-md h4:has(mark.nomi-think-highlight) { background: rgba(168, 85, 247, 0.22); }
+
+    /* Level 3: exact speech text */
+    mark.nomi-highlight {
+      background: rgba(168, 85, 247, 0.38);
+      color: #e8d8ff;
+      border-radius: 3px;
+      padding: 0 2px;
+      outline: 1px solid rgba(168, 85, 247, 0.6);
+      outline-offset: 1px;
+      font-style: inherit; font-weight: inherit;
+    }
+
+    /* Level 3t: think-highlight — same look as speech highlight, fades out when TTS starts */
+    mark.nomi-think-highlight {
+      background: rgba(168, 85, 247, 0.38);
+      color: #e8d8ff;
+      border-radius: 3px;
+      padding: 0 2px;
+      outline: 1px solid rgba(168, 85, 247, 0.6);
+      outline-offset: 1px;
+      font-style: inherit; font-weight: inherit;
+      transition: background 0.7s ease, outline-color 0.7s ease, color 0.7s ease;
+    }
+    mark.nomi-think-highlight.nomi-think-fading {
+      background: transparent;
+      outline-color: transparent;
+      color: inherit;
+    }
+
+    /* Level 3s: transient "scan" highlight — a non-quoted word Nomí mentions
+       while reasoning that also appears on a card. Lighter and shorter-lived
+       than think-highlights so the accumulated quoted terms stay dominant. */
+    .data-card:has(mark.nomi-think-scan) {
+      border-color: rgba(168, 85, 247, 0.6);
+      box-shadow: 0 0 22px rgba(168, 85, 247, 0.22);
+    }
+    .card-md td:has(mark.nomi-think-scan),
+    .card-md th:has(mark.nomi-think-scan),
+    .card-md li:has(mark.nomi-think-scan),
+    .card-md p:has(mark.nomi-think-scan),
+    .card-md h3:has(mark.nomi-think-scan),
+    .card-md h4:has(mark.nomi-think-scan) { background: rgba(168, 85, 247, 0.12); }
+    mark.nomi-think-scan {
+      background: rgba(168, 85, 247, 0.30);
+      color: #e8d8ff;
+      border-radius: 3px;
+      padding: 0 2px;
+      font-style: inherit; font-weight: inherit;
+      /* Fade IN smoothly on insert so bursts of matches never strobe */
+      animation: nomi-scan-in 0.32s ease both;
+    }
+    @keyframes nomi-scan-in {
+      from { background: rgba(168, 85, 247, 0); color: inherit; }
+      to   { background: rgba(168, 85, 247, 0.30); color: #e8d8ff; }
+    }
+    /* Fade OUT smoothly when JS schedules removal */
+    mark.nomi-think-scan.nomi-think-scan-fading {
+      animation: none;
+      background: transparent;
+      color: inherit;
+      transition: background 0.55s ease, color 0.55s ease;
+    }
+
+    /* User-selected cards — amber, intentionally distinct from Nomi's purple focus */
+    .data-card.user-selected {
+      border-color: rgba(240, 180, 41, 0.8);
+      box-shadow: 0 0 18px rgba(240, 180, 41, 0.18);
+    }
+    .data-card.user-selected::before {
+      content: '✓';
+      position: absolute;
+      top: 5px; right: 7px;
+      font-size: 10px; line-height: 1;
+      color: rgba(240, 180, 41, 0.85);
+      pointer-events: none;
+    }
+
+    /* Selection bar — sits at the bottom of the content panel */
+    #selection-bar {
+      display: none;
+      align-items: center;
+      gap: 8px; padding: 5px 14px;
+      background: rgba(240, 180, 41, 0.04);
+      border-top: 1px solid rgba(240, 180, 41, 0.18);
+      font-size: 11px; color: rgba(240, 180, 41, 0.85);
+      flex-shrink: 0;
+    }
+    #selection-bar.visible { display: flex; }
+    #sel-count { flex: 1; }
+    #sel-delete {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: var(--bad); cursor: pointer;
+      font-size: 11px; padding: 3px 10px; border-radius: 4px;
+      transition: background 0.2s;
+    }
+    #sel-delete:hover { background: rgba(248, 113, 113, 0.22); }
+    #sel-clear {
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer;
+      font-size: 12px; padding: 3px 8px; border-radius: 4px;
+      transition: background 0.2s;
+    }
+    #sel-clear:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+    #response-wrap { display: none; flex-direction: column; gap: 5px; padding: 6px 18px 8px; flex-shrink: 0; border-top: 1px solid var(--border); }
+    #response-wrap.visible { display: flex; }
+    #prompt-bubble { font-size: 11px; color: var(--muted); opacity: 0.65; align-self: flex-end; padding: 1px 4px; }
+    #speech-bubbles { display: flex; flex-wrap: wrap; gap: 5px; }
+    .speech-bubble { background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.2); border-radius: 14px; padding: 4px 11px; font-size: 12px; color: var(--text); cursor: pointer; user-select: none; transition: border-color 0.2s, background 0.2s; }
+    .speech-bubble:hover { border-color: rgba(168,85,247,0.45); background: rgba(168,85,247,0.14); }
+    .speech-bubble.selected { border-color: rgba(240,180,41,0.8); background: rgba(240,180,41,0.08); }
+    .speech-bubble.selected::after { content: ' ✓'; font-size: 10px; color: rgba(240,180,41,0.85); }
+
+    /* ── Input row ─────────────────────────────────────── */
+    #input-row {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 14px;
+    }
+    #mic-btn {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--card); color: var(--muted); font-size: 18px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; flex-shrink: 0;
+    }
+    #mic-btn:hover  { border-color: var(--accent); color: var(--accent) }
+    #mic-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-color: transparent; color: white;
+      animation: mic-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes mic-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(236,72,153,0.5) }
+      50%       { box-shadow: 0 0 0 8px rgba(236,72,153,0) }
+    }
+    #audio-canvas { display: none }
+    #live-btn {
+      height: 40px; padding: 0 14px; border-radius: 20px;
+      border: 2px solid var(--border);
+      background: var(--card); color: var(--muted); font-size: 13px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+      transition: all 0.2s; flex-shrink: 0; white-space: nowrap;
+    }
+    #live-btn:hover { border-color: var(--accent); color: var(--accent) }
+    #live-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-color: transparent; color: white;
+      animation: mic-pulse 1.6s ease-in-out infinite;
+    }
+    #text-row { display: contents }
+    #input-text {
+      flex: 1; background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 13px;
+      padding: 8px 12px; outline: none; resize: none; height: 38px;
+      transition: border-color 0.2s; font-family: inherit;
+    }
+    #input-text:focus { border-color: var(--accent) }
+    #input-text::placeholder { color: var(--muted); opacity: 0.7 }
+    #send-btn {
+      padding: 0 14px; height: 36px; border-radius: 8px; border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    #send-btn:hover   { opacity: 0.88 }
+    #send-btn:disabled { opacity: 0.35; cursor: default }
+    #send-btn.stop-mode {
+      background: rgba(248, 113, 113, 0.85);
+    }
+    #send-btn.stop-mode:hover { opacity: 1; }
+
+    /* ── Floating Nomí ──────────────────────────────────── */
+    #nomi-float {
+      position: fixed;
+      z-index: 200;
+      width: 88px; height: 88px;
+      pointer-events: none;
+      /* position driven by JS lerp — no CSS transition */
+    }
+
+    #nomi-svg {
+      width: 88px; height: 88px;
+      animation: float-bob 4s ease-in-out infinite;
+      filter: drop-shadow(0 0 12px rgba(168,85,247,0.4));
+      transition: filter 0.5s ease;
+    }
+    @keyframes float-bob {
+      0%, 100% { transform: translateY(0) }
+      50%       { transform: translateY(-6px) }
+    }
+    /* Glow states — swapped via class on #nomi-float */
+    #nomi-float.glow-excited #nomi-svg { filter: drop-shadow(0 0 16px rgba(236,72,153,0.6)) }
+    #nomi-float.glow-thinking #nomi-svg { filter: drop-shadow(0 0 10px rgba(99,102,241,0.5)) }
+    #nomi-float.glow-surprised #nomi-svg { filter: drop-shadow(0 0 18px rgba(251,191,36,0.5)) }
+    #nomi-float.glow-warm #nomi-svg { filter: drop-shadow(0 0 14px rgba(251,113,133,0.55)) }
+
+    /* Thinking cloud — a fixed-size ticker beside the orb. Nomí's reasoning
+       words stream in from the right and scroll left through a static window,
+       so the box never resizes with the text. Opens to the LEFT since the orb
+       rests near the right edge and follows it (child of #nomi-float). */
+    #think-cloud {
+      position: absolute;
+      right: 80px; bottom: 20px;
+      width: 190px;                 /* static — the ticker scrolls, the box does not resize */
+      background: linear-gradient(135deg, rgba(52, 33, 92, 0.96), rgba(30, 20, 54, 0.96));
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      border-radius: 15px;
+      padding: 6px 12px;
+      font-size: 11px; line-height: 1.3;
+      font-style: italic; letter-spacing: 0.01em;
+      color: #cbb6f5;
+      opacity: 0; transform: scale(0.9) translateY(4px);
+      transform-origin: right bottom;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(88, 28, 135, 0.42);
+      z-index: 1;
+    }
+    #think-cloud.visible { opacity: 0.98; transform: scale(1) translateY(0); }
+    /* Thought-bubble tail: two shrinking dots toward the orb (to the right) */
+    #think-cloud::before, #think-cloud::after {
+      content: ''; position: absolute; border-radius: 50%;
+      background: rgba(30, 20, 54, 0.96);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+    }
+    #think-cloud::before { width: 9px; height: 9px; right: -5px;  bottom: -3px; }
+    #think-cloud::after  { width: 5px; height: 5px; right: -12px; bottom: -9px; }
+    /* Static window that clips the line; the box keeps overflow visible so the
+       tail dots still show outside it. */
+    #think-cloud-view { display: block; overflow: hidden; white-space: nowrap; }
+    /* The sliding line — JS translates it left so the newest words stay in view. */
+    #think-cloud-text { display: inline-block; white-space: nowrap; transition: transform 0.28s linear; will-change: transform; }
+
+    #expr-badge { display: none }
+
+    /* ── Scrollbar ──────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px }
+    ::-webkit-scrollbar-track { background: transparent }
+    ::-webkit-scrollbar-thumb { background: rgba(150,120,220,0.22); border-radius: 2px }
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <header id="header">
+    <div class="logo"></div>
+    <h1>Nomí</h1>
+    <div id="status-badge">
+      <div id="status-dot"></div>
+      <span id="status-text">Connecting…</span>
+    </div>
+  </header>
+
+  <div id="content-panel">
+    <div id="data-area"></div>
+    <div id="response-wrap">
+      <div id="prompt-bubble"></div>
+      <div id="speech-bubbles"></div>
+    </div>
+    <div id="selection-bar">
+      <span id="sel-count"></span>
+      <button id="sel-delete">Delete</button>
+      <button id="sel-clear">✕</button>
+    </div>
+  </div>
+
+  <div id="input-row">
+    <button id="mic-btn" title="Toggle microphone (Space)">🎤</button>
+    <button id="live-btn" title="Toggle live mode — Nomí keeps refining the board on its own">○ Live</button>
+    <canvas id="audio-canvas"></canvas>
+    <div id="text-row">
+      <textarea id="input-text" rows="1"
+        placeholder="Type a message or use the mic… (Enter to send)"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Floating Nomí orb — lives outside the grid flow -->
+<div id="nomi-float">
+  <svg id="nomi-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="body-grad" cx="38%" cy="32%" r="62%">
+        <stop offset="0%"   stop-color="#c084fc"/>
+        <stop offset="100%" stop-color="#5b21b6"/>
+      </radialGradient>
+    </defs>
+
+    <!-- Outer subtle ring -->
+    <circle cx="40" cy="40" r="38"
+            fill="none" stroke="rgba(192,132,252,0.22)" stroke-width="3"/>
+
+    <!-- Body -->
+    <circle cx="40" cy="40" r="34" fill="url(#body-grad)"/>
+
+    <!-- Top-left sheen -->
+    <ellipse cx="30" cy="27" rx="11" ry="7" fill="white" opacity="0.1"/>
+
+    <!-- ── Left eye ─────────────────── -->
+    <g id="eye-left" transform="translate(25,38)">
+      <ellipse id="sclera-l" rx="9"   ry="9"   fill="white"/>
+      <ellipse id="iris-l"   rx="6"   ry="6"   cy="1"   fill="#4c1d95"/>
+      <ellipse id="pupil-l"  rx="3.2" ry="3.2" cy="1.5" fill="#080010"/>
+      <ellipse cx="2.8" cy="-1.8" rx="2.2" ry="1.6" fill="white" opacity="0.82"/>
+    </g>
+
+    <!-- ── Right eye ────────────────── -->
+    <g id="eye-right" transform="translate(55,38)">
+      <ellipse id="sclera-r" rx="9"   ry="9"   fill="white"/>
+      <ellipse id="iris-r"   rx="6"   ry="6"   cy="1"   fill="#4c1d95"/>
+      <ellipse id="pupil-r"  rx="3.2" ry="3.2" cy="1.5" fill="#080010"/>
+      <ellipse cx="2.8" cy="-1.8" rx="2.2" ry="1.6" fill="white" opacity="0.82"/>
+    </g>
+
+  </svg>
+
+  <div id="think-cloud"><span id="think-cloud-view"><span id="think-cloud-text"></span></span></div>
+  <div id="expr-badge"></div>
+</div>
+
+<script type="module" src="nomi.js"></script>
+</body>
+</html>

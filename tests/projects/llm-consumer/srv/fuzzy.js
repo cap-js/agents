@@ -2,26 +2,13 @@ import cds from "@sap/cds";
 
 import { pipeline } from 'node:stream/promises'
 import { Readable } from "node:stream"
-import AgentService from "../../../../lib/agentService";
 
-export default class FuzzyService extends AgentService {
-  AgentSession = class RAGAgentSession extends AgentSession {
-    async *loadSession() {
-      yield* super.loadSession()
-      // semantic search for last promp
-      const books = await SELECT.from(Books).where`embedding like ${prompt}`.limit(10)
-      yield { role: 'assistant', type: 'tool_call', query: {} }
-      yield { role: 'assistant', type: 'tool_result', content: books.map(...).join('\n') }
-    }
-  }
-
+export default class FuzzyService extends cds.ApplicationService {
   init() {
-    // this.on('start', () => {})
-
     this.on('llm', async (req) => {
       const message = req?.data?.message
       if (!message) cds.error`Required message argument is missing. Please provide an message to send.`
-      const llm = await cds.connect.to('llm')
+      const llm = await cds.connect.to('llm', {model:'qwen3.6'})
       const response = await llm.send(message)
       return response.reduce((l, c) => l + c.content, '')
     })
