@@ -62,11 +62,6 @@
       "attachments": {
         "kind": "db"
       },
-      "data-anonymization": {
-        "credentials": {
-          "destination": "c21-sfm-foa-dpi-anonymize"
-        }
-      },
       "telemetry": {
         "tracing": false,
         "metrics": false
