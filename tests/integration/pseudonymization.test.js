@@ -1119,3 +1119,96 @@ function collectSpanStrings(span) {
   walk(span.status)
   return out
 }
+
+describe("pseudonymization — remote MCP tool name prefix", () => {
+  const { axios: axiosInst } = cds.test(import.meta.dirname + "/../projects/bookshop")
+  axiosInst.defaults.validateStatus = () => true
+
+  let pseudonymizeMiddleware, encode, ToolMessage
+
+  beforeAll(async () => {
+    ;({ pseudonymizeMiddleware } = await import("../../lib/agents/middleware/pseudonymize.js"))
+    ;({ encode } = await import("@toon-format/toon"))
+    ;({ ToolMessage } = await import("@langchain/core/messages"))
+    cds.env.agents ??= {}
+    cds.env.agents.masking = true
+  })
+
+  afterAll(() => {
+    cds.env.agents.masking = false
+  })
+
+  async function setupRemoteMcpContext() {
+    const srv = cds.services["CatalogService"]
+    const mw = pseudonymizeMiddleware(srv)
+    cds.context = cds.context || {}
+    cds.context.model = cds.model
+    cds.context["agent.service"] = "CatalogService"
+    cds.context["agent.context.id"] = `remote-mcp-${Date.now()}`
+    cds.context["_pseudoSession"] = undefined
+    // __mcpDynamicTools mirrors what remoteMcpMiddleware caches after tools/list.
+    cds.context.__mcpDynamicTools = {
+      "http://mock-mcp/mcp": {
+        serviceName: "CatalogService",
+        tools: [{ name: "catalogservice_query" }, { name: "catalogservice_findauthor" }],
+      },
+    }
+    await mw.beforeAgent()
+    return { mw }
+  }
+
+  afterEach(() => {
+    const key = `CatalogService:_:anonymous:${cds.context?.["agent.context.id"] ?? ""}`
+    PseudoSession.evict(key)
+  })
+
+  it("prefixed query tool 'catalogservice_query' is pseudonymized after fix", async () => {
+    const { mw } = await setupRemoteMcpContext()
+    const rawContent = encode({
+      data: [{ ID: 1, name: "Emily Brontë", placeOfBirth: "Thornton" }],
+    })
+    const request = {
+      toolCall: {
+        name: "catalogservice_query",
+        id: "tc1",
+        args: { cql: "SELECT ID, name, placeOfBirth FROM CatalogService.Authors" },
+      },
+      tool: {},
+    }
+    const result = await mw.wrapToolCall(
+      request,
+      async () =>
+        new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "catalogservice_query" }),
+    )
+    expect(result.content).not.toContain("Emily Brontë")
+    expect(result.content).toMatch(/name-[0-9a-f]{8}/)
+    expect(result.content).toMatch(/placeOfBirth-[0-9a-f]{8}/)
+  })
+
+  it("prefixed action 'catalogservice_findauthor' is pseudonymized after fix", async () => {
+    const { mw } = await setupRemoteMcpContext()
+    const rawContent = encode({
+      data: { name: "Emily Brontë", dateOfBirth: "1818-07-30" },
+    })
+    const request = {
+      toolCall: {
+        name: "catalogservice_findauthor",
+        id: "tc1",
+        args: { searchTerm: "Emily" },
+      },
+      tool: {},
+    }
+    const result = await mw.wrapToolCall(
+      request,
+      async () =>
+        new ToolMessage({
+          content: rawContent,
+          tool_call_id: "tc1",
+          name: "catalogservice_findauthor",
+        }),
+    )
+    expect(result.content).not.toContain("Emily Brontë")
+    expect(result.content).toMatch(/name-[0-9a-f]{8}/)
+    expect(result.content).toContain("1818-07-30") // dateOfBirth not annotated
+  })
+})
