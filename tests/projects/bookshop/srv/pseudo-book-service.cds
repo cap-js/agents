@@ -15,4 +15,7 @@ service PseudoBookService {
     excluding {
       books
     };
+
+  @readonly
+  entity Customers as projection on my.Customers;
 }

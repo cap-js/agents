@@ -43,7 +43,7 @@ entity Authors {
 
 The plugin handles the rest automatically:
 
-- **LLM** sees `<<name>:a8f3d2c1>` instead of `"Emily Brontë"` — it reasons with the pseudonymous value but never sees real data.
+- **LLM** sees `name-a8f3d2c1` instead of `"Emily Brontë"` — it reasons with the pseudonymous value but never sees real data.
 - **User** receives the real value in the final response — hashes are resolved before the answer is returned.
 - **OTel traces and MLflow** record hashed values by default, keeping telemetry DPP-compliant.
 - **Multi-turn conversations** work across service instances — the same value always maps to the same hash within a session, and hashes are resolved back to originals before tool calls execute.
@@ -57,7 +57,7 @@ The plugin handles the rest automatically:
 | `@PersonalData.FieldSemantics: 'UserID'`        | Field pseudonymized |
 | `@PersonalData.FieldSemantics: 'DataSubjectID'` | Field pseudonymized |
 
-Applies to all field types except `Boolean`, `Date`, `DateTime`, and `Timestamp`.
+Applies to all field types except `Boolean`, `Date`, `DateTime`, and `Timestamp`. Numeric properties are only hashed if they are a key or foreign key property.
 
 ### Opting out
 

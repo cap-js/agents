@@ -34,7 +34,7 @@ export default class PseudoBookService extends cds.ApplicationService {
                   tool_calls: [
                     {
                       name: "query",
-                      args: { cql: "SELECT ID, name FROM PseudoBookService.Authors" },
+                      args: { cql: "SELECT ID, name, placeOfDeath FROM PseudoBookService.Authors" },
                       id: "call-1",
                     },
                   ],
@@ -46,7 +46,7 @@ export default class PseudoBookService extends cds.ApplicationService {
         }
 
         const content = typeof toolMsg.content === "string" ? toolMsg.content : ""
-        const hashes = [...content.matchAll(/<<name>:[0-9a-f]{8}>/g)].map((m) => m[0])
+        const hashes = [...content.matchAll(/(?:name|placeOfDeath)-[0-9a-f]{8}/g)].map((m) => m[0])
         const answer = hashes.length
           ? `The authors are: ${hashes.join(", ")}.`
           : "No authors found."

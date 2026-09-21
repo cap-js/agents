@@ -98,11 +98,20 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       const attrs = mlflowTraceAttrs()
       expect(Object.keys(attrs).includes("mlflow.traceTag.tenant")).toBeTruthy()
       expect(Object.keys(attrs).includes("session.id")).toBeTruthy()
-      expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
       // All values must be strings
       for (const v of Object.values(attrs)) {
         expect(typeof v).toBe("string")
       }
+    })
+
+    it("masking.resolveInTraces true leads to user.id being included", async () => {
+      cds.env.agents.masking = {
+        resolveInTraces: true,
+      }
+      const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow/index.js")
+      const attrs = mlflowTraceAttrs()
+      expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
+      cds.env.agents.masking = true
     })
   })
 
