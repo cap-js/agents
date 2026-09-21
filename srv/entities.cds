@@ -58,8 +58,6 @@ entity Tasks : managed {
       /** LangGraph checkpoint writes tied to this task. Cascade-deleted. */
       checkpointWrites : Composition of many CheckpointWrites
                            on checkpointWrites.task_id = taskId;
-
-      textAnalysis : Composition of many TextAnalysisResults on textAnalysis.taskId = taskId;
 }
 
 entity Checkpoints : managed {
@@ -116,15 +114,4 @@ entity PushNotificationConfigs : managed {
       task     : Association to one Tasks
                    on task.taskId = taskId;
       url      : String(2048);
-}
-
-entity TextAnalysisResults {
-  key ID            : UUID;
-      taskId        : String;
-      type          : String(3);
-      SENTENCE_ID   : Integer;
-      TOKEN         : String(5000);
-      ENTITY        : String(1000);
-      OFFSET        : Integer;
-      GLOBAL_OFFSET : Integer;
 }

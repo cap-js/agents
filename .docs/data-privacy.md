@@ -95,23 +95,41 @@ To identify and mask PII in unstructured data, [SAP DPI Data Anonymization](http
 
 The plugin can call SAP Data Privacy Integration (DPI) through a BTP Destination before the agent model runs. It pseudonymizes only incoming human messages in the current turn; tool output, system prompts, and model responses are not sent to DPI.
 
-Bind the Destination service to the application and configure the DPI destination name in CAP. When this required-service entry exists, DPI pseudonymization is always active.
+1. Create a DPI service instance for pseudonymization:
+
+```sh
+cf create-service data-privacy-integration-service enterprise bookshop-anonymization -c '{ "dataPrivacyConfiguration": { "configType": "anonymization", "applicationConfiguration": { "applicationName": "bookshop-srv", "applicationDescription": "Pseudonymization for Bookshop Service"}}}'
+```
+
+2. Go to the Subaccount. Under Connectivity -> Destination Certificates create a new certificate.
+3. Under Destination create a new destination using the certificate. The minimal working config is:
+
+```json
+{
+  "Authentication": "ClientCertificateAuthentication",
+  "Name": "bookshop-srv-pseudonymization",
+  "KeyStore.Source": "DestinationService",
+  "KeyStoreLocation": "<select certificate in BTP>",
+  "ProxyType": "Internet",
+  "Type": "HTTP",
+  // Change eu12 to the BTP region of your subaccount
+  "URL": "https://service.canary.eu12.anonymization.dpp.cloud.sap"
+}
+```
+
+4. Bind the Destination service to the application and provide the destination name as follows:
 
 ```jsonc
 {
   "cds": {
     "requires": {
       "data-anonymization": {
-        "credentials": { "destination": "data-anonymization" },
+        "credentials": { "destination": "bookshop-srv-pseudonymization" },
       },
     },
   },
 }
 ```
-
-In the BTP Destination service, create a matching destination with certificate-based authentication.
-
-The destination URL must be the anonymization service base URL from the service key and follows the pattern `https://service.{region}.anonymization.dpp.cloud.sap` (for example `https://service.eu10.anonymization.dpp.cloud.sap`).
 
 The following profiles are configued to be pseudonymized:
 
