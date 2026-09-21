@@ -5,4 +5,5 @@ service AdminService @(requires: 'admin') {
   entity Books          as projection on my.Books;
   entity Authors        as projection on my.Authors;
   entity AuthorContacts as projection on my.AuthorContacts;
+  entity Profiles       as projection on my.Profiles;
 }

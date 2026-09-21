@@ -396,6 +396,48 @@ describe("pseudonymization", () => {
         [["author", "books", "author", "name"]],
         "AdminService",
       ],
+      // ── complex / arrayed element types on the queried entity ────────────────
+      // CAP flattens struct-typed elements in the runtime model (address → address_street,
+      // address_geo_lat, address_region_district, …), so nested-struct PII surfaces as
+      // flat scalar columns. Arrays of scalars and arrays of structs are NOT flattened.
+      [
+        "flattened complex type: SELECT flattened struct column is PII",
+        "SELECT address_street FROM AdminService.Profiles",
+        ["address_street"],
+        "AdminService",
+      ],
+      [
+        "scalar-array element: SELECT nicknames (many String) → single path",
+        "SELECT nicknames FROM AdminService.Profiles",
+        [["nicknames"]],
+        "AdminService",
+      ],
+      [
+        "scalar-array element: SELECT pastCities (array of String) → single path",
+        "SELECT pastCities FROM AdminService.Profiles",
+        [["pastCities"]],
+        "AdminService",
+      ],
+      [
+        "arrayed struct element: SELECT contacts → path into item's PII field",
+        "SELECT contacts FROM AdminService.Profiles",
+        [["contacts", "email"]],
+        "AdminService",
+      ],
+      [
+        "SELECT * over entity with complex (flattened) + arrayed + struct-array PII",
+        "SELECT * FROM AdminService.Profiles",
+        [
+          "address_geo_lat",
+          "address_region_district",
+          "address_street",
+          ["contacts", "email"],
+          "name",
+          "nicknames",
+          "pastCities",
+        ],
+        "AdminService",
+      ],
       // scalar subselect with inner join — cds.ql resolves element but loses PII;
       // must fall back to _discoverFromCqn on the subselect
       [
@@ -499,14 +541,14 @@ describe("pseudonymization", () => {
 
     afterEach(() => PseudoSession.evict(threadId()))
 
-    async function setupContext() {
-      const srv = cds.services[srvName]
+    async function setupContext(service = srvName) {
+      const srv = cds.services[service]
       cds.env.agents ??= {}
       cds.env.agents.masking ??= true
       const mw = pseudonymizeMiddleware(srv)
       cds.context = cds.context || {}
       cds.context.model = cds.model
-      cds.context["agent.service"] = srvName
+      cds.context["agent.service"] = service
       cds.context["agent.context.id"] = contextId
       cds.context["_pseudoSession"] = undefined
       // beforeAgent establishes the session on cds.context, mirroring runtime flow
@@ -549,6 +591,76 @@ describe("pseudonymization", () => {
         ([, original]) => original === "Emily Brontë",
       )?.[0]
       expect(emilyHash).toBeDefined()
+    })
+
+    it("query result with flattened struct, scalar arrays, and arrayed struct is fully masked", async () => {
+      // AdminService.Profiles: flattened struct cols (address_street, address_geo_lat,
+      // address_region_district), scalar arrays (nicknames, pastCities), arrayed struct
+      // (contacts[].email). Every PII must be hashed; non-PII left intact.
+      const { mw } = await setupContext("AdminService")
+      const rawContent = encode({
+        data: [
+          {
+            ID: 1,
+            name: "Emily Brontë",
+            address_street: "Market Street",
+            address_city: "Thornton",
+            address_geo_lat: "53.79",
+            address_region_district: "Yorkshire",
+            nicknames: ["Emmy", "Bell"],
+            pastCities: ["Haworth", "Cowan Bridge"],
+            contacts: [
+              { email: "emily@moors.uk", label: "home" },
+              { email: "eb@press.uk", label: "work" },
+            ],
+          },
+        ],
+      })
+      const request = {
+        toolCall: {
+          name: "query",
+          id: "tc1",
+          args: {
+            cql:
+              "SELECT ID, name, address_street, address_city, address_geo_lat, " +
+              "address_region_district, nicknames, pastCities, contacts FROM AdminService.Profiles",
+          },
+        },
+        tool: {},
+      }
+      const result = await mw.wrapToolCall(
+        request,
+        async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "query" }),
+      )
+      const content = result.content
+
+      // all PII originals gone
+      for (const pii of [
+        "Emily Brontë",
+        "Market Street",
+        "53.79",
+        "Yorkshire",
+        "Emmy",
+        "Bell",
+        "Haworth",
+        "Cowan Bridge",
+        "emily@moors.uk",
+        "eb@press.uk",
+      ]) {
+        expect(content, `PII must be masked: ${pii}`).not.toContain(pii)
+      }
+      // non-PII intact
+      expect(content).toContain("Thornton") // address_city not annotated
+      expect(content).toContain("home") // contacts.label not annotated
+      expect(content).toContain("work")
+      // hash tokens present for the various PII kinds
+      expect(content).toMatch(/name-[0-9a-f]{8}/)
+      expect(content).toMatch(/address_street-[0-9a-f]{8}/)
+      expect(content).toMatch(/address_geo_lat-[0-9a-f]{8}/)
+      expect(content).toMatch(/address_region_district-[0-9a-f]{8}/)
+      expect((content.match(/nicknames-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect((content.match(/pastCities-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect((content.match(/email-[0-9a-f]{8}/g) || []).length).toBe(2)
     })
 
     it("round-trip: hash in tool result survives model call and can resolve for user", async () => {
@@ -601,6 +713,132 @@ describe("pseudonymization", () => {
       const session = cds.context["_pseudoSession"]
       const hash = content.match(/name-[0-9a-f]{8}/)[0]
       expect(session.resolve(hash)).toBe("Emily Brontë")
+    })
+
+    // ── complex action/function return types ─────────────────────────────────
+    // Actions walk the return-type definition recursively, covering nested structs,
+    // arrays, named types, and arrayed scalars — beyond flat query field discovery.
+    const runAction = async (mw, toolName, data) => {
+      const rawContent = encode({ data })
+      const request = { toolCall: { name: toolName, id: "tc1", args: {} }, tool: {} }
+      const result = await mw.wrapToolCall(
+        request,
+        async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: toolName }),
+      )
+      return result.content
+    }
+
+    it("action returns a top-level scalar PII String — hashes using the tool name as prefix", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorName", "Emily Brontë")
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).toMatch(/authorName-[0-9a-f]{8}/)
+      const session = cds.context["_pseudoSession"]
+      const hash = content.match(/authorName-[0-9a-f]{8}/)[0]
+      expect(session.resolve(hash)).toBe("Emily Brontë")
+    })
+
+    it("action returns top-level scalar @Common.Masked String — still hashed for the LLM", async () => {
+      // @Common.Masked (=true) means normal masking applies; only @Common.Masked:false
+      // would let the LLM see the raw value. forLlm defaults to true here.
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorSecret", "Ellis Bell")
+      expect(content).not.toContain("Ellis Bell")
+      expect(content).toMatch(/authorSecret-[0-9a-f]{8}/)
+    })
+
+    it("action returns top-level array of scalar PII String — hashes every item", async () => {
+      // `array of String @PersonalData` puts the annotation on the arrayed node itself,
+      // not on the item type — every scalar item must still be hashed.
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorAllNames", ["Emily Brontë", "Charlotte Brontë"])
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("Charlotte Brontë")
+      expect((content.match(/authorAllNames-[0-9a-f]{8}/g) || []).length).toBe(2)
+    })
+
+    it("action returns object with a `many String` PII field — hashes every array element", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorWithNicknames", {
+        name: "Emily Brontë",
+        nicknames: ["Emmy", "Bell"],
+      })
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("Emmy")
+      expect(content).not.toContain("Bell")
+      expect(content).toMatch(/name-[0-9a-f]{8}/)
+      expect((content.match(/nicknames-[0-9a-f]{8}/g) || []).length).toBe(2)
+    })
+
+    it("action returns array of struct — hashes annotated field in every item", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "listAuthorNames", [
+        { name: "Emily Brontë" },
+        { name: "Edgar Allen Poe" },
+      ])
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("Edgar Allen Poe")
+      expect((content.match(/name-[0-9a-f]{8}/g) || []).length).toBe(2)
+    })
+
+    it("action returns array of multi-field struct — hashes only annotated fields", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "listAuthorContacts", [
+        { name: "Emily Brontë", city: "Thornton", country: "England" },
+      ])
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("Thornton")
+      expect(content).toContain("England") // country not annotated
+      expect(content).toMatch(/name-[0-9a-f]{8}/)
+      expect(content).toMatch(/city-[0-9a-f]{8}/)
+    })
+
+    it("action returns nested struct — hashes annotated field in the nested object", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorProfile", {
+        name: "Emily Brontë",
+        address: { street: "Market Street", city: "Thornton" },
+      })
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("Market Street")
+      expect(content).toContain("Thornton") // address.city not annotated
+      expect((content.match(/(?:name|street)-[0-9a-f]{8}/g) || []).length).toBe(2)
+    })
+
+    it("action returns a named complex type — resolves and hashes nested + arrayed PII", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorDossier", {
+        name: "Emily Brontë",
+        biography: "English novelist",
+        contact: { email: "emily@moors.uk", phone: "555-0100" },
+        aliases: [{ alias: "Ellis Bell" }],
+      })
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("emily@moors.uk")
+      expect(content).not.toContain("Ellis Bell")
+      expect(content).toContain("English novelist") // biography not annotated
+      expect(content).toContain("555-0100") // phone not annotated
+      expect(content).toMatch(/name-[0-9a-f]{8}/)
+      expect(content).toMatch(/email-[0-9a-f]{8}/)
+      expect(content).toMatch(/alias-[0-9a-f]{8}/)
+    })
+
+    it("action returns arrayed nested struct — hashes annotated field in every nested item", async () => {
+      const { mw } = await setupContext()
+      const content = await runAction(mw, "authorWithHistory", {
+        name: "Emily Brontë",
+        addresses: [
+          { street: "Market Street", city: "Thornton" },
+          { street: "Church Lane", city: "Haworth" },
+        ],
+      })
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).not.toContain("Market Street")
+      expect(content).not.toContain("Church Lane")
+      expect(content).toContain("Thornton") // city not annotated
+      expect(content).toContain("Haworth")
+      // 1 name + 2 street hashes
+      expect((content.match(/(?:name|street)-[0-9a-f]{8}/g) || []).length).toBe(3)
     })
 
     it("wrapToolCall hashes an aliased column using the alias as the result key", async () => {

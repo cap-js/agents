@@ -69,3 +69,46 @@ entity Customers {
       @PersonalData.IsPotentiallyPersonal
       favoriteAuthor   : Association to Authors;
 }
+
+/** Named structured type reused as an entity property (complexType within complexType). */
+type Address {
+  @PersonalData.IsPotentiallyPersonal
+  street  : String;
+  city    : String;
+  geo     : {
+    @PersonalData.IsPotentiallyPersonal
+    lat : String;
+    lng : String;
+  };
+  region  : Region;
+}
+
+/** Named type nested inside another named type (Address.region : Region). */
+type Region {
+  @PersonalData.IsPotentiallyPersonal
+  district : String;
+  code     : String;
+}
+
+/**
+ * Profiles exercise query pseudonymization over complex/arrayed element types:
+ *   - address       : named complex type (struct within struct)
+ *   - nicknames     : many String  (arrayed scalar)
+ *   - pastCities    : array of String (arrayed scalar)
+ *   - contacts      : arrayed struct
+ */
+entity Profiles {
+  key ID         : Integer;
+      @PersonalData.IsPotentiallyPersonal
+      name       : String(111);
+      address    : Address;
+      @PersonalData.IsPotentiallyPersonal
+      nicknames  : many String;
+      @PersonalData.IsPotentiallyPersonal
+      pastCities : array of String;
+      contacts   : array of {
+        @PersonalData.IsPotentiallyPersonal
+        email : String;
+        label : String;
+      };
+}
