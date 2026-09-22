@@ -129,20 +129,27 @@ describe("pseudonymization", () => {
     })
   })
 
-  it("pseudonymize handler is called with req.data.text on A2A message/send", async () => {
+  it("pseudonymize handler is called with req.data on A2A message/send", async () => {
+    // PseudoBookService overrides pseudonymize for type=unstructured, replacing
+    // "Emily Brontë" with "PSEUDO_EMILY" and returning a mapping.
     const res = await sendMessage("pseudo-book", "Tell me about Emily Brontë")
     expect(res.status).toBe(200)
-    // PseudoBookService overrides the pseudonymize handler to replace
-    // "Emily Brontë" with "PSEUDO_EMILY". Verify the LLM saw the replaced text.
+
+    // Verify the LLM saw the replaced text in its input
     const graphThreadId = `PseudoBookService:${res.data.result.contextId}`
     const saver = new CdsCheckpointSaver()
     const tuple = await saver.getTuple({ configurable: { thread_id: graphThreadId } })
     const messages = tuple?.checkpoint?.channel_values?.messages ?? []
     const human = messages.find((m) => (m._getType?.() ?? m.type) === "human")
     expect(human).toBeDefined()
-    const text = typeof human.content === "string" ? human.content : human.content?.[0]?.text
-    expect(text).toContain("PSEUDO_EMILY")
-    expect(text).not.toContain("Emily Brontë")
+    const humanText = typeof human.content === "string" ? human.content : human.content?.[0]?.text
+    expect(humanText).toContain("PSEUDO_EMILY")
+    expect(humanText).not.toContain("Emily Brontë")
+
+    // Verify the user-facing response resolves the pseudonym back to the original
+    const responseText = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""
+    expect(responseText).toContain("Emily Brontë")
+    expect(responseText).not.toContain("PSEUDO_EMILY")
   })
 
   describe("annotation resolution", () => {
@@ -215,7 +222,7 @@ describe("pseudonymization", () => {
       expect(set.has("age")).toBe(false) // numeric, not a key
     })
 
-    it("excludes @Common.Masked:false fields when forLlm=true", () => {
+    it("excludes @Common.Masked:false fields when strictMasking=false", () => {
       const def = {
         elements: {
           name: {
@@ -225,8 +232,8 @@ describe("pseudonymization", () => {
           },
         },
       }
-      expect(_personalDataElements(def, true).has("name")).toBe(false)
-      expect(_personalDataElements(def, false).has("name")).toBe(true)
+      expect(_personalDataElements(def, false).has("name")).toBe(false)
+      expect(_personalDataElements(def, true).has("name")).toBe(true)
     })
 
     it("returns empty set for entity without elements", () => {
@@ -295,7 +302,7 @@ describe("pseudonymization", () => {
   describe("discoverElementsToBeMasked", () => {
     const { discoverElementsToBeMasked } = pseudo
     const fields = (cql, service = "CatalogService") =>
-      [...discoverElementsToBeMasked(cds.model, { name: service }, cql, true)].sort((a, b) =>
+      [...discoverElementsToBeMasked(cds.model, { name: service }, cql, false)].sort((a, b) =>
         String(a).localeCompare(String(b)),
       )
 
@@ -580,11 +587,11 @@ describe("pseudonymization", () => {
       const mw = maskingMiddleware(srv)
       cds.context = cds.context || {}
       cds.context.model = cds.model
+      cds.context.user = new cds.User.Privileged()
       cds.context["agent.service"] = service
       cds.context["agent.context.id"] = contextId
-      cds.context["agent.pseudonyms"] = undefined
-      // beforeAgent creates the session from state and stashes it on cds.context.
-      await mw.beforeAgent({ seed: randomBytes(16).toString("hex"), hashToOriginal: new Map() })
+      // Create session directly — unit tests have no checkpointer.
+      cds.context["agent.pseudonyms"] = new PseudonymStore(randomBytes(16).toString("hex"))
       return { srv, mw }
     }
 
@@ -772,7 +779,7 @@ describe("pseudonymization", () => {
 
     it("action returns top-level scalar @Common.Masked String — still hashed for the LLM", async () => {
       // @Common.Masked (=true) means normal masking applies; only @Common.Masked:false
-      // would let the LLM see the raw value. forLlm defaults to true here.
+      // would let the LLM see the raw value. strictMasking defaults to false here.
       const { mw } = await setupContext()
       const content = await runAction(mw, "authorSecret", "Ellis Bell")
       expect(content).not.toContain("Ellis Bell")
@@ -1045,7 +1052,7 @@ describe("pseudonymization OTel leak check", () => {
     expect(text).not.toMatch(/[a-z]+-[0-9a-f]{8}\b/)
   })
 
-  it("@Common.Masked:false field is still masked in spans by default (forLlm=false in scrubToolOutputs)", async () => {
+  it("@Common.Masked:false field is still masked in spans by default (strictMasking=true in scrubToolOutputs)", async () => {
     const allSpans = await getSpansAfterRequest(() =>
       sendMessage("pseudo-book", "Who wrote these books?"),
     )
@@ -1180,7 +1187,6 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
     cds.context.model = cds.model
     cds.context["agent.service"] = "CatalogService"
     cds.context["agent.context.id"] = `remote-mcp-${Date.now()}`
-    cds.context["agent.pseudonyms"] = undefined
     // __mcpDynamicTools mirrors what remoteMcpMiddleware caches after tools/list.
     cds.context.__mcpDynamicTools = {
       "http://mock-mcp/mcp": {
@@ -1188,7 +1194,8 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
         tools: [{ name: "catalogservice_query" }, { name: "catalogservice_findauthor" }],
       },
     }
-    await mw.beforeAgent({ seed: randomBytes(16).toString("hex"), hashToOriginal: new Map() })
+    // Create session directly — unit tests have no checkpointer.
+    cds.context["agent.pseudonyms"] = new PseudonymStore(randomBytes(16).toString("hex"))
     return { mw }
   }
 

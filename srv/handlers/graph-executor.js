@@ -7,6 +7,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
+import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -407,21 +408,12 @@ class GraphExecutor {
     cds.context["agent.eventBus"] = eventBus
 
     // Resolve graph early so checkpointer + thread_id are on cds.context
-    // before anonymizeUserMessage — ensureSession reads prior-turn state from it.
+    // before pseudonymizeUserMessage — ensureSession reads prior-turn state from it.
     const graph = await this._resolveGraph()
     cds.context["agent.checkpointer"] = graph.checkpointer
     cds.context["agent.graph.thread_id"] = `${serviceName}:${contextId}`
 
-    if (cds.env.agents.masking) {
-      const parts = requestContext.userMessage?.parts
-      if (Array.isArray(parts)) {
-        const textParts = parts.filter((p) => (p.kind === "text" || (!p.kind && p.text)) && p.text)
-        const results = await Promise.all(
-          textParts.map((p) => this._srv.send("pseudonymize", { text: p.text })),
-        )
-        for (let i = 0; i < textParts.length; i++) textParts[i].text = results[i]
-      }
-    }
+    await pseudonymizeUserMessage(this._srv, requestContext)
 
     metrics.concurrentExecutions.add(1, mAttrs)
 

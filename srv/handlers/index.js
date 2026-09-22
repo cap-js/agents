@@ -5,7 +5,7 @@ import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
 import { registerChat } from "./chat.js"
-import anonymizeUserMessage from "../../lib/masking/unstructured/index.js"
+import { pseudonymize } from "../../lib/masking/index.js"
 
 const LOG = cds.log("agents")
 
@@ -176,7 +176,7 @@ export default function registerDefaultAgentHandlers(srv) {
   })
 
   srv.on("pseudonymize", async (req) => {
-    return await anonymizeUserMessage(req.data.text, srv.name)
+    return pseudonymize(req.data, srv)
   })
 
   srv.on("cleanupTasks", async () => {
