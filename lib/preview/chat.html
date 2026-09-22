@@ -256,6 +256,7 @@
 
       #prompt {
         flex: 1;
+        box-sizing: border-box;
         padding: 10px 14px;
         border: 1px solid #91adc5;
         border-radius: 8px;
@@ -558,7 +559,8 @@
 
       prompt.addEventListener("input", () => {
         prompt.style.height = "auto"
-        prompt.style.height = Math.min(prompt.scrollHeight, 140) + "px"
+        const borderHeight = prompt.offsetHeight - prompt.clientHeight
+        prompt.style.height = Math.min(prompt.scrollHeight + borderHeight, 140) + "px"
         renderComposerAction()
       })
       prompt.addEventListener("keydown", (e) => {
