@@ -6,6 +6,7 @@ import * as pseudo from "../../lib/masking/structured/index.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import { setup, teardown, resetCapture, getSpansAfterRequest } from "../utils/telemetry-utils.js"
 import createHelpers from "../utils/helpers.js"
+import { setupTraceScrubbing } from "../../lib/telemetry/span-masking.js"
 
 const mock = createMockAICore()
 const mockPort = await mock.start()
@@ -49,6 +50,11 @@ describe("pseudonymization", () => {
   before(async () => {
     const helpers = createHelpers({ POST, axios })
     sendMessage = helpers.sendMessage
+    cds.env.agents.masking = true
+    setupTraceScrubbing()
+  })
+  after(() => {
+    cds.env.agents.masking = false
   })
 
   describe("PseudonymStore", () => {
@@ -968,12 +974,15 @@ describe("pseudonymization OTel leak check", () => {
   before(async () => {
     const helpers = createHelpers({ POST, axios })
     sendMessage = helpers.sendMessage
+    cds.env.agents.masking = true
+    setupTraceScrubbing()
     // Enable debug logging so gen_ai.tool.call.arguments and gen_ai.tool.call.result
     // attrs fire — these carry resolved (real) PII and must be scrubbed by the span processor.
     cds.log("agents", { level: "debug" })
     cds.env.agents.mlflow = true
   })
   after(async () => {
+    cds.env.agents.masking = false
     cds.log("agents", { level: "warn" })
     cds.env.agents.mlflow = false
     teardown()

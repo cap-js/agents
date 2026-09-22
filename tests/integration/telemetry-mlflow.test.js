@@ -111,7 +111,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       const attrs = mlflowTraceAttrs()
       expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
-      cds.env.agents.masking = true
+      cds.env.agents.masking = false
     })
   })
 
