@@ -87,26 +87,6 @@ describe("bookshop CatalogService — LLM-as-judge evals", () => {
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
 
-  describe("bookshop CatalogService — tool mocking via vitest", () => {
-    test.concurrent(
-      "mock getStock with vi.spyOn(agent, 'send') — auto-restored after test",
-      async () => {
-        const agent = await cds.connect.to("CatalogService")
-        const original = agent.send.bind(agent)
-
-        vi.spyOn(agent, "send").mockImplementation((event, ...args) => {
-          if (event === "getStock" || event?.event === "getStock") return 999
-          return original(event, ...args)
-        })
-
-        const result = await agent.chat(
-          "Use getStock to report the stock level for Wuthering Heights.",
-        )
-        expect(result.text).toContain("999")
-      },
-    )
-  })
-
   describe("bookshop CatalogService — trajectory & tool call validation", () => {
     test.concurrent("matchToolCall + success_rate rollup", async () => {
       const agent = await cds.connect.to("CatalogService")
@@ -147,10 +127,10 @@ describe("bookshop CatalogService — conversation-level judges", () => {
 
     // Conversation-level judges evaluate the full session
     const completion = await new Judge("TASK_COMPLETION_PROMPT").evaluate([r1, r2])
-    expect(completion.pass).toBe(true)
+    expect(completion.pass, completion.comment).toBe(true)
 
     const retention = await new Judge("KNOWLEDGE_RETENTION_PROMPT").evaluate([r1, r2])
-    expect(retention.pass).toBe(true)
+    expect(retention.pass, retention.comment).toBe(true)
   })
 
   describe("bookshop CatalogService — HITL order flow", () => {
@@ -214,5 +194,22 @@ describe("bookshop CatalogService — conversation-level judges", () => {
         expect(judgement.score).toBeGreaterThanOrEqual(PASS)
       },
     )
+  })
+
+  describe("bookshop CatalogService — tool mocking via vitest", () => {
+    test("mock getStock with vi.spyOn(agent, 'send') — auto-restored after test", async () => {
+      const agent = await cds.connect.to("CatalogService")
+      const original = agent.send.bind(agent)
+
+      vi.spyOn(agent, "send").mockImplementation((event, ...args) => {
+        if (event === "getStock" || event?.event === "getStock") return 999
+        return original(event, ...args)
+      })
+
+      const result = await agent.chat(
+        "Use getStock to report the stock level for Wuthering Heights.",
+      )
+      expect(result.text).toContain("999")
+    })
   })
 })
