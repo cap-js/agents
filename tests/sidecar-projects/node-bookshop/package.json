@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1",
-    "@sap/cds-dk": "^10.1.1"
+    "@sap/cds-dk": "^10.1.2"
   },
   "cds": {
     "protocols": {
