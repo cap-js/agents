@@ -129,6 +129,22 @@ describe("pseudonymization", () => {
     })
   })
 
+  it("pseudonymize handler is called with req.data.text on A2A message/send", async () => {
+    const res = await sendMessage("pseudo-book", "Tell me about Emily Brontë")
+    expect(res.status).toBe(200)
+    // PseudoBookService overrides the pseudonymize handler to replace
+    // "Emily Brontë" with "PSEUDO_EMILY". Verify the LLM saw the replaced text.
+    const graphThreadId = `PseudoBookService:${res.data.result.contextId}`
+    const saver = new CdsCheckpointSaver()
+    const tuple = await saver.getTuple({ configurable: { thread_id: graphThreadId } })
+    const messages = tuple?.checkpoint?.channel_values?.messages ?? []
+    const human = messages.find((m) => (m._getType?.() ?? m.type) === "human")
+    expect(human).toBeDefined()
+    const text = typeof human.content === "string" ? human.content : human.content?.[0]?.text
+    expect(text).toContain("PSEUDO_EMILY")
+    expect(text).not.toContain("Emily Brontë")
+  })
+
   describe("annotation resolution", () => {
     it("@PersonalData.IsPotentiallyPersonal on Authors.name is detected", async () => {
       // The bookshop Authors entity has @PersonalData.IsPotentiallyPersonal on name

@@ -3,6 +3,10 @@ import cds from "@sap/cds"
 export default class PseudoBookService extends cds.ApplicationService {
   init() {
     this.on("buildGraph", async () => this._buildGraph())
+    this.on("pseudonymize", async (req) => {
+      // Fixed replacement so tests can verify the handler was called.
+      return req.data.text.replace(/Emily Brontë/g, "PSEUDO_EMILY")
+    })
     return super.init()
   }
 

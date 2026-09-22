@@ -7,7 +7,6 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
-import anonymizeUserMessage from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -414,7 +413,14 @@ class GraphExecutor {
     cds.context["agent.graph.thread_id"] = `${serviceName}:${contextId}`
 
     if (cds.env.agents.masking) {
-      await anonymizeUserMessage(requestContext, serviceName)
+      const parts = requestContext.userMessage?.parts
+      if (Array.isArray(parts)) {
+        const textParts = parts.filter((p) => (p.kind === "text" || (!p.kind && p.text)) && p.text)
+        const results = await Promise.all(
+          textParts.map((p) => this._srv.send("pseudonymize", { text: p.text })),
+        )
+        for (let i = 0; i < textParts.length; i++) textParts[i].text = results[i]
+      }
     }
 
     metrics.concurrentExecutions.add(1, mAttrs)
