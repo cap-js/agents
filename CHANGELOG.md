@@ -10,6 +10,12 @@
 
 - CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
 - Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP
+- Chat preview queues messages submitted while the agent is busy
+
+### Fixed
+
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
+- `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
 
 ## Version 0.9.6 - 2026-09-17
 
