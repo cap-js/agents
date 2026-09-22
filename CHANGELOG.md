@@ -6,6 +6,10 @@
 
 ## Version 0.9.7 - tbd
 
+### Added
+
+- Chat preview queues messages submitted while the agent is busy
+
 ### Fixed
 
 - Correct lookup for `@agent.directory` and `@agent.card` on BTP
