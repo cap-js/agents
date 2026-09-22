@@ -407,6 +407,12 @@ class GraphExecutor {
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
 
+    // Resolve graph early so checkpointer + thread_id are on cds.context
+    // before anonymizeUserMessage — ensureSession reads prior-turn state from it.
+    const graph = await this._resolveGraph()
+    cds.context["agent.checkpointer"] = graph.checkpointer
+    cds.context["agent.graph.thread_id"] = `${serviceName}:${contextId}`
+
     if (cds.env.agents.masking) {
       await anonymizeUserMessage(requestContext, serviceName)
     }
@@ -559,8 +565,6 @@ class GraphExecutor {
       let usageData
       let result
       try {
-        const graph = await this._resolveGraph()
-
         const extraConfig = this._configMapper ? await this._configMapper(requestContext) : {}
         if (extraConfig !== null && extraConfig !== undefined && typeof extraConfig !== "object") {
           throw new TypeError(`configMapper must return a plain object, got ${typeof extraConfig}`)
@@ -579,8 +583,6 @@ class GraphExecutor {
             _userId: cds.context?.user?.id,
           },
         }
-        cds.context["agent.checkpointer"] = graph.checkpointer
-        cds.context["agent.graph.thread_id"] = config.configurable.thread_id
 
         const t0 = Date.now()
 
