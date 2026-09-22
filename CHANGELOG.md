@@ -4,12 +4,17 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.7 - tbd
+
+### Fixed
+
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
+
 ## Version 0.9.6 - 2026-09-17
 
 ### Fixed
 
 - Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
-- Correct lookup for `@agent.directory` and `@agent.card` on BTP
 
 ## Version 0.9.5 - 2026-09-16
 
