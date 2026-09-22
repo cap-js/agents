@@ -9,6 +9,7 @@
 ### Fixed
 
 - Chat preview keeps the message field height stable when typing the first character
+- `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
 
 ## Version 0.9.6 - 2026-09-17
 
