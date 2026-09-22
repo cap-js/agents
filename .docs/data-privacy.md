@@ -23,9 +23,15 @@ For all tasks created within a 24h window for a specific Agent service, a single
 
 ## Pseudonymization of Personal Data
 
-When your CDS entities carry `@PersonalData` annotations, the plugin automatically pseudonymizes those fields before they reach the LLM — and before they are written to OTel traces. Users always see real values in the final response.
+When your CDS entities carry `@PersonalData` annotations, the plugin pseudonymizes those fields before they reach the LLM — and before they are written to OTel traces. Users always see real values in the final response.
 
 ### Setup
+
+Enable pseudonymization:
+
+```json
+{ "cds": { "agents": { "masking": true } } }
+```
 
 Annotate fields in your CDS model:
 
@@ -69,12 +75,6 @@ entity Contacts {
   @Common.Masked: false   // LLM sees the real value; trace still hashed
   displayName : String;
 }
-```
-
-To disable pseudonymization entirely:
-
-```json
-{ "cds": { "agents": { "masking": false } } }
 ```
 
 ### Viewing real values in traces (dev/test)
