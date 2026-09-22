@@ -11,19 +11,6 @@ CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) prot
 
 For detailed instructions about setup and usage, refer to the [official documentation](https://cap.cloud.sap/docs/guides/ai/cap-agents).
 
-
-## Advanced
-
-The following capabilities are experimental and documented separately. Their public surface may change.
-
-- [Connectivity](.docs/connectivity.md) — destination-based connectivity, `AICORE_SERVICE_KEY` / `ANTHROPIC_API_KEY`, and the `anthropic` kind
-- [Configuration](.docs/configuration.md) — using multiple models, global and per-service settings, file I/O, and push notifications
-- [Quota Enforcement](.docs/quota.md) — configurable rate limits and resource quotas
-- [Audit Logging](.docs/audit-logging.md) — immutable audit trail of agent decisions and tool usage
-- [Data Privacy](.docs/data-privacy.md) — deletion of message history
-- [Telemetry](.docs/telemetry.md) — OpenTelemetry metrics, tracing, and MLflow export
-- [Content Filter](.docs/content-filter.md) — SAP AI Core content filtering and prompt injection shielding
-
 ## Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/cap-js/agents/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
