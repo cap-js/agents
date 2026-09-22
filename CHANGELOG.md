@@ -4,11 +4,17 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.6 - 2026-09-17
+## Version 0.9.7 - tbd
 
 ### Fixed
 
 - `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
+
+## Version 0.9.6 - 2026-09-17
+
+### Fixed
+
+- Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
 
 ## Version 0.9.5 - 2026-09-16
 

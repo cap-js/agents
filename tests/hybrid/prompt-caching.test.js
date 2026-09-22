@@ -74,7 +74,10 @@ describe("@cap-js/agents - Hybrid prompt caching (AI Core GPT)", () => {
           auth: { username: user, password: "" },
         })
         expect(res.status).toBe(200)
-        expect(res.data.result?.status?.state).toBe("completed")
+        expect(
+          res.data.result?.status?.state,
+          res.data.result?.status?.message?.parts[0]?.text,
+        ).toBe("completed")
       })
 
       const chatSpan = findSpan(spans, `chat ${modelName}`)
