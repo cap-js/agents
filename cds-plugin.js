@@ -69,24 +69,27 @@ cds.on("bootstrap", (app) => {
 
 !(function cds_requires_llm() {
   cds.on("served", async () => {
-    if (
-      cds.requires.llm === "anthropic" ||
-      cds.requires.llm?.kind === "anthropic" ||
-      cds.requires.llm === "auto" ||
-      cds.requires.llm?.kind === "auto"
-    ) {
+    const kind = cds.requires.llm?.kind ?? cds.requires.llm
+    if (kind === "auto") {
       const { resolve_config } = await import("./lib/config/local.js")
-      let options = cds.requires.llm
-      if (options === "auto") options = { kind: "auto" }
-      cds.env.requires.llm = resolve_config(options)
+      cds.env.requires.llm = resolve_config({ kind: "auto" })
+    }
+    if (kind === "anthropic") {
+      const { resolve_anthropic_config } = await import("./lib/config/local.js")
+      cds.env.requires.llm = resolve_anthropic_config(cds.requires.llm)
+    }
+    if (kind === "openai") {
+      const { resolve_openai_config } = await import("./lib/config/local.js")
+      cds.env.requires.llm = resolve_openai_config(cds.requires.llm)
     }
 
     const config = cds.requires.llm,
       credentials = {}
-    const { url, destination, anthropicApiUrl, apiKey } = config?.credentials || {}
+    const { url, destination, anthropicApiUrl, openaiBaseUrl, apiKey } = config?.credentials || {}
     if (url) credentials.url = url
     if (destination) credentials.destination = destination
     if (anthropicApiUrl) credentials.anthropicApiUrl = anthropicApiUrl
+    if (openaiBaseUrl) credentials.openaiBaseUrl = openaiBaseUrl
     if (apiKey) credentials.apiKey = "***"
     LOG.info(`cds.connect.to 'llm' with:`, { ...config, credentials })
   })
