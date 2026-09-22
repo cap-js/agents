@@ -184,6 +184,9 @@
         "anthropic": {
           "impl": "@cap-js/agents/lib/models/anthropic"
         },
+        "openai": {
+          "impl": "@cap-js/agents/lib/models/openai"
+        },
         "llm-mock": {
           "impl": "@cap-js/agents/lib/models/mock"
         }

@@ -85,11 +85,11 @@ cds.on("bootstrap", (app) => {
 
     const config = cds.requires.llm,
       credentials = {}
-    const { url, destination, anthropicApiUrl, openaiBaseUrl, apiKey } = config?.credentials || {}
+    const { url, destination, anthropicApiUrl, baseURL, apiKey } = config?.credentials || {}
     if (url) credentials.url = url
     if (destination) credentials.destination = destination
     if (anthropicApiUrl) credentials.anthropicApiUrl = anthropicApiUrl
-    if (openaiBaseUrl) credentials.openaiBaseUrl = openaiBaseUrl
+    if (baseURL) credentials.baseURL = baseURL
     if (apiKey) credentials.apiKey = "***"
     LOG.info(`cds.connect.to 'llm' with:`, { ...config, credentials })
   })
