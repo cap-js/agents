@@ -6,7 +6,6 @@
 
 CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
-
 ## Usage
 
 For detailed instructions about setup and usage, refer to the [official documentation](https://cap.cloud.sap/docs/guides/ai/cap-agents).
