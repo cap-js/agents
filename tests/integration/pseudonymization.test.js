@@ -93,11 +93,16 @@ describe("pseudonymization", () => {
       expect(session.scrubText("The author is Emily Brontë")).toBe(`The author is ${hash}`)
     })
 
-    it("remember stores externally generated pseudonyms", () => {
+    it("addMappings stores externally generated pseudonyms without overwriting", () => {
       const session = makeSession(id)
-      session.remember("Emily Brontë", "person_1")
+      session.addMappings([
+        ["person_1", "Emily Brontë"],
+        ["p1hash", "Emily Brontë"],
+      ])
+      // _originalToHash keeps first entry (tag), not bare hash
       expect(session.scrubText("The author is Emily Brontë")).toBe("The author is person_1")
       expect(session.resolveText("The author is person_1")).toBe("The author is Emily Brontë")
+      expect(session.resolveText("The author is p1hash")).toBe("The author is Emily Brontë")
     })
 
     it("different seeds produce different hashes for same value", () => {
@@ -126,6 +131,42 @@ describe("pseudonymization", () => {
 
       const secondState = await latestMaskingState(graphThreadId)
       expect(secondState.hashToOriginal.get(firstHash)).toBe("Emily Brontë")
+    })
+
+    it("scrubText replaces PII from prior turn in user message", async () => {
+      // Turn 1: query tool returns authors → structured masking hashes their names.
+      const first = await sendMessage("pseudo-book", "Who wrote these books?")
+      expect(first.status).toBe(200)
+      const contextId = first.data.result.contextId
+      const graphThreadId = `PseudoBookService:${contextId}`
+
+      // Verify "Charlotte Brontë" was hashed in turn 1 (structured masking on tool result).
+      const state = await latestMaskingState(graphThreadId)
+      const charlotteHash = [...state.hashToOriginal.entries()].find(
+        ([, value]) => value === "Charlotte Brontë",
+      )?.[0]
+      expect(charlotteHash).toMatch(/^name-[0-9a-f]{8}$/)
+
+      // Turn 2: user mentions "Charlotte Brontë" in plain text.
+      // PseudoBookService override only replaces "Emily Brontë" → "PSEUDO_EMILY",
+      // so the pseudonymize handler won't catch Charlotte. But session.scrubText()
+      // (runs after srv.send) should replace it using mappings from turn 1.
+      const second = await sendMessage("pseudo-book", "Tell me more about Charlotte Brontë", {
+        contextId,
+      })
+      expect(second.status).toBe(200)
+
+      // Check HumanMessage in checkpoint — must contain the hash, not the original.
+      const saver = new CdsCheckpointSaver()
+      const tuple = await saver.getTuple({ configurable: { thread_id: graphThreadId } })
+      const messages = tuple?.checkpoint?.channel_values?.messages ?? []
+      const humans = messages.filter((m) => (m._getType?.() ?? m.type) === "human")
+      const lastHuman = humans[humans.length - 1]
+      expect(lastHuman).toBeDefined()
+      const text =
+        typeof lastHuman.content === "string" ? lastHuman.content : lastHuman.content?.[0]?.text
+      expect(text).toContain(charlotteHash)
+      expect(text).not.toContain("Charlotte Brontë")
     })
   })
 
