@@ -8,6 +8,7 @@
 
 ### Added
 
+- `@agent` services bound to CAP Agent Gateway register automatically and process gateway invocations
 - Chat preview queues messages submitted while the agent is busy
 
 ### Fixed

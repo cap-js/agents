@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import "./lib/registry.js"
 
 const LOG = cds.log("agents")
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
