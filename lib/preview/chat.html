@@ -96,6 +96,16 @@
         border-bottom-right-radius: 3px;
         white-space: pre-wrap;
       }
+      .msg.user.queued {
+        opacity: 0.65;
+      }
+      .msg.user.queued::after {
+        content: "Queued";
+        display: block;
+        margin-top: 4px;
+        font-size: 0.7em;
+        text-align: right;
+      }
       .msg.agent {
         align-self: flex-start;
         background: #d0e9ff;
@@ -289,7 +299,6 @@
       #send.cancel:hover {
         background: #c62828;
       }
-
       .approval-actions {
         display: flex;
         gap: 8px;
@@ -509,6 +518,8 @@
       const THINKING_SUMMARY_ANIMATION_MS = 160
 
       let busy = false
+      let processingQueue = false
+      const messageQueue = []
       let contextId = null
       let pendingTaskId = null
       let activeTaskId = null
@@ -550,12 +561,12 @@
         prompt.style.height = "auto"
         const borderHeight = prompt.offsetHeight - prompt.clientHeight
         prompt.style.height = Math.min(prompt.scrollHeight + borderHeight, 140) + "px"
+        renderComposerAction()
       })
       prompt.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault()
-          if (busy) cancel()
-          else send()
+          enqueueMessage()
         } else if (e.key === "ArrowUp" && prompt.selectionStart === 0) {
           e.preventDefault()
           if (historyIndex === -1) currentDraft = prompt.value
@@ -563,6 +574,7 @@
             historyIndex++
             prompt.value = inputHistory[inputHistory.length - 1 - historyIndex]
             prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+            renderComposerAction()
           }
         } else if (e.key === "ArrowDown" && prompt.selectionEnd === prompt.value.length) {
           e.preventDefault()
@@ -570,26 +582,32 @@
             historyIndex--
             prompt.value = inputHistory[inputHistory.length - 1 - historyIndex]
             prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+            renderComposerAction()
           } else if (historyIndex === 0) {
             historyIndex = -1
             prompt.value = currentDraft
             prompt.selectionStart = prompt.selectionEnd = prompt.value.length
+            renderComposerAction()
           }
         }
       })
       sendBtn.addEventListener("click", () => {
-        if (busy) cancel()
-        else send()
+        if (busy && !prompt.value.trim()) cancel()
+        else enqueueMessage()
       })
+      renderComposerAction()
 
-      function addMessage(role, text) {
+      function addMessage(role, text, beforeEl) {
         const el = document.createElement("div")
         el.className = "msg " + role
         if (role === "agent" || role === "agent_thinking")
           el.innerHTML = md(text, { sanitize: true })
         else el.textContent = text
         if (role === "agent_thinking") el.className = "msg agent_thinking"
-        messages.insertBefore(el, typing.parentElement === messages ? typing : statusText)
+        messages.insertBefore(
+          el,
+          beforeEl ?? (typing.parentElement === messages ? typing : statusText),
+        )
         messages.scrollTop = messages.scrollHeight
         return el
       }
@@ -871,23 +889,25 @@
 
       function setBusy(val) {
         busy = val
-        prompt.disabled = val
         if (typing.parentElement !== messages) messages.insertBefore(typing, statusText)
         typing.style.display = val ? "block" : "none"
         dot.className = "status-dot" + (val ? " busy" : "")
-        if (val) {
-          sendBtn.textContent = "Cancel"
-          sendBtn.classList.add("cancel")
-          sendBtn.disabled = false
-        } else {
-          sendBtn.textContent = "Send"
-          sendBtn.classList.remove("cancel")
-          sendBtn.disabled = false
+        if (!val) {
           activeTaskId = null
           activeAbort = null
           statusText.textContent = ""
         }
+        renderComposerAction()
         messages.scrollTop = messages.scrollHeight
+      }
+
+      function renderComposerAction() {
+        const stopsGeneration = busy && !prompt.value.trim()
+        sendBtn.textContent = stopsGeneration ? "Cancel" : "Send"
+        sendBtn.classList.toggle("cancel", stopsGeneration)
+        sendBtn.setAttribute("aria-label", stopsGeneration ? "Stop generating" : "Send message")
+        sendBtn.title = stopsGeneration ? "Stop generating" : "Send message"
+        sendBtn.disabled = !busy && !prompt.value.trim()
       }
 
       async function resume(decision) {
@@ -936,6 +956,7 @@
         } finally {
           setBusy(false)
           prompt.focus()
+          processQueue()
         }
       }
 
@@ -984,11 +1005,10 @@
         finalizeThinking(replyEl, reply)
       }
 
-      async function send() {
+      function enqueueMessage() {
         const text = prompt.value.trim()
-        if (!text || busy) return
+        if (!text) return
 
-        // Save to input history (skip if same as last entry)
         if (inputHistory[inputHistory.length - 1] !== text) {
           inputHistory.push(text)
           if (inputHistory.length > 100) inputHistory.shift()
@@ -996,10 +1016,31 @@
         }
         historyIndex = -1
         currentDraft = ""
-
-        addMessage("user", text)
         prompt.value = ""
         prompt.style.height = "auto"
+        renderComposerAction()
+        const el = addMessage("user", text, statusText)
+        el.classList.add("queued")
+        messageQueue.push({ text, el })
+        processQueue()
+      }
+
+      async function processQueue() {
+        if (processingQueue || pendingTaskId) return
+        processingQueue = true
+        try {
+          while (messageQueue.length && !pendingTaskId) {
+            const message = messageQueue.shift()
+            await sendMessage(message)
+          }
+        } finally {
+          processingQueue = false
+        }
+      }
+
+      async function sendMessage({ text, el }) {
+        el.classList.remove("queued")
+        messages.insertBefore(el, typing.parentElement === messages ? typing : statusText)
         setBusy(true)
 
         const abort = new AbortController()
@@ -1204,11 +1245,8 @@
 
       async function cancel() {
         const taskId = activeTaskId
+        activeAbort?.abort()
 
-        // Abort ongoing fetch
-        if (activeAbort) activeAbort.abort()
-
-        // Send tasks/cancel if we have a taskId
         if (taskId) {
           fetch(AGENT_URL, {
             method: "POST",
@@ -1221,10 +1259,6 @@
             }),
           }).catch(() => {})
         }
-
-        addMessage("agent", "⊘ Task canceled.")
-        setBusy(false)
-        prompt.focus()
       }
     </script>
   </body>

@@ -6,9 +6,14 @@
 
 ## Version 0.9.7 - tbd
 
+### Added
+
+- Chat preview queues messages submitted while the agent is busy
+
 ### Fixed
 
 - Chat preview keeps the message field height stable when typing the first character
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
 - `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
 
 ## Version 0.9.6 - 2026-09-17
