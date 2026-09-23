@@ -407,13 +407,16 @@ class GraphExecutor {
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
 
-    // Resolve graph early so checkpointer + thread_id are on cds.context
-    // before pseudonymizeUserMessage — ensureSession reads prior-turn state from it.
+    // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
     const graph = await this._resolveGraph()
-    cds.context["agent.checkpointer"] = graph.checkpointer
-    cds.context["agent.graph.thread_id"] = `${serviceName}:${contextId}`
-
-    await pseudonymizeUserMessage(this._srv, requestContext)
+    if (cds.env.agents.masking) {
+      await pseudonymizeUserMessage(
+        this._srv,
+        requestContext,
+        graph.checkpointer,
+        `${serviceName}:${contextId}`,
+      )
+    }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
