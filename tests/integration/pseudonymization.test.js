@@ -1294,3 +1294,83 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
     expect(getContent(result)).toContain("1818-07-30") // dateOfBirth not annotated
   })
 })
+
+describe("pseudonymization — parallel tool calls", () => {
+  const { axios: axiosInst } = cds.test(import.meta.dirname + "/../projects/bookshop")
+  axiosInst.defaults.validateStatus = () => true
+
+  let maskingMw, encode, ToolMessage
+
+  beforeAll(async () => {
+    ;({ default: maskingMw } = await import("../../lib/agents/middleware/masking.js"))
+    ;({ encode } = await import("@toon-format/toon"))
+    ;({ ToolMessage } = await import("@langchain/core/messages"))
+    cds.env.agents ??= {}
+    cds.env.agents.masking = true
+  })
+
+  afterAll(() => {
+    cds.env.agents.masking = false
+  })
+
+  afterEach(() => {
+    if (cds.context) cds.context["agent.pseudonyms"] = undefined
+  })
+
+  it("stateSchema uses ReducedValue so parallel updates do not crash LastValue channels", async () => {
+    const { ReducedValue } = await import("@langchain/langgraph")
+    const srv = cds.services["CatalogService"]
+    const mw = maskingMw(srv)
+    const schema = mw.stateSchema
+    // StateSchema exposes .fields — verify each field is a ReducedValue
+    for (const key of ["seed", "hashToOriginal", "textAnalysisResults"]) {
+      expect(ReducedValue.isInstance(schema.fields[key])).toBe(true)
+    }
+  })
+
+  it("concurrent wrapToolCall invocations both return valid Commands", async () => {
+    const srv = cds.services["CatalogService"]
+    const mw = maskingMw(srv)
+    cds.context = cds.context || {}
+    cds.context.model = cds.model
+    cds.context["agent.service"] = "CatalogService"
+    cds.context["agent.context.id"] = `parallel-${Date.now()}`
+    cds.context["agent.pseudonyms"] = new PseudonymStore(randomBytes(16).toString("hex"))
+
+    const makeRequest = (id, name, city) => ({
+      toolCall: {
+        name: "query",
+        id,
+        args: { cql: "SELECT ID, name, placeOfBirth FROM CatalogService.Authors" },
+      },
+      tool: {},
+    })
+
+    const makeHandler = (id, name, city) => async () =>
+      new ToolMessage({
+        content: encode({ data: [{ ID: 1, name, placeOfBirth: city }] }),
+        tool_call_id: id,
+        name: "query",
+      })
+
+    const [r1, r2] = await Promise.all([
+      mw.wrapToolCall(
+        makeRequest("tc1", "Emily Brontë", "Thornton"),
+        makeHandler("tc1", "Emily Brontë", "Thornton"),
+      ),
+      mw.wrapToolCall(
+        makeRequest("tc2", "Charlotte Brontë", "Thornton"),
+        makeHandler("tc2", "Charlotte Brontë", "Thornton"),
+      ),
+    ])
+
+    // Both must return Command-shaped results with update.seed (string)
+    expect(r1?.update?.seed).toEqual(expect.any(String))
+    expect(r2?.update?.seed).toEqual(expect.any(String))
+    // Same session → same seed
+    expect(r1.update.seed).toBe(r2.update.seed)
+    // Both messages pseudonymized
+    expect(getContent(r1)).not.toContain("Emily Brontë")
+    expect(getContent(r2)).not.toContain("Charlotte Brontë")
+  })
+})
