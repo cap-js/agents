@@ -7,6 +7,7 @@ import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
+import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -374,7 +375,7 @@ class GraphExecutor {
   async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
     return resolvePseudonyms(
-      summarizePartialWork({
+      await summarizePartialWork({
         taskId,
         contextId,
         serviceName,
@@ -405,6 +406,17 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+
+    // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
+    const graph = await this._resolveGraph()
+    if (cds.env.agents.masking) {
+      await pseudonymizeUserMessage(
+        this._srv,
+        requestContext,
+        graph.checkpointer,
+        `${serviceName}:${contextId}`,
+      )
+    }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
@@ -554,8 +566,6 @@ class GraphExecutor {
       let usageData
       let result
       try {
-        const graph = await this._resolveGraph()
-
         const extraConfig = this._configMapper ? await this._configMapper(requestContext) : {}
         if (extraConfig !== null && extraConfig !== undefined && typeof extraConfig !== "object") {
           throw new TypeError(`configMapper must return a plain object, got ${typeof extraConfig}`)
@@ -574,8 +584,6 @@ class GraphExecutor {
             _userId: cds.context?.user?.id,
           },
         }
-        cds.context["agent.checkpointer"] = graph.checkpointer
-        cds.context["agent.graph.thread_id"] = config.configurable.thread_id
 
         const t0 = Date.now()
 

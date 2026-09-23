@@ -39,7 +39,12 @@ describe("agent card from cds build output (gen/ folder)", () => {
     const output = await new Promise((resolve, reject) => {
       const proc = spawn("cds", ["watch"], {
         cwd: GEN_SRV_DIR,
-        env: { ...process.env, CDS_ENV: "test", NODE_ENV: "test" },
+        env: {
+          ...process.env,
+          CDS_ENV: "test",
+          NODE_ENV: "test",
+          PORT: Math.round(Math.random() * 35000 + 5001),
+        },
         stdio: ["ignore", "pipe", "pipe"],
       })
 
