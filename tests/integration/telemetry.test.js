@@ -190,6 +190,12 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(RunnableLambda.prototype[PATCHED]).toBe(true)
   })
 
+  it("should patch RunnableSequence.invoke", async () => {
+    const { RunnableSequence } = await import("@langchain/core/runnables")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
+    expect(RunnableSequence.prototype[PATCHED]).toBe(true)
+  })
+
   // ─── Metrics ────────────────────────────────────────────────────────
 
   it("should record golden signal metrics", async () => {

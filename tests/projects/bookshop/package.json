@@ -35,6 +35,8 @@
       },
       "[test]": {
         "quotas": {
+          "maxConcurrentTasks": 50,
+          "maxConcurrentTasksPerUser": 50,
           "maxTasksPerHour": 10000,
           "maxTasksPerHourPerUser": 10000
         },
