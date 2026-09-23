@@ -375,7 +375,7 @@ class GraphExecutor {
   async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
     return resolvePseudonyms(
-      summarizePartialWork({
+      await summarizePartialWork({
         taskId,
         contextId,
         serviceName,
