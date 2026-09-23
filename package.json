@@ -9,6 +9,9 @@
     "type": "git",
     "url": "git+https://github.com/cap-js/agents.git"
   },
+  "bin": {
+    "cap-agents": "./bin/cli.js"
+  },
   "type": "module",
   "exports": {
     "./package.json": "./package.json",
@@ -34,6 +37,7 @@
     "prettier:check": "npx -y prettier@3 --check ."
   },
   "files": [
+    "bin",
     "cds-plugin.js",
     "lib",
     "srv",
