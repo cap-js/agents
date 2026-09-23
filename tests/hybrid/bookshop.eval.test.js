@@ -31,7 +31,9 @@ describe.concurrent("bookshop CatalogService — list books", () => {
     const provider = trace.getTracerProvider()
     const delegate = provider.getDelegate?.() || provider
     if (delegate.forceFlush) await delegate.forceFlush().catch(() => {})
-    spans = exporter.getFinishedSpans()
+    const allSpans = exporter.getFinishedSpans()
+    // Filter to spans from this request's trace only — the workflow span name is unique per service.
+    spans = allSpans.filter((s) => s.spanContext().traceId === result.traceId)
   })
 
   // ── Functional assertions ─────────────────────────────────────────────

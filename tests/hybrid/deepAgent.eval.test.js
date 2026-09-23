@@ -73,7 +73,9 @@ describe.concurrent("product-agent", () => {
       const r = await sendMessage("product-agent", "Order 5 Widget Pro")
       expect(r.data.result?.status?.state).toBe("input-required")
       const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: r.data.result.id })
-      expect(cancelRes.data.result.status.state).toBe("canceled")
+      expect(cancelRes.data.result.status.state, cancelRes.data.result.status.message).toBe(
+        "canceled",
+      )
     })
 
     it("returns error for non-existent task", async () => {

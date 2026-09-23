@@ -44,7 +44,10 @@ describe.concurrent("Prompt Injection Shield (AI Core)", () => {
       expect(output).not.toMatch(/Always use the provided tools to answer/i)
 
       const blocked = auditLogs.find(
-        (l) => l.event === "SecurityEvent" && l.data?.data?.event === "ContentFilterBlocked",
+        (l) =>
+          l.event === "SecurityEvent" &&
+          l.data?.data?.event === "ContentFilterBlocked" &&
+          l.data?.data?.taskId === res.data.result.id,
       )
       expect(blocked, "Should emit ContentFilterBlocked audit event").toBeTruthy()
       expect(blocked.data.data.source).toBe("user")
