@@ -21,3 +21,4 @@ proposal.md
 *.sqlite-wal
 *.sqlite-shm
 .playwright-mcp
+coverage/*

@@ -187,8 +187,7 @@ describe("Travel Sample E2E", () => {
   })
 })
 
-// ─── File I/O E2E (deep-agent path): upload CSV → read_file → write_file → FilePart ───
-describe("@cap-js/agent - File I/O (travel-agent — deep-agent path)", () => {
+describe("File I/O (travel-agent — deep-agent path)", () => {
   let csvBase64
   let savedTaskId
   let savedFileBytesB64
