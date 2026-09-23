@@ -89,6 +89,7 @@ describe.concurrent("product-agent", () => {
     })
 
     it("can cancel actively running task", async () => {
+      const messageId = cds.utils.uuid()
       const streamPromise = POST(
         "/a2a/product-agent/",
         {
@@ -98,7 +99,7 @@ describe.concurrent("product-agent", () => {
           params: {
             message: {
               kind: "message",
-              messageId: cds.utils.uuid(),
+              messageId: messageId,
               role: "user",
               parts: [
                 {
@@ -114,7 +115,10 @@ describe.concurrent("product-agent", () => {
 
       await new Promise((r) => setTimeout(r, 1000))
 
-      const [task] = await SELECT.from("cap.agent.Tasks").orderBy("createdAt desc").limit(1)
+      const [task] = await SELECT.from("cap.agent.Tasks")
+        .where(`data like '%${messageId}%'`)
+        .orderBy("createdAt desc")
+        .limit(1)
 
       if (!task?.taskId || task.state === "completed" || task.state === "failed") {
         await streamPromise.catch(() => {})
