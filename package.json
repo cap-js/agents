@@ -223,14 +223,20 @@
       },
       "[pi]": {
         "agent-executor": "pi",
-        "[with-claude]": {
+        "[anthropic]": {
           "llm": "pi-anthropic"
+        },
+        "[openai]": {
+          "llm": "pi-openai"
         }
       },
       "[webagent]": {
         "agent-executor": "webagent",
-        "[with-claude]": {
+        "[anthropic]": {
           "llm": "pi-anthropic"
+        },
+        "[openai]": {
+          "llm": "pi-openai"
         }
       }
     },
