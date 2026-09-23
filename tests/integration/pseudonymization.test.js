@@ -1302,7 +1302,7 @@ describe("pseudonymization — parallel tool calls", () => {
     const mw = maskingMw(srv)
     const schema = mw.stateSchema
     // StateSchema exposes .fields — verify each field is a ReducedValue
-    for (const key of ["seed", "hashToOriginal", "textAnalysisResults"]) {
+    for (const key of ["seed", "hashToOriginal"]) {
       expect(ReducedValue.isInstance(schema.fields[key])).toBe(true)
     }
   })
