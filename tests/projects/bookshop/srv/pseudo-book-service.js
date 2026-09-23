@@ -54,7 +54,7 @@ export default class PseudoBookService extends cds.ApplicationService {
         }
 
         const content = typeof toolMsg.content === "string" ? toolMsg.content : ""
-        const hashes = [...content.matchAll(/(?:name|placeOfDeath)-[0-9a-f]{8}/g)].map((m) => m[0])
+        const hashes = [...content.matchAll(/(?:name|placeOfDeath)-[0-9a-f]{16}/g)].map((m) => m[0])
         const answer = hashes.length
           ? `The authors are: ${hashes.join(", ")}.`
           : "No authors found."

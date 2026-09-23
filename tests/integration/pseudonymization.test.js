@@ -64,7 +64,7 @@ describe("pseudonymization", () => {
     it("hashes a string value with property name prefix", () => {
       const session = makeSession(id)
       const hash = session.pseudonymize("Emily Brontë", "name")
-      expect(hash).toMatch(/^name-[0-9a-f]{8}$/)
+      expect(hash).toMatch(/^name-[0-9a-f]{16}$/)
     })
 
     it("same value produces same hash within session (idempotent)", () => {
@@ -123,7 +123,7 @@ describe("pseudonymization", () => {
       const firstHash = [...firstState.hashToOriginal.entries()].find(
         ([, value]) => value === "Emily Brontë",
       )?.[0]
-      expect(firstHash).toMatch(/^name-[0-9a-f]{8}$/)
+      expect(firstHash).toMatch(/^name-[0-9a-f]{16}$/)
 
       // Second call with same contextId: seed + hashToOriginal must be preserved in state.
       const second = await sendMessage("pseudo-book", "Who wrote these books?", { contextId })
@@ -145,7 +145,7 @@ describe("pseudonymization", () => {
       const charlotteHash = [...state.hashToOriginal.entries()].find(
         ([, value]) => value === "Charlotte Brontë",
       )?.[0]
-      expect(charlotteHash).toMatch(/^name-[0-9a-f]{8}$/)
+      expect(charlotteHash).toMatch(/^name-[0-9a-f]{16}$/)
 
       // Turn 2: user mentions "Charlotte Brontë" in plain text.
       // PseudoBookService override only replaces "Emily Brontë" → "PSEUDO_EMILY",
@@ -295,7 +295,7 @@ describe("pseudonymization", () => {
         { name: "Charlotte", ID: 2 },
       ]
       _pseudonymizeData(rows, new Set(["name"]), session)
-      expect(rows[0].name).toMatch(/^name-[0-9a-f]{8}$/)
+      expect(rows[0].name).toMatch(/^name-[0-9a-f]{16}$/)
       expect(rows[0].ID).toBe(1) // untouched
       expect(session.resolve(rows[0].name)).toBe("Emily")
     })
@@ -612,7 +612,7 @@ describe("pseudonymization", () => {
           })
 
     beforeAll(async () => {
-      ;({ default: maskingMiddleware } = await import("../../lib/agents/middleware/masking.js"))
+      ;({ masking: maskingMiddleware } = await import("../../lib/agents/middleware/masking.js"))
       ;({ encode } = await import("@toon-format/toon"))
       ;({ HumanMessage, AIMessage, ToolMessage } = await import("@langchain/core/messages"))
     })
@@ -734,13 +734,13 @@ describe("pseudonymization", () => {
       expect(content).toContain("home") // contacts.label not annotated
       expect(content).toContain("work")
       // hash tokens present for the various PII kinds
-      expect(content).toMatch(/name-[0-9a-f]{8}/)
-      expect(content).toMatch(/address_street-[0-9a-f]{8}/)
-      expect(content).toMatch(/address_geo_lat-[0-9a-f]{8}/)
-      expect(content).toMatch(/address_region_district-[0-9a-f]{8}/)
-      expect((content.match(/nicknames-[0-9a-f]{8}/g) || []).length).toBe(2)
-      expect((content.match(/pastCities-[0-9a-f]{8}/g) || []).length).toBe(2)
-      expect((content.match(/email-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect(content).toMatch(/name-[0-9a-f]{16}/)
+      expect(content).toMatch(/address_street-[0-9a-f]{16}/)
+      expect(content).toMatch(/address_geo_lat-[0-9a-f]{16}/)
+      expect(content).toMatch(/address_region_district-[0-9a-f]{16}/)
+      expect((content.match(/nicknames-[0-9a-f]{16}/g) || []).length).toBe(2)
+      expect((content.match(/pastCities-[0-9a-f]{16}/g) || []).length).toBe(2)
+      expect((content.match(/email-[0-9a-f]{16}/g) || []).length).toBe(2)
     })
 
     it("round-trip: hash in tool result survives model call and can resolve for user", async () => {
@@ -759,7 +759,7 @@ describe("pseudonymization", () => {
         toolReq,
         async () => new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "query" }),
       )
-      const hash = getContent(toolMsg).match(/name-[0-9a-f]{8}/)[0]
+      const hash = getContent(toolMsg).match(/name-[0-9a-f]{16}/)[0]
 
       // model may echo the hash; GraphExecutor resolves it back before publishing.
       const session = cds.context["agent.pseudonyms"]
@@ -791,7 +791,7 @@ describe("pseudonymization", () => {
 
       // hash resolves back to the original
       const session = cds.context["agent.pseudonyms"]
-      const hash = content.match(/name-[0-9a-f]{8}/)[0]
+      const hash = content.match(/name-[0-9a-f]{16}/)[0]
       expect(session.resolve(hash)).toBe("Emily Brontë")
     })
 
@@ -812,9 +812,9 @@ describe("pseudonymization", () => {
       const { mw } = await setupContext()
       const content = await runAction(mw, "authorName", "Emily Brontë")
       expect(content).not.toContain("Emily Brontë")
-      expect(content).toMatch(/authorName-[0-9a-f]{8}/)
+      expect(content).toMatch(/authorName-[0-9a-f]{16}/)
       const session = cds.context["agent.pseudonyms"]
-      const hash = content.match(/authorName-[0-9a-f]{8}/)[0]
+      const hash = content.match(/authorName-[0-9a-f]{16}/)[0]
       expect(session.resolve(hash)).toBe("Emily Brontë")
     })
 
@@ -824,7 +824,7 @@ describe("pseudonymization", () => {
       const { mw } = await setupContext()
       const content = await runAction(mw, "authorSecret", "Ellis Bell")
       expect(content).not.toContain("Ellis Bell")
-      expect(content).toMatch(/authorSecret-[0-9a-f]{8}/)
+      expect(content).toMatch(/authorSecret-[0-9a-f]{16}/)
     })
 
     it("action returns top-level array of scalar PII String — hashes every item", async () => {
@@ -834,7 +834,7 @@ describe("pseudonymization", () => {
       const content = await runAction(mw, "authorAllNames", ["Emily Brontë", "Charlotte Brontë"])
       expect(content).not.toContain("Emily Brontë")
       expect(content).not.toContain("Charlotte Brontë")
-      expect((content.match(/authorAllNames-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect((content.match(/authorAllNames-[0-9a-f]{16}/g) || []).length).toBe(2)
     })
 
     it("action returns object with a `many String` PII field — hashes every array element", async () => {
@@ -846,8 +846,8 @@ describe("pseudonymization", () => {
       expect(content).not.toContain("Emily Brontë")
       expect(content).not.toContain("Emmy")
       expect(content).not.toContain("Bell")
-      expect(content).toMatch(/name-[0-9a-f]{8}/)
-      expect((content.match(/nicknames-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect(content).toMatch(/name-[0-9a-f]{16}/)
+      expect((content.match(/nicknames-[0-9a-f]{16}/g) || []).length).toBe(2)
     })
 
     it("action returns array of struct — hashes annotated field in every item", async () => {
@@ -858,7 +858,7 @@ describe("pseudonymization", () => {
       ])
       expect(content).not.toContain("Emily Brontë")
       expect(content).not.toContain("Edgar Allen Poe")
-      expect((content.match(/name-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect((content.match(/name-[0-9a-f]{16}/g) || []).length).toBe(2)
     })
 
     it("action returns array of multi-field struct — hashes only annotated fields", async () => {
@@ -869,8 +869,8 @@ describe("pseudonymization", () => {
       expect(content).not.toContain("Emily Brontë")
       expect(content).not.toContain("Thornton")
       expect(content).toContain("England") // country not annotated
-      expect(content).toMatch(/name-[0-9a-f]{8}/)
-      expect(content).toMatch(/city-[0-9a-f]{8}/)
+      expect(content).toMatch(/name-[0-9a-f]{16}/)
+      expect(content).toMatch(/city-[0-9a-f]{16}/)
     })
 
     it("action returns nested struct — hashes annotated field in the nested object", async () => {
@@ -882,7 +882,7 @@ describe("pseudonymization", () => {
       expect(content).not.toContain("Emily Brontë")
       expect(content).not.toContain("Market Street")
       expect(content).toContain("Thornton") // address.city not annotated
-      expect((content.match(/(?:name|street)-[0-9a-f]{8}/g) || []).length).toBe(2)
+      expect((content.match(/(?:name|street)-[0-9a-f]{16}/g) || []).length).toBe(2)
     })
 
     it("action returns a named complex type — resolves and hashes nested + arrayed PII", async () => {
@@ -898,9 +898,9 @@ describe("pseudonymization", () => {
       expect(content).not.toContain("Ellis Bell")
       expect(content).toContain("English novelist") // biography not annotated
       expect(content).toContain("555-0100") // phone not annotated
-      expect(content).toMatch(/name-[0-9a-f]{8}/)
-      expect(content).toMatch(/email-[0-9a-f]{8}/)
-      expect(content).toMatch(/alias-[0-9a-f]{8}/)
+      expect(content).toMatch(/name-[0-9a-f]{16}/)
+      expect(content).toMatch(/email-[0-9a-f]{16}/)
+      expect(content).toMatch(/alias-[0-9a-f]{16}/)
     })
 
     it("action returns arrayed nested struct — hashes annotated field in every nested item", async () => {
@@ -918,7 +918,7 @@ describe("pseudonymization", () => {
       expect(content).toContain("Thornton") // city not annotated
       expect(content).toContain("Haworth")
       // 1 name + 2 street hashes
-      expect((content.match(/(?:name|street)-[0-9a-f]{8}/g) || []).length).toBe(3)
+      expect((content.match(/(?:name|street)-[0-9a-f]{16}/g) || []).length).toBe(3)
     })
 
     it("wrapToolCall hashes an aliased column using the alias as the result key", async () => {
@@ -948,10 +948,10 @@ describe("pseudonymization", () => {
       // aliased personal-data column must still be hashed (no PII leak)
       expect(content).not.toContain(author)
       // hash prefix uses the alias (the result key)
-      expect(content).toMatch(/authorName-[0-9a-f]{8}/)
+      expect(content).toMatch(/authorName-[0-9a-f]{16}/)
 
       const session = cds.context["agent.pseudonyms"]
-      const hash = content.match(/authorName-[0-9a-f]{8}/)[0]
+      const hash = content.match(/authorName-[0-9a-f]{16}/)[0]
       expect(session.resolve(hash)).toBe(author)
     })
 
@@ -984,10 +984,10 @@ describe("pseudonymization", () => {
       // annotated joined column hashed; non-personal title untouched
       expect(content).not.toContain(author)
       expect(content).toContain("Wuthering Heights")
-      expect(content).toMatch(/name-[0-9a-f]{8}/)
+      expect(content).toMatch(/name-[0-9a-f]{16}/)
 
       const session = cds.context["agent.pseudonyms"]
-      const hash = content.match(/name-[0-9a-f]{8}/)[0]
+      const hash = content.match(/name-[0-9a-f]{16}/)[0]
       expect(session.resolve(hash)).toBe(author)
     })
 
@@ -1019,12 +1019,12 @@ describe("pseudonymization", () => {
       expect(content).not.toContain("1001")
       expect(content).not.toContain("1002")
       // Hash tokens for ID and name must be present
-      expect(content).toMatch(/ID-[0-9a-f]{8}/)
-      expect(content).toMatch(/name-[0-9a-f]{8}/)
+      expect(content).toMatch(/ID-[0-9a-f]{16}/)
+      expect(content).toMatch(/name-[0-9a-f]{16}/)
 
       // Hashes resolve back to originals
       const session = cds.context["agent.pseudonyms"]
-      const idHash = content.match(/ID-[0-9a-f]{8}/)[0]
+      const idHash = content.match(/ID-[0-9a-f]{16}/)[0]
       expect(session.resolve(idHash)).toBe("1001")
     })
   })
@@ -1072,7 +1072,7 @@ describe("pseudonymization OTel leak check", () => {
     let sawHash = false
     for (const span of spans) {
       for (const s of collectSpanStrings(span)) {
-        if (/name-[0-9a-f]{8}/.test(s)) sawHash = true
+        if (/name-[0-9a-f]{16}/.test(s)) sawHash = true
         for (const pii of authors) {
           if (s.includes(pii)) {
             offenders.push({ span: span.name, pii, snippet: s.slice(0, 160) })
@@ -1090,7 +1090,7 @@ describe("pseudonymization OTel leak check", () => {
     expect(res.status).toBe(200)
     const text = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""
     expect(text).toMatch(/Brontë|Poe|Carpenter/)
-    expect(text).not.toMatch(/[a-z]+-[0-9a-f]{8}\b/)
+    expect(text).not.toMatch(/[a-z]+-[0-9a-f]{16}\b/)
   })
 
   it("@Common.Masked:false field is still masked in spans by default (strictMasking=true in scrubToolOutputs)", async () => {
@@ -1115,7 +1115,7 @@ describe("pseudonymization OTel leak check", () => {
     expect(offenders).toEqual([])
 
     const hasPlaceHash = toolSpans.some((s) =>
-      collectSpanStrings(s).some((str) => /placeOfDeath-[0-9a-f]{8}/.test(str)),
+      collectSpanStrings(s).some((str) => /placeOfDeath-[0-9a-f]{16}/.test(str)),
     )
     expect(hasPlaceHash).toBe(true)
   })
@@ -1144,7 +1144,7 @@ describe("pseudonymization OTel leak check", () => {
 
       // No unresolved hash tokens must remain in spans
       const hasUnresolvedHash = spans.some((s) =>
-        collectSpanStrings(s).some((str) => /name-[0-9a-f]{8}/.test(str)),
+        collectSpanStrings(s).some((str) => /name-[0-9a-f]{16}/.test(str)),
       )
       expect(hasUnresolvedHash).toBe(false)
     } finally {
@@ -1178,7 +1178,7 @@ describe("pseudonymization OTel leak check", () => {
 
       // No placeOfDeath hash tokens must remain
       const hasUnresolvedPlaceHash = toolSpans.some((s) =>
-        collectSpanStrings(s).some((str) => /placeOfDeath-[0-9a-f]{8}/.test(str)),
+        collectSpanStrings(s).some((str) => /placeOfDeath-[0-9a-f]{16}/.test(str)),
       )
       expect(hasUnresolvedPlaceHash).toBe(false)
     } finally {
@@ -1210,7 +1210,7 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
   let maskingMw, encode, ToolMessage
 
   beforeAll(async () => {
-    ;({ default: maskingMw } = await import("../../lib/agents/middleware/masking.js"))
+    ;({ masking: maskingMw } = await import("../../lib/agents/middleware/masking.js"))
     ;({ encode } = await import("@toon-format/toon"))
     ;({ ToolMessage } = await import("@langchain/core/messages"))
     cds.env.agents ??= {}
@@ -1263,8 +1263,8 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
         new ToolMessage({ content: rawContent, tool_call_id: "tc1", name: "catalogservice_query" }),
     )
     expect(getContent(result)).not.toContain("Emily Brontë")
-    expect(getContent(result)).toMatch(/name-[0-9a-f]{8}/)
-    expect(getContent(result)).toMatch(/placeOfBirth-[0-9a-f]{8}/)
+    expect(getContent(result)).toMatch(/name-[0-9a-f]{16}/)
+    expect(getContent(result)).toMatch(/placeOfBirth-[0-9a-f]{16}/)
   })
 
   it("prefixed action 'catalogservice_findauthor' is pseudonymized after fix", async () => {
@@ -1290,7 +1290,7 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
         }),
     )
     expect(getContent(result)).not.toContain("Emily Brontë")
-    expect(getContent(result)).toMatch(/name-[0-9a-f]{8}/)
+    expect(getContent(result)).toMatch(/name-[0-9a-f]{16}/)
     expect(getContent(result)).toContain("1818-07-30") // dateOfBirth not annotated
   })
 })
@@ -1302,7 +1302,7 @@ describe("pseudonymization — parallel tool calls", () => {
   let maskingMw, encode, ToolMessage
 
   beforeAll(async () => {
-    ;({ default: maskingMw } = await import("../../lib/agents/middleware/masking.js"))
+    ;({ masking: maskingMw } = await import("../../lib/agents/middleware/masking.js"))
     ;({ encode } = await import("@toon-format/toon"))
     ;({ ToolMessage } = await import("@langchain/core/messages"))
     cds.env.agents ??= {}
