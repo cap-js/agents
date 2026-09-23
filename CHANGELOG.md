@@ -8,6 +8,7 @@
 
 ### Added
 
+- CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
 - Chat preview queues messages submitted while the agent is busy
 
 ### Fixed
