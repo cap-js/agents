@@ -90,6 +90,12 @@ The MLflow exporter is added as a **second span processor** alongside any existi
 
 **Enable:**
 
+Install packages:
+```sh
+npm add @cap-js/telemetry @opentelemetry/sdk-trace-base @opentelemetry/exporter-trace-otlp-proto
+```
+
+
 ```json
 { "cds": { "agents": { "mlflow": true } } }
 ```
