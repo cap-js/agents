@@ -1,12 +1,7 @@
 import cds from "@sap/cds"
 import { vi, test } from "vitest"
 import { Judge, matchToolCall } from "@cap-js/agents/eval"
-import {
-  setup,
-  flushMetrics,
-  findSpan,
-  findSpans,
-} from "../utils/telemetry-utils.js"
+import { setup, flushMetrics, findSpan, findSpans } from "../utils/telemetry-utils.js"
 import createHelpers from "../utils/helpers.js"
 import { summarizePartialWork } from "../../lib/agents/summarize-on-timeout.js"
 
@@ -14,7 +9,10 @@ const PASS = 0.7
 
 setup()
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
-const { sendMessage, jsonrpc, streamMessage, parseSSEFrames, setupErrorDetection } = createHelpers({ POST, axios })
+const { sendMessage, jsonrpc, streamMessage, parseSSEFrames, setupErrorDetection } = createHelpers({
+  POST,
+  axios,
+})
 
 const judge = new Judge("ANSWER_RELEVANCE_PROMPT").criteria(
   "Response fully and accurately answers the user's question.",
@@ -46,7 +44,9 @@ describe.concurrent("bookshop CatalogService — list books", () => {
     expect(result.metrics.latency_ms).toBeGreaterThan(0)
     expect(matchToolCall(result, "query", (args) => !!args.cql)).toBe(true)
     const judgement = await judge
-      .criteria("Response must list multiple books from the catalog with recognisable titles or authors.")
+      .criteria(
+        "Response must list multiple books from the catalog with recognisable titles or authors.",
+      )
       .evaluate(result)
     expect(judgement.score).toBeGreaterThanOrEqual(PASS)
   })
@@ -86,7 +86,9 @@ describe.concurrent("bookshop CatalogService — list books", () => {
     expect(Array.isArray(finishReasons)).toBeTruthy()
     expect(finishReasons.length > 0).toBeTruthy()
     expect(
-      ["stop", "end_turn", "tool_calls", "tool_use", "length", "max_tokens"].includes(finishReasons[0]),
+      ["stop", "end_turn", "tool_calls", "tool_use", "length", "max_tokens"].includes(
+        finishReasons[0],
+      ),
     ).toBeTruthy()
   })
 
@@ -112,7 +114,10 @@ describe.concurrent("bookshop CatalogService — list books", () => {
       (s) =>
         s.spanContext().traceId === traceId &&
         s.spanContext().spanId !== chatSpanId &&
-        (s.kind === 3 || s.name.includes("POST") || s.name.includes("HTTP") || s.name.includes("GET")),
+        (s.kind === 3 ||
+          s.name.includes("POST") ||
+          s.name.includes("HTTP") ||
+          s.name.includes("GET")),
     )
     expect(outboundSpans.length >= 1).toBeTruthy()
   })
@@ -266,66 +271,84 @@ describe.concurrent("bookshop CatalogService — conversation-level judges", () 
       expect(retried.status).toBe("input-required")
     })
 
-    it(
-      "submitOrder triggers HITL, approve completes order and reduces stock",
-      async () => {
-        const BOOK_ID = 201
-        const QUANTITY = 1
+    it("submitOrder triggers HITL, approve completes order and reduces stock", async () => {
+      const BOOK_ID = 9001
+      const QUANTITY = 1
 
-        // Read stock before order
+      await INSERT.into("sap.capire.bookshop.Books").entries({
+        ID: BOOK_ID,
+        title: "Test Book HITL Approve",
+        author_ID: 101,
+        stock: 5,
+        price: 9.99,
+        currency_code: "USD",
+        genre_ID: 11,
+      })
+      try {
         const before = await SELECT.one
           .from("sap.capire.bookshop.Books")
           .columns("stock")
           .where({ ID: BOOK_ID })
-        expect(before?.stock).toBeGreaterThanOrEqual(QUANTITY)
 
         const agent = await cds.connect.to("CatalogService")
-
-        // Step 1: chat agent to order — submitOrder is @agent.hitl so agent pauses for approval
         const r1 = await agent.chat(`Submit order for ${QUANTITY} copy of book ${BOOK_ID} hitl`)
         expect(r1.status).toBe("input-required")
         expect(r1.taskId).toBeTruthy()
 
-        // Step 2: approve — pass r1 directly so taskId + contextId are forwarded
         const r2 = await agent.chat("yes", r1)
         expect(r2.status).toBe("completed")
         expect(r2.text).toBeTruthy()
 
-        // Stock reduced
         const after = await SELECT.one
           .from("sap.capire.bookshop.Books")
           .columns("stock")
           .where({ ID: BOOK_ID })
         expect(after.stock).toBe(before.stock - QUANTITY)
 
-        // LLM judge confirms the response acknowledges the completed order
         const judgement = await judge
           .criteria("Response confirms the order was placed successfully.")
           .evaluate(r2)
         expect(judgement.score).toBeGreaterThanOrEqual(PASS)
-      },
-    )
+      } finally {
+        await DELETE.from("sap.capire.bookshop.Books").where({ ID: BOOK_ID })
+      }
+    })
 
     it("tasks/cancel cancels HITL task and leaves stock unchanged", async () => {
-      const BOOK_ID = 201
-      const stockBefore = await SELECT.one
-        .from("sap.capire.bookshop.Books")
-        .columns("stock")
-        .where({ ID: BOOK_ID })
-      expect(stockBefore?.stock).not.toBe(undefined)
+      const BOOK_ID = 9002
 
-      const res = await sendMessage("catalog", `Submit order for 2 copies of book ${BOOK_ID} hitl`)
-      expect(res.data.result?.status?.state).toBe("input-required")
+      await INSERT.into("sap.capire.bookshop.Books").entries({
+        ID: BOOK_ID,
+        title: "Test Book HITL Cancel",
+        author_ID: 101,
+        stock: 5,
+        price: 9.99,
+        currency_code: "USD",
+        genre_ID: 11,
+      })
+      try {
+        const stockBefore = await SELECT.one
+          .from("sap.capire.bookshop.Books")
+          .columns("stock")
+          .where({ ID: BOOK_ID })
 
-      const taskId = res.data.result.id
-      const cancelRes = await jsonrpc("catalog", "tasks/cancel", { id: taskId })
-      expect(cancelRes.data.result.status.state).toBe("canceled")
+        const res = await sendMessage(
+          "catalog",
+          `Submit order for 2 copies of book ${BOOK_ID} hitl`,
+        )
+        expect(res.data.result?.status?.state).toBe("input-required")
 
-      const stockAfter = await SELECT.one
-        .from("sap.capire.bookshop.Books")
-        .columns("stock")
-        .where({ ID: BOOK_ID })
-      expect(stockAfter?.stock).toBe(stockBefore?.stock)
+        const cancelRes = await jsonrpc("catalog", "tasks/cancel", { id: res.data.result.id })
+        expect(cancelRes.data.result.status.state).toBe("canceled")
+
+        const stockAfter = await SELECT.one
+          .from("sap.capire.bookshop.Books")
+          .columns("stock")
+          .where({ ID: BOOK_ID })
+        expect(stockAfter?.stock).toBe(stockBefore?.stock)
+      } finally {
+        await DELETE.from("sap.capire.bookshop.Books").where({ ID: BOOK_ID })
+      }
     })
   })
 
@@ -510,7 +533,10 @@ describe.concurrent("HITL DataPart carry", () => {
           kind: "data",
           data: {
             decisions: [
-              { type: "edit", editedAction: { name: "submitOrder", args: { ...original.args, quantity: 4 } } },
+              {
+                type: "edit",
+                editedAction: { name: "submitOrder", args: { ...original.args, quantity: 4 } },
+              },
             ],
           },
         },
@@ -559,7 +585,10 @@ describe("Token streaming", () => {
     const incrementalFrames = artifactFrames.filter(
       (f) => f.result?.append === true && f.result?.lastChunk !== true,
     )
-    expect(incrementalFrames.length, "expected at least one incremental append frame").toBeGreaterThan(0)
+    expect(
+      incrementalFrames.length,
+      "expected at least one incremental append frame",
+    ).toBeGreaterThan(0)
 
     const lastArtifact = artifactFrames[artifactFrames.length - 1]
     expect(lastArtifact.result.lastChunk).toBe(true)
@@ -581,7 +610,10 @@ describe("Token streaming", () => {
     const incrementalFrames = artifactFrames.filter(
       (f) => f.result?.append === true && f.result?.lastChunk !== true,
     )
-    expect(incrementalFrames.length, "expected no incremental token frames when streaming:false").toBe(0)
+    expect(
+      incrementalFrames.length,
+      "expected no incremental token frames when streaming:false",
+    ).toBe(0)
 
     const completed = frames.find(
       (f) => f.result?.kind === "status-update" && f.result?.final === true,
