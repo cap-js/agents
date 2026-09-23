@@ -1,7 +1,5 @@
 /* eslint-disable no-await-in-loop */
-import { spawn } from "node:child_process"
-import { readdirSync, unlinkSync, readFileSync } from "node:fs"
-import { createConnection } from "node:net"
+import { readFileSync } from "node:fs"
 import path from "node:path"
 import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
@@ -89,7 +87,7 @@ async function collectToolCallsFromCheckpoints(threadId) {
   return tools
 }
 
-describe("@cap-js/agents - Travel Sample E2E", () => {
+describe("Travel Sample E2E", () => {
   let helpers
 
   beforeAll(async () => {

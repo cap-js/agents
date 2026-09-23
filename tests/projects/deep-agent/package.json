@@ -16,6 +16,10 @@
   },
   "cds": {
     "agents": {
+      "quotas": {
+        "maxConcurrentTasks": 50,
+        "maxConcurrentTasksPerUser": 50
+      },
       "[tracing]": {
         "mlflow": true
       },
@@ -36,7 +40,10 @@
       "[test]": {
         "llm": "mock",
         "[hybrid]": {
-          "llm": "aicore"
+          "llm": {
+            "kind": "aicore",
+            "model": "anthropic--claude-4.5-haiku"
+          }
         },
         "audit-log": {
           "kind": "audit-log-to-console",
