@@ -91,6 +91,12 @@ While CDS annotations can be leveraged to mask PII in structured data returned f
 
 To identify and mask PII in unstructured data, [SAP DPI Data Anonymization](https://help.sap.com/docs/data-privacy-integration/development-for-data-privacy-integration/data-privacy-integration-nextgen-data-anonymization?ai=true) and [SAP HANA Cloud Named Entity Recognition](https://help.sap.com/docs/hana-cloud-database/sap-hana-cloud-sap-hana-database-predictive-analysis-library/named-entity-recognition-ner) can be leveraged.
 
+To leverage this feature masking must be enabled:
+
+```json
+{ "cds": { "agents": { "masking": true } } }
+```
+
 ### DPI Data Anonymization
 
 The plugin can call SAP Data Privacy Integration (DPI) through a BTP Destination before the agent model runs. It pseudonymizes only incoming human messages in the current turn; tool output, system prompts, and model responses are not sent to DPI.

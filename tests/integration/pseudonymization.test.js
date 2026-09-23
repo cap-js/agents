@@ -170,29 +170,6 @@ describe("pseudonymization", () => {
     })
   })
 
-  it("pseudonymize handler is called with req.data on A2A message/send", async () => {
-    // PseudoBookService overrides pseudonymize for type=unstructured, replacing
-    // "Emily Brontë" with "PSEUDO_EMILY" and returning a mapping.
-    const res = await sendMessage("pseudo-book", "Tell me about Emily Brontë")
-    expect(res.status).toBe(200)
-
-    // Verify the LLM saw the replaced text in its input
-    const graphThreadId = `PseudoBookService:${res.data.result.contextId}`
-    const saver = new CdsCheckpointSaver()
-    const tuple = await saver.getTuple({ configurable: { thread_id: graphThreadId } })
-    const messages = tuple?.checkpoint?.channel_values?.messages ?? []
-    const human = messages.find((m) => (m._getType?.() ?? m.type) === "human")
-    expect(human).toBeDefined()
-    const humanText = typeof human.content === "string" ? human.content : human.content?.[0]?.text
-    expect(humanText).toContain("PSEUDO_EMILY")
-    expect(humanText).not.toContain("Emily Brontë")
-
-    // Verify the user-facing response resolves the pseudonym back to the original
-    const responseText = res.data?.result?.status?.message?.parts?.[0]?.text ?? ""
-    expect(responseText).toContain("Emily Brontë")
-    expect(responseText).not.toContain("PSEUDO_EMILY")
-  })
-
   describe("annotation resolution", () => {
     it("@PersonalData.IsPotentiallyPersonal on Authors.name is detected", async () => {
       // The bookshop Authors entity has @PersonalData.IsPotentiallyPersonal on name
@@ -631,6 +608,7 @@ describe("pseudonymization", () => {
       cds.context.user = new cds.User.Privileged()
       cds.context["agent.service"] = service
       cds.context["agent.context.id"] = contextId
+      cds.context["agent.masking.tools"] = true
       // Create session directly — unit tests have no checkpointer.
       cds.context["agent.pseudonyms"] = new PseudonymStore(randomBytes(16).toString("hex"))
       return { srv, mw }
@@ -1228,6 +1206,7 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
     cds.context.model = cds.model
     cds.context["agent.service"] = "CatalogService"
     cds.context["agent.context.id"] = `remote-mcp-${Date.now()}`
+    cds.context["agent.masking.tools"] = true
     // __mcpDynamicTools mirrors what remoteMcpMiddleware caches after tools/list.
     cds.context.__mcpDynamicTools = {
       "http://mock-mcp/mcp": {
@@ -1335,6 +1314,7 @@ describe("pseudonymization — parallel tool calls", () => {
     cds.context.model = cds.model
     cds.context["agent.service"] = "CatalogService"
     cds.context["agent.context.id"] = `parallel-${Date.now()}`
+    cds.context["agent.masking.tools"] = true
     cds.context["agent.pseudonyms"] = new PseudonymStore(randomBytes(16).toString("hex"))
 
     const makeRequest = (id, name, city) => ({

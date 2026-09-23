@@ -9,7 +9,7 @@
 ### Added
 
 - CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
-- Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP
+- Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP when the respective services are enabled & cds.env.agents.masking = true
 - Chat preview queues messages submitted while the agent is busy
 
 ### Fixed

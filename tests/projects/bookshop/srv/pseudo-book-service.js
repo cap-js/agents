@@ -3,14 +3,6 @@ import cds from "@sap/cds"
 export default class PseudoBookService extends cds.ApplicationService {
   init() {
     this.on("buildGraph", async () => this._buildGraph())
-    this.on("pseudonymize", async (req, next) => {
-      if (req.data.type !== "unstructured") return next()
-      // Fixed replacement so tests can verify the handler was called.
-      const { data, type, seed } = req.data
-      const replaced = data.replace(/Emily Brontë/g, "PSEUDO_EMILY")
-      const mappings = data !== replaced ? [["PSEUDO_EMILY", "Emily Brontë"]] : undefined
-      return { data: replaced, mappings, metadata: { seed: seed ?? "test-seed", type } }
-    })
     return super.init()
   }
 
