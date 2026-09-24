@@ -5,17 +5,21 @@
   "private": true,
   "dependencies": {
     "@cap-js/agents": "file:../../../",
-    "@cap-js/audit-logging": ">=1",
+    "@cap-js/audit-logging": "^1.3.0",
     "@cap-js/sqlite": "*",
     "@cap-js/telemetry": "^2",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
-    "@sap/cds": "^10.0.6",
+    "@sap/cds": "^10.1.1",
     "zod": "^4"
   },
   "cds": {
     "agents": {
+      "quotas": {
+        "maxConcurrentTasks": 50,
+        "maxConcurrentTasksPerUser": 50
+      },
       "[tracing]": {
         "mlflow": true
       },
@@ -34,6 +38,13 @@
         "metrics": false
       },
       "[test]": {
+        "llm": "mock",
+        "[hybrid]": {
+          "llm": {
+            "kind": "aicore",
+            "model": "anthropic--claude-4.5-haiku"
+          }
+        },
         "audit-log": {
           "kind": "audit-log-to-console",
           "outbox": false

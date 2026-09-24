@@ -241,7 +241,7 @@ export function isTimeoutHitl(task) {
 
 export function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
   const { taskId, contextId } = requestContext
-  LOG.info("timeout awaiting decision", { conversation: short(contextId), service: serviceName })
+  LOG.info(serviceName, "-", "timeout awaiting decision", { conversation: short(contextId) })
   audit("AgentInputRequired", {
     data: { taskId, contextId, service: serviceName, reason: "timeout", description },
   })
@@ -361,7 +361,7 @@ export function handleHitlInterrupt({
   for (const action of actionRequests) {
     metrics.hitlGates.add(1, hitlMetricAttrs(serviceName, action))
   }
-  LOG.info("input-required", { conversation: short(contextId), service: serviceName, duration })
+  LOG.info(serviceName, "-", "input-required", { conversation: short(contextId), duration })
   onInputRequired?.(description)
   audit("AgentInputRequired", {
     data: { taskId, contextId, service: serviceName, description, interruptData },

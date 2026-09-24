@@ -4,7 +4,33 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.5 - tbd.
+## Version 0.9.8 - tbd
+
+### Fixed
+
+- Correctly handle non `@cap-js/mcp` tools during PII masking
+
+## Version 0.9.7 - 2026-09-23
+
+### Added
+
+- CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
+- Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP when the respective services are enabled & cds.env.agents.masking = true
+- Chat preview queues messages submitted while the agent is busy
+
+### Fixed
+
+- Chat preview keeps the message field height stable when typing the first character
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
+- `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
+
+## Version 0.9.6 - 2026-09-17
+
+### Fixed
+
+- Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
+
+## Version 0.9.5 - 2026-09-16
 
 ### Added
 
@@ -14,6 +40,7 @@
 ### Changed
 
 - Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+- Renamed config option `cds.agents.pool` to `cds.agents.quotas`
 
 ### Fixed
 
@@ -22,6 +49,7 @@
 - Adjusted error message to be more accurate
 - Prompts are now correctly uploaded to MLFlow for markdown-based agents
 - `Judge.evaluate()` assessments now also appear in Databricks UC MLflow
+- Propagate opentelemetry traceparent to subagents
 
 ## Version 0.9.4 - 2026-09-10
 

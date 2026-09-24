@@ -7,13 +7,13 @@
     "start": "cds-serve"
   },
   "dependencies": {
-    "@cap-js/hana": ">=1",
-    "@sap/cds": "^10.0.6",
+    "@cap-js/hana": "^3.1.1",
+    "@sap/cds": "^10.1.1",
     "@sap/xssec": "^4"
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1",
-    "@sap/cds-dk": "^10.1.1"
+    "@sap/cds-dk": "^10.1.2"
   },
   "cds": {
     "protocols": {

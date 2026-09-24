@@ -6,6 +6,8 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
+import { resolvePseudonyms } from "../../lib/masking/index.js"
+import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -152,7 +154,7 @@ class GraphExecutor {
   abort(taskId) {
     const controller = this._abortControllers.get(taskId)
     if (controller && !controller.signal.aborted) {
-      LOG.info("aborting", { task: short(taskId), service: this._srv.name })
+      LOG.info(this._srv.name, "aborting", { task: short(taskId) })
       controller.abort()
     }
   }
@@ -170,7 +172,7 @@ class GraphExecutor {
       const { CdsCheckpointSaver } =
         await import("../../lib/protocol/persistence/checkpoint-saver.js")
       resolved.checkpointer = new CdsCheckpointSaver()
-      LOG.debug("Auto-injected CdsCheckpointSaver", { service: this._srv.name })
+      LOG.debug(this._srv.name, "- auto-injected CdsCheckpointSaver")
     }
     this._graph = resolved
     return this._graph
@@ -181,7 +183,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
@@ -197,6 +199,9 @@ class GraphExecutor {
     // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
     let thinkingCount = 0
+    // Holds a trailing fragment of the previous chunk that is a prefix of a known
+    // pseudonym hash. Prepended to the next chunk so split hashes are resolved correctly.
+    let pendingPrefix = ""
 
     try {
       if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
@@ -238,8 +243,23 @@ class GraphExecutor {
           const lastChunk =
             !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
-          const text = messageText(msgChunk?.content)
-          if (!text) continue
+          const raw = pendingPrefix + (messageText(msgChunk?.content) ?? "")
+          pendingPrefix = ""
+          if (!raw) continue
+
+          // Hashes look like name-8hexchars and never contain spaces.
+          // On non-last chunks, slice last token and append to next chunk
+          // to avoid unresolved boundaries
+          let toEmit = raw
+          if (!lastChunk) {
+            const lastSpace = raw.lastIndexOf(" ")
+            if (lastSpace !== -1 && lastSpace < raw.length - 1) {
+              pendingPrefix = raw.slice(lastSpace + 1)
+              toEmit = raw.slice(0, lastSpace + 1)
+            }
+          }
+
+          const text = resolvePseudonyms(toEmit)
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
           // ResultManager reads event.append; nesting them leaves it undefined and
@@ -318,7 +338,7 @@ class GraphExecutor {
     return { state: finalState, tokenCount }
   }
   async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.pool?.maxExecutionTimePerTask || "5min")
+    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
@@ -354,16 +374,18 @@ class GraphExecutor {
    */
   async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
-    return summarizePartialWork({
-      taskId,
-      contextId,
-      serviceName,
-      reason,
-      checkpointer: this._graph?.checkpointer,
-      getModel: () => this._srv.send("buildModel"),
-      // Summary runs after graph abort, so no execution-time grace is needed.
-      timeout: 10_000,
-    })
+    return resolvePseudonyms(
+      await summarizePartialWork({
+        taskId,
+        contextId,
+        serviceName,
+        reason,
+        checkpointer: this._graph?.checkpointer,
+        getModel: () => this._srv.send("buildModel"),
+        // Summary runs after graph abort, so no execution-time grace is needed.
+        timeout: 10_000,
+      }),
+    )
   }
 
   async execute(requestContext, eventBus) {
@@ -384,6 +406,17 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+
+    // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
+    const graph = await this._resolveGraph()
+    if (cds.env.agents.masking) {
+      await pseudonymizeUserMessage(
+        this._srv,
+        requestContext,
+        graph.checkpointer,
+        `${serviceName}:${contextId}`,
+      )
+    }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
@@ -442,9 +475,8 @@ class GraphExecutor {
                 cds.env.agents?.fileIO,
               )
               if (rejection) {
-                LOG.warn("input file rejected", {
+                LOG.warn(serviceName, "-", "input file rejected", {
                   conversation: short(contextId),
-                  service: serviceName,
                   name: safeName,
                   mimeType: safeMime,
                   reason: rejection,
@@ -453,9 +485,8 @@ class GraphExecutor {
               }
               const buf = Buffer.from(file.bytes, "base64")
               await fileStore.saveInputFile(taskId, safeName, safeMime, buf)
-              LOG.info("file uploaded", {
+              LOG.info(serviceName, "-", "file uploaded", {
                 conversation: short(contextId),
-                service: serviceName,
                 name: safeName,
                 mimeType: safeMime,
                 size: buf.length,
@@ -535,8 +566,6 @@ class GraphExecutor {
       let usageData
       let result
       try {
-        const graph = await this._resolveGraph()
-
         const extraConfig = this._configMapper ? await this._configMapper(requestContext) : {}
         if (extraConfig !== null && extraConfig !== undefined && typeof extraConfig !== "object") {
           throw new TypeError(`configMapper must return a plain object, got ${typeof extraConfig}`)
@@ -613,16 +642,18 @@ class GraphExecutor {
         }
 
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = outputMapper(result) || "I could not generate a response."
+        const output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
 
-        LOG.info("completed", { conversation: short(contextId), service: serviceName, duration })
+        LOG.info(serviceName, "completed", { conversation: short(contextId), duration })
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "completed")
           setSpanAttrs(
             wfSpan,
             mlflowAttrs("AGENT", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: output } }],
+              },
               functionName: serviceName,
             }),
           )
@@ -632,7 +663,9 @@ class GraphExecutor {
           setSpanAttrs(
             rootSpan,
             mlflowAttrs("CHAIN", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: output } }],
+              },
             }),
           )
         }
@@ -746,9 +779,8 @@ class GraphExecutor {
                   ? Buffer.byteLength(artifact.file.bytes, "base64")
                   : 0
               if (declaredBytes > maxFileBytes) {
-                LOG.warn("emit_file_part artifact exceeds cap; skipping", {
+                LOG.warn(serviceName, "-", "emit_file_part artifact exceeds cap; skipping", {
                   conversation: short(contextId),
-                  service: serviceName,
                   name: artifact.file?.name,
                   size: declaredBytes,
                   cap: maxFileBytes,
@@ -773,9 +805,8 @@ class GraphExecutor {
           const outputMeta = await fileStore.listOutputFilesMeta(taskId)
           for (const meta of outputMeta) {
             if (meta.size > maxFileBytes) {
-              LOG.warn("output file exceeds cap; skipping", {
+              LOG.warn(serviceName, "-", "output file exceeds cap; skipping", {
                 conversation: short(contextId),
-                service: serviceName,
                 name: meta.name,
                 size: meta.size,
                 cap: maxFileBytes,
@@ -794,7 +825,7 @@ class GraphExecutor {
           // Exclude emit_file_part outputs — those are this agent's own artifacts, not
           // downstream files, and re-persisting them would create spurious /uploads/ entries.
           // Enforce the same size + MIME guard as inbound uploads so a malicious
-          // sub-agent cannot bypass the cap by echoing an oversized FilePart.
+          // subagent cannot bypass the cap by echoing an oversized FilePart.
           await Promise.all(
             fileArtifacts
               .slice(0, source1Count)
@@ -802,9 +833,8 @@ class GraphExecutor {
                 if (!fa.file?.bytes || !fa.file?.name || fa._fromEmitFilePart) return false
                 const rejection = checkInputFile(fa.file, cds.env.agents?.fileIO)
                 if (rejection) {
-                  LOG.warn("downstream file re-persist rejected", {
+                  LOG.warn(serviceName, "-", "downstream file re-persist rejected", {
                     conversation: short(contextId),
-                    service: serviceName,
                     name: fa.file.name,
                     reason: rejection,
                   })
@@ -824,9 +854,8 @@ class GraphExecutor {
         // Capture source classification for the log line below.
         for (const filePart of fileArtifacts) {
           if (!filePart.file?.name) {
-            LOG.warn("skipping malformed file artifact", {
+            LOG.warn(serviceName, "-", "skipping malformed file artifact", {
               conversation: short(contextId),
-              service: serviceName,
             })
             continue
           }
@@ -837,9 +866,8 @@ class GraphExecutor {
             typeof filePart.file?.bytes === "string"
               ? Buffer.byteLength(filePart.file.bytes, "base64")
               : 0
-          LOG.info("file emitted", {
+          LOG.info(serviceName, "-", "file emitted", {
             conversation: short(contextId),
-            service: serviceName,
             name: safeName,
             mimeType: filePart.file?.mimeType,
             bytes: decodedSize,
@@ -859,13 +887,12 @@ class GraphExecutor {
 
         dataArtifacts.forEach((artifact, i) => {
           if (artifact.data == null || typeof artifact.data !== "object") {
-            LOG.warn("skipping malformed data artifact", {
+            LOG.warn(serviceName, "-", "skipping malformed data artifact", {
               conversation: short(contextId),
-              service: serviceName,
             })
             return
           }
-          LOG.info("data emitted", { conversation: short(contextId), service: serviceName })
+          LOG.info(serviceName, "-", "data emitted", { conversation: short(contextId) })
           eventBus.publish({
             kind: "artifact-update",
             taskId,
@@ -903,7 +930,7 @@ class GraphExecutor {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
         // Use name check (not instanceof) to also catch native DOMException AbortError from LangGraph
         if (err.name === "AbortError") {
-          LOG.info("canceled", { conversation: short(contextId), service: serviceName })
+          LOG.info(serviceName, "-", "canceled", { conversation: short(contextId) })
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "canceled")
 
           audit("AgentTaskCanceled", {
@@ -926,7 +953,7 @@ class GraphExecutor {
 
         // Timeout — pause at checkpoint. User decides whether to resume graph.
         if (err.name === "TimeoutError") {
-          LOG.warn("timeout", { conversation: short(contextId), service: serviceName })
+          LOG.warn(serviceName, "-", "timeout", { conversation: short(contextId) })
 
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "input-required")
 
@@ -943,9 +970,8 @@ class GraphExecutor {
 
         // Quota exceeded — summarize partial work instead of raw error
         if (err.quotaExceeded) {
-          LOG.warn("quota exceeded", {
+          LOG.warn(serviceName, "-", "quota exceeded", {
             conversation: short(contextId),
-            service: serviceName,
             error: err.message,
           })
 
@@ -979,16 +1005,11 @@ class GraphExecutor {
           return
         }
 
-        LOG.error("failed", {
-          conversation: short(contextId),
-          service: serviceName,
-          error: err.message,
-        })
-        LOG.debug("failed stack", {
-          conversation: short(contextId),
-          service: serviceName,
-          stack: err.stack,
-        })
+        LOG.error(
+          Object.assign(err, {
+            conversation: short(contextId),
+          }),
+        )
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")

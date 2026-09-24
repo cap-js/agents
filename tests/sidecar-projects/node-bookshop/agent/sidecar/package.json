@@ -8,9 +8,9 @@
   },
   "dependencies": {
     "@cap-js/agents": "*",
-    "@cap-js/hana": ">=1",
+    "@cap-js/hana": "^3.1.1",
     "@cap-js/sqlite": ">=1",
-    "@sap/cds": "^10.0.6"
+    "@sap/cds": "^10.1.1"
   },
   "cds": {
     "build": {
@@ -34,11 +34,11 @@
       "node"
     ],
     "agents": {
-      "pool": null
+      "quotas": null
     },
     "requires": {
       "db": {
-        "pool": {
+        "quotas": {
           "acquireTimeoutMillis": 30000
         }
       },

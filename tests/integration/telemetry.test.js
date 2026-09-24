@@ -190,6 +190,12 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(RunnableLambda.prototype[PATCHED]).toBe(true)
   })
 
+  it("should patch RunnableSequence.invoke", async () => {
+    const { RunnableSequence } = await import("@langchain/core/runnables")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
+    expect(RunnableSequence.prototype[PATCHED]).toBe(true)
+  })
+
   // ─── Metrics ────────────────────────────────────────────────────────
 
   it("should record golden signal metrics", async () => {
@@ -257,8 +263,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
 
   let originalQuota
   before(() => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
+    originalQuota = cds.env.agents.quotas.maxTasksPerHourPerUser
+    cds.env.agents.quotas.maxTasksPerHourPerUser = 200
     // Intercept cds.log("agents").warn after cds is fully bootstrapped
     const LOG = cds.log("agents")
     _originalLogWarn = LOG.warn.bind(LOG)
@@ -269,7 +275,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
     }
   })
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
+    cds.env.agents.quotas.maxTasksPerHourPerUser = originalQuota
     mock.stop()
     const LOG = cds.log("agents")
     if (_originalLogWarn) LOG.warn = _originalLogWarn

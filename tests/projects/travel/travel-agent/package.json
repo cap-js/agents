@@ -6,11 +6,11 @@
   "dependencies": {
     "@cap-js/agents": "file:../../../..",
     "@cap-js/sqlite": "*",
-    "@sap/cds": "^10.0.6"
+    "@sap/cds": "^10.1.1"
   },
   "cds": {
     "agents": {
-      "pool": {
+      "quotas": {
         "maxLLMInvocationsPerTask": 50
       },
       "fileIO": {

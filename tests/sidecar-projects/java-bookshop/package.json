@@ -4,7 +4,7 @@
   "private": true,
   "description": "Java CAP bookshop with agent sidecar support via HCQL",
   "devDependencies": {
-    "@sap/cds-dk": "^10.1.1"
+    "@sap/cds-dk": "^10.1.2"
   },
   "scripts": {
     "build:java": "cd srv && mvn clean package -DskipTests",
@@ -13,7 +13,7 @@
     "install:sidecar": "cd agent/sidecar && npm install"
   },
   "dependencies": {
-    "@cap-js/hana": "*",
+    "@cap-js/hana": "^3.1.1",
     "@cap-js/sqlite": "*"
   }
 }
