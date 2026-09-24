@@ -1005,6 +1005,28 @@ describe("pseudonymization", () => {
       const idHash = content.match(/ID-[0-9a-f]{16}/)[0]
       expect(session.resolve(idHash)).toBe("1001")
     })
+
+    it("wrapToolCall scrubs PII from plain-text (read_file) tool output via session mappings", async () => {
+      const { mw } = await setupContext()
+      const session = cds.context["agent.pseudonyms"]
+      session.addMappings([
+        ["name-abc12345", "Emily Brontë"],
+        ["abc12345", "Emily Brontë"],
+      ])
+      const rawFileContent = "Emily Brontë wrote Wuthering Heights in 1847."
+
+      const request = {
+        toolCall: { name: "read_file", id: "tc-file", args: { path: "/uploads/book.txt" } },
+        tool: {},
+      }
+      const handler = async () =>
+        new ToolMessage({ content: rawFileContent, tool_call_id: "tc-file", name: "read_file" })
+
+      const result = await mw.wrapToolCall(request, handler)
+      const content = getContent(result)
+      expect(content).not.toContain("Emily Brontë")
+      expect(content).toContain("name-abc12345")
+    })
   })
 })
 
