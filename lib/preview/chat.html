@@ -459,6 +459,82 @@
           border-top-color: #333;
         }
       }
+
+      /* Tool-call events: collapsible panel showing each tool/agent call. */
+      .tool-calls-summary {
+        align-self: flex-start;
+        margin: 4px 0 8px 0;
+        font-size: 0.88em;
+        color: #666;
+        border-left: 2px solid #ccc;
+        padding-left: 10px;
+      }
+      .tool-calls-summary summary {
+        cursor: pointer;
+        user-select: none;
+        color: #888;
+        list-style: none;
+      }
+      .tool-calls-summary summary::before { content: "▶ "; font-size: 0.8em; }
+      .tool-calls-summary[open] summary::before { content: "▼ "; }
+      .tool-call-item {
+        padding: 4px 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px;
+      }
+      .tool-call-item + .tool-call-item {
+        border-top: 1px dashed #e0e0e0;
+        margin-top: 4px;
+      }
+      .tool-call-status { font-size: 0.85em; }
+      .tool-call-label { font-weight: 500; }
+      .tool-call-kind {
+        font-size: 0.78em;
+        padding: 1px 5px;
+        border-radius: 8px;
+        background: #eee;
+        color: #555;
+      }
+      .tool-call-kind.kind-query  { background: #dbeafe; color: #1d4ed8; }
+      .tool-call-kind.kind-action { background: #fef3c7; color: #92400e; }
+      .tool-call-kind.kind-agent  { background: #ede9fe; color: #5b21b6; }
+      .tool-call-toggle {
+        font-size: 0.78em;
+        padding: 1px 6px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background: none;
+        cursor: pointer;
+        color: #666;
+      }
+      .tool-call-toggle:hover { background: #f5f5f5; }
+      .tool-call-detail {
+        width: 100%;
+        margin-top: 4px;
+        padding: 4px 8px;
+        background: #f9f9f9;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.85em;
+        white-space: pre-wrap;
+        overflow-x: auto;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      @media (prefers-color-scheme: dark) {
+        .tool-calls-summary { color: #999; border-left-color: #444; }
+        .tool-calls-summary summary { color: #aaa; }
+        .tool-call-item + .tool-call-item { border-top-color: #333; }
+        .tool-call-kind { background: #333; color: #aaa; }
+        .tool-call-kind.kind-query  { background: #1e3a5f; color: #93c5fd; }
+        .tool-call-kind.kind-action { background: #451a03; color: #fcd34d; }
+        .tool-call-kind.kind-agent  { background: #2e1065; color: #c4b5fd; }
+        .tool-call-toggle { border-color: #444; color: #aaa; }
+        .tool-call-toggle:hover { background: #333; }
+        .tool-call-detail { background: #1a1a1a; color: #ccc; }
+      }
     </style>
     <script src="marked.min.js"></script>
   </head>
@@ -535,6 +611,8 @@
       let currentThinkingClosed = false // true once lastChunk seen for current id
       let pendingThinkingUpdate = null
       let pendingThinkingTimer = null
+      let toolCallsMap = new Map() // tool call id → { el, data }
+      let toolCallsSummaryEl = null // <details> containing tool call items
 
       // Auto-enable streaming when agent card advertises streaming capability
       fetch(AGENT_URL + ".well-known/agent-card.json", { headers: authHeaders() })
@@ -724,6 +802,78 @@
           thinkingTexts.length > 0 &&
           thinkingTexts[thinkingTexts.length - 1].trim() === responseText.trim()
         )
+      }
+
+      function escHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+      }
+
+      const TOOL_STATUS_ICON = { running: "⏳", done: "✓", error: "✗" }
+      const TOOL_RESULT_TRUNCATE = 500
+
+      function getOrCreateToolCallsPanel() {
+        if (!toolCallsSummaryEl) {
+          toolCallsSummaryEl = document.createElement("details")
+          toolCallsSummaryEl.className = "tool-calls-summary"
+          toolCallsSummaryEl.open = true
+          const sum = document.createElement("summary")
+          toolCallsSummaryEl.appendChild(sum)
+          messages.insertBefore(
+            toolCallsSummaryEl,
+            typing.parentElement === messages ? typing : statusText,
+          )
+        }
+        const n = toolCallsMap.size
+        toolCallsSummaryEl.querySelector("summary").textContent =
+          `Tools (${n} call${n === 1 ? "" : "s"})`
+        return toolCallsSummaryEl
+      }
+
+      function updateToolCall(id, data) {
+        let entry = toolCallsMap.get(id)
+        if (!entry) {
+          const el = document.createElement("div")
+          el.className = "tool-call-item"
+          toolCallsMap.set(id, { el, data: {} })
+          entry = toolCallsMap.get(id)
+          getOrCreateToolCallsPanel().appendChild(el)
+        } else {
+          getOrCreateToolCallsPanel()
+        }
+        Object.assign(entry.data, data)
+        const { el } = entry
+        const d = entry.data
+        const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_")
+        const icon = TOOL_STATUS_ICON[d.status] ?? "⏳"
+        const kindClass = d.kind ? `kind-${d.kind}` : ""
+
+        let html = `<span class="tool-call-status">${icon}</span> `
+        html += `<span class="tool-call-label">${escHtml(d.label ?? d.name ?? "")}</span>`
+        if (d.kind) html += ` <span class="tool-call-kind ${kindClass}">${escHtml(d.kind)}</span>`
+
+        if (d.args != null) {
+          const argsStr = typeof d.args === "string" ? d.args : JSON.stringify(d.args, null, 2)
+          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tca-${safeId}');e.hidden=!e.hidden">Args</button>`
+          html += `<pre class="tool-call-detail" id="tca-${safeId}" hidden>${escHtml(argsStr)}</pre>`
+        }
+        if (d.result != null) {
+          const raw = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2)
+          const truncated = raw.length > TOOL_RESULT_TRUNCATE
+            ? raw.slice(0, TOOL_RESULT_TRUNCATE) + `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
+            : raw
+          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tcr-${safeId}');e.hidden=!e.hidden">Result</button>`
+          html += `<pre class="tool-call-detail" id="tcr-${safeId}" hidden>${escHtml(truncated)}</pre>`
+        }
+        el.innerHTML = html
+        messages.scrollTop = messages.scrollHeight
+      }
+
+      function finalizeToolCallsPanel() {
+        if (toolCallsSummaryEl?.open) {
+          setTimeout(() => { if (toolCallsSummaryEl) toolCallsSummaryEl.open = false }, 800)
+        }
       }
 
       function promoteLatestThinkingToResponse(responseText) {
@@ -983,6 +1133,7 @@
         // If streaming already rendered the final text via lastChunk, skip.
         if (useStreaming && streamingText !== "") {
           if (!thinkingFinalized) finalizeThinking(streamingBubble, streamingText)
+          finalizeToolCallsPanel()
           streamingBubble = null
           streamingText = ""
           return
@@ -992,6 +1143,7 @@
         if (streamingBubble) {
           if (streamingText) streamingBubble.innerHTML = md(streamingText)
           finalizeThinking(streamingBubble, streamingText)
+          finalizeToolCallsPanel()
           streamingBubble = null
           streamingText = ""
           return
@@ -1003,6 +1155,7 @@
         const replyEl =
           promoteLatestThinkingToResponse(reply) || addMessage("agent", reply || "(no response)")
         finalizeThinking(replyEl, reply)
+        finalizeToolCallsPanel()
       }
 
       function enqueueMessage() {
@@ -1055,6 +1208,8 @@
         thinkingSummaryEl = null
         currentThinkingArtifactId = null
         currentThinkingClosed = false
+        toolCallsMap = new Map()
+        toolCallsSummaryEl = null
 
         const useStream = useStreaming
         try {
@@ -1176,6 +1331,17 @@
             return null
           }
 
+          if (event.artifact?.artifactId?.startsWith("tool-call-")) {
+            const dataPart = (event.artifact?.parts ?? []).find(
+              (p) => p.kind === "data" && p.data?.type === "tool-call",
+            )
+            if (dataPart) {
+              const id = event.artifact.artifactId.slice("tool-call-".length)
+              updateToolCall(id, dataPart.data)
+            }
+            return null
+          }
+
           if (event.artifact?.artifactId !== "response") return null
 
           // A2A spec: append/lastChunk are event-level fields (siblings of `artifact`).
@@ -1194,6 +1360,7 @@
               }
             }
             finalizeThinking(streamingBubble, text)
+            finalizeToolCallsPanel()
             thinkingFinalized = true
             streamingBubble = null
             streamingText = text // dedupe with handleResult
