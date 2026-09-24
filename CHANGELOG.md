@@ -9,6 +9,7 @@
 ### Fixed
 
 - Correctly handle non `@cap-js/mcp` tools during PII masking
+- Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
 
 ## Version 0.9.7 - 2026-09-23
 
