@@ -63,6 +63,36 @@ class NoopEventBus {
     }
     return { status: "completed", description: "" }
   }
+
+  getSteps() {
+    const steps = []
+    const thoughts = new Map()
+    for (const event of this.events) {
+      if (event.kind === "status-update" && event.status?.state === "working") {
+        const text = event.status.message?.parts
+          ?.filter((part) => part.kind === "text")
+          .map((part) => part.text)
+          .join("")
+          .trim()
+        if (text && steps.at(-1)?.text !== text) steps.push({ text })
+      }
+      if (event.kind === "artifact-update" && event.artifact?.artifactId?.startsWith("thinking-")) {
+        const text = event.artifact.parts
+          ?.filter((part) => part.kind === "text")
+          .map((part) => part.text)
+          .join("")
+        if (!text) continue
+        let step = thoughts.get(event.artifact.artifactId)
+        if (!step) {
+          step = { text: "" }
+          thoughts.set(event.artifact.artifactId, step)
+          steps.push(step)
+        }
+        step.text = event.append ? step.text + text : text
+      }
+    }
+    return steps.map((step) => step.text.trim()).filter(Boolean)
+  }
 }
 
 // Derive toolCalls from graph messages by pairing AIMessage.tool_calls with ToolMessage results.
@@ -224,6 +254,7 @@ export function registerChat(srv) {
       contextId: requestContext.contextId,
       taskId: requestContext.taskId,
       status,
+      steps: eventBus.getSteps(),
     }
 
     if (includeDetails) {
