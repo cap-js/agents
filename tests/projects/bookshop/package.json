@@ -24,6 +24,10 @@
   },
   "cds": {
     "agents": {
+      "status-update": {
+        "args": true,
+        "result": false
+      },
       "fileIO": {
         "enabled": true
       },

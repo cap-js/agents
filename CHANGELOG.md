@@ -6,6 +6,10 @@
 
 ## Version 0.9.8 - tbd
 
+### Added
+
+- Tool and agent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; the chat preview renders them as a collapsible "Tools (N calls)" panel; visibility of args and result is configurable via `cds.env.agents["status-update"]`
+
 ### Fixed
 
 - Correctly handle non `@cap-js/mcp` tools during PII masking
