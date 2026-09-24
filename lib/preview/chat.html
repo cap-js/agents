@@ -465,15 +465,14 @@
         display: block;
         margin-top: 3px;
         font-size: 10px;
-        opacity: 0.45;
         cursor: default;
         position: relative;
         white-space: nowrap;
         text-align: right;
-        color: #537492;
+        color: rgba(83, 116, 146, 0.5);
       }
       .msg-meta:hover {
-        opacity: 0.75;
+        color: rgba(83, 116, 146, 0.85);
       }
       /* Hover tooltip with full token breakdown */
       .msg-meta-tooltip {
@@ -481,15 +480,18 @@
         position: absolute;
         bottom: calc(100% + 6px);
         right: 0;
-        background: #2a3d52;
+        background: rgba(42, 61, 82, 0.72);
         color: #e8f2fa;
-        font-size: 10px;
+        font-size: 11px;
         border-radius: 6px;
-        padding: 6px 10px;
+        padding: 7px 11px;
         white-space: pre;
         z-index: 100;
         pointer-events: none;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         line-height: 1.6;
       }
       .msg-meta:hover .msg-meta-tooltip {
@@ -513,12 +515,16 @@
       }
       @media (prefers-color-scheme: dark) {
         .msg-meta {
-          color: #91adc5;
+          color: rgba(145, 173, 197, 0.55);
+        }
+        .msg-meta:hover {
+          color: rgba(145, 173, 197, 0.9);
         }
         .msg-meta-tooltip {
-          background: #0a1e30;
+          background: rgba(10, 30, 48, 0.72);
           color: #c8dff0;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
         }
         #context-indicator {
           color: #91adc5;
