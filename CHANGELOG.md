@@ -6,6 +6,10 @@
 
 ## Version 0.9.8 - tbd
 
+### Added
+
+- Preview now shows context size and token usage
+
 ### Fixed
 
 - Correctly handle non `@cap-js/mcp` tools during PII masking
