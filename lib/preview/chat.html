@@ -684,7 +684,8 @@
         meta.className = "msg-meta"
 
         const growthLabel = (contextGrowth >= 0 ? "+" : "") + fmt(contextGrowth)
-        const summary = "⛁ " + fmt(contextGrowth) + (durationMs != null ? " · " + fmtDuration(durationMs) : "")
+        const summary =
+          "⛁ " + fmt(contextGrowth) + (durationMs != null ? " · " + fmtDuration(durationMs) : "")
         meta.appendChild(document.createTextNode(summary))
 
         // Hover tooltip: per-turn, billing-relevant token breakdown.
@@ -695,7 +696,11 @@
         if (stepCacheRead > 0) lines.push("Cache read: " + fmt(stepCacheRead))
         if (stepCacheCreate > 0) lines.push("Cache write: " + fmt(stepCacheCreate))
         if (stepOut > 0)
-          lines.push("Output: " + fmt(stepOut) + (stepReasoning > 0 ? " (reasoning " + fmt(stepReasoning) + ")" : ""))
+          lines.push(
+            "Output: " +
+              fmt(stepOut) +
+              (stepReasoning > 0 ? " (reasoning " + fmt(stepReasoning) + ")" : ""),
+          )
         tooltip.textContent = lines.join("\n")
         tooltip.style.whiteSpace = "pre"
         meta.appendChild(tooltip)
@@ -1159,13 +1164,16 @@
         }
 
         // Token usage: non-streaming embeds in status message metadata; streaming passes via _tokenUsage
-        const tokenUsage = result?._tokenUsage ?? result?.status?.message?.metadata?.["sap.cds.agents.token-usage"]
-        const durationMs = responseStartTime != null ? Math.round(performance.now() - responseStartTime) : null
+        const tokenUsage =
+          result?._tokenUsage ?? result?.status?.message?.metadata?.["sap.cds.agents.token-usage"]
+        const durationMs =
+          responseStartTime != null ? Math.round(performance.now() - responseStartTime) : null
 
         // If streaming already rendered the final text via lastChunk, skip.
         if (useStreaming && streamingText !== "") {
           if (!thinkingFinalized) finalizeThinking(lastStreamingBubble, streamingText)
-          if (tokenUsage && lastStreamingBubble) attachMsgMeta(lastStreamingBubble, tokenUsage, durationMs)
+          if (tokenUsage && lastStreamingBubble)
+            attachMsgMeta(lastStreamingBubble, tokenUsage, durationMs)
           lastStreamingBubble = null
           streamingBubble = null
           streamingText = ""

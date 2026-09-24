@@ -911,9 +911,7 @@ class GraphExecutor {
         }
 
         const usageMeta =
-          usageData?.total_tokens > 0
-            ? { "sap.cds.agents.token-usage": usageData }
-            : undefined
+          usageData?.total_tokens > 0 ? { "sap.cds.agents.token-usage": usageData } : undefined
         eventBus.publish({
           kind: "status-update",
           taskId,
