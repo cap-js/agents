@@ -1,13 +1,11 @@
 /* eslint-disable no-await-in-loop */
-import { spawn } from "node:child_process"
-import { readdirSync, unlinkSync, readFileSync } from "node:fs"
-import { createConnection } from "node:net"
+import { readFileSync } from "node:fs"
 import path from "node:path"
 import cds from "@sap/cds"
 import createHelpers from "../utils/helpers.js"
 import { isPortOpen, startServer, stopServer, registerCleanupHandlers } from "../utils/servers.js"
 
-const SAMPLE_DIR = path.resolve(import.meta.dirname, "../samples/travel")
+const SAMPLE_DIR = path.resolve(import.meta.dirname, "../projects/travel")
 const TRAVEL_AGENT_DIR = path.join(SAMPLE_DIR, "travel-agent")
 const XFLIGHTS_DIR = path.join(SAMPLE_DIR, "xflights")
 const LEISURE_DIR = path.join(SAMPLE_DIR, "leisure-services")
@@ -89,7 +87,7 @@ async function collectToolCallsFromCheckpoints(threadId) {
   return tools
 }
 
-describe("@cap-js/agents - Travel Sample E2E", () => {
+describe("Travel Sample E2E", () => {
   let helpers
 
   beforeAll(async () => {
@@ -189,8 +187,7 @@ describe("@cap-js/agents - Travel Sample E2E", () => {
   })
 })
 
-// ─── File I/O E2E (deep-agent path): upload CSV → read_file → write_file → FilePart ───
-describe("@cap-js/agent - File I/O (travel-agent — deep-agent path)", () => {
+describe("File I/O (travel-agent — deep-agent path)", () => {
   let csvBase64
   let savedTaskId
   let savedFileBytesB64

@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 
@@ -48,13 +48,13 @@ describe("@cap-js/agents - Production error sanitization", () => {
     it("should hide error details in production", async () => {
       process.env.NODE_ENV = "production"
 
-      const originalMax = cds.env.agents.pool.maxLLMInvocationsPerTask
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+      const originalMax = cds.env.agents.quotas.maxLLMInvocationsPerTask
+      cds.env.agents.quotas.maxLLMInvocationsPerTask = 1
 
       const res = await sendMessage("looping", "trigger")
       await wait()
 
-      cds.env.agents.pool.maxLLMInvocationsPerTask = originalMax
+      cds.env.agents.quotas.maxLLMInvocationsPerTask = originalMax
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
@@ -66,18 +66,37 @@ describe("@cap-js/agents - Production error sanitization", () => {
     it("should show error details in development", async () => {
       process.env.NODE_ENV = "development"
 
-      const originalMax = cds.env.agents.pool.maxLLMInvocationsPerTask
-      cds.env.agents.pool.maxLLMInvocationsPerTask = 1
+      const originalMax = cds.env.agents.quotas.maxLLMInvocationsPerTask
+      cds.env.agents.quotas.maxLLMInvocationsPerTask = 1
 
       const res = await sendMessage("looping", "trigger")
       await wait()
 
-      cds.env.agents.pool.maxLLMInvocationsPerTask = originalMax
+      cds.env.agents.quotas.maxLLMInvocationsPerTask = originalMax
 
       if (res.data.result?.status?.state === "failed") {
         const msg = res.data.result.status.message.parts[0].text
         expect(msg).toMatch(/^Agent error:/)
       }
     })
+  })
+})
+
+describe("@cap-js/agents - toolWrapMiddleware error handling", () => {
+  it("includes err.details from a CAP multi-error action in the ToolMessage content", async () => {
+    const { ToolMessage } = await import("@langchain/core/messages")
+    const { toolWrapMiddleware } = await import("../../lib/agents/middleware/tool-wrap.js")
+
+    const srv = await cds.connect.to("CatalogService")
+    const mw = toolWrapMiddleware(srv)
+    const result = await mw.wrapToolCall(
+      { toolCall: { name: "validateOrder", id: "test-call-1" } },
+      async () => srv.send("validateOrder", { book: 1, quantity: 1 }),
+    )
+
+    expect(ToolMessage.isInstance(result)).toBe(true)
+    expect(result.status).toBe("error")
+    expect(result.content).toContain("book is required")
+    expect(result.content).toContain("quantity must be positive")
   })
 })

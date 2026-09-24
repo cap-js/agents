@@ -3,8 +3,10 @@ import { generateTools, createReadFileTool } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
+import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
+import { registerChat } from "./chat.js"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Register default event handlers for agent graph building on an @agent service.
@@ -65,7 +67,7 @@ export default function registerDefaultAgentHandlers(srv) {
     }
 
     const { buildMcpTools } = await import("./mcp-tools.js")
-    const { buildSubAgentTool } = await import("./sub-agent-tools.js")
+    const { buildSubAgentTool } = await import("./subagent-tools.js")
 
     const results = await Promise.allSettled([
       ...mcpEntries.map((e) => buildMcpTools(e.service ?? e)),
@@ -74,7 +76,7 @@ export default function registerDefaultAgentHandlers(srv) {
 
     const extraTools = []
     for (const r of results) {
-      // MCP connections yield an array of tools; sub-agent connections yield a
+      // MCP connections yield an array of tools; subagent connections yield a
       // single tool. Normalize both so instrumentTools sees a flat tool list.
       if (r.status === "fulfilled") {
         if (Array.isArray(r.value)) extraTools.push(...r.value.filter(Boolean))
@@ -90,7 +92,8 @@ export default function registerDefaultAgentHandlers(srv) {
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
     const name = srv?.options?.agent?.llm || srv?.definition?.["@agent.llm"] || "llm"
-    let { kind, impl, ...options } = cds.requires[name] ?? {}
+    const options = cds.requires[name] ?? {}
+    let { kind, impl } = options
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)
@@ -170,4 +173,10 @@ export default function registerDefaultAgentHandlers(srv) {
       },
     })
   })
+
+  srv.on("cleanupTasks", async () => {
+    await cleanupExpiredTasks(srv.name)
+  })
+
+  registerChat(srv)
 }

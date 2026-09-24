@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import crypto from "crypto"
 
-const LOG = cds.log("agent")
+const LOG = cds.log("agents")
 
 /**
  * Compute a stable hash key from cds.context.features.

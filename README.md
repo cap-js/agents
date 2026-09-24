@@ -1,24 +1,14 @@
+[![REUSE status](https://api.reuse.software/badge/github.com/cap-js/agents)](https://api.reuse.software/info/github.com/cap-js/agents)
+
 # SAP Cloud Application Programming Model, agent development plugin for Node.js
 
 ## About this project
 
-This is a CDS plugin for building agents in CAP.
+CDS plugin for building agents based on the [A2A](https://a2a-protocol.org) protocol.
 
-## Requirements and Setup
+## Usage
 
-We use the @capire/bookshop as a running sample hereinafter. Clone it and open it in VSCode as follows:
-
-```bash
-git clone https://github.com/capire/bookshop
-code bookshop
-```
-
-Annotate the CatalogService with `@agent`:
-
-```cds
-@agent @odata
-service CatalogService { ... }
-```
+For detailed instructions about setup and usage, refer to the [official documentation](https://cap.cloud.sap/docs/guides/ai/cap-agents).
 
 ## Support, Feedback, Contributing
 

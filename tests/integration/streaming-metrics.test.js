@@ -20,7 +20,7 @@ process.env.CDS_TEST_SILENT = "false"
 
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const { sendMessage } = createHelpers({ POST, axios })
 
 const isHybrid = cds.env.profiles?.includes("hybrid")
@@ -36,8 +36,8 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
   let originalQuota
 
   before(async () => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
+    originalQuota = cds.env.agents.quotas.maxTasksPerHourPerUser
+    cds.env.agents.quotas.maxTasksPerHourPerUser = 200
 
     // Wire audit capture
     if (!cds.env.requires?.["audit-log"]?.kind)
@@ -50,7 +50,7 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
   })
 
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
+    cds.env.agents.quotas.maxTasksPerHourPerUser = originalQuota
     teardown()
     mock.stop()
   })
@@ -94,6 +94,9 @@ describe.skipIf(isHybrid)("@cap-js/agents - Streaming path metrics + audit", () 
     const data = decisions[0].data.data
     expect(data.event).toBe("AgentDecision")
     expect(data.model).toBe("mock-streaming-model")
+    expect(data.provider).toBe(cds.env.requires.llm.kind)
+    expect(data.modelParams).toEqual({ temperature: 0, max_tokens: 100 })
+    expect(data.finishReason).toBe("stop")
     expect(typeof data.taskId).toBe("string")
     expect(typeof data.duration).toBe("number")
     expect(data.tokenUsage.input_tokens).toBe(10) // from mock AI Core

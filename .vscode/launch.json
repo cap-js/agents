@@ -67,7 +67,7 @@
       "name": "watch:travel-sample",
       "cwd": "${workspaceFolder}",
       "runtimeExecutable": "cds",
-      "runtimeArgs": ["w", "tests/samples/travel/travel-agent", "--profile", "hybrid"],
+      "runtimeArgs": ["w", "tests/projects/travel/travel-agent", "--profile", "hybrid"],
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
     }

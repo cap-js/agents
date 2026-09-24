@@ -1,6 +1,6 @@
 import path from "node:path"
 import cds from "@sap/cds"
-const { GET } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { GET } = cds.test(import.meta.dirname + "/../projects/bookshop")
 
 describe("@cap-js/agents - Agent Card Generation", () => {
   // ── Agentify mode (CDS model) ────────────────────────────────────────
@@ -80,6 +80,27 @@ describe("@cap-js/agents - Agent Card Generation", () => {
     })
   })
 
+  // ── X-Forwarded-Proto (cloud proxy protocol) ────────────────────────────
+
+  describe("X-Forwarded-Proto header", () => {
+    it("agent card URL uses https when X-Forwarded-Proto: https is set", async () => {
+      const res = await GET("/a2a/catalog/.well-known/agent-card.json", {
+        headers: { "x-forwarded-proto": "https" },
+      })
+      const card = res.data
+      expect(card.url.startsWith("https://")).toBeTruthy()
+      expect(card.supportedInterfaces[0].url.startsWith("https://")).toBeTruthy()
+    })
+
+    it("agent card URL handles multi-value X-Forwarded-Proto", async () => {
+      const res = await GET("/a2a/catalog/.well-known/agent-card.json", {
+        headers: { "x-forwarded-proto": "https, http" },
+      })
+      const card = res.data
+      expect(card.url.startsWith("https://")).toBeTruthy()
+    })
+  })
+
   // ── Proxy URL from @Core.Links rel=via ──────────────────────────────────
 
   describe("Proxy URL from @Core.Links rel=via", () => {
@@ -102,7 +123,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
     it("compile to agent uses @Core.Links via href as URL", () => {
       const card = cds.compile.to.a2a(cds.model, {
         service: "CircuitBreakerService",
-        as: "object",
+        as: "json",
       })
 
       expect(card.url).toBe("https://example.com/agent/circuit-breaker")
@@ -112,7 +133,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
     it("compile to agent without @Core.Links via uses default HOST URL", () => {
       const card = cds.compile.to.a2a(cds.model, {
         service: "CatalogService",
-        as: "object",
+        as: "json",
       })
 
       expect(card.url.includes("HOST"), "URL should contain HOST placeholder").toBeTruthy()

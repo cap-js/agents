@@ -26,11 +26,8 @@
     {
       "description": "Query data from the service. Available entities: 
  Books: Book details with author information 
- Currencies: Code list for currencies
-
-See https://cap.cloud.sap/docs/cds/common#entity-currencies 
- Genres: Hierarchically organized Code List for Genres 
- ListOfBooks: Browse available books",
+ ListOfBooks: Browse available books 
+ Authors: Pseudonymized authors of the books on offer",
       "examples": [
         "Show me all Books",
       ],
@@ -41,8 +38,8 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
         "data",
         "read",
         "books",
-        "currencies",
-        "genres",
+        "listofbooks",
+        "authors",
       ],
     },
     {
@@ -68,6 +65,139 @@ See https://cap.cloud.sap/docs/cds/common#entity-currencies
       "tags": [
         "getstock",
         "function",
+      ],
+    },
+    {
+      "description": "Look up author contact details",
+      "examples": [
+        "Look up author contact details",
+      ],
+      "id": "findAuthor",
+      "name": "findAuthor",
+      "tags": [
+        "findauthor",
+        "function",
+      ],
+    },
+    {
+      "description": "Get an author name as a scalar",
+      "examples": [
+        "Get an author name as a scalar",
+      ],
+      "id": "authorName",
+      "name": "authorName",
+      "tags": [
+        "authorname",
+        "function",
+      ],
+    },
+    {
+      "description": "Get a masked author secret as a scalar",
+      "examples": [
+        "Get a masked author secret as a scalar",
+      ],
+      "id": "authorSecret",
+      "name": "authorSecret",
+      "tags": [
+        "authorsecret",
+        "function",
+      ],
+    },
+    {
+      "description": "Get all names of an author as a scalar array",
+      "examples": [
+        "Get all names of an author as a scalar array",
+      ],
+      "id": "authorAllNames",
+      "name": "authorAllNames",
+      "tags": [
+        "authorallnames",
+        "function",
+      ],
+    },
+    {
+      "description": "Get author with a list of nicknames",
+      "examples": [
+        "Get author with a list of nicknames",
+      ],
+      "id": "authorWithNicknames",
+      "name": "authorWithNicknames",
+      "tags": [
+        "authorwithnicknames",
+        "function",
+      ],
+    },
+    {
+      "description": "List author names",
+      "examples": [
+        "List author names",
+      ],
+      "id": "listAuthorNames",
+      "name": "listAuthorNames",
+      "tags": [
+        "listauthornames",
+        "function",
+      ],
+    },
+    {
+      "description": "List author contacts",
+      "examples": [
+        "List author contacts",
+      ],
+      "id": "listAuthorContacts",
+      "name": "listAuthorContacts",
+      "tags": [
+        "listauthorcontacts",
+        "function",
+      ],
+    },
+    {
+      "description": "Author profile with nested address",
+      "examples": [
+        "Author profile with nested address",
+      ],
+      "id": "authorProfile",
+      "name": "authorProfile",
+      "tags": [
+        "authorprofile",
+        "function",
+      ],
+    },
+    {
+      "description": "Author dossier using a named type",
+      "examples": [
+        "Author dossier using a named type",
+      ],
+      "id": "authorDossier",
+      "name": "authorDossier",
+      "tags": [
+        "authordossier",
+        "function",
+      ],
+    },
+    {
+      "description": "Author with many past addresses",
+      "examples": [
+        "Author with many past addresses",
+      ],
+      "id": "authorWithHistory",
+      "name": "authorWithHistory",
+      "tags": [
+        "authorwithhistory",
+        "function",
+      ],
+    },
+    {
+      "description": "Validate an order (always fails with two errors for testing)",
+      "examples": [
+        "Validate an order (always fails with two errors for testing)",
+      ],
+      "id": "validateOrder",
+      "name": "validateOrder",
+      "tags": [
+        "validateorder",
+        "action",
+        "hitl",
       ],
     },
   ],

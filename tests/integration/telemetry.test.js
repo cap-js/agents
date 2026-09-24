@@ -28,7 +28,7 @@ process.env.CDS_TEST_SILENT = "false"
 // Must be called BEFORE cds.test()
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const sendMessage = createSendMessage(POST)
 const { sendMessage: sendMsgHelper } = createHelpers({ POST, axios })
 
@@ -190,6 +190,12 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(RunnableLambda.prototype[PATCHED]).toBe(true)
   })
 
+  it("should patch RunnableSequence.invoke", async () => {
+    const { RunnableSequence } = await import("@langchain/core/runnables")
+    const PATCHED = Symbol.for("@cap-js/agents:patched")
+    expect(RunnableSequence.prototype[PATCHED]).toBe(true)
+  })
+
   // ─── Metrics ────────────────────────────────────────────────────────
 
   it("should record golden signal metrics", async () => {
@@ -210,6 +216,24 @@ describe.skipIf(isHybrid)("@cap-js/agents - OpenTelemetry integration", () => {
     expect(output).toMatch(/agent\.llm\.output_tokens/)
     expect(output).toMatch(/agent\.llm\.invocations/)
     expect(output).toMatch(/mock-model-for-testing/)
+  })
+
+  it("should record HITL gates and decisions by action", async () => {
+    const contextId = cds.utils.uuid()
+    const initial = await sendMsgHelper("deterministic-hitl", "start", { contextId })
+    const taskId = initial.data.result.id
+    expect(initial.data.result.status.state).toBe("input-required")
+
+    await sendMsgHelper("deterministic-hitl", "approve", { contextId, taskId })
+    await sendMsgHelper("deterministic-hitl", "reject", { contextId, taskId })
+
+    const output = await flushMetrics()
+    expect(output).toMatch(/agent.hitl.gates/)
+    expect(output).toMatch(/agent.hitl.decisions/)
+    expect(output).toMatch(/firstAction/)
+    expect(output).toMatch(/secondAction/)
+    expect(output).toMatch(/approve/)
+    expect(output).toMatch(/reject/)
   })
 
   // ─── Correlation ────────────────────────────────────────────────────
@@ -239,10 +263,10 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
 
   let originalQuota
   before(() => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
-    // Intercept cds.log("agent").warn after cds is fully bootstrapped
-    const LOG = cds.log("agent")
+    originalQuota = cds.env.agents.quotas.maxTasksPerHourPerUser
+    cds.env.agents.quotas.maxTasksPerHourPerUser = 200
+    // Intercept cds.log("agents").warn after cds is fully bootstrapped
+    const LOG = cds.log("agents")
     _originalLogWarn = LOG.warn.bind(LOG)
     LOG.warn = function (...args) {
       const msg = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")
@@ -251,9 +275,9 @@ describe.skipIf(isHybrid)("@cap-js/agents - GenAI Semantic Conventions", () => {
     }
   })
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
+    cds.env.agents.quotas.maxTasksPerHourPerUser = originalQuota
     mock.stop()
-    const LOG = cds.log("agent")
+    const LOG = cds.log("agents")
     if (_originalLogWarn) LOG.warn = _originalLogWarn
   })
   beforeEach(() => {

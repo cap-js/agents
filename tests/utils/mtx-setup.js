@@ -5,7 +5,7 @@ import { fileURLToPath } from "url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const APP_DIR = path.join(__dirname, "..", "samples", "mtx")
+const APP_DIR = path.join(__dirname, "..", "projects", "mtx")
 const SIDECAR_DIR = path.join(APP_DIR, "mtx", "sidecar")
 
 function cleanDbFiles() {

@@ -11,73 +11,193 @@ import {
   executeCallActionTool,
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
-import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
-import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
-import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 
-const LOG = cds.log("agent")
+import { getFilteredEntities, getFilteredActions } from "@cap-js/mcp/lib/utils/tools-shared.js"
+import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
+import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
+
+const LOG = cds.log("agents")
 
 const unwrap = (result) => {
   const text = result.content?.[0]?.text ?? ""
-  if (result.isError) throw new Error(text)
-  return text
+  return [text, { isError: result.isError === true }]
+}
+
+// we need the checkAuthorization result many times in the same cds context
+function cachedAuth(srv) {
+  if (!cds.context) return checkAuthorization(srv)
+  const cache = (cds.context.__agentAuth ??= {})
+  return (cache[srv.name] ??= checkAuthorization(srv))
+}
+
+class GenericReadTool extends DynamicStructuredTool {
+  constructor(srv, entities) {
+    const def = createGenericReadToolDefinition(Object.keys(entities), srv.name, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
+      func: async (args) => {
+        return unwrap(await executeGenericReadTool(srv, entities, args))
+      },
+    })
+    this.srv = srv
+    this._allEntities = entities
+    delete this.description
+    delete this.schema
+  }
+
+  get description() {
+    const { entities, error } = cachedAuth(this.srv)
+    if (error) return "Not available due to " + error?.reason
+    return createGenericReadToolDefinition(Object.keys(entities), this.srv.name, "").description
+  }
+
+  get schema() {
+    const { entities, error } = cachedAuth(this.srv)
+    if (error) return z.undefined
+    return createGenericReadToolDefinition(Object.keys(entities), this.srv.name, "").inputSchema
+  }
+
+  isAllowed() {
+    const { entities, error } = cachedAuth(this.srv)
+    return !error && Object.keys(entities).length > 0
+  }
+}
+
+class DescribeTool extends DynamicStructuredTool {
+  constructor(srv, entities, actions) {
+    const def = createDescribeToolDefinition(
+      Object.keys(entities),
+      Object.keys(actions),
+      srv.name,
+      "",
+    )
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
+      func: (args) => {
+        return unwrap(executeDescribe(srv, entities, actions, args))
+      },
+    })
+    this.srv = srv
+    this._allEntities = entities
+    this._allActions = actions
+    delete this.description
+    delete this.schema
+  }
+
+  get description() {
+    const { entities, actions, error } = cachedAuth(this.srv)
+    if (error) return "Not available due to " + error?.reason
+    return createDescribeToolDefinition(
+      Object.keys(entities),
+      Object.keys(actions),
+      this.srv.name,
+      "",
+    ).description
+  }
+
+  get schema() {
+    const { entities, actions, error } = cachedAuth(this.srv)
+    if (error) return z.undefined
+    return createDescribeToolDefinition(
+      Object.keys(entities),
+      Object.keys(actions),
+      this.srv.name,
+      "",
+    ).inputSchema
+  }
+
+  isAllowed() {
+    const { entities, actions, error } = cachedAuth(this.srv)
+    return !error && (Object.keys(entities).length > 0 || Object.keys(actions).length > 0)
+  }
+}
+
+class PerActionTool extends DynamicStructuredTool {
+  constructor(srv, actionName, action) {
+    const def = createPerActionToolDefinition(actionName, action, srv.name, srv.model, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
+      func: async (args) => {
+        return unwrap(await executePerActionTool(srv, actionName, action, args))
+      },
+    })
+    this.srv = srv
+    this.actionName = actionName
+    this.action = action
+  }
+
+  isAllowed() {
+    const { actions, error } = cachedAuth(this.srv)
+    return !error && Object.prototype.hasOwnProperty.call(actions, this.actionName)
+  }
+}
+
+class CallActionTool extends DynamicStructuredTool {
+  constructor(srv, actions) {
+    const def = createCallActionToolDefinition(Object.keys(actions), srv.name, "")
+    super({
+      name: def.name,
+      description: def.description,
+      schema: def.inputSchema,
+      responseFormat: "content_and_artifact",
+      func: async (args) => {
+        return unwrap(await executeCallActionTool(srv, actions, args))
+      },
+    })
+    this.srv = srv
+    this._allActions = actions
+    delete this.description
+    delete this.schema
+  }
+
+  get description() {
+    const { actions, error } = cachedAuth(this.srv)
+    if (error) return "Not available due to " + error?.reason
+    return createCallActionToolDefinition(Object.keys(actions), this.srv.name, "").description
+  }
+
+  get schema() {
+    const { actions, error } = cachedAuth(this.srv)
+    if (error) return z.undefined
+    return createCallActionToolDefinition(Object.keys(actions), this.srv.name, "").inputSchema
+  }
+
+  isAllowed() {
+    const { actions, error } = cachedAuth(this.srv)
+    return !error && Object.keys(actions).length > 0
+  }
 }
 
 /**
- * Reuses tool definitions and execution logic from @cap-js/mcp
+ * Reuses tool definitions and execution logic from @cap-js/mcp.
  *
  * @param {object} srv - CDS ApplicationService
- * @param {object} [options] - Options
- * @param {boolean} [options.skipAuth] - Skip authorization check (e.g. when generating tools at startup for custom graphs)
  */
-export function generateTools(srv, options = {}) {
-  let entities, actions
-
-  // TODO: needs to be done differently
-  if (options.skipAuth) {
-    entities = getFilteredEntities(srv)
-    actions = getFilteredActions(srv)
-  } else {
-    const authResult = checkAuthorization(srv)
-    if (authResult.error) return []
-    entities = authResult.entities
-    actions = authResult.actions
-  }
+export function generateTools(srv) {
+  const entities = getFilteredEntities(srv)
+  const actions = getFilteredActions(srv)
 
   const tools = []
-
-  const TOOL_PREFIX = ""
 
   // Query tool — one tool for reading all entities
   const entityNames = Object.keys(entities)
   if (entityNames.length > 0) {
-    const def = createGenericReadToolDefinition(entityNames, srv.name, TOOL_PREFIX)
-    tools.push(
-      new DynamicStructuredTool({
-        name: def.name,
-        description: def.description,
-        schema: def.inputSchema,
-        func: async (args) => {
-          return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
-        },
-      }),
-    )
+    tools.push(new GenericReadTool(srv, entities))
   }
 
   // Describe tool — introspect service model
   const actionNames = Object.keys(actions)
   if (entityNames.length > 0 || actionNames.length > 0) {
-    const def = createDescribeToolDefinition(entityNames, actionNames, srv.name, TOOL_PREFIX)
-    tools.push(
-      new DynamicStructuredTool({
-        name: def.name,
-        description: def.description,
-        schema: def.inputSchema,
-        func: async (args) => {
-          return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
-        },
-      }),
-    )
+    tools.push(new DescribeTool(srv, entities, actions))
   }
 
   // Action/function tools — per-action (default) or combined call action
@@ -85,30 +205,10 @@ export function generateTools(srv, options = {}) {
   if (actionNames.length > 0) {
     if (usePerActionTools) {
       for (const [name, action] of Object.entries(actions)) {
-        const def = createPerActionToolDefinition(name, action, srv.name, srv.model, TOOL_PREFIX)
-        tools.push(
-          new DynamicStructuredTool({
-            name: def.name,
-            description: def.description,
-            schema: def.inputSchema,
-            func: async (args) => {
-              return unwrap(await executePerActionTool(srv, name, action, args, { log: LOG }))
-            },
-          }),
-        )
+        tools.push(new PerActionTool(srv, name, action))
       }
     } else {
-      const def = createCallActionToolDefinition(actionNames, srv.name, TOOL_PREFIX)
-      tools.push(
-        new DynamicStructuredTool({
-          name: def.name,
-          description: def.description,
-          schema: def.inputSchema,
-          func: async (args) => {
-            return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
-          },
-        }),
-      )
+      tools.push(new CallActionTool(srv, actions))
     }
   }
 
@@ -117,6 +217,10 @@ export function generateTools(srv, options = {}) {
   // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
   if (cds.env.agents?.fileIO?.enabled) {
     tools.push(createEmitFilePartTool())
+  }
+
+  if (cds.env.agents?.emitDataParts) {
+    tools.push(createEmitDataPartTool())
   }
 
   return tools
@@ -261,6 +365,32 @@ export function createReadFileTool(fileStore, contextId, userId) {
         "Read the contents of an uploaded file. Use the /uploads/<filename> path from the file manifest. Returns file content for text-based formats.",
       schema: z.object({
         path: z.string().describe("File path, e.g. /uploads/report.csv"),
+      }),
+    },
+  )
+}
+
+/**
+ * Create a tool that emits a DataPart in the A2A response.
+ * The executor's toolResults collection detects `kind: "data"`
+ * and emits the tool result as a data part.
+ */
+export function createEmitDataPartTool() {
+  return tool(
+    async ({ data, mediaType }) => {
+      return {
+        kind: "data",
+        data,
+        mediaType: mediaType ?? "application/json",
+      }
+    },
+    {
+      name: "emit_data_part",
+      description: "Emit a structured A2A DataPart. Only use when instructed.",
+      schema: z.object({
+        // A2A DataPart is specified to be an object in A2A 0.3
+        // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object
+        data: z.looseObject().describe("Structured object"),
       }),
     },
   )

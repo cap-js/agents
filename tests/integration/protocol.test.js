@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { jsonrpc, sendMessage, streamMessage, parseSSEFrames, setupErrorDetection } = createHelpers({
   POST,
@@ -158,5 +158,75 @@ describeMock("@cap-js/agents - SSE Streaming (message/stream)", () => {
     expect(getRes.data.result).not.toBe(undefined)
     expect(getRes.data.result.id).toBe(taskId)
     expect(getRes.data.result.status.state).toBe("completed")
+  })
+})
+
+describe("@cap-js/agents - @protocol enabled agent", () => {
+  it("serves an agent endpoint for a service enabled via @protocol (no @agent)", () => {
+    const srv = cds.services.ProtocolAgentService
+    expect(srv, "ProtocolAgentService must be running").toBeTruthy()
+    const endpoints = cds.service.endpoints4({ name: srv.name, definition: srv.definition })
+    const agentEndpoint = endpoints.find((ep) => ep.kind === "agent")
+    expect(agentEndpoint, "expected an agent endpoint").not.toBe(undefined)
+  })
+
+  it("registers the default buildGraph handler so A2A execution resolves", async () => {
+    const srv = cds.services.ProtocolAgentService
+    const graph = await srv.send("buildGraph", {})
+    expect(graph).toBeTruthy()
+    expect(
+      typeof graph.invoke === "function" || typeof graph.execute === "function",
+      "buildGraph must return a compiled LangGraph (invoke) or GraphExecutor (execute)",
+    ).toBe(true)
+  })
+})
+
+// ─── Multi-action HITL (deterministic graph) ─────────────────────────────
+
+describe("deterministic multi-action HITL", () => {
+  function send(parts, { contextId, taskId } = {}) {
+    return POST("/a2a/deterministic-hitl/", {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "message/send",
+      params: {
+        message: {
+          kind: "message",
+          messageId: cds.utils.uuid(),
+          role: "user",
+          ...(contextId && { contextId }),
+          ...(taskId && { taskId }),
+          parts,
+        },
+      },
+    })
+  }
+
+  it("queues decisions until every action has one, then resumes GraphExecutor", async () => {
+    const contextId = cds.utils.uuid()
+    const initial = await send([{ kind: "text", text: "start" }], { contextId })
+    const task = initial.data.result
+    expect(task.status.state).toBe("input-required")
+    expect(task.status.message.metadata["sap.cds.agents.hitl"]).toMatchObject({
+      actionCount: 2,
+      decisions: [],
+    })
+
+    const first = await send([{ kind: "text", text: "approve" }], {
+      contextId,
+      taskId: task.id,
+    })
+    const waiting = first.data.result
+    expect(waiting.status.state).toBe("input-required")
+    expect(waiting.status.message.parts[0].text).toBe("Approve second action?")
+    expect(waiting.status.message.metadata["sap.cds.agents.hitl"].decisions).toEqual([
+      { type: "approve" },
+    ])
+
+    const complete = await send([{ kind: "text", text: "reject" }], {
+      contextId,
+      taskId: task.id,
+    })
+    expect(complete.data.result.status.state).toBe("completed")
   })
 })

@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 
-const test = cds.test(import.meta.dirname + "/../samples/bookshop")
+const test = cds.test(import.meta.dirname + "/../projects/bookshop")
 const { POST, GET, axios } = test
 import createHelpers from "../utils/helpers.js"
 const { sendMessage, jsonrpc } = createHelpers({ POST, axios })
@@ -91,30 +91,28 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(typeof data.contextId).toBe("string")
       expect(data.service).toBe("GraphBookService")
       expect(typeof data.duration).toBe("string")
-      expect(data.output).not.toBe(undefined)
     })
 
-    it("should include duration and output", async () => {
+    it("should include duration and taskId", async () => {
       await sendMessage("graph-book", "Show me books")
       await wait()
 
       const event = _auditLogs.find(byEvent("AgentTaskCompleted"))
       expect(event).not.toBe(undefined)
       expect(event.data.data.duration).not.toBe(undefined)
-      expect(event.data.data.output).not.toBe(undefined)
       expect(event.data.data.taskId).not.toBe(undefined)
     })
   })
 
   describe("SecurityEvent (quota breach)", () => {
     it("should emit on quota breach (maxTasksPerHourPerUser)", async () => {
-      const originalMax = cds.env.agents.pool.maxTasksPerHourPerUser
-      cds.env.agents.pool.maxTasksPerHourPerUser = 0
+      const originalMax = cds.env.agents.quotas.maxTasksPerHourPerUser
+      cds.env.agents.quotas.maxTasksPerHourPerUser = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.agents.pool.maxTasksPerHourPerUser = originalMax
+      cds.env.agents.quotas.maxTasksPerHourPerUser = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       expect(events.length).toBe(1)
@@ -127,13 +125,13 @@ describe("@cap-js/agents - Audit Logging", () => {
     })
 
     it("should emit on quota breach (maxConcurrentTasks)", async () => {
-      const originalMax = cds.env.agents.pool.maxConcurrentTasks
-      cds.env.agents.pool.maxConcurrentTasks = 0
+      const originalMax = cds.env.agents.quotas.maxConcurrentTasks
+      cds.env.agents.quotas.maxConcurrentTasks = 0
 
       await sendMessage("graph-book", "Should be blocked")
       await wait()
 
-      cds.env.agents.pool.maxConcurrentTasks = originalMax
+      cds.env.agents.quotas.maxConcurrentTasks = originalMax
 
       const events = _auditLogs.filter(byEvent("QuotaExceeded"))
       expect(events.length).toBe(1)
@@ -157,7 +155,6 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(data.outcome).toBe("success")
       expect(typeof data.duration).toBe("number")
       expect(data.args).not.toBe(undefined)
-      expect(data.result).not.toBe(undefined)
     })
 
     it("should emit for custom (non-CDS) tools in the same graph", async () => {
@@ -172,7 +169,6 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(data.tool).toBe("getBookCount")
       expect(data.outcome).toBe("success")
       expect(typeof data.duration).toBe("number")
-      expect(data.result).not.toBe(undefined)
       expect(data.taskId).not.toBe(undefined)
     })
 

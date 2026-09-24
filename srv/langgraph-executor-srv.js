@@ -25,6 +25,10 @@ export class LangGraphExecutor {
         const executor = await this._ensureExecutor(srv)
         return executor.cancelTask(taskId, eventBus)
       },
+      abort: async (taskId) => {
+        const executor = await this._ensureExecutor(srv)
+        return executor.abort(taskId)
+      },
     }
   }
 

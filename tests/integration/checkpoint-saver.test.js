@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-cds.test(import.meta.dirname + "/../samples/bookshop")
+cds.test(import.meta.dirname + "/../projects/bookshop")
 import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
 
 const CHECKPOINTS = "cap.agent.Checkpoints"

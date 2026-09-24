@@ -14,7 +14,7 @@ import {
 
 setup()
 
-const { POST, axios } = cds.test(import.meta.dirname + "/../samples/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const sendMessage = createSendMessage(POST)
 const sendMessageWithParts = createSendMessageWithParts(POST)
 
@@ -34,7 +34,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
 
   describe("mlflowAttrs()", () => {
     it("should return empty object when mlflow disabled", async () => {
-      const { mlflowAttrs, mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const { mlflowAttrs, mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       const saved = cds.env.agents.mlflow
       cds.env.agents.mlflow = false
       expect(mlflowAttrs("LLM")).toEqual({})
@@ -43,7 +43,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     })
 
     it("should return mlflow attributes when enabled", async () => {
-      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       // Set agent.service context so resolveExperimentId finds @Core.SchemaVersion
       const origCtx = cds.context
       cds.context = { ...cds.context, "agent.service": "CatalogService" }
@@ -58,7 +58,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     })
 
     it("should include token usage when provided", async () => {
-      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       const attrs = mlflowAttrs("LLM", {
         tokenUsage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
       })
@@ -68,7 +68,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     })
 
     it("should not include inputs/outputs/tokenUsage keys when not provided", async () => {
-      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       const attrs = mlflowAttrs("AGENT")
       expect(attrs["mlflow.spanInputs"]).toBe(undefined)
       expect(attrs["mlflow.spanOutputs"]).toBe(undefined)
@@ -76,7 +76,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     })
 
     it("should throw when @Core.SchemaVersion is not numeric", async () => {
-      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       // Mock a service with non-numeric SchemaVersion
       const origServices = cds.services
       const mockSrv = { definition: { "@Core.SchemaVersion": "not-a-number" } }
@@ -94,15 +94,24 @@ describe("@cap-js/agents - MLflow span attributes", () => {
 
   describe("mlflowTraceAttrs()", () => {
     it("should return trace tag attributes when enabled", async () => {
-      const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow.js")
+      const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       const attrs = mlflowTraceAttrs()
       expect(Object.keys(attrs).includes("mlflow.traceTag.tenant")).toBeTruthy()
       expect(Object.keys(attrs).includes("session.id")).toBeTruthy()
-      expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
       // All values must be strings
       for (const v of Object.values(attrs)) {
         expect(typeof v).toBe("string")
       }
+    })
+
+    it("masking.resolveInTraces true leads to user.id being included", async () => {
+      cds.env.agents.masking = {
+        resolveInTraces: true,
+      }
+      const { mlflowTraceAttrs } = await import("../../lib/telemetry/mlflow/index.js")
+      const attrs = mlflowTraceAttrs()
+      expect(Object.keys(attrs).includes("user.id")).toBeTruthy()
+      cds.env.agents.masking = false
     })
   })
 
@@ -324,7 +333,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
   // ─── Unity Catalog header ───────────────────────────────────────────
 
   it("UC table name header composed from UC_CATALOG + UC_SCHEMA + UC_TABLE_PREFIX", async () => {
-    const { RoutingSpanProcessor } = await import("../../lib/telemetry/mlflow.js")
+    const { RoutingSpanProcessor } = await import("../../lib/telemetry/mlflow/index.js")
 
     const exporterHeaders = []
     class CapturingExporter {
@@ -354,7 +363,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
   })
 
   it("UC table name omitted from header when ucTableName not set", async () => {
-    const { RoutingSpanProcessor } = await import("../../lib/telemetry/mlflow.js")
+    const { RoutingSpanProcessor } = await import("../../lib/telemetry/mlflow/index.js")
 
     const exporterHeaders = []
     class CapturingExporter {
@@ -392,7 +401,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       UC_TABLE_PREFIX: "myapp",
     }
 
-    const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow.js")
+    const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow/index.js")
     await setupMlflowExporter()
 
     cds.env.requires.mlflow.credentials = savedCreds
@@ -420,7 +429,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       cds.env.requires.mlflow.credentials = undefined
     }
 
-    const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow.js")
+    const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow/index.js")
     await setupMlflowExporter()
 
     // Restore credentials
