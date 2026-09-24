@@ -54,7 +54,7 @@ jobs:
   test-hybrid:
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    name: Hybrid Tests with Node.js ${{ matrix.node-version }}
+    name: Hybrid Tests with Node.js 24
     strategy:
       fail-fast: false
       matrix:
