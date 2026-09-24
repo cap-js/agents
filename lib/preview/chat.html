@@ -522,6 +522,20 @@
         opacity: 0.45;
         white-space: nowrap;
         color: #537492;
+        position: relative;
+        cursor: default;
+        transition: opacity 0.15s;
+      }
+      #context-indicator:hover {
+        opacity: 0.85;
+      }
+      /* Hover tooltip mirroring per-message breakdown, anchored to the indicator */
+      #context-indicator .msg-meta-tooltip {
+        bottom: calc(100% + 6px);
+        right: 0;
+      }
+      #context-indicator:hover .msg-meta-tooltip {
+        display: block;
       }
       @media (prefers-color-scheme: dark) {
         .msg-meta {
@@ -556,7 +570,7 @@
     </div>
 
     <div id="context-indicator-row">
-      <span id="context-indicator"></span>
+      <span id="context-indicator"><span class="msg-meta-tooltip" id="context-indicator-tooltip"></span></span>
     </div>
 
     <div id="input-row">
@@ -633,6 +647,7 @@
       let prev = { input: 0, output: 0, cacheRead: 0, cacheCreate: 0, reasoning: 0 }
       let responseStartTime = null
       const contextIndicator = document.getElementById("context-indicator")
+      const contextIndicatorTooltip = document.getElementById("context-indicator-tooltip")
 
       function fmt(n) {
         if (n >= 1000000) return (n / 1000000).toFixed(1) + "M"
@@ -647,7 +662,32 @@
 
       function updateContextIndicator() {
         if (contextTokens === 0) return
-        contextIndicator.textContent = "⛁ " + fmt(contextTokens)
+        // Set the label text without clobbering the nested tooltip span.
+        contextIndicator.childNodes[0].nodeType === Node.TEXT_NODE
+          ? (contextIndicator.childNodes[0].textContent = "⛁ " + fmt(contextTokens))
+          : contextIndicator.insertBefore(
+              document.createTextNode("⛁ " + fmt(contextTokens)),
+              contextIndicatorTooltip,
+            )
+
+        // Conversation-wide totals accumulated so far (cumulative as of last turn).
+        const lines = ["Live context: " + fmt(contextTokens)]
+        const totalOut = prev.output
+        const totalCacheRead = prev.cacheRead
+        const totalCacheCreate = prev.cacheCreate
+        const totalInNew = prev.input - totalCacheRead - totalCacheCreate
+        lines.push("── conversation totals ──")
+        if (totalInNew > 0) lines.push("Input (new): " + fmt(totalInNew))
+        if (totalCacheRead > 0) lines.push("Cache read: " + fmt(totalCacheRead))
+        if (totalCacheCreate > 0) lines.push("Cache write: " + fmt(totalCacheCreate))
+        if (totalOut > 0)
+          lines.push(
+            "Output: " +
+              fmt(totalOut) +
+              (prev.reasoning > 0 ? " (reasoning " + fmt(prev.reasoning) + ")" : ""),
+          )
+        contextIndicatorTooltip.textContent = lines.join("\n")
+
         document.getElementById("context-indicator-row").classList.add("visible")
       }
 
