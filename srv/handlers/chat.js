@@ -6,8 +6,9 @@ import { getActiveRunState, logMlflowMetricsForResult } from "../../lib/eval/eva
 export const COLLECT_RESULT = Symbol.for("@cap-js/agents:chat:collect-result")
 
 class NoopEventBus {
-  constructor() {
+  constructor(onSteps) {
     this.events = []
+    this.onSteps = onSteps
     this[COLLECT_RESULT] = true
     this._graphResult = null
     this._done = false
@@ -19,6 +20,7 @@ class NoopEventBus {
 
   publish(event) {
     this.events.push(event)
+    this.onSteps?.(this.getSteps())
   }
 
   finished() {
@@ -187,7 +189,7 @@ export function registerChat(srv) {
         "agent.chat: second argument must be a previous chat result object or options object",
       )
     } else if (previous && typeof previous === "object") {
-      if ("text" in previous || "contextId" in previous) {
+      if ("text" in previous) {
         // prior chat() result — extract conversation ids and HITL state
         opts = {
           contextId: previous.contextId,
@@ -198,7 +200,7 @@ export function registerChat(srv) {
           }),
         }
       } else {
-        opts = { _details: previous._details === true }
+        opts = previous
       }
     }
 
@@ -212,7 +214,7 @@ export function registerChat(srv) {
     const { LangGraphExecutor } = await import("../langgraph-executor-srv.js")
     const executor = LangGraphExecutor.for(srv)
     const requestContext = buildRequestContext(query, opts)
-    const eventBus = new NoopEventBus()
+    const eventBus = new NoopEventBus(opts.onSteps)
     const mlflowRunId = runState?.mlflowRunId
     let traceId
 

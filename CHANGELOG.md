@@ -10,6 +10,7 @@
 
 - `@agent` services bound to CAP Agent Gateway register automatically and process gateway invocations
 - Programmatic agent chat results include client-facing progress and reasoning artifacts as `steps`
+- Gateway-bound agents publish their explicit execution steps while an invocation is running
 - Chat preview queues messages submitted while the agent is busy
 
 ### Fixed
