@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.8 - tbd
+
+### Fixed
+
+- Correctly handle non `@cap-js/mcp` tools during PII masking
+
 ## Version 0.9.7 - 2026-09-23
 
 ### Added

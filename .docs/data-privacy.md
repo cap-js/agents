@@ -119,7 +119,7 @@ cf create-service data-privacy-integration-service enterprise bookshop-anonymiza
   "ProxyType": "Internet",
   "Type": "HTTP",
   // Change eu12 to the BTP region of your subaccount
-  "URL": "https://service.canary.eu12.anonymization.dpp.cloud.sap"
+  "URL": "https://service.eu10.anonymization.dpp.cloud.sap"
 }
 ```
 
