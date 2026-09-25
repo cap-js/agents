@@ -1217,6 +1217,18 @@
         if (!entry) {
           const el = document.createElement("div")
           el.className = "tool-call-item"
+          el.innerHTML =
+            `<span class="tool-call-status"></span> 
+            <span class="tool-call-label"></span>
+            <span class="tool-call-kind" hidden></span>
+            <button class="tool-call-toggle" hidden>Args</button>
+            <button class="tool-call-toggle" hidden>Result</button>
+            <pre class="tool-call-detail" hidden></pre>
+            <pre class="tool-call-detail" hidden></pre>`
+          const [argsBtn, resultBtn] = el.querySelectorAll("button")
+          const [argsPre, resultPre] = el.querySelectorAll("pre")
+          argsBtn.addEventListener("click", () => { argsPre.hidden = !argsPre.hidden })
+          resultBtn.addEventListener("click", () => { resultPre.hidden = !resultPre.hidden })
           toolCallsMap.set(id, { el, data: {} })
           entry = toolCallsMap.get(id)
           getOrCreateToolCallsPanel().appendChild(el)
@@ -1226,13 +1238,15 @@
         Object.assign(entry.data, data)
         const { el } = entry
         const d = entry.data
-        const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_")
-        const icon = TOOL_STATUS_ICON[d.status] ?? "⏳"
-        const kindClass = d.kind ? `kind-${d.kind}` : ""
 
-        let html = `<span class="tool-call-status">${icon}</span> `
-        html += `<span class="tool-call-label">${escHtml(d.label ?? d.name ?? "")}</span>`
-        if (d.kind) html += ` <span class="tool-call-kind ${kindClass}">${escHtml(d.kind)}</span>`
+        el.querySelector(".tool-call-status").textContent = TOOL_STATUS_ICON[d.status] ?? "⏳"
+        el.querySelector(".tool-call-label").textContent = d.label ?? d.name ?? ""
+        if (d.kind) {
+          const kindEl = el.querySelector(".tool-call-kind")
+          kindEl.textContent = d.kind
+          kindEl.className = `tool-call-kind kind-${d.kind}`
+          kindEl.hidden = false
+        }
 
         const argsStr =
           d.args != null
@@ -1249,15 +1263,12 @@
                 `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
               : raw
         }
-        if (argsStr != null)
-          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tca-${safeId}');e.hidden=!e.hidden">Args</button>`
-        if (resultStr != null)
-          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tcr-${safeId}');e.hidden=!e.hidden">Result</button>`
-        if (argsStr != null)
-          html += `<pre class="tool-call-detail" id="tca-${safeId}" hidden>${escHtml(argsStr)}</pre>`
-        if (resultStr != null)
-          html += `<pre class="tool-call-detail" id="tcr-${safeId}" hidden>${escHtml(resultStr)}</pre>`
-        el.innerHTML = html
+
+        const [argsBtn, resultBtn] = el.querySelectorAll("button")
+        const [argsPre, resultPre] = el.querySelectorAll("pre")
+        if (argsStr != null) { argsPre.textContent = argsStr; argsBtn.hidden = false }
+        if (resultStr != null) { resultPre.textContent = resultStr; resultBtn.hidden = false }
+
         messages.scrollTop = messages.scrollHeight
       }
 
