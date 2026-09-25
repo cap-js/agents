@@ -494,15 +494,7 @@
         font-style: italic;
         overflow-x: auto;
       }
-      .thinking-step p {
-        margin: 0 0 4px;
-      }
-      .thinking-step p:last-child {
-        margin-bottom: 0;
-      }
-      .thinking-step > :first-child {
-        margin-top: 0;
-      }
+      .thinking-step p { margin: 0; }
       .thinking-step + .thinking-step,
       .thinking-step + .tool-call-item,
       .tool-call-item + .thinking-step,
@@ -833,10 +825,7 @@
       let thinkingFinalized = false
       let thinkingStepEls = []
       let thinkingTexts = []
-      let thinkingStepCount = 0
       let turnPanelEl = null // single <details> for thinking steps + tool calls
-      let currentThinkingArtifactId = null
-      let currentThinkingClosed = false
       let pendingThinkingUpdate = null
       let pendingThinkingTimer = null
       let toolCallsMap = new Map() // tool call id → { el, data }
@@ -1059,7 +1048,7 @@
 
       function updateTurnPanelLabel() {
         if (!turnPanelEl) return
-        const n = thinkingStepCount + toolCallsMap.size
+        const n = thinkingStepEls.length + toolCallsMap.size
         turnPanelEl.querySelector("summary").textContent = `Steps (${n})`
       }
 
@@ -1136,12 +1125,8 @@
           panel.appendChild(step)
           thinkingStepEls.push(step)
           thinkingTexts.push(text)
-          thinkingStepCount = thinkingStepEls.length
           updateTurnPanelLabel()
-          currentThinkingArtifactId = artifactId
-          currentThinkingClosed = false
         }
-        if (lastChunk) currentThinkingClosed = true
         messages.scrollTop = messages.scrollHeight
       }
 
@@ -1194,8 +1179,8 @@
             `</summary>` +
             `<div class="tool-call-detail-label" hidden>Args</div><pre class="tool-call-detail args" hidden></pre>` +
             `<div class="tool-call-detail-label" hidden>Result</div><pre class="tool-call-detail result" hidden></pre>`
-          toolCallsMap.set(id, { el, data: {} })
-          entry = toolCallsMap.get(id)
+          entry = { el, data: {} }
+          toolCallsMap.set(id, entry)
           ensureTurnPanel().appendChild(el)
         } else {
           ensureTurnPanel()
@@ -1250,7 +1235,6 @@
 
         thinkingTexts.pop()
         const responseEl = thinkingStepEls.pop()
-        thinkingStepCount = thinkingStepEls.length
 
         responseEl.className = "msg agent"
         responseEl._promotedFromThinking = true
@@ -1282,7 +1266,6 @@
         thinkingTexts.pop()
         const finalResponse = thinkingStepEls.pop()
         finalResponse?.remove()
-        thinkingStepCount = thinkingStepEls.length
         updateTurnPanelLabel()
 
         if (thinkingStepEls.length === 0 && toolCallsMap.size === 0) {
@@ -1586,10 +1569,7 @@
         clearPendingThinkingUpdate()
         thinkingStepEls = []
         thinkingTexts = []
-        thinkingStepCount = 0
         turnPanelEl = null
-        currentThinkingArtifactId = null
-        currentThinkingClosed = false
         toolCallsMap = new Map()
 
         const useStream = useStreaming
