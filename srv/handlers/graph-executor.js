@@ -1157,7 +1157,8 @@ function aggregateUsageData(messages) {
     Object.keys(innerRes).forEach((k) => {
       if (k in result && innerRes[k] != null) result[k] += innerRes[k]
     })
-    if (innerRes.input_tokens != null) result.context_tokens = innerRes.input_tokens
+    if (innerRes.input_tokens != null)
+      result.context_tokens = innerRes.input_tokens + (innerRes.output_tokens || 0)
   }
   return result
 }
