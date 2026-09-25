@@ -2,13 +2,13 @@ name: CI
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  merge_group:
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   test:
@@ -20,6 +20,7 @@ jobs:
       matrix:
         node-version: [22, 24]
         cds-version: [9, latest]
+        exclude: ${{ github.event_name == 'merge_group' && fromJSON('[]') || fromJSON('[{"node-version":22,"cds-version":9},{"node-version":22,"cds-version":"latest"},{"node-version":24,"cds-version":9}]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use Node.js ${{ matrix.node-version }}
@@ -51,8 +52,9 @@ jobs:
       - run: npm test
 
   test-hybrid:
+    if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    name: Hybrid Tests with Node.js ${{ matrix.node-version }}
+    name: Hybrid Tests with Node.js 24
     strategy:
       fail-fast: false
       matrix:
@@ -74,3 +76,12 @@ jobs:
       - run: npm run test:hybrid
         env:
           AICORE_SERVICE_KEY: ${{ secrets.AICORE_SERVICE_KEY }}
+
+  summary:
+    if: always()
+    runs-on: ubuntu-latest
+    name: Summary
+    needs: [test, test-hybrid]
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
