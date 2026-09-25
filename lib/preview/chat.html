@@ -542,10 +542,6 @@
         opacity: 0.85;
       }
       /* Hover tooltip mirroring per-message breakdown, anchored to the indicator */
-      #context-indicator .msg-meta-tooltip {
-        bottom: calc(100% + 6px);
-        right: 0;
-      }
       #context-indicator:hover .msg-meta-tooltip {
         display: block;
       }
@@ -690,35 +686,27 @@
         return grid
       }
 
+      function buildTokenRows(contextVal, input, cacheRead, cacheCreate, output, reasoning) {
+        const rows = [{ label: "Context", value: contextVal }]
+        if (input > 0) {
+          rows.push({ label: "Input", value: fmt(input) })
+          if (cacheRead > 0) rows.push({ label: "Cache read", value: fmt(cacheRead), indent: true })
+          if (cacheCreate > 0) rows.push({ label: "Cache write", value: fmt(cacheCreate), indent: true })
+        }
+        if (output > 0)
+          rows.push({ label: "Output" + (reasoning > 0 ? " (reasoning " + fmt(reasoning) + ")" : ""), value: fmt(output) })
+        return rows
+      }
+
       function updateContextIndicator() {
         if (contextTokens === 0) return
-        // Set the label text without clobbering the nested tooltip span.
         contextIndicator.childNodes[0].nodeType === Node.TEXT_NODE
           ? (contextIndicator.childNodes[0].textContent = "⛁ " + fmt(contextTokens))
-          : contextIndicator.insertBefore(
-              document.createTextNode("⛁ " + fmt(contextTokens)),
-              contextIndicatorTooltip,
-            )
-
-        // Conversation-wide totals accumulated so far (cumulative as of last turn).
-        const totalOut = prev.output
-        const totalCacheRead = prev.cacheRead
-        const totalCacheCreate = prev.cacheCreate
-        const totalIn = prev.input
-        const rows = [{ label: "Context", value: fmt(contextTokens) }]
-        if (totalIn > 0) {
-          rows.push({ label: "Input", value: fmt(totalIn) })
-          if (totalCacheRead > 0) rows.push({ label: "Cache read", value: fmt(totalCacheRead), indent: true })
-          if (totalCacheCreate > 0) rows.push({ label: "Cache write", value: fmt(totalCacheCreate), indent: true })
-        }
-        if (totalOut > 0)
-          rows.push({
-            label: "Output" + (prev.reasoning > 0 ? " (reasoning " + fmt(prev.reasoning) + ")" : ""),
-            value: fmt(totalOut),
-          })
+          : contextIndicator.insertBefore(document.createTextNode("⛁ " + fmt(contextTokens)), contextIndicatorTooltip)
         contextIndicatorTooltip.innerHTML = ""
-        contextIndicatorTooltip.appendChild(buildTooltipTable(rows))
-
+        contextIndicatorTooltip.appendChild(
+          buildTooltipTable(buildTokenRows(fmt(contextTokens), prev.input, prev.cacheRead, prev.cacheCreate, prev.output, prev.reasoning))
+        )
         document.getElementById("context-indicator-row").classList.add("visible")
       }
 
@@ -759,18 +747,9 @@
         const tooltip = document.createElement("span")
         tooltip.className = "msg-meta-tooltip"
         const growthLabel = (contextGrowth >= 0 ? "+" : "") + fmt(contextGrowth)
-        const rows = [{ label: "Context", value: fmt(contextTokens) + " (" + growthLabel + ")" }]
-        if (stepInTotal > 0) {
-          rows.push({ label: "Input", value: fmt(stepInTotal) })
-          if (stepCacheRead > 0) rows.push({ label: "Cache read", value: fmt(stepCacheRead), indent: true })
-          if (stepCacheCreate > 0) rows.push({ label: "Cache write", value: fmt(stepCacheCreate), indent: true })
-        }
-        if (stepOut > 0)
-          rows.push({
-            label: "Output" + (stepReasoning > 0 ? " (reasoning " + fmt(stepReasoning) + ")" : ""),
-            value: fmt(stepOut),
-          })
-        tooltip.appendChild(buildTooltipTable(rows))
+        tooltip.appendChild(buildTooltipTable(
+          buildTokenRows(fmt(contextTokens) + " (" + growthLabel + ")", stepInTotal, stepCacheRead, stepCacheCreate, stepOut, stepReasoning)
+        ))
         meta.appendChild(tooltip)
 
         ;(el._wrap ?? el).appendChild(meta)
