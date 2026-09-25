@@ -531,23 +531,41 @@
         color: #888;
         list-style: none;
       }
-      .tool-calls-summary summary::before {
+      .tool-calls-summary > summary::before {
         content: "▶ ";
         font-size: 0.8em;
       }
-      .tool-calls-summary[open] summary::before {
+      .tool-calls-summary[open] > summary::before {
         content: "▼ ";
       }
       .tool-call-item {
-        padding: 4px 0;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        gap: 4px;
+        padding: 2px 0;
+        list-style: none;
       }
       .tool-call-item + .tool-call-item {
         border-top: 1px dashed #e0e0e0;
         margin-top: 4px;
+      }
+      .tool-call-item summary {
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        padding: 2px 0;
+      }
+      .tool-call-item > summary::before {
+        content: "▶";
+        font-size: 0.7em;
+        color: #aaa;
+        flex-shrink: 0;
+      }
+      .tool-call-item[open] > summary::before {
+        content: "▼";
+      }
+      .tool-call-item:not([hasdetails]) > summary::before {
+        visibility: hidden;
       }
       .tool-call-status {
         font-size: 0.85em;
@@ -574,21 +592,8 @@
         background: #ede9fe;
         color: #5b21b6;
       }
-      .tool-call-toggle {
-        font-size: 0.78em;
-        padding: 1px 6px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        background: none;
-        cursor: pointer;
-        color: #666;
-      }
-      .tool-call-toggle:hover {
-        background: #f5f5f5;
-      }
       .tool-call-detail {
-        width: 100%;
-        margin-top: 4px;
+        margin: 4px 0 2px 12px;
         padding: 4px 8px;
         background: #f9f9f9;
         border-radius: 4px;
@@ -598,6 +603,13 @@
         overflow-x: auto;
         max-height: 200px;
         overflow-y: auto;
+      }
+      .tool-call-detail-label {
+        font-size: 0.75em;
+        color: #999;
+        margin: 6px 0 2px 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
       }
       @media (prefers-color-scheme: dark) {
         .tool-calls-summary {
@@ -609,6 +621,9 @@
         }
         .tool-call-item + .tool-call-item {
           border-top-color: #333;
+        }
+        .tool-call-item > summary::before {
+          color: #555;
         }
         .tool-call-kind {
           background: #333;
@@ -626,16 +641,12 @@
           background: #2e1065;
           color: #c4b5fd;
         }
-        .tool-call-toggle {
-          border-color: #444;
-          color: #aaa;
-        }
-        .tool-call-toggle:hover {
-          background: #333;
-        }
         .tool-call-detail {
           background: #1a1a1a;
           color: #ccc;
+        }
+        .tool-call-detail-label {
+          color: #555;
         }
       }
       /* Subtle per-message metadata: context size + response time */
@@ -1215,20 +1226,16 @@
       function updateToolCall(id, data) {
         let entry = toolCallsMap.get(id)
         if (!entry) {
-          const el = document.createElement("div")
+          const el = document.createElement("details")
           el.className = "tool-call-item"
           el.innerHTML =
-            `<span class="tool-call-status"></span> 
-            <span class="tool-call-label"></span>
-            <span class="tool-call-kind" hidden></span>
-            <button class="tool-call-toggle" hidden>Args</button>
-            <button class="tool-call-toggle" hidden>Result</button>
-            <pre class="tool-call-detail" hidden></pre>
-            <pre class="tool-call-detail" hidden></pre>`
-          const [argsBtn, resultBtn] = el.querySelectorAll("button")
-          const [argsPre, resultPre] = el.querySelectorAll("pre")
-          argsBtn.addEventListener("click", () => { argsPre.hidden = !argsPre.hidden })
-          resultBtn.addEventListener("click", () => { resultPre.hidden = !resultPre.hidden })
+            `<summary>` +
+              `<span class="tool-call-status"></span> ` +
+              `<span class="tool-call-label"></span>` +
+              `<span class="tool-call-kind" hidden></span>` +
+            `</summary>` +
+            `<div class="tool-call-detail-label" hidden>Args</div><pre class="tool-call-detail args" hidden></pre>` +
+            `<div class="tool-call-detail-label" hidden>Result</div><pre class="tool-call-detail result" hidden></pre>`
           toolCallsMap.set(id, { el, data: {} })
           entry = toolCallsMap.get(id)
           getOrCreateToolCallsPanel().appendChild(el)
@@ -1250,24 +1257,26 @@
 
         const argsStr =
           d.args != null
-            ? typeof d.args === "string"
-              ? d.args
-              : JSON.stringify(d.args, null, 2)
+            ? typeof d.args === "string" ? d.args : JSON.stringify(d.args, null, 2)
             : null
         let resultStr = null
         if (d.result != null) {
           const raw = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2)
-          resultStr =
-            raw.length > TOOL_RESULT_TRUNCATE
-              ? raw.slice(0, TOOL_RESULT_TRUNCATE) +
-                `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
-              : raw
+          resultStr = raw.length > TOOL_RESULT_TRUNCATE
+            ? raw.slice(0, TOOL_RESULT_TRUNCATE) + `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
+            : raw
         }
 
-        const [argsBtn, resultBtn] = el.querySelectorAll("button")
-        const [argsPre, resultPre] = el.querySelectorAll("pre")
-        if (argsStr != null) { argsPre.textContent = argsStr; argsBtn.hidden = false }
-        if (resultStr != null) { resultPre.textContent = resultStr; resultBtn.hidden = false }
+        if (argsStr != null) {
+          const pre = el.querySelector(".args")
+          pre.textContent = argsStr; pre.hidden = false; pre.previousElementSibling.hidden = false
+          el.setAttribute("hasdetails", "")
+        }
+        if (resultStr != null) {
+          const pre = el.querySelector(".result")
+          pre.textContent = resultStr; pre.hidden = false; pre.previousElementSibling.hidden = false
+          el.setAttribute("hasdetails", "")
+        }
 
         messages.scrollTop = messages.scrollHeight
       }
