@@ -472,13 +472,13 @@
         max-width: 75%;
       }
       .msg-meta {
-        display: block;
+        display: inline-block;
+        align-self: flex-end;
         margin-top: 3px;
         font-size: 10px;
         cursor: default;
         position: relative;
         white-space: nowrap;
-        text-align: right;
         color: rgba(83, 116, 146, 0.5);
       }
       .msg-meta:hover {
@@ -494,15 +494,27 @@
         color: #e8f2fa;
         font-size: 11px;
         border-radius: 6px;
-        padding: 7px 11px;
-        white-space: pre;
+        padding: 7px 9px;
         z-index: 100;
         pointer-events: none;
         border: 1px solid rgba(255, 255, 255, 0.14);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        line-height: 1.6;
+        text-align: left;
+      }
+      .msg-meta-tooltip-grid {
+        display: grid;
+        grid-template-columns: auto auto;
+        column-gap: 16px;
+        row-gap: 2px;
+        white-space: nowrap;
+      }
+      .msg-meta-tooltip-grid .tt-indent {
+        padding-left: 12px;
+      }
+      .msg-meta-tooltip-grid .tt-val {
+        text-align: right;
       }
       .msg-meta:hover .msg-meta-tooltip {
         display: block;
@@ -662,6 +674,22 @@
         return (ms / 1000).toFixed(1) + "s"
       }
 
+      function buildTooltipTable(rows) {
+        const grid = document.createElement("div")
+        grid.className = "msg-meta-tooltip-grid"
+        for (const row of rows) {
+          const label = document.createElement("div")
+          if (row.indent) label.className = "tt-indent"
+          label.textContent = row.label
+          const val = document.createElement("div")
+          val.className = "tt-val"
+          val.textContent = row.value
+          grid.appendChild(label)
+          grid.appendChild(val)
+        }
+        return grid
+      }
+
       function updateContextIndicator() {
         if (contextTokens === 0) return
         // Set the label text without clobbering the nested tooltip span.
@@ -673,22 +701,23 @@
             )
 
         // Conversation-wide totals accumulated so far (cumulative as of last turn).
-        const lines = ["Live context: " + fmt(contextTokens)]
         const totalOut = prev.output
         const totalCacheRead = prev.cacheRead
         const totalCacheCreate = prev.cacheCreate
-        const totalInNew = prev.input - totalCacheRead - totalCacheCreate
-        lines.push("── conversation totals ──")
-        if (totalInNew > 0) lines.push("Input (new): " + fmt(totalInNew))
-        if (totalCacheRead > 0) lines.push("Cache read: " + fmt(totalCacheRead))
-        if (totalCacheCreate > 0) lines.push("Cache write: " + fmt(totalCacheCreate))
+        const totalIn = prev.input
+        const rows = [{ label: "Context", value: fmt(contextTokens) }]
+        if (totalIn > 0) {
+          rows.push({ label: "Input", value: fmt(totalIn) })
+          if (totalCacheRead > 0) rows.push({ label: "Cache read", value: fmt(totalCacheRead), indent: true })
+          if (totalCacheCreate > 0) rows.push({ label: "Cache write", value: fmt(totalCacheCreate), indent: true })
+        }
         if (totalOut > 0)
-          lines.push(
-            "Output: " +
-              fmt(totalOut) +
-              (prev.reasoning > 0 ? " (reasoning " + fmt(prev.reasoning) + ")" : ""),
-          )
-        contextIndicatorTooltip.textContent = lines.join("\n")
+          rows.push({
+            label: "Output" + (prev.reasoning > 0 ? " (reasoning " + fmt(prev.reasoning) + ")" : ""),
+            value: fmt(totalOut),
+          })
+        contextIndicatorTooltip.innerHTML = ""
+        contextIndicatorTooltip.appendChild(buildTooltipTable(rows))
 
         document.getElementById("context-indicator-row").classList.add("visible")
       }
@@ -703,9 +732,6 @@
         const stepCacheRead = (usage.cache_read_input_tokens || 0) - prev.cacheRead
         const stepCacheCreate = (usage.cache_creation_input_tokens || 0) - prev.cacheCreate
         const stepReasoning = (usage.reasoning_tokens || 0) - prev.reasoning
-        const stepInNew = stepInTotal - stepCacheRead - stepCacheCreate
-        // context_tokens is the live context size (last model call's prompt). Fall
-        // back to the summed input_tokens only if an older server omits the field.
         const newContext = usage.context_tokens || usage.input_tokens || 0
 
         // Context growth: how much this exchange added to the live context window.
@@ -725,7 +751,6 @@
         const meta = document.createElement("span")
         meta.className = "msg-meta"
 
-        const growthLabel = (contextGrowth >= 0 ? "+" : "") + fmt(contextGrowth)
         const summary =
           "⛁ " + fmt(contextGrowth) + (durationMs != null ? " · " + fmtDuration(durationMs) : "")
         meta.appendChild(document.createTextNode(summary))
@@ -733,18 +758,19 @@
         // Hover tooltip: per-turn, billing-relevant token breakdown.
         const tooltip = document.createElement("span")
         tooltip.className = "msg-meta-tooltip"
-        const lines = ["Context: " + fmt(contextTokens) + " (" + growthLabel + ")"]
-        if (stepInNew > 0) lines.push("Input (new): " + fmt(stepInNew))
-        if (stepCacheRead > 0) lines.push("Cache read: " + fmt(stepCacheRead))
-        if (stepCacheCreate > 0) lines.push("Cache write: " + fmt(stepCacheCreate))
+        const growthLabel = (contextGrowth >= 0 ? "+" : "") + fmt(contextGrowth)
+        const rows = [{ label: "Context", value: fmt(contextTokens) + " (" + growthLabel + ")" }]
+        if (stepInTotal > 0) {
+          rows.push({ label: "Input", value: fmt(stepInTotal) })
+          if (stepCacheRead > 0) rows.push({ label: "Cache read", value: fmt(stepCacheRead), indent: true })
+          if (stepCacheCreate > 0) rows.push({ label: "Cache write", value: fmt(stepCacheCreate), indent: true })
+        }
         if (stepOut > 0)
-          lines.push(
-            "Output: " +
-              fmt(stepOut) +
-              (stepReasoning > 0 ? " (reasoning " + fmt(stepReasoning) + ")" : ""),
-          )
-        tooltip.textContent = lines.join("\n")
-        tooltip.style.whiteSpace = "pre"
+          rows.push({
+            label: "Output" + (stepReasoning > 0 ? " (reasoning " + fmt(stepReasoning) + ")" : ""),
+            value: fmt(stepOut),
+          })
+        tooltip.appendChild(buildTooltipTable(rows))
         meta.appendChild(tooltip)
 
         ;(el._wrap ?? el).appendChild(meta)
