@@ -80,7 +80,7 @@ function formatToolResult({ text, files }) {
  */
 function createA2ATool(client, agentCard) {
   const subagent = agentCard.name
-  return tool(
+  const t = tool(
     async ({ message }) => {
       try {
         const messageId = cds.utils.uuid()
@@ -116,6 +116,8 @@ function createA2ATool(client, agentCard) {
       }),
     },
   )
+  t.metadata = { ...t.metadata, kind: "agent", agentName: agentCard.name }
+  return t
 }
 
 export async function buildSubAgentToolLocally(serviceName) {
@@ -130,7 +132,7 @@ export async function buildSubAgentToolLocally(serviceName) {
 
   const { RequestContext, DefaultExecutionEventBus } = await import("@a2a-js/sdk/server")
 
-  return tool(
+  const localTool = tool(
     async ({ message }) => {
       const taskId = cds.utils.uuid()
       const contextId = cds.utils.uuid()
@@ -221,6 +223,8 @@ export async function buildSubAgentToolLocally(serviceName) {
       }),
     },
   )
+  localTool.metadata = { ...localTool.metadata, kind: "agent", agentName: agentCard.name }
+  return localTool
 }
 
 export async function buildSubAgentToolFromConnection(serviceName) {

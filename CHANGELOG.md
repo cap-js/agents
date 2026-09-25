@@ -8,6 +8,7 @@
 
 ### Added
 
+- Tool and agent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; the chat preview renders them as a collapsible "Tools (N calls)" panel; opt-in per request via `userMessage.metadata["tool-status-update"]`
 - Preview now shows context size and token usage
 
 ### Fixed
