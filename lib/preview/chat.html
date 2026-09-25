@@ -985,21 +985,29 @@
         html += `<span class="tool-call-label">${escHtml(d.label ?? d.name ?? "")}</span>`
         if (d.kind) html += ` <span class="tool-call-kind ${kindClass}">${escHtml(d.kind)}</span>`
 
-        if (d.args != null) {
-          const argsStr = typeof d.args === "string" ? d.args : JSON.stringify(d.args, null, 2)
-          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tca-${safeId}');e.hidden=!e.hidden">Args</button>`
-          html += `<pre class="tool-call-detail" id="tca-${safeId}" hidden>${escHtml(argsStr)}</pre>`
-        }
+        const argsStr =
+          d.args != null
+            ? typeof d.args === "string"
+              ? d.args
+              : JSON.stringify(d.args, null, 2)
+            : null
+        let resultStr = null
         if (d.result != null) {
           const raw = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2)
-          const truncated =
+          resultStr =
             raw.length > TOOL_RESULT_TRUNCATE
               ? raw.slice(0, TOOL_RESULT_TRUNCATE) +
                 `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
               : raw
-          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tcr-${safeId}');e.hidden=!e.hidden">Result</button>`
-          html += `<pre class="tool-call-detail" id="tcr-${safeId}" hidden>${escHtml(truncated)}</pre>`
         }
+        if (argsStr != null)
+          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tca-${safeId}');e.hidden=!e.hidden">Args</button>`
+        if (resultStr != null)
+          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tcr-${safeId}');e.hidden=!e.hidden">Result</button>`
+        if (argsStr != null)
+          html += `<pre class="tool-call-detail" id="tca-${safeId}" hidden>${escHtml(argsStr)}</pre>`
+        if (resultStr != null)
+          html += `<pre class="tool-call-detail" id="tcr-${safeId}" hidden>${escHtml(resultStr)}</pre>`
         el.innerHTML = html
         messages.scrollTop = messages.scrollHeight
       }
