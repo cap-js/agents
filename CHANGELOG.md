@@ -10,6 +10,7 @@
 
 - Correctly handle non `@cap-js/mcp` tools during PII masking
 - Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
+- Correctly report input tokens for Anthropic models. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
 
 ## Version 0.9.7 - 2026-09-23
 
