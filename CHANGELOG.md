@@ -9,10 +9,13 @@
 ### Added
 
 - Tool and agent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; the chat preview renders them as a collapsible "Tools (N calls)" panel; opt-in per request via `userMessage.metadata["tool-status-update"]`
+- Preview now shows context size and token usage
 
 ### Fixed
 
 - Correctly handle non `@cap-js/mcp` tools during PII masking
+- Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
+- Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
 
 ## Version 0.9.7 - 2026-09-23
 

@@ -121,6 +121,10 @@
         box-sizing: border-box;
       }
 
+      .msg-wrap .msg {
+        max-width: 100%;
+      }
+
       .msg {
         padding: 10px 14px;
         border-radius: 12px;
@@ -634,6 +638,104 @@
           color: #ccc;
         }
       }
+      /* Subtle per-message metadata: context size + response time */
+      .msg-wrap {
+        display: flex;
+        flex-direction: column;
+        align-self: flex-start;
+        max-width: 75%;
+      }
+      .msg-meta {
+        display: inline-block;
+        align-self: flex-end;
+        margin-top: 3px;
+        font-size: 10px;
+        cursor: default;
+        position: relative;
+        white-space: nowrap;
+        color: rgba(83, 116, 146, 0.5);
+      }
+      .msg-meta:hover {
+        color: rgba(83, 116, 146, 0.85);
+      }
+      /* Hover tooltip with full token breakdown */
+      .msg-meta-tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 6px);
+        right: 0;
+        background: rgba(42, 61, 82, 0.72);
+        color: #e8f2fa;
+        font-size: 11px;
+        border-radius: 6px;
+        padding: 7px 9px;
+        z-index: 100;
+        pointer-events: none;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        text-align: left;
+      }
+      .msg-meta-tooltip-grid {
+        display: grid;
+        grid-template-columns: auto auto;
+        column-gap: 16px;
+        row-gap: 2px;
+        white-space: nowrap;
+      }
+      .msg-meta-tooltip-grid .tt-indent {
+        padding-left: 12px;
+      }
+      .msg-meta-tooltip-grid .tt-val {
+        text-align: right;
+      }
+      .msg-meta:hover .msg-meta-tooltip {
+        display: block;
+      }
+      /* Total context indicator: right-aligned row just above the input bar */
+      #context-indicator-row {
+        display: none;
+        padding: 2px 20px 2px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+      #context-indicator-row.visible {
+        display: block;
+      }
+      #context-indicator {
+        font-size: 10px;
+        opacity: 0.45;
+        white-space: nowrap;
+        color: #537492;
+        position: relative;
+        cursor: default;
+        transition: opacity 0.15s;
+      }
+      #context-indicator:hover {
+        opacity: 0.85;
+      }
+      /* Hover tooltip mirroring per-message breakdown, anchored to the indicator */
+      #context-indicator:hover .msg-meta-tooltip {
+        display: block;
+      }
+      @media (prefers-color-scheme: dark) {
+        .msg-meta {
+          color: rgba(145, 173, 197, 0.55);
+        }
+        .msg-meta:hover {
+          color: rgba(145, 173, 197, 0.9);
+        }
+        .msg-meta-tooltip {
+          background: rgba(10, 30, 48, 0.72);
+          color: #c8dff0;
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+        }
+        #context-indicator {
+          color: #91adc5;
+        }
+      }
     </style>
     <script src="marked.min.js"></script>
   </head>
@@ -655,6 +757,12 @@
     <div id="messages">
       <div class="typing" id="typing"><span></span><span></span><span></span></div>
       <div class="status-text" id="status-text"></div>
+    </div>
+
+    <div id="context-indicator-row">
+      <span id="context-indicator"
+        ><span class="msg-meta-tooltip" id="context-indicator-tooltip"></span
+      ></span>
     </div>
 
     <div id="input-row">
@@ -731,6 +839,7 @@
       let activeTaskId = null
       let activeAbort = null
       let streamingBubble = null
+      let lastStreamingBubble = null
       let streamingText = ""
       let thinkingFinalized = false
       let thinkingStepEls = [] // thinking steps inside the summary panel
@@ -743,6 +852,140 @@
       let pendingThinkingTimer = null
       let toolCallsMap = new Map() // tool call id → { el, data }
       let toolCallsSummaryEl = null // <details> containing tool call items
+
+      // Token accounting. The server sends cumulative token counts (a running sum
+      // over every model call in the conversation) plus context_tokens — the prompt
+      // size of the most recent model call, i.e. the current live context occupancy.
+      // Every field except context_tokens is cumulative, so per-turn values are
+      // derived by diffing against the previous turn.
+      let contextTokens = 0 // current live context size (last-call input incl. cache)
+      let prevContextTokens = 0 // context size after the previous turn
+      // Cumulative counts as of the previous turn, for per-turn deltas.
+      let prev = { input: 0, output: 0, cacheRead: 0, cacheCreate: 0, reasoning: 0 }
+      let responseStartTime = null
+      const contextIndicator = document.getElementById("context-indicator")
+      const contextIndicatorTooltip = document.getElementById("context-indicator-tooltip")
+
+      function fmt(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + "M"
+        if (n >= 1000) return (n / 1000).toFixed(1) + "k"
+        return String(n)
+      }
+
+      function fmtDuration(ms) {
+        if (ms < 1000) return ms + "ms"
+        return (ms / 1000).toFixed(1) + "s"
+      }
+
+      function buildTooltipTable(rows) {
+        const grid = document.createElement("div")
+        grid.className = "msg-meta-tooltip-grid"
+        for (const row of rows) {
+          const label = document.createElement("div")
+          if (row.indent) label.className = "tt-indent"
+          label.textContent = row.label
+          const val = document.createElement("div")
+          val.className = "tt-val"
+          val.textContent = row.value
+          grid.appendChild(label)
+          grid.appendChild(val)
+        }
+        return grid
+      }
+
+      function buildTokenRows(contextVal, input, cacheRead, cacheCreate, output, reasoning) {
+        const rows = [{ label: "Context", value: contextVal }]
+        if (input > 0) {
+          rows.push({ label: "Input", value: fmt(input) })
+          if (cacheRead > 0) rows.push({ label: "Cache read", value: fmt(cacheRead), indent: true })
+          if (cacheCreate > 0)
+            rows.push({ label: "Cache write", value: fmt(cacheCreate), indent: true })
+        }
+        if (output > 0)
+          rows.push({
+            label: "Output" + (reasoning > 0 ? " (reasoning " + fmt(reasoning) + ")" : ""),
+            value: fmt(output),
+          })
+        return rows
+      }
+
+      function updateContextIndicator() {
+        if (contextTokens === 0) return
+        contextIndicator.childNodes[0].nodeType === Node.TEXT_NODE
+          ? (contextIndicator.childNodes[0].textContent = "⛁ " + fmt(contextTokens))
+          : contextIndicator.insertBefore(
+              document.createTextNode("⛁ " + fmt(contextTokens)),
+              contextIndicatorTooltip,
+            )
+        contextIndicatorTooltip.innerHTML = ""
+        contextIndicatorTooltip.appendChild(
+          buildTooltipTable(
+            buildTokenRows(
+              fmt(contextTokens),
+              prev.input,
+              prev.cacheRead,
+              prev.cacheCreate,
+              prev.output,
+              prev.reasoning,
+            ),
+          ),
+        )
+        document.getElementById("context-indicator-row").classList.add("visible")
+      }
+
+      function attachMsgMeta(el, usage, durationMs) {
+        // All these fields are cumulative across the conversation; diff against the
+        // previous turn to get this turn's billing-relevant amounts. input_tokens
+        // already includes cache-read/cache-write tokens, so the uncached (full-rate)
+        // input is input minus those.
+        const stepInTotal = (usage.input_tokens || 0) - prev.input
+        const stepOut = (usage.output_tokens || 0) - prev.output
+        const stepCacheRead = (usage.cache_read_input_tokens || 0) - prev.cacheRead
+        const stepCacheCreate = (usage.cache_creation_input_tokens || 0) - prev.cacheCreate
+        const stepReasoning = (usage.reasoning_tokens || 0) - prev.reasoning
+        const newContext = usage.context_tokens || usage.input_tokens || 0
+
+        // Context growth: how much this exchange added to the live context window.
+        const contextGrowth = newContext - prevContextTokens
+
+        prevContextTokens = newContext
+        contextTokens = newContext
+        prev = {
+          input: usage.input_tokens || 0,
+          output: usage.output_tokens || 0,
+          cacheRead: usage.cache_read_input_tokens || 0,
+          cacheCreate: usage.cache_creation_input_tokens || 0,
+          reasoning: usage.reasoning_tokens || 0,
+        }
+        updateContextIndicator()
+
+        const meta = document.createElement("span")
+        meta.className = "msg-meta"
+
+        const summary =
+          "⛁ " + fmt(contextGrowth) + (durationMs != null ? " · " + fmtDuration(durationMs) : "")
+        meta.appendChild(document.createTextNode(summary))
+
+        // Hover tooltip: per-turn, billing-relevant token breakdown.
+        const tooltip = document.createElement("span")
+        tooltip.className = "msg-meta-tooltip"
+        const growthLabel = (contextGrowth >= 0 ? "+" : "") + fmt(contextGrowth)
+        tooltip.appendChild(
+          buildTooltipTable(
+            buildTokenRows(
+              fmt(contextTokens) + " (" + growthLabel + ")",
+              stepInTotal,
+              stepCacheRead,
+              stepCacheCreate,
+              stepOut,
+              stepReasoning,
+            ),
+          ),
+        )
+        meta.appendChild(tooltip)
+
+        ;(el._wrap ?? el).appendChild(meta)
+      }
 
       // Auto-enable streaming when agent card advertises streaming capability
       fetch(AGENT_URL + ".well-known/agent-card.json", { headers: authHeaders() })
@@ -812,10 +1055,16 @@
           el.innerHTML = md(text, { sanitize: true })
         else el.textContent = text
         if (role === "agent_thinking") el.className = "msg agent_thinking"
-        messages.insertBefore(
-          el,
-          beforeEl ?? (typing.parentElement === messages ? typing : statusText),
-        )
+        const anchor = beforeEl ?? (typing.parentElement === messages ? typing : statusText)
+        if (role === "agent") {
+          const wrap = document.createElement("div")
+          wrap.className = "msg-wrap"
+          wrap.appendChild(el)
+          el._wrap = wrap
+          messages.insertBefore(wrap, anchor)
+        } else {
+          messages.insertBefore(el, anchor)
+        }
         messages.scrollTop = messages.scrollHeight
         return el
       }
@@ -1030,7 +1279,11 @@
         responseEl.className = "msg agent"
         responseEl._promotedFromThinking = true
         responseEl.innerHTML = md(responseText)
-        messages.insertBefore(responseEl, typing.parentElement === messages ? typing : statusText)
+        const wrap = document.createElement("div")
+        wrap.className = "msg-wrap"
+        wrap.appendChild(responseEl)
+        responseEl._wrap = wrap
+        messages.insertBefore(wrap, typing.parentElement === messages ? typing : statusText)
 
         if (thinkingStepEls.length === 0) {
           thinkingSummaryEl.remove()
@@ -1062,8 +1315,8 @@
           return
         }
 
-        if (beforeEl && thinkingSummaryEl.nextSibling !== beforeEl) {
-          messages.insertBefore(thinkingSummaryEl, beforeEl)
+        if (beforeEl && thinkingSummaryEl.nextSibling !== (beforeEl._wrap ?? beforeEl)) {
+          messages.insertBefore(thinkingSummaryEl, beforeEl._wrap ?? beforeEl)
         }
         collapseThinkingSummary(thinkingSummaryEl)
       }
@@ -1210,6 +1463,7 @@
 
         activeTaskId = taskId
         setBusy(true)
+        responseStartTime = performance.now()
 
         const abort = new AbortController()
         activeAbort = abort
@@ -1274,10 +1528,19 @@
           return
         }
 
+        // Token usage: non-streaming embeds in status message metadata; streaming passes via _tokenUsage
+        const tokenUsage =
+          result?._tokenUsage ?? result?.status?.message?.metadata?.["sap.cds.agents.token-usage"]
+        const durationMs =
+          responseStartTime != null ? Math.round(performance.now() - responseStartTime) : null
+
         // If streaming already rendered the final text via lastChunk, skip.
         if (useStreaming && streamingText !== "") {
-          if (!thinkingFinalized) finalizeThinking(streamingBubble, streamingText)
+          if (!thinkingFinalized) finalizeThinking(lastStreamingBubble, streamingText)
+          if (tokenUsage && lastStreamingBubble)
+            attachMsgMeta(lastStreamingBubble, tokenUsage, durationMs)
           finalizeToolCallsPanel()
+          lastStreamingBubble = null
           streamingBubble = null
           streamingText = ""
           return
@@ -1298,6 +1561,7 @@
         const reply = partsToText(parts)
         const replyEl =
           promoteLatestThinkingToResponse(reply) || addMessage("agent", reply || "(no response)")
+        if (tokenUsage) attachMsgMeta(replyEl, tokenUsage, durationMs)
         finalizeThinking(replyEl, reply)
         finalizeToolCallsPanel()
       }
@@ -1339,10 +1603,12 @@
         el.classList.remove("queued")
         messages.insertBefore(el, typing.parentElement === messages ? typing : statusText)
         setBusy(true)
+        responseStartTime = performance.now()
 
         const abort = new AbortController()
         activeAbort = abort
         streamingBubble = null
+        lastStreamingBubble = null
         streamingText = ""
         thinkingFinalized = false
         clearPendingThinkingUpdate()
@@ -1516,6 +1782,7 @@
             finalizeThinking(streamingBubble, text)
             finalizeToolCallsPanel()
             thinkingFinalized = true
+            lastStreamingBubble = streamingBubble
             streamingBubble = null
             streamingText = text // dedupe with handleResult
             return null
@@ -1543,11 +1810,13 @@
 
         // Status update with final=true means terminal state
         if (event.kind === "status-update" && event.final) {
+          const tokenUsage = event.metadata?.["sap.cds.agents.token-usage"]
           return {
             id: event.taskId || activeTaskId,
             contextId: event.contextId || contextId,
             status: event.status,
             artifacts: event.artifacts,
+            _tokenUsage: tokenUsage,
           }
         }
 

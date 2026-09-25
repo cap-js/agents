@@ -69,6 +69,16 @@
         "metrics": false
       },
       "[test]": {
+        "aicoreMissingCredentialsFilterOn": {
+          "kind": "aicore",
+          "model": "gpt-4o-mini",
+          "contentFilter": true
+        },
+        "aicoreMissingCredentialsFilterOff": {
+          "kind": "aicore",
+          "model": "gpt-4o-mini",
+          "contentFilter": false
+        },
         "llm": "mock",
         "[hybrid]": {
           "llm": "aicore"
