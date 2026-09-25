@@ -691,10 +691,14 @@
         if (input > 0) {
           rows.push({ label: "Input", value: fmt(input) })
           if (cacheRead > 0) rows.push({ label: "Cache read", value: fmt(cacheRead), indent: true })
-          if (cacheCreate > 0) rows.push({ label: "Cache write", value: fmt(cacheCreate), indent: true })
+          if (cacheCreate > 0)
+            rows.push({ label: "Cache write", value: fmt(cacheCreate), indent: true })
         }
         if (output > 0)
-          rows.push({ label: "Output" + (reasoning > 0 ? " (reasoning " + fmt(reasoning) + ")" : ""), value: fmt(output) })
+          rows.push({
+            label: "Output" + (reasoning > 0 ? " (reasoning " + fmt(reasoning) + ")" : ""),
+            value: fmt(output),
+          })
         return rows
       }
 
@@ -702,10 +706,22 @@
         if (contextTokens === 0) return
         contextIndicator.childNodes[0].nodeType === Node.TEXT_NODE
           ? (contextIndicator.childNodes[0].textContent = "⛁ " + fmt(contextTokens))
-          : contextIndicator.insertBefore(document.createTextNode("⛁ " + fmt(contextTokens)), contextIndicatorTooltip)
+          : contextIndicator.insertBefore(
+              document.createTextNode("⛁ " + fmt(contextTokens)),
+              contextIndicatorTooltip,
+            )
         contextIndicatorTooltip.innerHTML = ""
         contextIndicatorTooltip.appendChild(
-          buildTooltipTable(buildTokenRows(fmt(contextTokens), prev.input, prev.cacheRead, prev.cacheCreate, prev.output, prev.reasoning))
+          buildTooltipTable(
+            buildTokenRows(
+              fmt(contextTokens),
+              prev.input,
+              prev.cacheRead,
+              prev.cacheCreate,
+              prev.output,
+              prev.reasoning,
+            ),
+          ),
         )
         document.getElementById("context-indicator-row").classList.add("visible")
       }
@@ -747,9 +763,18 @@
         const tooltip = document.createElement("span")
         tooltip.className = "msg-meta-tooltip"
         const growthLabel = (contextGrowth >= 0 ? "+" : "") + fmt(contextGrowth)
-        tooltip.appendChild(buildTooltipTable(
-          buildTokenRows(fmt(contextTokens) + " (" + growthLabel + ")", stepInTotal, stepCacheRead, stepCacheCreate, stepOut, stepReasoning)
-        ))
+        tooltip.appendChild(
+          buildTooltipTable(
+            buildTokenRows(
+              fmt(contextTokens) + " (" + growthLabel + ")",
+              stepInTotal,
+              stepCacheRead,
+              stepCacheCreate,
+              stepOut,
+              stepReasoning,
+            ),
+          ),
+        )
         meta.appendChild(tooltip)
 
         ;(el._wrap ?? el).appendChild(meta)
