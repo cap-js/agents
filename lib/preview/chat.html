@@ -26,6 +26,7 @@
         align-items: center;
         gap: 12px;
         flex-shrink: 0;
+        position: relative;
       }
       header h1 {
         font-size: 1rem;
@@ -55,6 +56,41 @@
       header .status-dot.error {
         background: #e53935;
       }
+      #settings-btn {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: #c8def0;
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 2px 4px;
+        line-height: 1;
+      }
+      #settings-btn:hover { color: #fff; }
+      #settings-popover {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 16px;
+        background: #fff;
+        border: 1px solid #c8d9e8;
+        border-radius: 8px;
+        padding: 12px 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        z-index: 100;
+        min-width: 160px;
+      }
+      #settings-popover.open { display: block; }
+      #settings-popover label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        color: #333;
+        cursor: pointer;
+        padding: 4px 0;
+      }
+      #settings-popover label + label { border-top: 1px solid #eee; }
 
       table thead {
         text-align: left;
@@ -342,6 +378,9 @@
           background: #0a2138;
           border-color: #2a4a63;
         }
+        #settings-popover { background: #1a3d58; border-color: #2a4a63; }
+        #settings-popover label { color: #c8dff0; }
+        #settings-popover label + label { border-color: #2a4a63; }
         #prompt {
           background: #0f2d45;
           border-color: #2a4a63;
@@ -590,6 +629,12 @@
       <a class="back" id="back" title="Back to index">&#8592;</a>
       <h1>{{agentName}}</h1>
       <div class="status-dot" id="dot"></div>
+      <button id="settings-btn" title="Settings">&#9881;</button>
+      <div id="settings-popover">
+        <label><input type="checkbox" id="opt-tool-tracing" checked> Tool tracing</label>
+        <label id="opt-args-label"><input type="checkbox" id="opt-args" checked> Args</label>
+        <label id="opt-result-label"><input type="checkbox" id="opt-result" checked> Result</label>
+      </div>
     </header>
 
     <div id="messages">
@@ -639,6 +684,29 @@
       let useStreaming = false
       const THINKING_STEP_BUFFER_MS = 100
       const THINKING_SUMMARY_ANIMATION_MS = 160
+
+      const optToolTracing = document.getElementById("opt-tool-tracing")
+      const optArgs = document.getElementById("opt-args")
+      const optResult = document.getElementById("opt-result")
+      const settingsBtn = document.getElementById("settings-btn")
+      const settingsPopover = document.getElementById("settings-popover")
+
+      settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation()
+        settingsPopover.classList.toggle("open")
+      })
+      document.addEventListener("click", () => settingsPopover.classList.remove("open"))
+      settingsPopover.addEventListener("click", (e) => e.stopPropagation())
+
+      const optArgsLabel = document.getElementById("opt-args-label")
+      const optResultLabel = document.getElementById("opt-result-label")
+      function updateTracingOptions() {
+        const on = optToolTracing.checked
+        optArgsLabel.style.display = on ? "" : "none"
+        optResultLabel.style.display = on ? "" : "none"
+      }
+      optToolTracing.addEventListener("change", updateTracingOptions)
+      updateTracingOptions()
 
       let busy = false
       let processingQueue = false
@@ -1280,6 +1348,11 @@
                   messageId: crypto.randomUUID(),
                   ...(contextId ? { contextId } : {}),
                   parts: [{ kind: "text", text }],
+                  ...(optToolTracing.checked ? {
+                    metadata: {
+                      "tool-status-update": { args: optArgs.checked, result: optResult.checked }
+                    }
+                  } : {}),
                 },
               },
             }),

@@ -406,6 +406,7 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+    cds.context["agent.request.metadata"] = requestContext.userMessage?.metadata ?? {}
 
     // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
     const graph = await this._resolveGraph()
