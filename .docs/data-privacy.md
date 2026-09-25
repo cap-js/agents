@@ -123,7 +123,16 @@ cf create-service data-privacy-integration-service enterprise bookshop-anonymiza
 }
 ```
 
-4. Bind the Destination service to the application and provide the destination name as follows:
+4. Follow the SAP DPI documentation for [Service Provisioning for External Consumers](https://help.sap.com/docs/data-privacy-integration/development/service-provisioning-for-external-consumers)
+  - Download the certificate
+  - Convert it into a single string with explicit `\r\n` line ends.
+  - Create a service key with the parameters
+  ```json
+  { "credentials": { "certificate": "-----BEGIN CERTIFICATE-----\r\n...\r\n-----END CERTIFICATE-----\r\n" } }
+  ```
+  This is mandatory for connectivity. Else a 401 error with `Certificate not registered` will be thrown at runtime.
+
+5. Bind the Destination service to the application and provide the destination name as follows:
 
 ```jsonc
 {
