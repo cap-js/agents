@@ -66,7 +66,9 @@
         padding: 2px 4px;
         line-height: 1;
       }
-      #settings-btn:hover { color: #fff; }
+      #settings-btn:hover {
+        color: #fff;
+      }
       #settings-popover {
         display: none;
         position: absolute;
@@ -76,11 +78,13 @@
         border: 1px solid #c8d9e8;
         border-radius: 8px;
         padding: 12px 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
         z-index: 100;
         min-width: 160px;
       }
-      #settings-popover.open { display: block; }
+      #settings-popover.open {
+        display: block;
+      }
       #settings-popover label {
         display: flex;
         align-items: center;
@@ -90,7 +94,9 @@
         cursor: pointer;
         padding: 4px 0;
       }
-      #settings-popover label + label { border-top: 1px solid #eee; }
+      #settings-popover label + label {
+        border-top: 1px solid #eee;
+      }
 
       table thead {
         text-align: left;
@@ -378,9 +384,16 @@
           background: #0a2138;
           border-color: #2a4a63;
         }
-        #settings-popover { background: #1a3d58; border-color: #2a4a63; }
-        #settings-popover label { color: #c8dff0; }
-        #settings-popover label + label { border-color: #2a4a63; }
+        #settings-popover {
+          background: #1a3d58;
+          border-color: #2a4a63;
+        }
+        #settings-popover label {
+          color: #c8dff0;
+        }
+        #settings-popover label + label {
+          border-color: #2a4a63;
+        }
         #prompt {
           background: #0f2d45;
           border-color: #2a4a63;
@@ -631,9 +644,11 @@
       <div class="status-dot" id="dot"></div>
       <button id="settings-btn" title="Settings">&#9881;</button>
       <div id="settings-popover">
-        <label><input type="checkbox" id="opt-tool-tracing" checked> Tool tracing</label>
-        <label id="opt-args-label"><input type="checkbox" id="opt-args" checked> Args</label>
-        <label id="opt-result-label"><input type="checkbox" id="opt-result" checked> Result</label>
+        <label><input type="checkbox" id="opt-tool-tracing" checked /> Tool tracing</label>
+        <label id="opt-args-label"><input type="checkbox" id="opt-args" checked /> Args</label>
+        <label id="opt-result-label"
+          ><input type="checkbox" id="opt-result" checked /> Result</label
+        >
       </div>
     </header>
 
@@ -1348,11 +1363,16 @@
                   messageId: crypto.randomUUID(),
                   ...(contextId ? { contextId } : {}),
                   parts: [{ kind: "text", text }],
-                  ...(optToolTracing.checked ? {
-                    metadata: {
-                      "tool-status-update": { args: optArgs.checked, result: optResult.checked }
-                    }
-                  } : {}),
+                  ...(optToolTracing.checked
+                    ? {
+                        metadata: {
+                          "tool-status-update": {
+                            args: optArgs.checked,
+                            result: optResult.checked,
+                          },
+                        },
+                      }
+                    : {}),
                 },
               },
             }),
