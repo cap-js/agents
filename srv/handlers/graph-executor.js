@@ -910,16 +910,19 @@ class GraphExecutor {
           eventBus._graphResult = { messages: result.messages || [] }
         }
 
+        const usageMeta =
+          usageData?.total_tokens > 0 ? { "sap.cds.agents.token-usage": usageData } : undefined
         eventBus.publish({
           kind: "status-update",
           taskId,
           contextId,
           status: {
             state: "completed",
-            message: agentMessage(output),
+            message: agentMessage(output, undefined, usageMeta),
             timestamp: new Date().toISOString(),
           },
           final: true,
+          metadata: usageMeta,
         })
       } catch (err) {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
@@ -1146,13 +1149,16 @@ function aggregateUsageData(messages) {
     cache_creation_input_tokens: 0,
     cache_read_input_tokens: 0,
     reasoning_tokens: 0,
+    context_tokens: 0,
   }
   for (let i = 0; i < messages.length; i++) {
     if (!messages[i].usage_metadata) continue
     const innerRes = convertUsageData(messages[i].usage_metadata)
     Object.keys(innerRes).forEach((k) => {
-      if (innerRes[k] != null) result[k] += innerRes[k]
+      if (k in result && innerRes[k] != null) result[k] += innerRes[k]
     })
+    if (innerRes.input_tokens != null)
+      result.context_tokens = innerRes.input_tokens + (innerRes.output_tokens || 0)
   }
   return result
 }
