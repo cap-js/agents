@@ -9,6 +9,7 @@
 ### Added
 
 - Preview now shows context size and token usage
+- OpenAI provider support via llm kind `openai`
 - Model and model parameters are shown in evaluation runs in MLflow
 
 ### Changed
