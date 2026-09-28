@@ -2,16 +2,7 @@ import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { isAdditiveCacheUsageModel, normalizeAdditiveCacheUsage } from "../../lib/utils/usage.js"
 
 function convertNormalizedAdditiveCacheUsage(usage) {
-  const result = {
-    generations: [
-      {
-        message: {
-          additional_kwargs: { intermediate_results: { llm: { id: "llm-1" } } },
-          usage_metadata: usage,
-        },
-      },
-    ],
-  }
+  const result = { generations: [{ message: { usage_metadata: usage } }] }
   normalizeAdditiveCacheUsage(result)
   return convertUsageData(result.generations[0].message.usage_metadata)
 }
@@ -58,7 +49,6 @@ describe("additive cache usage normalization", () => {
       generations: [
         {
           message: {
-            additional_kwargs: { intermediate_results: { llm: { id: "llm-1" } } },
             usage_metadata: {
               input_tokens: 112,
               output_tokens: 53,
