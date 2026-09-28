@@ -56,47 +56,6 @@
       header .status-dot.error {
         background: #e53935;
       }
-      #settings-btn {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: #c8def0;
-        cursor: pointer;
-        font-size: 1rem;
-        padding: 2px 4px;
-        line-height: 1;
-      }
-      #settings-btn:hover {
-        color: #fff;
-      }
-      #settings-popover {
-        display: none;
-        position: absolute;
-        top: calc(100% + 4px);
-        right: 16px;
-        background: #fff;
-        border: 1px solid #c8d9e8;
-        border-radius: 8px;
-        padding: 12px 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-        z-index: 100;
-        min-width: 160px;
-      }
-      #settings-popover.open {
-        display: block;
-      }
-      #settings-popover label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.85rem;
-        color: #333;
-        cursor: pointer;
-        padding: 4px 0;
-      }
-      #settings-popover label + label {
-        border-top: 1px solid #eee;
-      }
 
       table thead {
         text-align: left;
@@ -116,7 +75,7 @@
       }
 
       .msg,
-      .thinking-summary {
+      .turn-panel {
         max-width: 75%;
         box-sizing: border-box;
       }
@@ -388,16 +347,6 @@
           background: #0a2138;
           border-color: #2a4a63;
         }
-        #settings-popover {
-          background: #1a3d58;
-          border-color: #2a4a63;
-        }
-        #settings-popover label {
-          color: #c8dff0;
-        }
-        #settings-popover label + label {
-          border-color: #2a4a63;
-        }
         #prompt {
           background: #0f2d45;
           border-color: #2a4a63;
@@ -466,7 +415,7 @@
 
       /* Thinking messages are streamed into an expanded <details> panel,
          then collapsed once the final response arrives. */
-      .thinking-summary {
+      .turn-panel {
         align-self: flex-start;
         margin: 4px 0 8px 0;
         font-size: 0.88em;
@@ -475,17 +424,17 @@
         padding-left: 10px;
         overflow-wrap: anywhere;
       }
-      .thinking-summary summary {
+      .turn-panel summary {
         cursor: pointer;
         user-select: none;
         color: #888;
         list-style: none;
       }
-      .thinking-summary summary::before {
+      .turn-panel > summary::before {
         content: "▶ ";
         font-size: 0.8em;
       }
-      .thinking-summary[open] summary::before {
+      .turn-panel[open] > summary::before {
         content: "▼ ";
       }
       .thinking-step {
@@ -494,60 +443,58 @@
         font-style: italic;
         overflow-x: auto;
       }
-      .thinking-step + .thinking-step {
+      .thinking-step p { margin: 0; }
+      .thinking-step + .thinking-step,
+      .thinking-step + .tool-call-item,
+      .tool-call-item + .thinking-step,
+      .tool-call-item + .tool-call-item {
         border-top: 1px dashed #e0e0e0;
         margin-top: 4px;
       }
       @media (prefers-reduced-motion: no-preference) {
-        .thinking-summary {
+        .turn-panel {
           transition: height 0.16s ease;
         }
       }
       @media (prefers-color-scheme: dark) {
-        .thinking-summary {
+        .turn-panel {
           color: #999;
           border-left-color: #444;
         }
-        .thinking-summary summary {
+        .turn-panel summary {
           color: #aaa;
         }
-        .thinking-step + .thinking-step {
+        .thinking-step + .thinking-step,
+        .thinking-step + .tool-call-item,
+        .tool-call-item + .thinking-step,
+        .tool-call-item + .tool-call-item {
           border-top-color: #333;
         }
       }
-
-      /* Tool-call events: collapsible panel showing each tool/agent call. */
-      .tool-calls-summary {
-        align-self: flex-start;
-        margin: 4px 0 8px 0;
-        font-size: 0.88em;
-        color: #666;
-        border-left: 2px solid #ccc;
-        padding-left: 10px;
-      }
-      .tool-calls-summary summary {
-        cursor: pointer;
-        user-select: none;
-        color: #888;
+      .tool-call-item {
+        padding: 2px 0;
         list-style: none;
       }
-      .tool-calls-summary summary::before {
-        content: "▶ ";
-        font-size: 0.8em;
-      }
-      .tool-calls-summary[open] summary::before {
-        content: "▼ ";
-      }
-      .tool-call-item {
-        padding: 4px 0;
+      .tool-call-item summary {
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
         display: flex;
-        flex-wrap: wrap;
         align-items: baseline;
         gap: 4px;
+        padding: 2px 0;
       }
-      .tool-call-item + .tool-call-item {
-        border-top: 1px dashed #e0e0e0;
-        margin-top: 4px;
+      .tool-call-item > summary::before {
+        content: "▶";
+        font-size: 0.7em;
+        color: #aaa;
+        flex-shrink: 0;
+      }
+      .tool-call-item[open] > summary::before {
+        content: "▼";
+      }
+      .tool-call-item:not([hasdetails]) > summary::before {
+        visibility: hidden;
       }
       .tool-call-status {
         font-size: 0.85em;
@@ -574,21 +521,8 @@
         background: #ede9fe;
         color: #5b21b6;
       }
-      .tool-call-toggle {
-        font-size: 0.78em;
-        padding: 1px 6px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        background: none;
-        cursor: pointer;
-        color: #666;
-      }
-      .tool-call-toggle:hover {
-        background: #f5f5f5;
-      }
       .tool-call-detail {
-        width: 100%;
-        margin-top: 4px;
+        margin: 4px 0 2px 12px;
         padding: 4px 8px;
         background: #f9f9f9;
         border-radius: 4px;
@@ -599,16 +533,16 @@
         max-height: 200px;
         overflow-y: auto;
       }
+      .tool-call-detail-label {
+        font-size: 0.75em;
+        color: #999;
+        margin: 6px 0 2px 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
       @media (prefers-color-scheme: dark) {
-        .tool-calls-summary {
-          color: #999;
-          border-left-color: #444;
-        }
-        .tool-calls-summary summary {
-          color: #aaa;
-        }
-        .tool-call-item + .tool-call-item {
-          border-top-color: #333;
+        .tool-call-item > summary::before {
+          color: #555;
         }
         .tool-call-kind {
           background: #333;
@@ -626,16 +560,12 @@
           background: #2e1065;
           color: #c4b5fd;
         }
-        .tool-call-toggle {
-          border-color: #444;
-          color: #aaa;
-        }
-        .tool-call-toggle:hover {
-          background: #333;
-        }
         .tool-call-detail {
           background: #1a1a1a;
           color: #ccc;
+        }
+        .tool-call-detail-label {
+          color: #555;
         }
       }
       /* Subtle per-message metadata: context size + response time */
@@ -744,14 +674,6 @@
       <a class="back" id="back" title="Back to index">&#8592;</a>
       <h1>{{agentName}}</h1>
       <div class="status-dot" id="dot"></div>
-      <button id="settings-btn" title="Settings">&#9881;</button>
-      <div id="settings-popover">
-        <label><input type="checkbox" id="opt-tool-tracing" checked /> Tool tracing</label>
-        <label id="opt-args-label"><input type="checkbox" id="opt-args" checked /> Args</label>
-        <label id="opt-result-label"
-          ><input type="checkbox" id="opt-result" checked /> Result</label
-        >
-      </div>
     </header>
 
     <div id="messages">
@@ -808,29 +730,6 @@
       const THINKING_STEP_BUFFER_MS = 100
       const THINKING_SUMMARY_ANIMATION_MS = 160
 
-      const optToolTracing = document.getElementById("opt-tool-tracing")
-      const optArgs = document.getElementById("opt-args")
-      const optResult = document.getElementById("opt-result")
-      const settingsBtn = document.getElementById("settings-btn")
-      const settingsPopover = document.getElementById("settings-popover")
-
-      settingsBtn.addEventListener("click", (e) => {
-        e.stopPropagation()
-        settingsPopover.classList.toggle("open")
-      })
-      document.addEventListener("click", () => settingsPopover.classList.remove("open"))
-      settingsPopover.addEventListener("click", (e) => e.stopPropagation())
-
-      const optArgsLabel = document.getElementById("opt-args-label")
-      const optResultLabel = document.getElementById("opt-result-label")
-      function updateTracingOptions() {
-        const on = optToolTracing.checked
-        optArgsLabel.style.display = on ? "" : "none"
-        optResultLabel.style.display = on ? "" : "none"
-      }
-      optToolTracing.addEventListener("change", updateTracingOptions)
-      updateTracingOptions()
-
       let busy = false
       let processingQueue = false
       const messageQueue = []
@@ -842,16 +741,12 @@
       let lastStreamingBubble = null
       let streamingText = ""
       let thinkingFinalized = false
-      let thinkingStepEls = [] // thinking steps inside the summary panel
-      let thinkingTexts = [] // accumulated text per thinking step
-      let thinkingStepCount = 0
-      let thinkingSummaryEl = null // <details> containing thinking steps
-      let currentThinkingArtifactId = null // artifactId of open thinking step
-      let currentThinkingClosed = false // true once lastChunk seen for current id
+      let thinkingStepEls = []
+      let thinkingTexts = []
+      let turnPanelEl = null // single <details> for thinking steps + tool calls
       let pendingThinkingUpdate = null
       let pendingThinkingTimer = null
       let toolCallsMap = new Map() // tool call id → { el, data }
-      let toolCallsSummaryEl = null // <details> containing tool call items
 
       // Token accounting. The server sends cumulative token counts (a running sum
       // over every model call in the conversation) plus context_tokens — the prompt
@@ -1069,31 +964,29 @@
         return el
       }
 
-      function updateThinkingSummaryLabel() {
-        if (!thinkingSummaryEl) return
-        const summary = thinkingSummaryEl.querySelector("summary")
-        if (!summary) return
-        const count = thinkingStepCount
-        summary.textContent = `Thinking (${count} step${count === 1 ? "" : "s"})`
+      function updateTurnPanelLabel() {
+        if (!turnPanelEl) return
+        const n = thinkingStepEls.length + toolCallsMap.size
+        turnPanelEl.querySelector("summary").textContent = `Steps (${n})`
       }
 
-      function ensureThinkingSummary() {
-        if (!thinkingSummaryEl) {
-          thinkingSummaryEl = document.createElement("details")
-          thinkingSummaryEl.className = "thinking-summary"
-          thinkingSummaryEl.open = true
+      function ensureTurnPanel() {
+        if (!turnPanelEl) {
+          turnPanelEl = document.createElement("details")
+          turnPanelEl.className = "turn-panel"
+          turnPanelEl.open = true
           const summary = document.createElement("summary")
-          summary.addEventListener("click", toggleThinkingSummary)
-          thinkingSummaryEl.appendChild(summary)
-          updateThinkingSummaryLabel()
+          summary.addEventListener("click", toggleTurnPanel)
+          turnPanelEl.appendChild(summary)
           messages.insertBefore(
-            thinkingSummaryEl,
+            turnPanelEl,
             typing.parentElement === messages ? typing : statusText,
           )
         }
-        cancelThinkingSummaryAnimation(thinkingSummaryEl)
-        thinkingSummaryEl.open = true
-        return thinkingSummaryEl
+        cancelTurnPanelAnimation(turnPanelEl)
+        turnPanelEl.open = true
+        updateTurnPanelLabel()
+        return turnPanelEl
       }
 
       function clearPendingThinkingUpdate() {
@@ -1112,34 +1005,31 @@
         return window.matchMedia("(prefers-reduced-motion: reduce)").matches
       }
 
-      function resetThinkingSummaryAnimation(el) {
+      function resetTurnPanelAnimation(el) {
         el.style.height = ""
         el.style.overflow = ""
       }
 
-      function cancelThinkingSummaryAnimation(el) {
+      function cancelTurnPanelAnimation(el) {
         if (!el) return
-        el._thinkingAnimationId = (el._thinkingAnimationId ?? 0) + 1
-        resetThinkingSummaryAnimation(el)
+        el._animationId = (el._animationId ?? 0) + 1
+        resetTurnPanelAnimation(el)
       }
 
-      function toggleThinkingSummary(event) {
+      function toggleTurnPanel(event) {
         if (prefersReducedMotion()) return
         event.preventDefault()
         const el = event.currentTarget.parentElement
-        if (el.open) collapseThinkingSummary(el)
-        else expandThinkingSummary(el)
+        if (el.open) collapseTurnPanel(el)
+        else expandTurnPanel(el)
       }
 
       function renderThinkingStep(update) {
-        const { artifactId, text, lastChunk, append } = update
-        const panel = ensureThinkingSummary()
-        const idx = thinkingStepEls.findIndex((step) => step._artifactId === artifactId)
-        if (append && idx >= 0) {
-          thinkingTexts[idx] += text
-          thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
-        } else if (artifactId === currentThinkingArtifactId && !currentThinkingClosed) {
-          thinkingTexts[idx] += "\n" + text
+        const { artifactId, text, append } = update
+        const panel = ensureTurnPanel()
+        const idx = thinkingStepEls.findIndex((s) => s._artifactId === artifactId)
+        if (idx !== -1) {
+          thinkingTexts[idx] += append ? text : "\n" + text
           thinkingStepEls[idx].innerHTML = md(thinkingTexts[idx])
         } else {
           const step = document.createElement("div")
@@ -1149,12 +1039,8 @@
           panel.appendChild(step)
           thinkingStepEls.push(step)
           thinkingTexts.push(text)
-          thinkingStepCount = thinkingStepEls.length
-          updateThinkingSummaryLabel()
-          currentThinkingArtifactId = artifactId
-          currentThinkingClosed = false
+          updateTurnPanelLabel()
         }
-        if (lastChunk) currentThinkingClosed = true
         messages.scrollTop = messages.scrollHeight
       }
 
@@ -1194,87 +1080,75 @@
       const TOOL_STATUS_ICON = { running: "⏳", done: "✓", error: "✗" }
       const TOOL_RESULT_TRUNCATE = 500
 
-      function getOrCreateToolCallsPanel() {
-        if (!toolCallsSummaryEl) {
-          toolCallsSummaryEl = document.createElement("details")
-          toolCallsSummaryEl.className = "tool-calls-summary"
-          toolCallsSummaryEl.open = true
-          const sum = document.createElement("summary")
-          toolCallsSummaryEl.appendChild(sum)
-          messages.insertBefore(
-            toolCallsSummaryEl,
-            typing.parentElement === messages ? typing : statusText,
-          )
-        }
-        const n = toolCallsMap.size
-        toolCallsSummaryEl.querySelector("summary").textContent =
-          `Tools (${n} call${n === 1 ? "" : "s"})`
-        return toolCallsSummaryEl
-      }
-
       function updateToolCall(id, data) {
         let entry = toolCallsMap.get(id)
         if (!entry) {
-          const el = document.createElement("div")
+          const el = document.createElement("details")
           el.className = "tool-call-item"
-          toolCallsMap.set(id, { el, data: {} })
-          entry = toolCallsMap.get(id)
-          getOrCreateToolCallsPanel().appendChild(el)
+          el.innerHTML =
+            `<summary>` +
+              `<span class="tool-call-status"></span> ` +
+              `<span class="tool-call-label"></span>` +
+              `<span class="tool-call-kind" hidden></span>` +
+            `</summary>` +
+            `<div class="tool-call-detail-label" hidden>Args</div><pre class="tool-call-detail args" hidden></pre>` +
+            `<div class="tool-call-detail-label" hidden>Result</div><pre class="tool-call-detail result" hidden></pre>`
+          entry = { el, data: {} }
+          toolCallsMap.set(id, entry)
+          ensureTurnPanel().appendChild(el)
         } else {
-          getOrCreateToolCallsPanel()
+          ensureTurnPanel()
         }
         Object.assign(entry.data, data)
         const { el } = entry
         const d = entry.data
-        const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_")
-        const icon = TOOL_STATUS_ICON[d.status] ?? "⏳"
-        const kindClass = d.kind ? `kind-${d.kind}` : ""
 
-        let html = `<span class="tool-call-status">${icon}</span> `
-        html += `<span class="tool-call-label">${escHtml(d.label ?? d.name ?? "")}</span>`
-        if (d.kind) html += ` <span class="tool-call-kind ${kindClass}">${escHtml(d.kind)}</span>`
+        el.querySelector(".tool-call-status").textContent = TOOL_STATUS_ICON[d.status] ?? "⏳"
+        el.querySelector(".tool-call-label").textContent = d.label ?? d.name ?? ""
+        if (d.kind) {
+          const kindEl = el.querySelector(".tool-call-kind")
+          kindEl.textContent = d.kind
+          kindEl.className = `tool-call-kind kind-${d.kind}`
+          kindEl.hidden = false
+        }
 
         const argsStr =
           d.args != null
-            ? typeof d.args === "string"
-              ? d.args
-              : JSON.stringify(d.args, null, 2)
+            ? typeof d.args === "string" ? d.args : JSON.stringify(d.args, null, 2)
             : null
         let resultStr = null
         if (d.result != null) {
           const raw = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2)
-          resultStr =
-            raw.length > TOOL_RESULT_TRUNCATE
-              ? raw.slice(0, TOOL_RESULT_TRUNCATE) +
-                `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
-              : raw
+          resultStr = raw.length > TOOL_RESULT_TRUNCATE
+            ? raw.slice(0, TOOL_RESULT_TRUNCATE) + `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
+            : raw
         }
-        if (argsStr != null)
-          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tca-${safeId}');e.hidden=!e.hidden">Args</button>`
-        if (resultStr != null)
-          html += ` <button class="tool-call-toggle" onclick="var e=document.getElementById('tcr-${safeId}');e.hidden=!e.hidden">Result</button>`
-        if (argsStr != null)
-          html += `<pre class="tool-call-detail" id="tca-${safeId}" hidden>${escHtml(argsStr)}</pre>`
-        if (resultStr != null)
-          html += `<pre class="tool-call-detail" id="tcr-${safeId}" hidden>${escHtml(resultStr)}</pre>`
-        el.innerHTML = html
+
+        if (argsStr != null) {
+          const pre = el.querySelector(".args")
+          pre.textContent = argsStr; pre.hidden = false; pre.previousElementSibling.hidden = false
+          el.setAttribute("hasdetails", "")
+        }
+        if (resultStr != null) {
+          const pre = el.querySelector(".result")
+          pre.textContent = resultStr; pre.hidden = false; pre.previousElementSibling.hidden = false
+          el.setAttribute("hasdetails", "")
+        }
+
         messages.scrollTop = messages.scrollHeight
       }
 
-      function finalizeToolCallsPanel() {
-        if (toolCallsSummaryEl?.open) {
-          setTimeout(() => {
-            if (toolCallsSummaryEl) toolCallsSummaryEl.open = false
-          }, 800)
+      function finalizeTurnPanel() {
+        if (turnPanelEl?.open) {
+          setTimeout(() => { if (turnPanelEl) collapseTurnPanel(turnPanelEl) }, 800)
         }
       }
 
       function promoteLatestThinkingToResponse(responseText) {
-        if (!thinkingSummaryEl || !latestThinkingMatches(responseText)) return null
+        if (!turnPanelEl || !latestThinkingMatches(responseText)) return null
 
         thinkingTexts.pop()
         const responseEl = thinkingStepEls.pop()
-        thinkingStepCount = thinkingStepEls.length
 
         responseEl.className = "msg agent"
         responseEl._promotedFromThinking = true
@@ -1285,12 +1159,12 @@
         responseEl._wrap = wrap
         messages.insertBefore(wrap, typing.parentElement === messages ? typing : statusText)
 
-        if (thinkingStepEls.length === 0) {
-          thinkingSummaryEl.remove()
-          thinkingSummaryEl = null
+        if (thinkingStepEls.length === 0 && toolCallsMap.size === 0) {
+          turnPanelEl.remove()
+          turnPanelEl = null
         } else {
-          updateThinkingSummaryLabel()
-          collapseThinkingSummary(thinkingSummaryEl)
+          updateTurnPanelLabel()
+          collapseTurnPanel(turnPanelEl)
         }
 
         messages.scrollTop = messages.scrollHeight
@@ -1300,28 +1174,27 @@
       function finalizeThinking(beforeEl, responseText) {
         clearPendingThinkingUpdate()
         if (beforeEl?._promotedFromThinking) return
-        if (thinkingStepEls.length === 0 || !thinkingSummaryEl) return
+        if (thinkingStepEls.length === 0 || !turnPanelEl) return
         // Stream labels every model turn as thinking until terminal response is
         // known. Its final turn is authoritative response, never a thinking step.
         thinkingTexts.pop()
         const finalResponse = thinkingStepEls.pop()
         finalResponse?.remove()
-        thinkingStepCount = thinkingStepEls.length
-        updateThinkingSummaryLabel()
+        updateTurnPanelLabel()
 
-        if (thinkingStepEls.length === 0) {
-          thinkingSummaryEl.remove()
-          thinkingSummaryEl = null
+        if (thinkingStepEls.length === 0 && toolCallsMap.size === 0) {
+          turnPanelEl.remove()
+          turnPanelEl = null
           return
         }
 
-        if (beforeEl && thinkingSummaryEl.nextSibling !== (beforeEl._wrap ?? beforeEl)) {
-          messages.insertBefore(thinkingSummaryEl, beforeEl._wrap ?? beforeEl)
+        if (beforeEl && turnPanelEl.nextSibling !== (beforeEl._wrap ?? beforeEl)) {
+          messages.insertBefore(turnPanelEl, beforeEl._wrap ?? beforeEl)
         }
-        collapseThinkingSummary(thinkingSummaryEl)
+        collapseTurnPanel(turnPanelEl)
       }
 
-      function collapseThinkingSummary(el) {
+      function collapseTurnPanel(el) {
         if (!el || !el.open) return
 
         if (prefersReducedMotion()) {
@@ -1332,30 +1205,28 @@
         const summary = el.querySelector("summary")
         const startHeight = `${el.offsetHeight}px`
         const endHeight = `${summary?.offsetHeight ?? 0}px`
-        const animationId = (el._thinkingAnimationId ?? 0) + 1
-        el._thinkingAnimationId = animationId
+        const animationId = (el._animationId ?? 0) + 1
+        el._animationId = animationId
         let finished = false
 
         const finish = () => {
           el.removeEventListener("transitionend", finish)
-          if (el._thinkingAnimationId !== animationId) return
+          if (el._animationId !== animationId) return
           if (finished) return
           finished = true
           el.open = false
-          resetThinkingSummaryAnimation(el)
+          resetTurnPanelAnimation(el)
         }
 
-        resetThinkingSummaryAnimation(el)
+        resetTurnPanelAnimation(el)
         el.style.overflow = "hidden"
         el.style.height = startHeight
-        requestAnimationFrame(() => {
-          el.style.height = endHeight
-        })
+        requestAnimationFrame(() => { el.style.height = endHeight })
         el.addEventListener("transitionend", finish)
         setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
       }
 
-      function expandThinkingSummary(el) {
+      function expandTurnPanel(el) {
         if (!el || el.open) return
 
         if (prefersReducedMotion()) {
@@ -1367,24 +1238,22 @@
         const summary = el.querySelector("summary")
         const startHeight = `${summary?.offsetHeight ?? 0}px`
         const endHeight = `${el.scrollHeight}px`
-        const animationId = (el._thinkingAnimationId ?? 0) + 1
-        el._thinkingAnimationId = animationId
+        const animationId = (el._animationId ?? 0) + 1
+        el._animationId = animationId
         let finished = false
 
         const finish = () => {
           el.removeEventListener("transitionend", finish)
-          if (el._thinkingAnimationId !== animationId) return
+          if (el._animationId !== animationId) return
           if (finished) return
           finished = true
-          resetThinkingSummaryAnimation(el)
+          resetTurnPanelAnimation(el)
         }
 
-        resetThinkingSummaryAnimation(el)
+        resetTurnPanelAnimation(el)
         el.style.overflow = "hidden"
         el.style.height = startHeight
-        requestAnimationFrame(() => {
-          el.style.height = endHeight
-        })
+        requestAnimationFrame(() => { el.style.height = endHeight })
         el.addEventListener("transitionend", finish)
         setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
       }
@@ -1539,7 +1408,7 @@
           if (!thinkingFinalized) finalizeThinking(lastStreamingBubble, streamingText)
           if (tokenUsage && lastStreamingBubble)
             attachMsgMeta(lastStreamingBubble, tokenUsage, durationMs)
-          finalizeToolCallsPanel()
+          finalizeTurnPanel()
           lastStreamingBubble = null
           streamingBubble = null
           streamingText = ""
@@ -1550,7 +1419,7 @@
         if (streamingBubble) {
           if (streamingText) streamingBubble.innerHTML = md(streamingText)
           finalizeThinking(streamingBubble, streamingText)
-          finalizeToolCallsPanel()
+          finalizeTurnPanel()
           streamingBubble = null
           streamingText = ""
           return
@@ -1563,7 +1432,7 @@
           promoteLatestThinkingToResponse(reply) || addMessage("agent", reply || "(no response)")
         if (tokenUsage) attachMsgMeta(replyEl, tokenUsage, durationMs)
         finalizeThinking(replyEl, reply)
-        finalizeToolCallsPanel()
+        finalizeTurnPanel()
       }
 
       function enqueueMessage() {
@@ -1614,12 +1483,8 @@
         clearPendingThinkingUpdate()
         thinkingStepEls = []
         thinkingTexts = []
-        thinkingStepCount = 0
-        thinkingSummaryEl = null
-        currentThinkingArtifactId = null
-        currentThinkingClosed = false
+        turnPanelEl = null
         toolCallsMap = new Map()
-        toolCallsSummaryEl = null
 
         const useStream = useStreaming
         try {
@@ -1637,16 +1502,12 @@
                   messageId: crypto.randomUUID(),
                   ...(contextId ? { contextId } : {}),
                   parts: [{ kind: "text", text }],
-                  ...(optToolTracing.checked
-                    ? {
-                        metadata: {
-                          "tool-status-update": {
-                            args: optArgs.checked,
-                            result: optResult.checked,
-                          },
-                        },
-                      }
-                    : {}),
+                  metadata: {
+                    "tool-status-update": {
+                      args: true,
+                      result: true,
+                    },
+                  },
                 },
               },
             }),
@@ -1780,7 +1641,7 @@
               }
             }
             finalizeThinking(streamingBubble, text)
-            finalizeToolCallsPanel()
+            finalizeTurnPanel()
             thinkingFinalized = true
             lastStreamingBubble = streamingBubble
             streamingBubble = null

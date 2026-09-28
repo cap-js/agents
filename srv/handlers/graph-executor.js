@@ -199,6 +199,7 @@ class GraphExecutor {
     // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
     let thinkingCount = 0
+    let thinkingMsgId = null
     // Holds a trailing fragment of the previous chunk that is a prefix of a known
     // pseudonym hash. Prepended to the next chunk so split hashes are resolved correctly.
     let pendingPrefix = ""
@@ -247,6 +248,9 @@ class GraphExecutor {
           pendingPrefix = ""
           if (!raw) continue
 
+          if (thinkingMsgId !== null && currentMsgId !== thinkingMsgId) thinkingCount++
+          thinkingMsgId = currentMsgId
+
           // Hashes look like name-8hexchars and never contain spaces.
           // On non-last chunks, slice last token and append to next chunk
           // to avoid unresolved boundaries
@@ -275,7 +279,6 @@ class GraphExecutor {
               parts: [{ kind: "text", text }],
             },
           })
-          if (lastChunk) thinkingCount++
           tokenCount++
         } else if (mode === "updates") {
           // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
