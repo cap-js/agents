@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { generateTools } from "./tools.js"
-import { toolName } from "../../lib/utils/utils.js"
+import { toolName, mcpToolKind } from "../../lib/utils/utils.js"
 
 const LOG = cds.log("agents:mcp")
 
@@ -45,7 +45,16 @@ export async function buildMcpToolsLocally(serviceName) {
   const srv = cds.services[serviceName]
   const tools = generateTools(srv)
   const prefix = toolName(`${serviceName}_`)
-  for (const tool of tools) tool.name = `${prefix}${tool.name}`
+  for (const tool of tools) {
+    // Keep PerActionTool's actionName so status-update can resolve the action's label.
+    tool.metadata = {
+      ...tool.metadata,
+      serviceName,
+      kind: mcpToolKind(tool.name),
+      ...(tool.actionName && { actionName: tool.actionName }),
+    }
+    tool.name = `${prefix}${tool.name}`
+  }
 
   LOG.debug(
     `Got ${tools.length} MCP tools from ${serviceName}: ${tools.map((t) => t.name).join(", ")}`,

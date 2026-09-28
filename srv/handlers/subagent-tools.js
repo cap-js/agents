@@ -78,9 +78,9 @@ function formatToolResult({ text, files }) {
 /**
  * Wrap an A2A client as a LangChain tool the agent can call.
  */
-function createA2ATool(client, agentCard) {
+function createA2ATool(client, agentCard, serviceName) {
   const subagent = agentCard.name
-  return tool(
+  const t = tool(
     async ({ message }) => {
       try {
         const messageId = cds.utils.uuid()
@@ -116,6 +116,8 @@ function createA2ATool(client, agentCard) {
       }),
     },
   )
+  t.metadata = { ...t.metadata, kind: "agent", agentName: agentCard.name, serviceName }
+  return t
 }
 
 export async function buildSubAgentToolLocally(serviceName) {
@@ -130,7 +132,7 @@ export async function buildSubAgentToolLocally(serviceName) {
 
   const { RequestContext, DefaultExecutionEventBus } = await import("@a2a-js/sdk/server")
 
-  return tool(
+  const localTool = tool(
     async ({ message }) => {
       const taskId = cds.utils.uuid()
       const contextId = cds.utils.uuid()
@@ -221,6 +223,13 @@ export async function buildSubAgentToolLocally(serviceName) {
       }),
     },
   )
+  localTool.metadata = {
+    ...localTool.metadata,
+    kind: "agent",
+    agentName: agentCard.name,
+    serviceName,
+  }
+  return localTool
 }
 
 export async function buildSubAgentToolFromConnection(serviceName) {
@@ -334,7 +343,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
   )
   const client = await factory.createFromAgentCard(agentCard)
 
-  return createA2ATool(client, agentCard)
+  return createA2ATool(client, agentCard, serviceName)
 }
 
 export function buildSubAgentTool(serviceName) {
