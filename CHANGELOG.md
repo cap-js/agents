@@ -9,6 +9,7 @@
 ### Added
 
 - Preview now shows context size and token usage
+- OpenAI provider support via llm kind `openai`
 
 ### Fixed
 
