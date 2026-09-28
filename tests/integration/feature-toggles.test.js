@@ -26,10 +26,26 @@ describe("Feature Toggles (@agent.card + @agent.directory)", () => {
   })
 
   it("@agent.llm is feature-toggle aware", async () => {
-    // Verify caching doesn't leak between feature vectors
-    const resBob = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: BOB })
-    const resAlice = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: ALICE })
-    expect(resBob.data.name).toBe("MtxTestService")
-    expect(resAlice.data.name).toBe("Experimental Agent")
+    const message = (text) => ({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "message/send",
+      params: {
+        message: {
+          kind: "message",
+          messageId: cds.utils.uuid(),
+          role: "user",
+          parts: [{ kind: "text", text }],
+        },
+      },
+    })
+
+    // Verify graph/model caching doesn't leak between feature vectors
+    const resBob = await POST("/a2a/mtx-test/", message("bob"), { auth: BOB })
+    const resAlice = await POST("/a2a/mtx-test/", message("alice"), { auth: ALICE })
+    expect(resBob.data.result.status.state).toBe("completed")
+    expect(resAlice.data.result.status.state).toBe("completed")
+    expect(resBob.data.result.status.message.parts[0].text).toBe("llm")
+    expect(resAlice.data.result.status.message.parts[0].text).toBe("another-llm")
   })
 })
