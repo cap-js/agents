@@ -35,7 +35,7 @@ describe("@cap-js/agents - Audit Logging", () => {
   })
 
   it("should emit all events as SecurityEvent for SAP ALS compatibility", async () => {
-    await sendMessage("graph-book", "Show me books")
+    await sendMessage("looping", "single response")
     await wait()
 
     const nonSecurity = _auditLogs.filter((l) => l.event !== "SecurityEvent")
@@ -43,7 +43,7 @@ describe("@cap-js/agents - Audit Logging", () => {
   })
 
   it("should include correlationId in all events for DPP cross-referencing", async () => {
-    await sendMessage("graph-book", "Show me books")
+    await sendMessage("looping", "single response")
     await wait()
 
     expect(_auditLogs.length > 0, `expected auditLogs.length > 0`).toBeTruthy()
@@ -58,7 +58,7 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("AgentTaskStarted", () => {
     it("should emit when a new task is submitted", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "single response")
       await wait()
 
       const events = _auditLogs.filter(byEvent("AgentTaskStarted"))
@@ -68,7 +68,7 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(data.event).toBe("AgentTaskStarted")
       expect(typeof data.taskId).toBe("string")
       expect(typeof data.contextId).toBe("string")
-      expect(data.service).toBe("GraphBookService")
+      expect(data.service).toBe("LoopingService")
 
       // Should include the full user message for forensic reconstruction
       expect(data.userMessage).not.toBe(undefined)
@@ -79,7 +79,7 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("AgentTaskCompleted", () => {
     it("should emit when task completes successfully", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "single response")
       await wait()
 
       const events = _auditLogs.filter(byEvent("AgentTaskCompleted"))
@@ -89,12 +89,12 @@ describe("@cap-js/agents - Audit Logging", () => {
       expect(data.event).toBe("AgentTaskCompleted")
       expect(typeof data.taskId).toBe("string")
       expect(typeof data.contextId).toBe("string")
-      expect(data.service).toBe("GraphBookService")
+      expect(data.service).toBe("LoopingService")
       expect(typeof data.duration).toBe("string")
     })
 
     it("should include duration and taskId", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "single response")
       await wait()
 
       const event = _auditLogs.find(byEvent("AgentTaskCompleted"))
@@ -109,7 +109,7 @@ describe("@cap-js/agents - Audit Logging", () => {
       const originalMax = cds.env.agents.quotas.maxTasksPerHourPerUser
       cds.env.agents.quotas.maxTasksPerHourPerUser = 0
 
-      await sendMessage("graph-book", "Should be blocked")
+      await sendMessage("looping", "single response")
       await wait()
 
       cds.env.agents.quotas.maxTasksPerHourPerUser = originalMax
@@ -119,7 +119,7 @@ describe("@cap-js/agents - Audit Logging", () => {
 
       const data = events[0].data.data
       expect(data.event).toBe("QuotaExceeded")
-      expect(data.service).toBe("GraphBookService")
+      expect(data.service).toBe("LoopingService")
       expect(data.reason).toMatch(/tasks per hour per user/)
       expect(events[0].data.ip).not.toBe(undefined)
     })
@@ -128,7 +128,7 @@ describe("@cap-js/agents - Audit Logging", () => {
       const originalMax = cds.env.agents.quotas.maxConcurrentTasks
       cds.env.agents.quotas.maxConcurrentTasks = 0
 
-      await sendMessage("graph-book", "Should be blocked")
+      await sendMessage("looping", "single response")
       await wait()
 
       cds.env.agents.quotas.maxConcurrentTasks = originalMax
@@ -142,7 +142,7 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("ToolInvocation", () => {
     it("should emit for each tool call with args and result", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "show me books")
       await wait()
 
       const events = _auditLogs.filter(byEvent("ToolInvocation"))
@@ -173,7 +173,7 @@ describe("@cap-js/agents - Audit Logging", () => {
     })
 
     it("should include task correlation", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "Show me books")
       await wait()
 
       const toolEvents = _auditLogs.filter(byEvent("ToolInvocation"))
@@ -189,7 +189,7 @@ describe("@cap-js/agents - Audit Logging", () => {
     })
 
     it("should truncate large results to 2000 chars", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "Show me books")
       await wait()
 
       const events = _auditLogs.filter(byEvent("ToolInvocation"))
@@ -203,7 +203,7 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("event ordering and completeness", () => {
     it("should emit events in correct lifecycle order", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("looping", "single response")
       await wait()
 
       const eventNames = _auditLogs.map((l) => l.data?.data?.event)
@@ -228,7 +228,7 @@ describe("@cap-js/agents - Audit Logging", () => {
     })
 
     it("should emit at least TaskStarted + ToolInvocation + TaskCompleted for a successful request", async () => {
-      await sendMessage("graph-book", "Show me books")
+      await sendMessage("pseudo-book", "show books")
       await wait()
 
       const eventTypes = new Set(_auditLogs.map((l) => l.data?.data?.event))
@@ -240,13 +240,13 @@ describe("@cap-js/agents - Audit Logging", () => {
 
   describe("AgentTaskCanceled", () => {
     it("should emit when task is canceled", async () => {
-      const res = await sendMessage("graph-book", "Show me books")
+      const res = await sendMessage("slow-agent", "Show me books")
       const taskId = res.data.result?.id
       expect(taskId).not.toBe(undefined)
 
       _auditLogs.length = 0
 
-      await jsonrpc("graph-book", "tasks/cancel", { id: taskId })
+      await jsonrpc("slow-agent", "tasks/cancel", { id: taskId })
       await wait()
 
       const events = _auditLogs.filter(byEvent("AgentTaskCanceled"))
@@ -255,7 +255,7 @@ describe("@cap-js/agents - Audit Logging", () => {
         const data = events[0].data.data
         expect(data.event).toBe("AgentTaskCanceled")
         expect(data.taskId).toBe(taskId)
-        expect(data.service).toBe("GraphBookService")
+        expect(data.service).toBe("SlowAgentService")
       }
     })
   })
