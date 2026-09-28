@@ -9,6 +9,11 @@
 ### Added
 
 - Preview now shows context size and token usage
+- Model and model parameters are shown in evaluation runs in MLflow
+
+### Changed
+
+- Consider static assertions in tests now in output_correctness metrics of evaluation runs
 
 ### Fixed
 

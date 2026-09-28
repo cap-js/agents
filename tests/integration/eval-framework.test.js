@@ -2,6 +2,11 @@ import cds from "@sap/cds"
 import { metricsFromSpans } from "../../lib/eval/metrics.js"
 import { Judge, matchToolCall } from "../../lib/eval/Judge.js"
 import { getActiveRunState, recordEvaluation } from "../../lib/eval/eval-run.js"
+import {
+  logFinalMlflowMetrics,
+  logMlflowRunMetadata,
+} from "../../lib/telemetry/mlflow/evaluation.js"
+import { DatabricksExporter } from "../../lib/telemetry/mlflow/exporter/DatabricksExporter.js"
 import { installEvalDescribe } from "../../lib/eval/eval-describe.js"
 
 cds.env.requires.llm = { kind: "mock", impl: "@cap-js/agents/lib/models/mock" } // only for cds 8
@@ -475,6 +480,89 @@ describe("eval-run helpers", () => {
     const result = { taskId: "t1", traceId: "tr1", _evalState: state }
     recordEvaluation(result, { pass: true })
     expect(state.validationsByTask.size).toBe(0)
+  })
+
+  it("logs final MLflow metric aggregates at step 1", async () => {
+    const logged = []
+    const exporter = {
+      getMetricHistory: async (_runId, key) => {
+        if (key === "latency_ms") {
+          return [
+            { value: 100, step: 0 },
+            { value: 200, step: 0 },
+            { value: 999, step: 1 },
+          ]
+        }
+        return [
+          { value: 1, step: 0 },
+          { value: 2, step: 0 },
+          { value: 999, step: 1 },
+        ]
+      },
+      logMetric: async (runId, key, value, opts) => logged.push({ runId, key, value, opts }),
+    }
+
+    await logFinalMlflowMetrics("run-1", new Set(["input_tokens", "latency_ms"]), exporter)
+
+    expect(logged).toEqual([
+      { runId: "run-1", key: "input_tokens", value: 3, opts: { step: 1 } },
+      { runId: "run-1", key: "latency_ms", value: 150, opts: { step: 1 } },
+    ])
+  })
+
+  it("logs MLflow model metadata as params", async () => {
+    const params = []
+    const exporter = {
+      logParam: async (runId, key, value) => params.push({ runId, key, value }),
+    }
+
+    await logMlflowRunMetadata(
+      "run-1",
+      {
+        model: "gpt-5",
+        provider: "sap-ai-core",
+        params: { temperature: 0, max_tokens: 4096, stop: ["END"] },
+      },
+      exporter,
+    )
+
+    expect(params).toEqual([
+      { runId: "run-1", key: "llm.model", value: "gpt-5" },
+      { runId: "run-1", key: "llm.provider", value: "sap-ai-core" },
+      { runId: "run-1", key: "llm.param.temperature", value: "0" },
+      { runId: "run-1", key: "llm.param.max_tokens", value: "4096" },
+      { runId: "run-1", key: "llm.param.stop", value: '["END"]' },
+    ])
+  })
+})
+
+describe("Databricks MLflow exporter", () => {
+  it("fetches metric history with the Databricks GET API and page tokens", async () => {
+    const calls = []
+    const exporter = new DatabricksExporter({ host: "https://example.com" })
+    exporter._fetch = async (path, body, method) => {
+      calls.push({ path, body, method })
+      return calls.length === 1
+        ? { metrics: [{ value: 1, step: 0 }], next_page_token: "next" }
+        : { metrics: [{ value: 2, step: 0 }] }
+    }
+
+    await expect(exporter.getMetricHistory("run-1", "latency_ms")).resolves.toEqual([
+      { value: 1, step: 0 },
+      { value: 2, step: 0 },
+    ])
+    expect(calls).toEqual([
+      {
+        path: "/api/2.0/mlflow/metrics/get-history?run_id=run-1&metric_key=latency_ms&max_results=1000",
+        body: undefined,
+        method: "GET",
+      },
+      {
+        path: "/api/2.0/mlflow/metrics/get-history?run_id=run-1&metric_key=latency_ms&max_results=1000&page_token=next",
+        body: undefined,
+        method: "GET",
+      },
+    ])
   })
 })
 
