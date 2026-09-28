@@ -6,7 +6,7 @@ axios.defaults.validateStatus = () => true
 const ALICE = { username: "alice", password: "" }
 const BOB = { username: "bob", password: "" }
 
-describe("@cap-js/agents - Feature Toggles (@agent.card + @agent.directory)", () => {
+describe("Feature Toggles (@agent.card + @agent.directory)", () => {
   it("bob gets default agent card (no features)", async () => {
     const res = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: BOB })
     expect(res.status).toBe(200)
@@ -25,7 +25,7 @@ describe("@cap-js/agents - Feature Toggles (@agent.card + @agent.directory)", ()
     expect(res.data.skills[0].tags).toEqual(["experimental"])
   })
 
-  it("different users get different cards in same process", async () => {
+  it("@agent.llm is feature-toggle aware", async () => {
     // Verify caching doesn't leak between feature vectors
     const resBob = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: BOB })
     const resAlice = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: ALICE })

@@ -18,6 +18,10 @@
       "[with-mtx]": {
         "multitenancy": true
       },
+      "another-llm": {
+        "kind": "aicore",
+        "model": "gpt-5.6-terra"
+      },
       "auth": {
         "kind": "mocked",
         "users": {
