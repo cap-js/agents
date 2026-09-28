@@ -443,7 +443,9 @@
         font-style: italic;
         overflow-x: auto;
       }
-      .thinking-step p { margin: 0; }
+      .thinking-step p {
+        margin: 0;
+      }
       .thinking-step + .thinking-step,
       .thinking-step + .tool-call-item,
       .tool-call-item + .thinking-step,
@@ -1087,9 +1089,9 @@
           el.className = "tool-call-item"
           el.innerHTML =
             `<summary>` +
-              `<span class="tool-call-status"></span> ` +
-              `<span class="tool-call-label"></span>` +
-              `<span class="tool-call-kind" hidden></span>` +
+            `<span class="tool-call-status"></span> ` +
+            `<span class="tool-call-label"></span>` +
+            `<span class="tool-call-kind" hidden></span>` +
             `</summary>` +
             `<div class="tool-call-detail-label" hidden>Args</div><pre class="tool-call-detail args" hidden></pre>` +
             `<div class="tool-call-detail-label" hidden>Result</div><pre class="tool-call-detail result" hidden></pre>`
@@ -1114,24 +1116,32 @@
 
         const argsStr =
           d.args != null
-            ? typeof d.args === "string" ? d.args : JSON.stringify(d.args, null, 2)
+            ? typeof d.args === "string"
+              ? d.args
+              : JSON.stringify(d.args, null, 2)
             : null
         let resultStr = null
         if (d.result != null) {
           const raw = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2)
-          resultStr = raw.length > TOOL_RESULT_TRUNCATE
-            ? raw.slice(0, TOOL_RESULT_TRUNCATE) + `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
-            : raw
+          resultStr =
+            raw.length > TOOL_RESULT_TRUNCATE
+              ? raw.slice(0, TOOL_RESULT_TRUNCATE) +
+                `\n… (+${raw.length - TOOL_RESULT_TRUNCATE} chars)`
+              : raw
         }
 
         if (argsStr != null) {
           const pre = el.querySelector(".args")
-          pre.textContent = argsStr; pre.hidden = false; pre.previousElementSibling.hidden = false
+          pre.textContent = argsStr
+          pre.hidden = false
+          pre.previousElementSibling.hidden = false
           el.setAttribute("hasdetails", "")
         }
         if (resultStr != null) {
           const pre = el.querySelector(".result")
-          pre.textContent = resultStr; pre.hidden = false; pre.previousElementSibling.hidden = false
+          pre.textContent = resultStr
+          pre.hidden = false
+          pre.previousElementSibling.hidden = false
           el.setAttribute("hasdetails", "")
         }
 
@@ -1140,7 +1150,9 @@
 
       function finalizeTurnPanel() {
         if (turnPanelEl?.open) {
-          setTimeout(() => { if (turnPanelEl) collapseTurnPanel(turnPanelEl) }, 800)
+          setTimeout(() => {
+            if (turnPanelEl) collapseTurnPanel(turnPanelEl)
+          }, 800)
         }
       }
 
@@ -1221,7 +1233,9 @@
         resetTurnPanelAnimation(el)
         el.style.overflow = "hidden"
         el.style.height = startHeight
-        requestAnimationFrame(() => { el.style.height = endHeight })
+        requestAnimationFrame(() => {
+          el.style.height = endHeight
+        })
         el.addEventListener("transitionend", finish)
         setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
       }
@@ -1253,7 +1267,9 @@
         resetTurnPanelAnimation(el)
         el.style.overflow = "hidden"
         el.style.height = startHeight
-        requestAnimationFrame(() => { el.style.height = endHeight })
+        requestAnimationFrame(() => {
+          el.style.height = endHeight
+        })
         el.addEventListener("transitionend", finish)
         setTimeout(finish, THINKING_SUMMARY_ANIMATION_MS + 80)
       }
