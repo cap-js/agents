@@ -1,8 +1,7 @@
 name: Lint & Prettier
 
 on:
-  push:
-    branches: [main]
+  merge_group:
   pull_request:
     types: [opened, synchronize, reopened, auto_merge_enabled]
 

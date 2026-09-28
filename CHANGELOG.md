@@ -4,6 +4,32 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.8 - tbd
+
+### Added
+
+- Preview now shows context size and token usage
+
+### Fixed
+
+- Correctly handle non `@cap-js/mcp` tools during PII masking
+- Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
+- Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
+
+## Version 0.9.7 - 2026-09-23
+
+### Added
+
+- CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
+- Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP when the respective services are enabled & cds.env.agents.masking = true
+- Chat preview queues messages submitted while the agent is busy
+
+### Fixed
+
+- Chat preview keeps the message field height stable when typing the first character
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
+- `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
+
 ## Version 0.9.6 - 2026-09-17
 
 ### Fixed

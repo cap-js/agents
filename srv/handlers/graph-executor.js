@@ -6,6 +6,8 @@ import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "./tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
+import { resolvePseudonyms } from "../../lib/masking/index.js"
+import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
@@ -197,6 +199,9 @@ class GraphExecutor {
     // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
     let thinkingCount = 0
+    // Holds a trailing fragment of the previous chunk that is a prefix of a known
+    // pseudonym hash. Prepended to the next chunk so split hashes are resolved correctly.
+    let pendingPrefix = ""
 
     try {
       if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
@@ -238,8 +243,23 @@ class GraphExecutor {
           const lastChunk =
             !!msgChunk.additional_kwargs?.intermediate_results?.llm?.choices[0].finish_reason
 
-          const text = messageText(msgChunk?.content)
-          if (!text) continue
+          const raw = pendingPrefix + (messageText(msgChunk?.content) ?? "")
+          pendingPrefix = ""
+          if (!raw) continue
+
+          // Hashes look like name-8hexchars and never contain spaces.
+          // On non-last chunks, slice last token and append to next chunk
+          // to avoid unresolved boundaries
+          let toEmit = raw
+          if (!lastChunk) {
+            const lastSpace = raw.lastIndexOf(" ")
+            if (lastSpace !== -1 && lastSpace < raw.length - 1) {
+              pendingPrefix = raw.slice(lastSpace + 1)
+              toEmit = raw.slice(0, lastSpace + 1)
+            }
+          }
+
+          const text = resolvePseudonyms(toEmit)
           // A2A TaskArtifactUpdateEvent: `append` and `lastChunk` are event-level
           // fields (siblings of `artifact`), NOT properties of `artifact`. The SDK's
           // ResultManager reads event.append; nesting them leaves it undefined and
@@ -354,16 +374,18 @@ class GraphExecutor {
    */
   async _summarizePartialWork(taskId, contextId, serviceName, reason) {
     const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
-    return summarizePartialWork({
-      taskId,
-      contextId,
-      serviceName,
-      reason,
-      checkpointer: this._graph?.checkpointer,
-      getModel: () => this._srv.send("buildModel"),
-      // Summary runs after graph abort, so no execution-time grace is needed.
-      timeout: 10_000,
-    })
+    return resolvePseudonyms(
+      await summarizePartialWork({
+        taskId,
+        contextId,
+        serviceName,
+        reason,
+        checkpointer: this._graph?.checkpointer,
+        getModel: () => this._srv.send("buildModel"),
+        // Summary runs after graph abort, so no execution-time grace is needed.
+        timeout: 10_000,
+      }),
+    )
   }
 
   async execute(requestContext, eventBus) {
@@ -384,6 +406,17 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+
+    // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
+    const graph = await this._resolveGraph()
+    if (cds.env.agents.masking) {
+      await pseudonymizeUserMessage(
+        this._srv,
+        requestContext,
+        graph.checkpointer,
+        `${serviceName}:${contextId}`,
+      )
+    }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
@@ -533,8 +566,6 @@ class GraphExecutor {
       let usageData
       let result
       try {
-        const graph = await this._resolveGraph()
-
         const extraConfig = this._configMapper ? await this._configMapper(requestContext) : {}
         if (extraConfig !== null && extraConfig !== undefined && typeof extraConfig !== "object") {
           throw new TypeError(`configMapper must return a plain object, got ${typeof extraConfig}`)
@@ -611,7 +642,7 @@ class GraphExecutor {
         }
 
         const outputMapper = this._outputMapper || defaultOutputMapper
-        const output = outputMapper(result) || "I could not generate a response."
+        const output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
 
         LOG.info(serviceName, "completed", { conversation: short(contextId), duration })
 
@@ -620,7 +651,9 @@ class GraphExecutor {
           setSpanAttrs(
             wfSpan,
             mlflowAttrs("AGENT", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: output } }],
+              },
               functionName: serviceName,
             }),
           )
@@ -630,7 +663,9 @@ class GraphExecutor {
           setSpanAttrs(
             rootSpan,
             mlflowAttrs("CHAIN", {
-              outputs: { choices: [{ message: { role: "assistant", content: output } }] },
+              outputs: {
+                choices: [{ message: { role: "assistant", content: output } }],
+              },
             }),
           )
         }
@@ -875,16 +910,19 @@ class GraphExecutor {
           eventBus._graphResult = { messages: result.messages || [] }
         }
 
+        const usageMeta =
+          usageData?.total_tokens > 0 ? { "sap.cds.agents.token-usage": usageData } : undefined
         eventBus.publish({
           kind: "status-update",
           taskId,
           contextId,
           status: {
             state: "completed",
-            message: agentMessage(output),
+            message: agentMessage(output, undefined, usageMeta),
             timestamp: new Date().toISOString(),
           },
           final: true,
+          metadata: usageMeta,
         })
       } catch (err) {
         // Aborted (client disconnect or tasks/cancel) — publish canceled, not failed
@@ -1111,13 +1149,16 @@ function aggregateUsageData(messages) {
     cache_creation_input_tokens: 0,
     cache_read_input_tokens: 0,
     reasoning_tokens: 0,
+    context_tokens: 0,
   }
   for (let i = 0; i < messages.length; i++) {
     if (!messages[i].usage_metadata) continue
     const innerRes = convertUsageData(messages[i].usage_metadata)
     Object.keys(innerRes).forEach((k) => {
-      if (innerRes[k] != null) result[k] += innerRes[k]
+      if (k in result && innerRes[k] != null) result[k] += innerRes[k]
     })
+    if (innerRes.input_tokens != null)
+      result.context_tokens = innerRes.input_tokens + (innerRes.output_tokens || 0)
   }
   return result
 }

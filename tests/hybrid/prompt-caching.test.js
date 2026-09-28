@@ -46,7 +46,7 @@ const GPT_52_CASE = {
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 const sendMessage = createSendMessage(POST)
 
-describe("@cap-js/agents - Hybrid prompt caching (AI Core GPT)", () => {
+describe("Prompt caching", () => {
   axios.defaults.validateStatus = () => true
   let savedModel
 
@@ -74,7 +74,10 @@ describe("@cap-js/agents - Hybrid prompt caching (AI Core GPT)", () => {
           auth: { username: user, password: "" },
         })
         expect(res.status).toBe(200)
-        expect(res.data.result?.status?.state).toBe("completed")
+        expect(
+          res.data.result?.status?.state,
+          res.data.result?.status?.message?.parts[0]?.text,
+        ).toBe("completed")
       })
 
       const chatSpan = findSpan(spans, `chat ${modelName}`)

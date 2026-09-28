@@ -8,9 +8,9 @@
   },
   "dependencies": {
     "@cap-js/agents": "*",
-    "@cap-js/hana": "^3.1.0",
+    "@cap-js/hana": "^3.1.1",
     "@cap-js/sqlite": ">=1",
-    "@sap/cds": "^10.1.0"
+    "@sap/cds": "^10.1.1"
   },
   "cds": {
     "build": {
