@@ -994,7 +994,7 @@ class GraphExecutor {
           let metadata
           if (err.retryAfter) {
             message = err.message
-            metadata["sap.cds.agents.quota.exceeded.retry"] = err.retryAfter
+            metadata = { "sap.cds.agents.quota.exceeded.retry": err.retryAfter }
           } else {
             message = await this._summarizePartialWork(taskId, contextId, serviceName, "quota")
           }
