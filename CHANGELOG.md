@@ -8,6 +8,7 @@
 
 ### Added
 
+- Tool and subagent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; opt-in per request via `userMessage.metadata["tool-status-update"]`; also added to preview
 - Preview now shows context size and token usage
 - OpenAI provider support via llm kind `openai`
 - Model and model parameters are shown in evaluation runs in MLflow
@@ -23,6 +24,7 @@
 - Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
 - Summarize on timeout prompts are now correctly shown in MLflow
 - Evaluation run metrics are now correctly aggregated in MLflow
+- Thinking steps are now correctly separated also inside a turn
 
 ## Version 0.9.7 - 2026-09-23
 
