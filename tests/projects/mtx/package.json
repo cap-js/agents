@@ -19,6 +19,11 @@
       "[with-mtx]": {
         "multitenancy": true
       },
+      "llm": {
+        "kind": "aicore",
+        "model": "gpt-5.5",
+        "contentFilter": false
+      },
       "another-llm": {
         "kind": "aicore",
         "model": "gpt-5.6-terra",
