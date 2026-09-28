@@ -6,6 +6,7 @@ import {
   logFinalMlflowMetrics,
   logMlflowRunMetadata,
 } from "../../lib/telemetry/mlflow/evaluation.js"
+import { MlflowExporter } from "../../lib/telemetry/mlflow/exporter/MlflowExporter.js"
 import { DatabricksExporter } from "../../lib/telemetry/mlflow/exporter/DatabricksExporter.js"
 import { installEvalDescribe } from "../../lib/eval/eval-describe.js"
 
@@ -536,6 +537,31 @@ describe("eval-run helpers", () => {
   })
 })
 
+describe("MLflow exporter", () => {
+  it("links prompt versions to runs with a JSON run tag", async () => {
+    const calls = []
+    const exporter = new MlflowExporter({ host: "https://example.com" })
+    exporter._fetch = async (path, body, method) => {
+      calls.push({ path, body, method })
+      return {}
+    }
+
+    await exporter.linkPromptVersionsToRun("run-1", [{ name: "prompt-a", version: "1" }])
+
+    expect(calls).toEqual([
+      {
+        path: "/api/2.0/mlflow/runs/set-tag",
+        body: {
+          run_id: "run-1",
+          key: "mlflow.linkedPrompts",
+          value: JSON.stringify([{ name: "prompt-a", version: "1" }]),
+        },
+        method: undefined,
+      },
+    ])
+  })
+})
+
 describe("Databricks MLflow exporter", () => {
   it("fetches metric history with the Databricks GET API and page tokens", async () => {
     const calls = []
@@ -562,6 +588,61 @@ describe("Databricks MLflow exporter", () => {
         body: undefined,
         method: "GET",
       },
+    ])
+  })
+
+  it("links prompt versions to runs with fallback tag and Databricks UC API", async () => {
+    const calls = []
+    const exporter = new DatabricksExporter({ host: "https://example.com" })
+    exporter._fetch = async (path, body, method) => {
+      calls.push({ path, body, method })
+      return {}
+    }
+
+    await exporter.linkPromptVersionsToRun("run-1", [{ name: "prompt-a", version: "1" }])
+
+    expect(calls).toEqual([
+      {
+        path: "/api/2.0/mlflow/runs/set-tag",
+        body: {
+          run_id: "run-1",
+          key: "mlflow.linkedPrompts",
+          value: JSON.stringify([{ name: "prompt-a", version: "1" }]),
+        },
+        method: undefined,
+      },
+      {
+        path: "/api/2.0/mlflow/unity-catalog/prompt-versions/links-to-runs",
+        body: {
+          prompt_versions: [{ name: "prompt-a", version: "1" }],
+          run_ids: ["run-1"],
+        },
+        method: undefined,
+      },
+    ])
+  })
+
+  it("uses API 2.0 prefix for Databricks prompt APIs", async () => {
+    const calls = []
+    const exporter = new DatabricksExporter({ host: "https://example.com" })
+    exporter._fetch = async (path, body, method) => {
+      calls.push({ path, body, method })
+      if (method === "GET") return { tags: [] }
+      if (path.endsWith("/versions/search"))
+        return { prompt_versions: [{ version: "1", tags: [] }] }
+      if (path.endsWith("/versions")) return { version: "2" }
+      return {}
+    }
+
+    await exporter.ensurePrompt("prompt-a", "description")
+    await exporter.createPromptVersion("prompt-a", "description", [], "template")
+    await exporter.setRegisteredModelTag("prompt-a", "key", "value")
+
+    expect(calls.map((call) => call.path)).toEqual([
+      "/api/2.0/mlflow/unity-catalog/prompts/prompt-a",
+      "/api/2.0/mlflow/unity-catalog/prompts/prompt-a/versions/search",
+      "/api/2.0/mlflow/unity-catalog/prompts/prompt-a/versions",
+      "/api/2.0/mlflow/unity-catalog/prompts/prompt-a/tags",
     ])
   })
 })
