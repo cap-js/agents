@@ -381,7 +381,7 @@ class GraphExecutor {
         serviceName,
         reason,
         checkpointer: this._graph?.checkpointer,
-        getModel: () => this._srv.send("buildModel", { _summarize: true }),
+        getModel: () => this._srv.send("buildModel", { _promptName: "cap-js-agents-summarize" }),
         // Summary runs after graph abort, so no execution-time grace is needed.
         timeout: 10_000,
       }),
