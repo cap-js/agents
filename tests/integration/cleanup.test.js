@@ -170,6 +170,18 @@ describe("@cap-js/agents - Task Cleanup", () => {
     })
   })
 
+  describe("triggerCleanup - setTimeout overflow protection", () => {
+    it("should handle retention values > 24 days", async () => {
+      cds.env.agents.retention = "30d"
+      await triggerCleanup(SERVICE_NAME)
+    })
+
+    it("should handle very large retention values", async () => {
+      cds.env.agents.retention = "365d"
+      await triggerCleanup(SERVICE_NAME)
+    })
+  })
+
   if (parseInt(cds.version) > 9) {
     describe("triggerCleanup (throttle)", () => {
       beforeEach(async () => {
