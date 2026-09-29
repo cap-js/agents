@@ -168,6 +168,42 @@ describe("@cap-js/agents - Task Cleanup", () => {
       const row = await SELECT.one.from(TASKS).where({ taskId })
       expect(row).toBeUndefined()
     })
+
+    it("should default to 7 days when retention is undefined", async () => {
+      cds.env.agents.retention = undefined
+
+      const oldTaskId = cds.utils.uuid()
+      const recentTaskId = cds.utils.uuid()
+
+      await insertTask({ taskId: oldTaskId, modifiedAt: pastDate(10) })
+      await insertTask({ taskId: recentTaskId, modifiedAt: pastDate(3) })
+
+      await cleanupExpiredTasks(SERVICE_NAME)
+
+      const old = await SELECT.one.from(TASKS).where({ taskId: oldTaskId })
+      const recent = await SELECT.one.from(TASKS).where({ taskId: recentTaskId })
+
+      expect(old).toBeUndefined()
+      expect(recent).toBeDefined()
+    })
+
+    it("should default to 7 days when retention is true", async () => {
+      cds.env.agents.retention = true
+
+      const oldTaskId = cds.utils.uuid()
+      const recentTaskId = cds.utils.uuid()
+
+      await insertTask({ taskId: oldTaskId, modifiedAt: pastDate(10) })
+      await insertTask({ taskId: recentTaskId, modifiedAt: pastDate(3) })
+
+      await cleanupExpiredTasks(SERVICE_NAME)
+
+      const old = await SELECT.one.from(TASKS).where({ taskId: oldTaskId })
+      const recent = await SELECT.one.from(TASKS).where({ taskId: recentTaskId })
+
+      expect(old).toBeUndefined()
+      expect(recent).toBeDefined()
+    })
   })
 
   describe("triggerCleanup - setTimeout overflow protection", () => {
