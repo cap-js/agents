@@ -220,8 +220,6 @@ export function generateTools(srv) {
     tools.push(createEmitFilePartTool())
   }
 
-  // REVISIT: does that mean we polute the context window with additional tools?
-  // When, and for which purposes are they used?
   if (cds.env.agents?.emitDataParts) {
     tools.push(createEmitDataPartTool())
   }
