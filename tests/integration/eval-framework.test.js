@@ -508,6 +508,22 @@ describe("eval-run helpers", () => {
     expect(logged).toEqual([
       { runId: "run-1", key: "input_tokens", value: 3, opts: { step: 1 } },
       { runId: "run-1", key: "latency_ms", value: 150, opts: { step: 1 } },
+      {
+        runId: "run-1",
+        key: "success_rate",
+        value: 1.5,
+        opts: {
+          step: 1,
+        },
+      },
+      {
+        runId: "run-1",
+        key: "output_correctness",
+        value: 1.5,
+        opts: {
+          step: 1,
+        },
+      },
     ])
   })
 
