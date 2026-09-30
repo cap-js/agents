@@ -2,13 +2,33 @@
   "name": "@cap-js/agents",
   "version": "0.9.7",
   "description": "CDS plugin for building agents",
-  "author": "SAP SE (https://www.sap.com)",
-  "license": "Apache-2.0",
   "homepage": "https://cap.cloud.sap/",
+  "license": "Apache-2.0",
+  "author": "SAP SE (https://www.sap.com)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cap-js/agents.git"
   },
+  "workspaces": [
+    "tests/projects/bookshop/",
+    "tests/projects/deep-agent/",
+    "tests/projects/mtx/mtx/sidecar/",
+    "tests/projects/telemetry-debug/",
+    "tests/projects/telemetry-v1/",
+    "tests/projects/travel/travel-agent/",
+    "tests/projects/travel/xflights/",
+    "tests/projects/travel/leisure-services/",
+    "tests/sidecar-projects/java-bookshop/agent/sidecar",
+    "tests/sidecar-projects/java-bookshop",
+    "tests/sidecar-projects/node-bookshop/agent/sidecar",
+    "tests/sidecar-projects/node-bookshop"
+  ],
+  "files": [
+    "cds-plugin.js",
+    "lib",
+    "srv",
+    "_i18n"
+  ],
   "type": "module",
   "exports": {
     "./package.json": "./package.json",
@@ -30,14 +50,9 @@
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
     "docs:audit": "node .scripts/generate-audit-docs.js",
     "docs:audit:check": "node .scripts/generate-audit-docs.js --check",
-    "prettier:check": "echo prettier has been removed"
+    "format": "npx -y oxfmt@0.70.0",
+    "format:check": "npx -y oxfmt@0.70.0 --check"
   },
-  "files": [
-    "cds-plugin.js",
-    "lib",
-    "srv",
-    "_i18n"
-  ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
     "@cap-js/attachments": ">=3",
@@ -226,19 +241,5 @@
     "folders": {
       "srvs": "srv/*"
     }
-  },
-  "workspaces": [
-    "tests/projects/bookshop/",
-    "tests/projects/deep-agent/",
-    "tests/projects/mtx/mtx/sidecar/",
-    "tests/projects/telemetry-debug/",
-    "tests/projects/telemetry-v1/",
-    "tests/projects/travel/travel-agent/",
-    "tests/projects/travel/xflights/",
-    "tests/projects/travel/leisure-services/",
-    "tests/sidecar-projects/java-bookshop/agent/sidecar",
-    "tests/sidecar-projects/java-bookshop",
-    "tests/sidecar-projects/node-bookshop/agent/sidecar",
-    "tests/sidecar-projects/node-bookshop"
-  ]
+  }
 }
