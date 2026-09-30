@@ -202,7 +202,7 @@ export function generateTools(srv) {
 
   // Action/function tools — per-action (default) or combined call action
   if (has_actions) {
-    if (cds.env.agents?.per_action_tool) {
+    if (cds.env.mcp?.per_action_tool) {
       for (const [name, action] of Object.entries(actions)) {
         LOG.debug(srv.name, '–', `adding specific tool to call action '${name}'`)
         tools.push(new PerActionTool(srv, name, action))
