@@ -51,6 +51,15 @@ describe("@agent.hitl tool wiring (non-hybrid)", () => {
     expect(interruptOn.call.when(callArgs("getStock"))).toBe(false)
   })
 
+  it("adds no 'call' entry (and no middleware) when no action is @agent.hitl", async () => {
+    // Synthetic service: has actions, but none annotated — the when-based entry
+    // must not be installed, so the whole HITL middleware stays off.
+    const srv = { actions: { getStock: {}, listBooks: {} } }
+    const tools = [{ name: "call" }]
+    expect(buildHitlInterruptMap(srv, tools)).toEqual({})
+    expect(await humanInTheLoopMiddleware(srv, tools)).toEqual([])
+  })
+
   it("per-action tools gate by matching the action name directly", async () => {
     const srv = service()
     const interruptOn = await withPerActionTool(true, () => {
