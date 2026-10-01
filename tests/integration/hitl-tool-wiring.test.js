@@ -1,17 +1,21 @@
 import cds from "@sap/cds"
 
-// Boot the bookshop test app — CatalogService.submitOrder is annotated @agent.hitl.
+// Boot the bookshop test app — CatalogService.submitOrder is annotated @agent.hitl,
+// while getStock is a plain, non-gated function.
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
 const { generateTools } = await import("../../srv/handlers/tools.js")
-const { humanInTheLoopMiddleware } = await import("../../lib/agents/middleware/hitl.js")
+const { buildHitlInterruptMap, humanInTheLoopMiddleware } = await import(
+  "../../lib/agents/middleware/hitl.js"
+)
 
-// HITL is wired by matching tool.name against srv.actions[tool.name]["@agent.hitl"]
-// (see lib/agents/middleware/hitl.js). That match only holds for per-action tools,
-// whose name IS the action name ("submitOrder"). The generic combined action tool is
-// named "call", which matches no action — so its presence silently drops HITL.
+// HITL is wired by matching tool calls against srv.actions[...]["@agent.hitl"].
+// Per-action tools carry the action name directly; the generic combined "call"
+// tool (the default) fronts every action behind one name and must gate per-call
+// via `when`, reading the requested action from args.action.
 describe("@agent.hitl tool wiring (non-hybrid)", () => {
   const service = () => cds.services["CatalogService"]
+  const callArgs = (action) => ({ toolCall: { args: { action } } })
 
   // Toggle generateTools' per-action vs generic decision without leaking env across tests.
   const withPerActionTool = async (value, fn) => {
@@ -26,26 +30,35 @@ describe("@agent.hitl tool wiring (non-hybrid)", () => {
 
   it("submitOrder carries the @agent.hitl annotation (model sanity)", () => {
     expect(service().actions.submitOrder?.["@agent.hitl"]).toBeTruthy()
+    expect(service().actions.getStock?.["@agent.hitl"]).toBeFalsy()
   })
 
   it("installs HITL middleware for an @agent.hitl action under the default config", async () => {
     const srv = service()
-    const tools = generateTools(srv)
-    const middleware = await humanInTheLoopMiddleware(srv, tools)
-
-    // Regression (PR #166): the default flipped to the generic "call" action tool,
-    // whose name never matches srv.actions, so no HITL middleware is installed and
-    // @agent.hitl is silently ignored.
+    const middleware = await humanInTheLoopMiddleware(srv, generateTools(srv))
     expect(middleware.length).toBeGreaterThan(0)
   })
 
-  it("installs HITL middleware when per_action_tool is enabled (proves the cause)", async () => {
+  it("generic 'call' tool gates per-action via when (interrupts submitOrder, not getStock)", () => {
     const srv = service()
-    const middleware = await withPerActionTool(true, async () => {
+    const tools = generateTools(srv)
+    expect(tools.map((t) => t.name)).toContain("call")
+
+    const interruptOn = buildHitlInterruptMap(srv, tools)
+    // One entry — the combined tool — not a per-action key.
+    expect(Object.keys(interruptOn)).toEqual(["call"])
+    expect(interruptOn.call.when(callArgs("submitOrder"))).toBe(true)
+    expect(interruptOn.call.when(callArgs("getStock"))).toBe(false)
+  })
+
+  it("per-action tools gate by matching the action name directly", async () => {
+    const srv = service()
+    const interruptOn = await withPerActionTool(true, () => {
       const tools = generateTools(srv)
       expect(tools.map((t) => t.name)).toContain("submitOrder")
-      return humanInTheLoopMiddleware(srv, tools)
+      return buildHitlInterruptMap(srv, tools)
     })
-    expect(middleware.length).toBeGreaterThan(0)
+    expect(interruptOn.submitOrder).toBeDefined()
+    expect(interruptOn.getStock).toBeUndefined()
   })
 })
