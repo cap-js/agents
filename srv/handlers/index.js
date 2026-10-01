@@ -99,6 +99,9 @@ export default function registerDefaultAgentHandlers(srv) {
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)
+    const { credentials, ...o } = options
+    if (credentials) o.credentials = '{ *** }'
+    LOG.debug (`Creating LLMProvider instance for cds.requires.${name} with options:`, o)
     return new LLMProvider(name, { ...options, ...req.data })
   })
 
