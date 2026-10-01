@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- Credentials are no longer exposed in logs when connecting to the `llm` service or instantiating an LLM provider; both now redact via `cds.utils.redacted()`
 - Correctly handle non `@cap-js/mcp` tools during PII masking
 - Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
 - Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
