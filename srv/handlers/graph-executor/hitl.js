@@ -81,23 +81,57 @@ function recordHitlDecisions(serviceName, actionRequests, resume, actionOffset =
   }
 }
 
+const DEFAULT_APPROVAL_PROMPT = "This action requires your approval. Reply 'approve' or 'reject'."
+
+// The generic combined "call" tool fronts every action behind one tool name,
+// carrying the real target in args.action and its own params in args.parameters.
+// HITL is defined over tool calls, so LangGraph's interrupts and resume decisions
+// speak "call" — but clients (and the DataParts we surface) must see the action
+// itself. toActionLevel unwraps on the way out; rewrapResumeDecisions re-wraps edits
+// on the way back in. Per-action tools already carry the action name and pass through.
+const GENERIC_CALL_TOOL = "call"
+
+function toActionLevel(request) {
+  if (request?.name !== GENERIC_CALL_TOOL || request.args?.action === undefined) return request
+  return { ...request, name: request.args.action, args: request.args.parameters ?? {} }
+}
+
+// Preserve the input array's identity when nothing is unwrapped, so extractInterruptData
+// can still return the payload opaquely (callers rely on reference equality).
+function normalizeActionRequests(actionRequests) {
+  if (!Array.isArray(actionRequests)) return actionRequests
+  let changed = false
+  const mapped = actionRequests.map((request) => {
+    const unwrapped = toActionLevel(request)
+    if (unwrapped !== request) changed = true
+    return unwrapped
+  })
+  return changed ? mapped : actionRequests
+}
+
+/** First-line approval prompt from an interrupt payload (action-level), or undefined. */
+function describeInterrupt(payload) {
+  const first = payload?.actionRequests?.[0]
+  if (!first) return undefined
+  const request = toActionLevel(first)
+  return request.description || `Approve action: ${request.name}?`
+}
+
 function extractInterruptDescription(resultOrErr) {
   const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
   const payload = interrupt?.value
-  if (!payload) return "This action requires your approval. Reply 'approve' or 'reject'."
-  if (payload.actionRequests?.length > 0) {
-    return (
-      payload.actionRequests[0].description || `Approve action: ${payload.actionRequests[0].name}?`
-    )
-  }
-  return typeof payload === "string" ? payload : JSON.stringify(payload)
+  if (!payload) return DEFAULT_APPROVAL_PROMPT
+  return (
+    describeInterrupt(payload) ?? (typeof payload === "string" ? payload : JSON.stringify(payload))
+  )
 }
 
 export function extractInterruptData(resultOrErr) {
   const interrupt = resultOrErr.__interrupt__?.[0] || resultOrErr.interrupts?.[0]
   const payload = interrupt?.value
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined
-  const actionRequests = mergeReviewConfigs(payload.actionRequests, payload.reviewConfigs)
+  const merged = mergeReviewConfigs(payload.actionRequests, payload.reviewConfigs)
+  const actionRequests = normalizeActionRequests(merged)
   return actionRequests === payload.actionRequests ? payload : { ...payload, actionRequests }
 }
 
@@ -161,6 +195,37 @@ export function composeHitlDecisionNote(actionRequests, resume) {
     return undefined
   }
   return ["User HITL decisions (not tool failures):", ...lines].join("\n")
+}
+
+/**
+ * Map action-level HITL edit decisions back onto the generic "call" tool's
+ * { action, parameters } shape so LangGraph can re-dispatch the original tool call.
+ * Decisions pair positionally with the interrupted tool calls. Edits on per-action
+ * tools (and non-edit decisions) pass through untouched. Because the action name is
+ * surfaced as the request's name — not an editable arg — an edit cannot silently
+ * swap to a different action; we assert that explicitly to make the invariant loud.
+ */
+export function rewrapResumeDecisions(resume, toolCalls = []) {
+  if (!Array.isArray(resume?.decisions)) return resume
+  let changed = false
+  const decisions = resume.decisions.map((decision, index) => {
+    if (decision?.type !== "edit") return decision
+    const call = toolCalls[index]
+    if (call?.name !== GENERIC_CALL_TOOL) return decision
+    const edited = decision.editedAction ?? {}
+    const action = call.args?.action
+    if (edited.name && action && edited.name !== action) {
+      throw new Error(
+        `HITL edit must not change the gated action (expected "${action}", got "${edited.name}").`,
+      )
+    }
+    changed = true
+    return {
+      ...decision,
+      editedAction: { name: GENERIC_CALL_TOOL, args: { action, parameters: edited.args ?? {} } },
+    }
+  })
+  return changed ? { ...resume, decisions } : resume
 }
 
 async function getPreInterruptToolCalls(graph, config) {
@@ -336,11 +401,11 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     data: { taskId, contextId, service: cds.context?.["agent.service"], decisions },
   })
 
-  const originalActions = actionRequests.length
-    ? actionRequests
-    : await getPreInterruptToolCalls(graph, config)
+  const toolCalls = await getPreInterruptToolCalls(graph, config)
+  const originalActions = actionRequests.length ? actionRequests : toolCalls
+  // Compose the note from the action-level decisions (readable), then re-wrap for the Command.
   const decisionNote = composeHitlDecisionNote(originalActions, resume)
-  const commandArgs = { resume }
+  const commandArgs = { resume: rewrapResumeDecisions(resume, toolCalls) }
   if (decisionNote) commandArgs.update = { _hitlDecisionNote: decisionNote }
   const resumed = await stream(new Command(commandArgs), signal)
   return resumed.state
@@ -355,8 +420,8 @@ export function handleHitlInterrupt({
   onInputRequired,
 }) {
   const { taskId, contextId } = requestContext
-  const description = extractInterruptDescription(result)
   const interruptData = extractInterruptData(result)
+  const description = describeInterrupt(interruptData) ?? extractInterruptDescription(result)
   const actionRequests = interruptData?.actionRequests || interruptActionRequests(result)
   for (const action of actionRequests) {
     metrics.hitlGates.add(1, hitlMetricAttrs(serviceName, action))
