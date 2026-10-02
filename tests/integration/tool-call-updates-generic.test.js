@@ -1,16 +1,10 @@
 import cds from "@sap/cds"
 import { AIMessage } from "@langchain/core/messages"
 
-// Boot the bookshop test app — CatalogService.submitOrder is a real action, so
-// the model-driven label resolution has a definition to resolve against.
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
 const { afterModelHook } = await import("../../lib/agents/middleware/status-update.js")
 
-// The #149 tool-call observability events classify and label each call. The generic
-// combined "call" tool fronts every action behind one tool name, carrying the target
-// action in args.action — so the label must come from args.action, not the tool name.
-// Guards that path (restored in #165) against regressing back to a bare "call" label.
 describe("tool-call data-part updates — generic call tool", () => {
   const emitFor = (toolCall, toolNames) => {
     const events = []
@@ -37,7 +31,6 @@ describe("tool-call data-part updates — generic call tool", () => {
     )
     expect(data?.type).toBe("tool-call")
     expect(data.name).toBe("call")
-    // The regression guard: label is derived from the requested action.
     expect(data.label).toBe("submitOrder")
   })
 
