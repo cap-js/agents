@@ -83,15 +83,8 @@ cds.on("bootstrap", (app) => {
       cds.env.requires.llm = resolve_openai_config(cds.requires.llm)
     }
 
-    const config = cds.requires.llm,
-      credentials = {}
-    const { url, destination, anthropicApiUrl, baseURL, apiKey } = config?.credentials || {}
-    if (url) credentials.url = url
-    if (destination) credentials.destination = destination
-    if (anthropicApiUrl) credentials.anthropicApiUrl = anthropicApiUrl
-    if (baseURL) credentials.baseURL = baseURL
-    if (apiKey) credentials.apiKey = "***"
-    LOG.info(`cds.connect.to 'llm' with:`, { ...config, credentials })
+    const config = cds.requires.llm
+    LOG.info(`cds.connect.to 'llm' with:`, cds.utils.redacted(config))
   })
 })()
 
