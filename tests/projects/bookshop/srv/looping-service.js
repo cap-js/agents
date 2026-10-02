@@ -35,6 +35,7 @@ export default class LoopingService extends cds.ApplicationService {
         return this
       }
       async _generate(messages) {
+        if (messages.length === 1) iteration = 0
         iteration++
         const lastHumanMessage = [...messages].reverse().find(HumanMessage.isInstance)
         const isSingleResponse = lastHumanMessage?.content === "single response"

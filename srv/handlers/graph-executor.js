@@ -14,6 +14,7 @@ import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
 import {
   handleHitlInterrupt,
   isTimeoutHitl,
+  publishConcurrentTasksHitl,
   publishTimeoutHitl,
   requiresHitl,
   resumeHitl,
@@ -21,6 +22,7 @@ import {
 } from "./graph-executor/hitl.js"
 import { registerShutdownHook } from "./graph-executor/crash-handler.js"
 
+const PROD = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
 const LOG = cds.log("agents")
 
 /**
@@ -976,7 +978,10 @@ class GraphExecutor {
         }
 
         // Quota exceeded — summarize partial work instead of raw error
-        if (err.quotaExceeded) {
+        if (err.hitl && err.quotaExceeded) {
+          await publishConcurrentTasksHitl({ requestContext, eventBus, serviceName })
+          return
+        } else if (err.quotaExceeded) {
           LOG.warn(serviceName, "-", "quota exceeded", {
             conversation: short(contextId),
             error: err.message,
@@ -985,7 +990,14 @@ class GraphExecutor {
           if (wfSpan) wfSpan.setAttribute("agent.outcome", "quota_exceeded")
           metrics.errorsTotal.add(1, { ...mAttrs, "agent.error.code": "quota_exceeded" })
 
-          const summary = await this._summarizePartialWork(taskId, contextId, serviceName, "quota")
+          let message
+          let metadata
+          if (err.retryAfter) {
+            message = err.message
+            metadata = { "sap.cds.agents.quota.exceeded.retry": err.retryAfter }
+          } else {
+            message = await this._summarizePartialWork(taskId, contextId, serviceName, "quota")
+          }
 
           audit("AgentTaskFailed", {
             data: {
@@ -1004,7 +1016,7 @@ class GraphExecutor {
             contextId,
             status: {
               state: "canceled",
-              message: agentMessage(summary),
+              message: agentMessage(message, undefined, metadata),
               timestamp: new Date().toISOString(),
             },
             final: true,
@@ -1038,7 +1050,6 @@ class GraphExecutor {
           },
         })
         // In production, don't reveal internal error details to clients (CDS pattern)
-        const PROD = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
         const errorMsg =
           PROD && err.$sanitize !== false
             ? cds.i18n.messages.at(500) || "Internal Server Error"

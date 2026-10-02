@@ -11,6 +11,7 @@
 - Tool and subagent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; opt-in per request via `userMessage.metadata["tool-status-update"]`; also added to preview
 - Preview now shows context size and token usage
 - OpenAI provider support via llm kind `openai`
+- Support HITL flow for the quota `maxConcurrentTasksPerUser` allowing users to continue with blocked task by canceling the others
 
 ### Fixed
 

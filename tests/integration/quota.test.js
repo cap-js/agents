@@ -38,72 +38,116 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(res.data.result.status.state).toBe("completed")
     })
 
-    it("should return 429 when maxTasksPerHourPerUser is exceeded", async () => {
+    it("should cancel when maxTasksPerHourPerUser is exceeded", async () => {
       cds.env.agents.quotas.maxTasksPerHourPerUser = 0
 
-      const res = await sendMessage("graph-book", "Should reject")
-      expect(res.status).toBe(429)
-      expect(res.data.error).not.toBe(undefined)
-      expect(res.data.error.message).toMatch(/tasks per hour per user/)
-      // Retry-After should be seconds until next hour
-      const retryAfter = parseInt(res.headers["retry-after"])
-      expect(retryAfter > 0, `expected ${retryAfter} > 0`).toBeTruthy()
-      expect(retryAfter <= 3600).toBeTruthy()
+      const res = await sendMessage("looping", "Should reject")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("canceled")
     })
 
-    it("should return 429 when maxTasksPerHour is exceeded", async () => {
+    it("should cancel when maxTasksPerHour is exceeded", async () => {
       cds.env.agents.quotas.maxTasksPerHour = 0
 
-      const res = await sendMessage("graph-book", "Should reject")
-      expect(res.status).toBe(429)
-      expect(res.headers["retry-after"]).not.toBe(undefined)
-      expect(res.data.error.message).toMatch(/tasks per hour/)
+      const res = await sendMessage("looping", "Should reject")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("canceled")
     })
 
-    it("should return 429 when maxConcurrentTasks is exceeded", async () => {
+    it("should cancel when maxConcurrentTasks is exceeded", async () => {
       cds.env.agents.quotas.maxConcurrentTasks = 0
 
-      const res = await sendMessage("graph-book", "Should reject")
-      expect(res.status).toBe(429)
-      // Concurrent limit → short retry (30s)
-      expect(res.headers["retry-after"]).toBe("30")
-      expect(res.data.error.message).toMatch(/concurrent tasks/)
+      const res = await sendMessage("looping", "Should reject")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("canceled")
     })
 
-    it("should return 429 when maxToolCallsPerHour is exceeded", async () => {
+    it("should cancel when maxToolCallsPerHour is exceeded", async () => {
       cds.env.agents.quotas.maxToolCallsPerHour = 0
 
-      const res = await sendMessage("graph-book", "Should reject")
-      expect(res.status).toBe(429)
-      expect(res.data.error.message).toMatch(/tool calls per hour/)
+      const res = await sendMessage("looping", "Should reject")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("canceled")
     })
 
-    it("should return 429 when maxLLMTokensPerDay is exceeded", async () => {
+    it("should cancel when maxLLMTokensPerDay is exceeded", async () => {
       cds.env.agents.quotas.maxLLMTokensPerDay = 0
 
-      const res = await sendMessage("graph-book", "Should reject")
-      expect(res.status).toBe(429)
-      // Daily limit → retry at midnight
-      const retryAfter = parseInt(res.headers["retry-after"])
-      expect(retryAfter > 0, `expected ${retryAfter} > 0`).toBeTruthy()
-      expect(retryAfter <= 86400).toBeTruthy()
-      expect(res.data.error.message).toMatch(/LLM tokens/)
+      const res = await sendMessage("looping", "Should reject")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("canceled")
     })
 
-    it("should include Retry-After header with specific values", async () => {
+    it("should offer wait or cancel when maxConcurrentTasksPerUser is exceeded", async () => {
       cds.env.agents.quotas.maxConcurrentTasksPerUser = 0
 
-      const res = await sendMessage("graph-book", "Check header")
-      expect(res.status).toBe(429)
-      // Concurrent per-user → short retry (30s)
-      expect(res.headers["retry-after"]).toBe("30")
+      const res = await sendMessage("looping", "Check header")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("input-required")
+      expect(
+        res.data.result.status.message.metadata["sap.cds.agents.input-required"].options,
+      ).toEqual([
+        { value: "wait", label: expect.any(String) },
+        { value: "continue", label: expect.any(String) },
+      ])
+      await UPDATE("cap.agent.Tasks")
+        .where({ taskId: res.data.result.id })
+        .set({ state: "canceled" })
+    })
+
+    it("should cancel active task when user chooses cancel", async () => {
+      cds.env.agents.quotas.maxConcurrentTasksPerUser = 1
+
+      const activePromise = sendMessage("slow-agent", "slow please")
+      let activeTask
+      const deadline = Date.now() + 5000
+      while (!activeTask && Date.now() < deadline) {
+        // eslint-disable-next-line no-await-in-loop
+        activeTask = await SELECT.one
+          .from("cap.agent.Tasks")
+          .where({ agentService: "SlowAgentService", state: { in: ["submitted", "working"] } })
+        // eslint-disable-next-line no-await-in-loop
+        if (!activeTask) await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      expect(activeTask).toBeTruthy()
+
+      const initial = await sendMessage("looping", "single response")
+      expect(initial.data.result.status.state).toBe("input-required")
+      const hitl =
+        initial.data.result.status.message.metadata["sap.cds.agents.concurrent-tasks-hitl"]
+      expect(hitl.activeTasks.some(({ taskId }) => taskId === activeTask.taskId)).toBe(true)
+
+      const resumed = await POST("/a2a/looping/", {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "message/send",
+        params: {
+          message: {
+            kind: "message",
+            messageId: cds.utils.uuid(),
+            taskId: initial.data.result.id,
+            contextId: initial.data.result.contextId,
+            role: "user",
+            metadata: { "sap.cds.agents.concurrent-tasks-hitl": hitl },
+            parts: [{ kind: "text", text: "continue" }],
+          },
+        },
+      })
+
+      expect(resumed.data.result.status.state).toBe("completed")
+      await activePromise
+      const canceled = await SELECT.one.from("cap.agent.Tasks").columns("state").where({
+        taskId: activeTask.taskId,
+      })
+      expect(canceled.state).toBe("canceled")
     })
 
     it("should include JSON-RPC error code -32029", async () => {
       cds.env.agents.quotas.maxTasksPerHour = 0
 
-      const res = await sendMessage("graph-book", "Check error code")
-      expect(res.data.error.code).toBe(-32029)
+      const res = await sendMessage("looping", "Check error code")
+      expect(res.status).toBe(200)
+      expect(res.data.result.status.state).toBe("canceled")
     })
   })
 
@@ -196,7 +240,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
 
     it("should return middleware with afterModel hook", async () => {
       const [mw] = await quotaEnforcerMiddleware()
-      expect(mw.name).toBe("agentQuotaEnforcerMiddleware")
+      expect(mw.name).toBe("quotaEnforcement")
       expect(mw.afterModel).not.toBe(undefined)
       expect(typeof mw.afterModel.hook).toBe("function")
     })
@@ -216,7 +260,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      expect(() => mw.afterModel.hook(state)).toThrow(/LLM call limit exceeded/)
+      await expect(mw.afterModel.hook(state)).rejects.toThrow(/LLM call limit exceeded/)
     })
 
     it("afterModel hook should throw when maxLLMTokensPerTask exceeded", async () => {
@@ -235,7 +279,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      expect(() => mw.afterModel.hook(state)).toThrow(/Token limit exceeded/)
+      await expect(mw.afterModel.hook(state)).rejects.toThrow(/Token limit exceeded/)
     })
 
     it("afterModel hook should throw when maxToolCallsPerTask exceeded", async () => {
@@ -256,7 +300,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      expect(() => mw.afterModel.hook(state)).toThrow(/Tool call limit exceeded/)
+      await expect(mw.afterModel.hook(state)).rejects.toThrow(/Tool call limit exceeded/)
     })
 
     it("afterModel hook should return updated counts when within limits", async () => {
@@ -277,7 +321,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
           }),
         ],
       }
-      const result = mw.afterModel.hook(state)
+      const result = await mw.afterModel.hook(state)
       expect(result.runModelCallCount).toBe(1)
       expect(result.runTokenCount).toBe(15)
       expect(result.runToolCallCount).toBe(1)

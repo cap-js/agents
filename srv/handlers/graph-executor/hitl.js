@@ -2,11 +2,13 @@ import cds from "@sap/cds"
 import { agentMessage, firstDataPart, partsToText } from "../../../lib/utils/message-handling.js"
 import { audit, short } from "../../../lib/utils/utils.js"
 import * as metrics from "../../../lib/telemetry/metrics.js"
+import { ACTIVE_TASK_STATES } from "../../../lib/agents/quota-handling.js"
 
 const LOG = cds.log("agents")
 
 export const HITL_METADATA_KEY = "sap.cds.agents.hitl"
 export const TIMEOUT_HITL_METADATA_KEY = "sap.cds.agents.timeout-hitl"
+export const CONCURRENT_TASKS_HITL_METADATA_KEY = "sap.cds.agents.concurrent-tasks-hitl"
 export const INPUT_REQUIRED_METADATA_KEY = "sap.cds.agents.input-required"
 
 function approvalOptions() {
@@ -22,12 +24,19 @@ function timeoutOptions() {
     { value: "reject", label: cds.i18n.messages.at("HITL_STOP") },
   ]
 }
+
+function concurrentTasksOptions() {
+  return [
+    { value: "wait", label: cds.i18n.messages.at("HITL_QUOTA_WAIT") },
+    { value: "continue", label: cds.i18n.messages.at("HITL_QUOTA_CONTINUE") },
+  ]
+}
 export const requiresHitl = (result) =>
   result?.__interrupt__?.length > 0 || result?.interrupts?.length > 0
 
 export function parseResumeDecision(userText) {
   const t = userText.trim()
-  if (/^(approve|yes|confirm|ok)$/i.test(t)) return { decisions: [{ type: "approve" }] }
+  if (/^(continue|approve|yes|confirm|ok)$/i.test(t)) return { decisions: [{ type: "approve" }] }
   if (/^edit$/i.test(t)) return { decisions: [{ type: "edit" }] }
   return {
     decisions: [
@@ -239,6 +248,43 @@ export function isTimeoutHitl(task) {
   return task?.status?.message?.metadata?.[TIMEOUT_HITL_METADATA_KEY] === true
 }
 
+export async function publishConcurrentTasksHitl({ requestContext, eventBus, serviceName }) {
+  const { taskId, contextId } = requestContext
+  const metadata = {
+    max: cds.env.agents?.quotas.maxConcurrentTasksPerUser,
+    activeTasks: await SELECT.from("cap.agent.Tasks")
+      .where({
+        taskId: { "!=": taskId },
+        createdBy: cds.context.user.id,
+        state: { in: ACTIVE_TASK_STATES },
+      })
+      .columns("taskId", "state", "agentService", "modifiedAt"),
+  }
+  const description = cds.i18n.messages.at("QUOTA_CONCURRENT_TASKS_HITL", [metadata.max])
+  LOG.info(serviceName, "-", "concurrent task input-required", {
+    conversation: short(contextId),
+    activeTasks: metadata.activeTasks.length,
+  })
+  audit("AgentInputRequired", {
+    data: { taskId, contextId, service: serviceName, reason: "concurrent_tasks", metadata },
+  })
+  eventBus.publish({
+    kind: "status-update",
+    taskId,
+    contextId,
+    status: {
+      state: "input-required",
+      message: agentMessage(description, undefined, {
+        [CONCURRENT_TASKS_HITL_METADATA_KEY]: metadata,
+        [HITL_METADATA_KEY]: { actionCount: 1, decisions: [] },
+        [INPUT_REQUIRED_METADATA_KEY]: { options: concurrentTasksOptions() },
+      }),
+      timestamp: new Date().toISOString(),
+    },
+    final: true,
+  })
+}
+
 export function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
   const { taskId, contextId } = requestContext
   LOG.info(serviceName, "-", "timeout awaiting decision", { conversation: short(contextId) })
@@ -342,6 +388,10 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
   const decisionNote = composeHitlDecisionNote(originalActions, resume)
   const commandArgs = { resume }
   if (decisionNote) commandArgs.update = { _hitlDecisionNote: decisionNote }
+  Object.assign(
+    cds.context["agent.request.metadata"],
+    requestContext.task?.status?.message.metadata,
+  )
   const resumed = await stream(new Command(commandArgs), signal)
   return resumed.state
 }
