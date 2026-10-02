@@ -2,6 +2,7 @@ import cds from "@sap/cds"
 
 const LOG = cds.log("agents")
 
+// REVISIT: Check if in the future tasks can be picked up again after restart
 async function markActiveTasksFailed() {
   const tasksByTenant = new Map()
 
