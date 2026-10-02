@@ -19,6 +19,7 @@ import {
   resumeHitl,
   resumeTimeoutHitl,
 } from "./graph-executor/hitl.js"
+import { registerShutdownHook } from "./graph-executor/crash-handler.js"
 
 const LOG = cds.log("agents")
 
@@ -145,6 +146,9 @@ class GraphExecutor {
     this._recursionLimit = options.recursionLimit ?? null
     /** @type {Map<string, AbortController>} per-task abort controllers */
     this._abortControllers = new Map()
+    /** @type {Map<string, string | undefined>} task tenant by task ID */
+    this._taskTenants = new Map()
+    registerShutdownHook(this)
   }
 
   /**
@@ -385,8 +389,6 @@ class GraphExecutor {
         reason,
         checkpointer: this._graph?.checkpointer,
         getModel: () => this._srv.send("buildModel"),
-        // Summary runs after graph abort, so no execution-time grace is needed.
-        timeout: 10_000,
       }),
     )
   }
@@ -400,6 +402,7 @@ class GraphExecutor {
     // Cooperative cancellation: per-task AbortController
     const controller = new AbortController()
     this._abortControllers.set(taskId, controller)
+    this._taskTenants.set(taskId, cds.context?.tenant)
 
     // A2A context for tracing
     if (!cds.context) {
@@ -1056,6 +1059,7 @@ class GraphExecutor {
         setSpanAttrs(rootSpan, linkTraceToPrompt())
 
         this._abortControllers.delete(taskId)
+        this._taskTenants.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 
         // Update task record with usage data (non-blocking, best effort)
