@@ -19,6 +19,8 @@
 - Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
 - Thinking steps are now correctly separated also inside a turn
 - Tasks are now moved into failed state on server crash to avoid quota issue on unstable servers
+- `@agent.llm` is now correctly considered for feature toggled services
+- SAP HANA Cloud based masking is now retried in case of HANA Cloud NLP connectivity issues
 
 ## Version 0.9.7 - 2026-09-23
 
