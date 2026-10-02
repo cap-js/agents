@@ -1,8 +1,11 @@
 {
   "name": "bookshop",
   "version": "1.0.0",
-  "type": "module",
   "description": "Sample CAP bookshop for @cap-js/agents tests",
+  "type": "module",
+  "scripts": {
+    "start": "cds-serve"
+  },
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
     "@cap-js/audit-logging": "^1.3.0",
@@ -13,9 +16,6 @@
     "@sap/cds": "^10.1.1",
     "@sap/xssec": "^4",
     "zod": "^4.3.6"
-  },
-  "scripts": {
-    "start": "cds-serve"
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1",
@@ -183,6 +183,14 @@
           "kind": "sqlite",
           "credentials": {
             "url": ":memory:"
+          }
+        }
+      },
+      "[crash-test]": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "url": "db.sqlite"
           }
         }
       },
