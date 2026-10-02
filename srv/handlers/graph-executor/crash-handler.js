@@ -1,15 +1,12 @@
 import cds from "@sap/cds"
 
 const LOG = cds.log("agents")
-const TASKS = "cap.agent.Tasks"
 
-const executors = new Set()
-let shutdownHookRegistered = false
-
+// REVISIT: Check if in the future tasks can be picked up again after restart
 async function markActiveTasksFailed() {
   const tasksByTenant = new Map()
 
-  for (const executor of executors) {
+  for (const executor of registerShutdownHook.executors) {
     for (const taskId of executor._abortControllers.keys()) {
       const tenant = executor._taskTenants.get(taskId)
       const taskIds = tasksByTenant.get(tenant) || []
@@ -21,7 +18,7 @@ async function markActiveTasksFailed() {
   await Promise.all(
     [...tasksByTenant].map(async ([tenant, taskIds]) => {
       const update = () =>
-        UPDATE(TASKS)
+        UPDATE("cap.agent.Tasks")
           .where({
             taskId: { in: [...new Set(taskIds)] },
             state: { in: ["submitted", "working", "input-required"] },
@@ -35,10 +32,9 @@ async function markActiveTasksFailed() {
 }
 
 export function registerShutdownHook(executor) {
-  executors.add(executor)
-  if (shutdownHookRegistered) return
+  registerShutdownHook.executors.add(executor)
+  if (registerShutdownHook.executors.size > 1) return
 
-  shutdownHookRegistered = true
   cds.on("shutdown", async () => {
     try {
       await markActiveTasksFailed()
@@ -47,3 +43,5 @@ export function registerShutdownHook(executor) {
     }
   })
 }
+
+registerShutdownHook.executors = new Set()
