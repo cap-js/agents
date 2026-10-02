@@ -389,12 +389,13 @@ describe("parseResumeDecision", () => {
 describe("composeHitlDecisionNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
-  it("does not inject a note for approval or rejection", () => {
+  it("injects a note describing user rejections (ignoring approvals)", () => {
     const note = composeHitlDecisionNote(
       [originalCall, { name: "submitOrder", args: { book: 207, quantity: 1 } }],
       { decisions: [{ type: "approve" }, { type: "reject", message: "reject" }] },
     )
-    expect(note).toBeUndefined()
+    expect(note).toContain("User explicitly rejected")
+    expect(note).toContain('"book":207')
   })
 
   it("describes user edits and ignores opaque resumes", () => {

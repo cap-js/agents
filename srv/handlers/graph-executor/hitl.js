@@ -156,6 +156,10 @@ export function composeHitlDecisionNote(actionRequests, resume) {
       lines.push("- User edited " + action(matched) + " to " + action(decision.editedAction) + ".")
       continue
     }
+    if (decision?.type === "reject") {
+      lines.push("- User explicitly rejected " + action(original) + ".")
+      continue
+    }
   }
   if (!lines.length) {
     return undefined
