@@ -389,8 +389,6 @@ class GraphExecutor {
         reason,
         checkpointer: this._graph?.checkpointer,
         getModel: () => this._srv.send("buildModel"),
-        // Summary runs after graph abort, so no execution-time grace is needed.
-        timeout: 10_000,
       }),
     )
   }

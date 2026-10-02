@@ -80,10 +80,10 @@ describe("summarizePartialWork", () => {
       }),
     })
 
-    expect(messages).toHaveLength(1)
+    expect(messages).toHaveLength(2)
     expect(messages[0]._getType()).toBe("human")
     expect(messages[0].content).toContain("within its time limit")
-    expect(messages[0].content).toContain("Which books are on offer?")
+    expect(messages[1].content).toContain("Which books are on offer?")
     expect(summary).toBe("Catalog checked. Continue running or stop?")
   })
 
