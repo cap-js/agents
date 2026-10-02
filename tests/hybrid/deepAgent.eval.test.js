@@ -178,17 +178,14 @@ describe.concurrent("Auto-built deep agents (zero-code convention)", () => {
       ).toBeTruthy()
     })
 
-    test.concurrent(
-      "message/send routes through the auto-deepagent (not the mock executor)",
-      async () => {
-        const res = await sendMessage("zero-code-agent", "Hi")
-        const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-        expect(
-          text,
-          `mock executor response received — auto-deepagent wiring failed: ${text}`,
-        ).not.toMatch(MOCK_EXECUTOR_TEXT)
-      },
-    )
+    test.concurrent("message/send routes through the auto-deepagent (not the mock executor)", async () => {
+      const res = await sendMessage("zero-code-agent", "Hi")
+      const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
+      expect(
+        text,
+        `mock executor response received — auto-deepagent wiring failed: ${text}`,
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
+    })
 
     test.concurrent(
       "deepagent internal filesystem tools are never exposed as artifact-update events",
@@ -244,27 +241,21 @@ describe.concurrent("Auto-built deep agents (zero-code convention)", () => {
   })
 
   describe.concurrent("@agent.directory annotation (override-card-service)", () => {
-    test.concurrent(
-      "agent card resolved from annotation-pointed dir + @agent.card file",
-      async () => {
-        const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
-        expect(res.status).toBe(200)
-        expect(res.data.name).toBe("card-override-explicit")
-        expect(res.data.version).toBe("2.0.0")
-      },
-    )
+    test.concurrent("agent card resolved from annotation-pointed dir + @agent.card file", async () => {
+      const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
+      expect(res.status).toBe(200)
+      expect(res.data.name).toBe("card-override-explicit")
+      expect(res.data.version).toBe("2.0.0")
+    })
 
-    test.concurrent(
-      "message/send routes through auto-deepagent (annotation-resolved dir)",
-      async () => {
-        const res = await sendMessage("override-card", "Hi")
-        const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-        expect(
-          text,
-          `mock executor response received — @agent.directory wiring failed: ${text}`,
-        ).not.toMatch(MOCK_EXECUTOR_TEXT)
-      },
-    )
+    test.concurrent("message/send routes through auto-deepagent (annotation-resolved dir)", async () => {
+      const res = await sendMessage("override-card", "Hi")
+      const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
+      expect(
+        text,
+        `mock executor response received — @agent.directory wiring failed: ${text}`,
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
+    })
   })
 
   test.concurrent("includes both auto-generated CDS tools and the user's custom tool", async () => {

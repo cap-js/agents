@@ -515,7 +515,7 @@
         background: #dbeafe;
         color: #1d4ed8;
       }
-      .tool-call-kind.kind-action {
+      .tool-call-kind.kind-call {
         background: #fef3c7;
         color: #92400e;
       }
@@ -554,7 +554,7 @@
           background: #1e3a5f;
           color: #93c5fd;
         }
-        .tool-call-kind.kind-action {
+        .tool-call-kind.kind-call {
           background: #451a03;
           color: #fcd34d;
         }
@@ -1089,9 +1089,9 @@
           el.className = "tool-call-item"
           el.innerHTML =
             `<summary>` +
-            `<span class="tool-call-status"></span> ` +
-            `<span class="tool-call-label"></span>` +
             `<span class="tool-call-kind" hidden></span>` +
+            `<span class="tool-call-label"></span>` +
+            `<span class="tool-call-status"></span> ` +
             `</summary>` +
             `<div class="tool-call-detail-label" hidden>Args</div><pre class="tool-call-detail args" hidden></pre>` +
             `<div class="tool-call-detail-label" hidden>Result</div><pre class="tool-call-detail result" hidden></pre>`
@@ -1369,6 +1369,7 @@
                   taskId,
                   contextId,
                   parts: [{ kind: "text", text: decision }],
+                  metadata: { "tool-status-update": { args: true, result: true } },
                 },
               },
             }),
