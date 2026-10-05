@@ -103,16 +103,20 @@ function messageText(content) {
  * Priority: last AI message content > result.output > JSON stringified result.
  */
 function defaultOutputMapper(result) {
-  // 1. Messages-based: last message content (standard LangChain pattern)
+  // Walk backwards: find the last AI message that has actual text content.
+  // The very last message may be a ToolMessage or an empty AIMessage (tool_calls only).
   if (result.messages?.length > 0) {
-    const lastMsg = result.messages[result.messages.length - 1]
-    const text = messageText(lastMsg?.content)
-    if (text) return text
+    for (let i = result.messages.length - 1; i >= 0; i--) {
+      const msg = result.messages[i]
+      if (msg?.getType?.() !== "ai" && msg?.type !== "ai") continue
+      const text = messageText(msg.content)
+      if (text) return text
+    }
   }
-  // 2. Output field (e.g. travel-sample pattern)
+  // Output field (e.g. travel-sample pattern)
   if (result.output) return result.output
-  // 3. Fallback
-  return JSON.stringify(result)
+  // Safe fallback — never serialize internal graph state
+  return "I could not generate a response."
 }
 
 /**
