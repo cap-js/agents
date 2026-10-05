@@ -31,6 +31,7 @@
 - Tasks are now moved into failed state on server crash to avoid quota issue on unstable servers
 - `@agent.llm` is now correctly considered for feature toggled services
 - SAP HANA Cloud based masking is now retried in case of HANA Cloud NLP connectivity issues
+- HITL tool rejections are now surfaced to the model as a deliberate user decision instead of a tool failure, so it no longer invents technical reasons (e.g. insufficient stock) for an action the user chose to reject
 
 ## Version 0.9.7 - 2026-09-23
 
