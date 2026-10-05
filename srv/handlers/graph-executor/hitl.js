@@ -167,6 +167,28 @@ export function composeHitlDecisionNote(actionRequests, resume) {
   return ["User HITL decisions (not tool failures):", ...lines].join("\n")
 }
 
+// The generic combined "call" tool carries its target action in args.action. HITL
+// gates it per-call via a `when` predicate, so the interrupt only fires for a gated
+// action. An edit must therefore not repoint args.action at a *different* action —
+// that would run an un-gated action under the approval granted for the gated one.
+// Editing the parameters is fine; the action itself is fixed.
+const GENERIC_CALL_TOOL = "call"
+
+export function guardHitlEdits(resume, actions = []) {
+  if (!Array.isArray(resume?.decisions)) return resume
+  resume.decisions.forEach((decision, index) => {
+    if (decision?.type !== "edit") return
+    const original = actions[index]
+    if (original?.name !== GENERIC_CALL_TOOL) return
+    const from = original.args?.action
+    const to = decision.editedAction?.args?.action
+    if (to !== undefined && from !== undefined && to !== from) {
+      throw new Error(`HITL edit must not change the gated action (expected "${from}", got "${to}").`)
+    }
+  })
+  return resume
+}
+
 async function getPreInterruptToolCalls(graph, config) {
   try {
     if (typeof graph.getState !== "function") return []
@@ -343,6 +365,7 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
   const originalActions = actionRequests.length
     ? actionRequests
     : await getPreInterruptToolCalls(graph, config)
+  guardHitlEdits(resume, originalActions)
   const decisionNote = composeHitlDecisionNote(originalActions, resume)
   const commandArgs = { resume }
   if (decisionNote) commandArgs.update = { _hitlDecisionNote: decisionNote }
