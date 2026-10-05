@@ -16,9 +16,12 @@
 ### Changed
 
 - Consider static assertions in tests now in "output_correctness" and "success_rate" metrics of evaluation runs
+- The generic `call` action tool is now the default, matching `@cap-js/mcp`; per-action tools are opt-in via `cds.env.mcp.per_action_tool: true`. This replaces the former `cds.env.agents.per_action_tool` flag (which defaulted to per-action) and resolves the conflicting defaults between `@cap-js/agents` and `@cap-js/mcp`
 
 ### Fixed
 
+- `@agent.hitl` / `@Common.IsActionCritical` are now honored when actions are exposed through the generic `call` action tool (previously human-in-the-loop gating only took effect with per-action tools)
+- Human-in-the-loop edit decisions can no longer repoint the generic `call` action tool to a different action than the one approved
 - Correctly handle non `@cap-js/mcp` tools during PII masking
 - Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
 - Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
