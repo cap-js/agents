@@ -74,11 +74,11 @@ cds.on("bootstrap", (app) => {
       const { resolve_config } = await import("./lib/config/local.js")
       cds.env.requires.llm = resolve_config({ kind: "auto" })
     }
-    if (kind === "anthropic") {
+    if (kind === "anthropic" || kind === "pi-anthropic") {
       const { resolve_anthropic_config } = await import("./lib/config/local.js")
       cds.env.requires.llm = resolve_anthropic_config(cds.requires.llm)
     }
-    if (kind === "openai") {
+    if (kind === "openai" || kind === "pi-openai") {
       const { resolve_openai_config } = await import("./lib/config/local.js")
       cds.env.requires.llm = resolve_openai_config(cds.requires.llm)
     }
