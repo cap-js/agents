@@ -14,20 +14,6 @@ function agentMessage(text) {
   }
 }
 
-function publishedStatus(taskId, contextId, state, text, final) {
-  return {
-    kind: "status-update",
-    taskId,
-    contextId,
-    status: {
-      state,
-      ...(text && { message: agentMessage(text) }),
-      timestamp: new Date().toISOString(),
-    },
-    final,
-  }
-}
-
 function toolText(result) {
   const value = Array.isArray(result) && result.length === 2 ? result[0] : result
   if (typeof value === "string") return value
@@ -43,13 +29,6 @@ function toolText(result) {
 /** Convert the existing CDS/LangChain tools to Pi's AgentTool contract. */
 export function toPiTools(tools = []) {
   return tools
-    .filter(
-      (tool) =>
-        tool &&
-        tool.name &&
-        typeof tool.invoke === "function" &&
-        (typeof tool.isAllowed !== "function" || tool.isAllowed()),
-    )
     .map((tool) => {
       let parameters = { type: "object", properties: {} }
       if (tool.schema) {
@@ -74,8 +53,7 @@ export function toPiTools(tools = []) {
     })
 }
 
-function assistantText(message) {
-  if (!message || message.role !== "assistant") return ""
+function messageContent(message) {
   if (typeof message.content === "string") return message.content
   return (message.content || [])
     .filter((part) => part?.type === "text")
@@ -83,9 +61,59 @@ function assistantText(message) {
     .join("")
 }
 
-async function defaultRuntime() {
-  const { Agent } = await import("@earendil-works/pi-agent-core")
-  return { Agent }
+/**
+ * Attempt to reduce the verbose boilerplate of giving A2A updates
+ */
+class SemanticEventBus {
+  /** @param {import('@a2a-js/sdk/server').ExecutionEventBus} base */
+  constructor(base, taskId, contextId) {
+    this.base = base
+    this.taskId = taskId
+    this.contextId = contextId
+  }
+
+  /**
+   * @param {import('@a2a-js/sdk').TaskStatus} status 
+   */
+  updateStatus(status) {
+    return this.base.publish({
+      kind: "task",
+      id: this.taskId,
+      contextId: this.contextId,
+      status: { timestamp: new Date().toISOString(), ...status },
+    })
+  }
+
+  /**
+   * @param {import('@a2a-js/sdk').Artifact1} artifact
+   * @param {boolean} final
+   * @param {boolean} append
+   */
+  updateArtifact(artifact, final = false, append = false) {
+    return this.base.publish({
+      kind: "artifact-update",
+      taskId: this.taskId,
+      contextId: this.contextId,
+      append: append,
+      lastChunk: final,
+      artifact,
+    })
+  }
+
+  /**
+   * @param {import('@a2a-js/sdk').Artifact1} artifact 
+   */
+  appendArtifact(artifact) {
+    return this.updateArtifact(artifact, false, true)
+  }
+
+  /**
+   * @param {import('@a2a-js/sdk').Artifact1} artifact 
+   */
+  finalArtifact(artifact) {
+    return this.updateArtifact(artifact, true)
+  }
+
 }
 
 /**
@@ -94,7 +122,6 @@ async function defaultRuntime() {
  */
 export default class PiExecutor {
   static _instance
-  static runtime = defaultRuntime
 
   _sessions = new Map()
   _running = new Map()
@@ -117,13 +144,11 @@ export default class PiExecutor {
   }
 
   async _createAgent(srv, options) {
-    const [{ Agent }, runtimeModel, tools, systemPrompt] = await Promise.all([
-      this.constructor.runtime(),
-      srv.send("buildModel"),
-      srv.send("buildTools"),
-      srv.send("buildSystemPrompt"),
-    ])
-    if (!runtimeModel?.model || typeof runtimeModel.streamFn !== "function") {
+    const { Agent } = await import("@earendil-works/pi-agent-core")
+    const tools = await srv.send("buildTools")
+    const llm = await srv.send("buildModel")
+    const systemPrompt = await srv.send("buildSystemPrompt")
+    if (!llm?.model || typeof llm.streamFn !== "function") {
       throw new Error(
         "Pi models must expose a model and streamFn; configure a Pi model kind such as pi-anthropic",
       )
@@ -132,13 +157,13 @@ export default class PiExecutor {
     return new Agent({
       initialState: {
         systemPrompt,
-        model: runtimeModel.model,
+        model: llm.model,
         thinkingLevel: options.thinkingLevel || "off",
         tools: toPiTools(tools),
         messages: [],
       },
-      streamFn: runtimeModel.streamFn,
-      ...(runtimeModel.getApiKey && { getApiKey: runtimeModel.getApiKey }),
+      streamFn: llm.streamFn,
+      getApiKey: llm.getApiKey,
     })
   }
 
@@ -148,25 +173,21 @@ export default class PiExecutor {
     const sessionKey = this._sessionKey(srv, contextId)
     let agent
     let unsubscribe
-    let streamed = false
 
     if (cds.context) {
+      // REVISIT: one cds.context.agent = {...}
       cds.context["agent.task.id"] = taskId
       cds.context["agent.context.id"] = contextId
       cds.context["agent.service"] = srv.name
-      cds.context["agent.eventBus"] = eventBus
+      cds.context["agent.eventBus"] = eventBus // event bus is a2a specific and should only be used in the protocol adapter
     }
+    const bus = new SemanticEventBus(eventBus, taskId, contextId)
 
     this._running.set(taskId, { controller })
     if (!requestContext.task) {
-      eventBus.publish({
-        kind: "task",
-        id: taskId,
-        contextId,
-        status: { state: "submitted", timestamp: new Date().toISOString() },
-      })
+      bus.updateStatus({ state: "submitted" }) // TODO: we should very much remove this
     }
-    eventBus.publish(publishedStatus(taskId, contextId, "working", undefined, false))
+    bus.updateStatus({ state: "working" })
 
     try {
       agent = this._sessions.get(sessionKey)
@@ -181,46 +202,31 @@ export default class PiExecutor {
         if (event?.type !== "message_update" || update?.type !== "text_delta" || !update.delta) {
           return
         }
-        eventBus.publish({
-          kind: "artifact-update",
-          taskId,
-          contextId,
-          append: streamed,
-          lastChunk: false,
-          artifact: { artifactId: "response", parts: [{ kind: "text", text: update.delta }] },
-        })
-        streamed = true
+        bus.appendArtifact({ artifactId: "response", parts: [{ kind: "text", text: update.delta }] })
       })
 
       const prompt = partsToText(requestContext.userMessage?.parts)
       await agent.prompt(prompt)
-      if (controller.signal.aborted) throw new globalThis.DOMException("Task canceled", "AbortError")
+      if (controller.signal.aborted) {
+        bus.updateStatus({ state: "canceled", message: agentMessage("Task canceled.") })
+        return
+      }
       if (agent.state?.errorMessage) throw new Error(agent.state.errorMessage)
 
       const messages = agent.state?.messages || []
-      const output = [...messages].reverse().map(assistantText).find(Boolean) || ""
-      eventBus.publish({
-        kind: "artifact-update",
-        taskId,
-        contextId,
-        append: false,
-        lastChunk: true,
-        artifact: { artifactId: "response", parts: [{ kind: "text", text: output }] },
-      })
-      eventBus.publish(publishedStatus(taskId, contextId, "completed", output, true))
+      const aiMsg = messages.findLast(m => m?.role === "assistant")
+      const output = messageContent(aiMsg)
+      bus.finalArtifact({ artifactId: "response", parts: [{ kind: "text", text: output }] })
+      bus.updateStatus({ state: "completed" })
     } catch (error) {
-      const canceled = controller.signal.aborted || error?.name === "AbortError"
-      const state = canceled ? "canceled" : "failed"
       const production = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
-      const text = canceled
-        ? "Task canceled."
-        : production && error?.$sanitize !== false
+      const text = production && error?.$sanitize !== false
           ? cds.i18n.messages.at(500) || "Internal Server Error"
           : `Agent error: ${error.message}`
-      if (!canceled) LOG.error("Pi agent failed", { service: srv.name, error: error.message })
-      eventBus.publish(publishedStatus(taskId, contextId, state, text, true))
+      LOG.error("Pi agent failed", { service: srv.name, error: error.stack })
+      bus.updateStatus({ state: "failed", message: agentMessage(text) })
     } finally {
-      if (typeof unsubscribe === "function") unsubscribe()
+      unsubscribe?.()
       this._running.delete(taskId)
       eventBus.finished()
     }
@@ -235,9 +241,10 @@ export default class PiExecutor {
 
   async cancelTask(taskId, eventBus) {
     if (this._running.has(taskId)) return this.abort(taskId)
-    eventBus.publish(publishedStatus(taskId, undefined, "canceled", "Task canceled.", true))
+    const bus = new SemanticEventBus(eventBus, taskId)
+    bus.updateStatus({ state: "canceled", message: agentMessage("Task canceled.") })
     eventBus.finished()
   }
 }
 
-export { PiExecutor, assistantText, publishedStatus }
+export { PiExecutor }
