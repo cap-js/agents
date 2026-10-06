@@ -1,7 +1,8 @@
 import cds from "@sap/cds"
-import { toJSONSchema } from "zod"
 
 import { partsToText } from "../lib/utils/message-handling.js"
+import agents from '../lib/agents/index.js'
+import { SemanticEventBus } from '../lib/protocol/utils.js'
 
 const LOG = cds.log("agents")
 
@@ -14,45 +15,6 @@ function agentMessage(text) {
   }
 }
 
-function toolText(result) {
-  const value = Array.isArray(result) && result.length === 2 ? result[0] : result
-  if (typeof value === "string") return value
-  if (value == null) return ""
-  if (Array.isArray(value)) {
-    return value
-      .map((part) => (typeof part === "string" ? part : part?.text || JSON.stringify(part)))
-      .join("\n")
-  }
-  return JSON.stringify(value)
-}
-
-/** Convert the existing CDS/LangChain tools to Pi's AgentTool contract. */
-export function toPiTools(tools = []) {
-  return tools
-    .map((tool) => {
-      let parameters = { type: "object", properties: {} }
-      if (tool.schema) {
-        try {
-          parameters = toJSONSchema(tool.schema, { target: "draft-7" })
-          delete parameters.$schema
-        } catch (error) {
-          LOG.warn(`Could not convert schema for Pi tool ${tool.name}`, error.message)
-        }
-      }
-
-      return {
-        name: tool.name,
-        label: tool.name,
-        description: tool.description || tool.name,
-        parameters,
-        execute: async (_toolCallId, args, signal) => {
-          const result = await tool.invoke(args, { signal })
-          return { content: [{ type: "text", text: toolText(result) }], details: {} }
-        },
-      }
-    })
-}
-
 function messageContent(message) {
   if (typeof message.content === "string") return message.content
   return (message.content || [])
@@ -61,60 +23,6 @@ function messageContent(message) {
     .join("")
 }
 
-/**
- * Attempt to reduce the verbose boilerplate of giving A2A updates
- */
-class SemanticEventBus {
-  /** @param {import('@a2a-js/sdk/server').ExecutionEventBus} base */
-  constructor(base, taskId, contextId) {
-    this.base = base
-    this.taskId = taskId
-    this.contextId = contextId
-  }
-
-  /**
-   * @param {import('@a2a-js/sdk').TaskStatus} status 
-   */
-  updateStatus(status) {
-    return this.base.publish({
-      kind: "task",
-      id: this.taskId,
-      contextId: this.contextId,
-      status: { timestamp: new Date().toISOString(), ...status },
-    })
-  }
-
-  /**
-   * @param {import('@a2a-js/sdk').Artifact1} artifact
-   * @param {boolean} final
-   * @param {boolean} append
-   */
-  updateArtifact(artifact, final = false, append = false) {
-    return this.base.publish({
-      kind: "artifact-update",
-      taskId: this.taskId,
-      contextId: this.contextId,
-      append: append,
-      lastChunk: final,
-      artifact,
-    })
-  }
-
-  /**
-   * @param {import('@a2a-js/sdk').Artifact1} artifact 
-   */
-  appendArtifact(artifact) {
-    return this.updateArtifact(artifact, false, true)
-  }
-
-  /**
-   * @param {import('@a2a-js/sdk').Artifact1} artifact 
-   */
-  finalArtifact(artifact) {
-    return this.updateArtifact(artifact, true)
-  }
-
-}
 
 /**
  * A Pi-native A2A executor. It intentionally does not construct or invoke a
@@ -143,35 +51,9 @@ export default class PiExecutor {
     return `${cds.context?.tenant || "anonymous"}:${srv.name}:${contextId}`
   }
 
-  async _createAgent(srv, options) {
-    const { Agent } = await import("@earendil-works/pi-agent-core")
-    const tools = await srv.send("buildTools")
-    const llm = await srv.send("buildModel")
-    const systemPrompt = await srv.send("buildSystemPrompt")
-    if (!llm?.model || typeof llm.streamFn !== "function") {
-      throw new Error(
-        "Pi models must expose a model and streamFn; configure a Pi model kind such as pi-anthropic",
-      )
-    }
-
-    return new Agent({
-      initialState: {
-        systemPrompt,
-        model: llm.model,
-        thinkingLevel: options.thinkingLevel || "off",
-        tools: toPiTools(tools),
-        messages: [],
-      },
-      streamFn: llm.streamFn,
-      getApiKey: llm.getApiKey,
-    })
-  }
-
   async execute(srv, options, requestContext, eventBus) {
     const { taskId, contextId } = requestContext
     const controller = new AbortController()
-    const sessionKey = this._sessionKey(srv, contextId)
-    let agent
     let unsubscribe
 
     if (cds.context) {
@@ -190,19 +72,15 @@ export default class PiExecutor {
     bus.updateStatus({ state: "working" })
 
     try {
-      agent = this._sessions.get(sessionKey)
-      if (!agent) {
-        agent = await this._createAgent(srv, options)
-        this._sessions.set(sessionKey, agent)
-      }
+      // REVISIT: inject the agent into the executor rather than having the executor own the agent
+      const agent = await agents.for(srv)
       this._running.set(taskId, { controller, agent })
 
       unsubscribe = agent.subscribe((event) => {
         const update = event?.assistantMessageEvent
-        if (event?.type !== "message_update" || update?.type !== "text_delta" || !update.delta) {
-          return
+        if (event?.type === "message_update" && update?.type === "text_delta" && update?.delta) {
+          bus.appendArtifact({ artifactId: "response", parts: [{ kind: "text", text: update.delta }] })
         }
-        bus.appendArtifact({ artifactId: "response", parts: [{ kind: "text", text: update.delta }] })
       })
 
       const prompt = partsToText(requestContext.userMessage?.parts)

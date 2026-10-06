@@ -6,6 +6,7 @@ import { partsToText } from "../../lib/utils/message-handling.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
 import { registerChat } from "./chat.js"
 import { effectiveDefinition } from "../../lib/utils/utils.js"
+import agents from '../../lib/agents/index.js'
 
 const LOG = cds.log("agents")
 
@@ -113,6 +114,11 @@ export default function registerDefaultAgentHandlers(srv) {
   // Default buildMiddleware: quota enforcement, content filtering, agent_actions metric
   srv.on("buildMiddleware", async (req) => {
     return buildMiddleware(srv, req.data)
+  })
+
+  // Default buildAgent: selects the harness (langchain / deepagents / pi) and builds the model, tool and agent for it
+  srv.on("buildAgent", async () => {
+    return agents.for(srv)
   })
 
   // Default buildGraph: if agent dir with AGENTS.md exists → auto-build deep agent.

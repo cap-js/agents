@@ -108,6 +108,8 @@
   },
   "cds": {
     "agents": {
+      "harness": "langchain",
+      "[pi]": { "harness": "pi" },
       "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
