@@ -114,3 +114,16 @@ entity PushNotificationConfigs : managed {
       task      : Association to one Tasks on task.taskId = taskId;
       url       : String(2048);
 }
+
+/**
+ * Persists Pi agent message transcripts for multi-turn conversations.
+ *
+ * One row per message, ordered by seq (auto-incremented per session).
+ * Keyed by sessionKey = "<tenant>:<userId>:<serviceName>:<contextId>".
+ * This entity is optional — when absent, only in-memory session caching applies.
+ */
+entity PiMessages {
+  key sessionKey : String;
+  key seq        : Integer;
+      message    : LargeString;
+}

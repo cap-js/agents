@@ -31,7 +31,6 @@ function messageContent(message) {
 export default class PiExecutor {
   static _instance
 
-  _sessions = new Map()
   _running = new Map()
 
   static for(srv, options = {}) {
@@ -45,10 +44,6 @@ export default class PiExecutor {
       cancelTask: (taskId, eventBus) => this.cancelTask(taskId, eventBus),
       abort: (taskId) => this.abort(taskId),
     }
-  }
-
-  _sessionKey(srv, contextId) {
-    return `${cds.context?.tenant || "anonymous"}:${srv.name}:${contextId}`
   }
 
   async execute(srv, options, requestContext, eventBus) {
