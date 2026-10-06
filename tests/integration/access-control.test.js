@@ -70,6 +70,18 @@ describe("@cap-js/agents - Access Control", () => {
       expect(aliceGet.data.result).not.toBe(undefined)
       expect(aliceGet.data.result.status.message.parts[0].text).not.toMatch(/Override/)
     })
+
+    it("bob cannot cancel alice task", async () => {
+      const aliceRes = await sendMessageAs("catalog", "What books?", ALICE)
+      expect(aliceRes.data.result.status.state).toBe("completed")
+      const aliceTaskId = aliceRes.data.result.id
+
+      const bobCancel = await jsonrpcAs("catalog", "tasks/cancel", { id: aliceTaskId }, BOB)
+      expect(bobCancel.data.error.message).toMatch(/Task not found/)
+
+      const aliceGet = await jsonrpcAs("catalog", "tasks/get", { id: aliceTaskId }, ALICE)
+      expect(aliceGet.data.result.status.state).toBe("completed")
+    })
   })
 
   // ─── @requires enforcement on A2A endpoint ───────────────────────────
@@ -299,6 +311,48 @@ describe("@cap-js/agents - Access Control", () => {
       // so the sentinel value must never appear in the response
       const text = res.data.result.status.message.parts[0].text
       expect(text, `sentinel must not leak to bob, got: ${text}`).not.toMatch(/ADMIN_ONLY_SENTINEL/)
+    })
+  })
+
+  // ─── Checkpoint isolation: cross-user HITL resume ─────────────────────
+  // Uses deterministic-hitl service which always triggers interrupt() — no LLM nondeterminism.
+
+  describe("Checkpoint isolation (HITL resume)", () => {
+    it("bob cannot resume alice's HITL conversation", async () => {
+      const contextId = `ac-hitl-${Date.now()}`
+
+      // Alice triggers HITL → deterministic graph always interrupts
+      const aliceRes = await sendMessageAs("deterministic-hitl", "start", ALICE, { contextId })
+      expect(aliceRes.data.result?.status?.state).toBe("input-required")
+      const taskId = aliceRes.data.result.id
+
+      // Bob tries to resume Alice's HITL task — should fail
+      const bobResume = await sendMessageAs("deterministic-hitl", "yes", BOB, { taskId })
+      if (bobResume.data.error) {
+        expect(bobResume.data.error).not.toBe(undefined)
+      } else {
+        // If no error, bob must not have hijacked alice's task
+        expect(bobResume.data.result.id).not.toBe(taskId)
+      }
+    })
+
+    it("alice can resume her own HITL conversation", async () => {
+      const contextId = `ac-hitl-own-${Date.now()}`
+
+      // Alice triggers HITL — deterministic graph interrupts with 2 actions
+      const aliceRes = await sendMessageAs("deterministic-hitl", "start", ALICE, { contextId })
+      expect(aliceRes.data.result?.status?.state).toBe("input-required")
+      const taskId = aliceRes.data.result.id
+
+      // Alice approves first action
+      const first = await sendMessageAs("deterministic-hitl", "approve", ALICE, { taskId })
+      expect(first.data.result.id).toBe(taskId)
+      expect(first.data.result.status.state).toBe("input-required")
+
+      // Alice approves second action → completes
+      const second = await sendMessageAs("deterministic-hitl", "approve", ALICE, { taskId })
+      expect(second.data.result.id).toBe(taskId)
+      expect(second.data.result.status.state).toBe("completed")
     })
   })
 })

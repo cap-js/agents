@@ -4,11 +4,108 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.3 - tbd
+## Version 0.9.8 - tbd
 
 ### Added
 
+- Tool and subagent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; opt-in per request via `userMessage.metadata["tool-status-update"]`; also added to preview
+- Preview now shows context size and token usage
+- OpenAI provider support via llm kind `openai`
+- Model and model parameters are shown in evaluation runs in MLflow
+
+### Changed
+
+- Consider static assertions in tests now in "output_correctness" and "success_rate" metrics of evaluation runs
+- The generic `call` action tool is now the default, matching `@cap-js/mcp`; per-action tools are opt-in via `cds.env.mcp.per_action_tool: true`. This replaces the former `cds.env.agents.per_action_tool` flag (which defaulted to per-action) and resolves the conflicting defaults between `@cap-js/agents` and `@cap-js/mcp`
+
+### Fixed
+
+- `@agent.hitl` / `@Common.IsActionCritical` are now honored when actions are exposed through the generic `call` action tool (previously human-in-the-loop gating only took effect with per-action tools)
+- Human-in-the-loop edit decisions can no longer repoint the generic `call` action tool to a different action than the one approved
+- Correctly handle non `@cap-js/mcp` tools during PII masking
+- Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
+- Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
+- Summarize on timeout prompts are now correctly shown in MLflow
+- Evaluation run metrics are now correctly aggregated in MLflow
+- Thinking steps are now correctly separated also inside a turn
+- Tasks are now moved into failed state on server crash to avoid quota issue on unstable servers
+- `@agent.llm` is now correctly considered for feature toggled services
+- SAP HANA Cloud based masking is now retried in case of HANA Cloud NLP connectivity issues
+- HITL tool rejections are now surfaced to the model as a deliberate user decision instead of a tool failure, so it no longer invents technical reasons (e.g. insufficient stock) for an action the user chose to reject
+
+## Version 0.9.7 - 2026-09-23
+
+### Added
+
+- CAP query result fields which are marked as containing personal data will be masked for the LLM, that the LLM works with hashes
+- Incoming user messages are pseudonymized using SAP Data Privacy Integration service as well as HANA Cloud NLP when the respective services are enabled & cds.env.agents.masking = true
+- Chat preview queues messages submitted while the agent is busy
+
+### Fixed
+
+- Chat preview keeps the message field height stable when typing the first character
+- Correct lookup for `@agent.directory` and `@agent.card` on BTP
+- `triggerCleanup` now uses a unique outbox job name per invocation, preventing the scheduled cleanup job from being silently replaced when a fresh instance starts or the 24h throttle expires
+
+## Version 0.9.6 - 2026-09-17
+
+### Fixed
+
+- Reuse entity filter logic from `@cap-js/mcp` for consistent behavior with Compositions
+
+## Version 0.9.5 - 2026-09-16
+
+### Added
+
+- Two new metrics about HITL reporting for which tools HITL was enforced and how the user decided
+- Remote MCP connections support `mcp.tools` in `cds.requires` to restrict which tools are exposed to the agent
+
+### Changed
+
+- Instead of failing when the agent reaches the maximum execution time, a HITL message is thrown asking the user whether to continue
+- Renamed config option `cds.agents.pool` to `cds.agents.quotas`
+
+### Fixed
+
+- Services with `@protocol: 'agent'` now also register `@agent` specific handlers
+- Mask apiKey in debug logs read from claude / opencode settings
+- Adjusted error message to be more accurate
+- Prompts are now correctly uploaded to MLFlow for markdown-based agents
+- `Judge.evaluate()` assessments now also appear in Databricks UC MLflow
+- Propagate opentelemetry traceparent to subagents
+
+## Version 0.9.4 - 2026-09-10
+
+### Added
+
+- Data parts can now be emitted based on tool output
+
+### Fixed
+
+- Multiple tools with HITL needed in the same round no longer cause an error
+- Better message to the LLM on HITL rejection
+- Remote A2A response does not yield duplicate content
+- Added `cds.folders.srvs` to support adjacent agent markdowns ootb.
+- Resets quota counter correctly between tasks for task related quota
+
+## Version 0.9.3 - 2026-09-04
+
+### Added
+
+- Added evaluation helpers & MLFlow integration to test the agents behaviour & functional correctness
 - Debug logs for tool calls
+
+### Changed
+
+- Adjusted agent audit log attributes to follow latest recommendations
+- LLM timeout, retry and circuit-breaker resilience now use a zero-dependency Node-native implementation instead of `@sap-cloud-sdk/resilience`
+- Prompt caching is now applied when GPT models are used (previously it was only applied with anthropic models)
+
+### Fixed
+
+- A2A agent card advertises `https://` instead of `http://` when deployed behind a cloud reverse proxy (CF, BTP, Kyma) by reading `X-Forwarded-Proto`
+- No longer emits orphaned spans during graph creation
+- Fixed remote MCP connections with authenticated server cards
 
 ## Version 0.9.2 - 2026-08-26
 
@@ -17,6 +114,7 @@
 - `cds.agents.retention` (default 30d) to configure retention of Tasks and related assets stored for A2A and the agent
 - Outgoing MCP and A2A connections now consider `credentials.path` together with the destination
 - Added additional OpenTelemetry span attributes detailing how many content filters were active
+- Thinking steps are shown in the preview
 
 ### Fixed
 

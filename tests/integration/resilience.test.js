@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import { createRequire } from "node:module"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 
 // Start mock AI Core BEFORE cds.test() boots
@@ -11,37 +10,18 @@ const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
 import createHelpers from "../utils/helpers.js"
 const { sendMessage } = createHelpers({ POST, axios })
 
-// Access shared circuit breakers map (CJS — same reference as runtime)
-const require = createRequire(import.meta.url)
-let circuitBreakers
-try {
-  // 4.9.1+: package.json exports field exposes ./internal; dist/circuit-breaker.js is blocked
-  circuitBreakers = require("@sap-cloud-sdk/resilience/internal").circuitBreakers
-} catch {
-  try {
-    // <4.9.0: no exports field, deep path works
-    circuitBreakers = require("@sap-cloud-sdk/resilience/dist/circuit-breaker.js").circuitBreakers
-  } catch {
-    circuitBreakers = null
-  }
-}
-
 describe("@cap-js/agents - LLM Circuit Breaker", () => {
   axios.defaults.validateStatus = () => true
 
-  let originalQuota
-  before(() => {
-    originalQuota = cds.env.agents.pool.maxTasksPerHourPerUser
-    cds.env.agents.pool.maxTasksPerHourPerUser = 200
-  })
+  // Reset the server-side circuit breaker state via a test-only OData action so
+  // each test starts with closed breakers and we never wait out resetTimeout.
+  const resetBreakers = () => POST("/odata/v4/circuit-breaker/resetBreakers", {})
+
   after(() => {
-    cds.env.agents.pool.maxTasksPerHourPerUser = originalQuota
     mock.stop()
   })
-  beforeEach(() => {
-    if (circuitBreakers) {
-      for (const key of Object.keys(circuitBreakers)) delete circuitBreakers[key]
-    }
+  beforeEach(async () => {
+    await resetBreakers()
     mock.resetCallCount()
     mock.setStatus(200)
   })
@@ -60,8 +40,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should NOT open circuit breaker on 4xx errors (httpErrorFilter)", async () => {
     mock.setStatus(429)
-    // volumeThreshold=10 — send 12 to exceed it; 4xx are filtered (don't trip breaker)
-    for (let i = 0; i < 12; i++) {
+    // volumeThreshold=2, send 4 to exceed it. 4xx are filtered (don't trip breaker).
+    for (let i = 0; i < 4; i++) {
       await sendMessage("circuit-breaker", `rate-limit-${i}`) // eslint-disable-line no-await-in-loop
     }
 
@@ -74,8 +54,8 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
 
   it("should open circuit breaker after repeated 5xx failures", async () => {
     mock.setStatus(502)
-    // volumeThreshold=10, errorThreshold=50% → opens after ≥10 failures
-    for (let i = 0; i < 11; i++) {
+    // volumeThreshold=2, errorThreshold=50% → opens after ≥2 failures
+    for (let i = 0; i < 3; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
@@ -87,7 +67,7 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
   it("open circuit breaker should cause immediate failure, not timeout from retries", async () => {
     mock.setStatus(502)
     // Trip the breaker
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 3; i++) {
       await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
 
@@ -105,9 +85,17 @@ describe("@cap-js/agents - LLM Circuit Breaker", () => {
   })
 
   it("should recover after circuit breaker state is reset", async () => {
-    if (circuitBreakers) {
-      for (const key of Object.keys(circuitBreakers)) delete circuitBreakers[key]
+    mock.setStatus(502)
+    // Trip the breaker
+    for (let i = 0; i < 3; i++) {
+      await sendMessage("circuit-breaker", `trip-${i}`) // eslint-disable-line no-await-in-loop
     }
+
+    // Reset breaker state directly instead of waiting out resetTimeout.
+    await resetBreakers()
+    mock.setStatus(200)
+    mock.resetCallCount()
+
     const res = await sendMessage("circuit-breaker", "recovered")
     expect(res.data.result?.status?.state).toBe("completed")
     expect(mock.getCallCount() > 0, "expected HTTP calls after recovery").toBeTruthy()

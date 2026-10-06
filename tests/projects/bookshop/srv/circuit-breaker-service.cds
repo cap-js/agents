@@ -6,6 +6,7 @@ using {sap.capire.bookshop as my} from '../db/schema';
  * pointed at a mock AI Core server.
  */
 @agent
+@odata
 @Core.Links : [
   {
       rel : 'via',
@@ -16,4 +17,7 @@ using {sap.capire.bookshop as my} from '../db/schema';
 service CircuitBreakerService {
   @readonly
   entity Books as projection on my.Books { ID, title, stock };
+
+  // Test-only: reset all circuit breaker state so tests don't wait out resetTimeout.
+  action resetBreakers();
 }

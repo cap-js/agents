@@ -1,5 +1,6 @@
 name: Check PR Title
 on:
+  merge_group:
   pull_request:
     types: [opened, synchronize, reopened, edited]
     branches:

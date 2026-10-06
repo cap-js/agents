@@ -1,16 +1,16 @@
 {
   "name": "agent-sample-travel-agent",
   "version": "1.0.0",
-  "type": "module",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@cap-js/agents": "file:../../../..",
     "@cap-js/sqlite": "*",
-    "@sap/cds": "^10.0.6"
+    "@sap/cds": "^10.1.1"
   },
   "cds": {
     "agents": {
-      "pool": {
+      "quotas": {
         "maxLLMInvocationsPerTask": 50
       },
       "fileIO": {

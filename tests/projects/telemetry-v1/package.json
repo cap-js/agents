@@ -1,12 +1,12 @@
 {
   "name": "telemetry-v1-test",
   "version": "1.0.0",
-  "type": "module",
   "description": "Test project for @cap-js/telemetry v1 (OTEL SDK v1) backward compatibility",
+  "type": "module",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
     "@cap-js/telemetry": "^1",
-    "@sap/cds": "^10.0.6"
+    "@sap/cds": "^10.1.1"
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1"

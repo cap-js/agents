@@ -4,7 +4,7 @@
   "cds": {
     "profile": "agent-sidecar",
     "agent": {
-      "pool": null
+      "quotas": null
     },
     "requires": {
       "db": {

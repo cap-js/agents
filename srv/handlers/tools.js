@@ -11,7 +11,8 @@ import {
   executeCallActionTool,
   executePerActionTool,
 } from "@cap-js/mcp/lib/tools.js"
-import { getFilteredEntities, getFilteredActions } from "../../lib/utils/utils.js"
+
+import { getFilteredEntities, getFilteredActions } from "@cap-js/mcp/lib/utils/tools-shared.js"
 import { isTextMime } from "../../lib/agents/markdown/backends/mime-utils.js"
 import { checkAuthorization } from "@cap-js/mcp/lib/auth.js"
 
@@ -38,7 +39,7 @@ class GenericReadTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeGenericReadTool(srv, entities, args, { log: LOG }))
+        return unwrap(await executeGenericReadTool(srv, entities, args))
       },
     })
     this.srv = srv
@@ -78,8 +79,8 @@ class DescribeTool extends DynamicStructuredTool {
       description: def.description,
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
-      func: async (args) => {
-        return unwrap(await executeDescribe(srv, entities, actions, args, { log: LOG }))
+      func: (args) => {
+        return unwrap(executeDescribe(srv, entities, actions, args))
       },
     })
     this.srv = srv
@@ -126,7 +127,7 @@ class PerActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executePerActionTool(srv, actionName, action, args, { log: LOG }))
+        return unwrap(await executePerActionTool(srv, actionName, action, args))
       },
     })
     this.srv = srv
@@ -149,7 +150,7 @@ class CallActionTool extends DynamicStructuredTool {
       schema: def.inputSchema,
       responseFormat: "content_and_artifact",
       func: async (args) => {
-        return unwrap(await executeCallActionTool(srv, actions, args, { log: LOG }))
+        return unwrap(await executeCallActionTool(srv, actions, args))
       },
     })
     this.srv = srv
@@ -182,31 +183,32 @@ class CallActionTool extends DynamicStructuredTool {
  * @param {object} srv - CDS ApplicationService
  */
 export function generateTools(srv) {
-  const entities = getFilteredEntities(srv)
-  const actions = getFilteredActions(srv)
+  const entities = getFilteredEntities(srv), has_entities = Object.keys(entities).length > 0
+  const actions = getFilteredActions(srv), has_actions = Object.keys(actions).length > 0
 
   const tools = []
 
-  // Query tool — one tool for reading all entities
-  const entityNames = Object.keys(entities)
-  if (entityNames.length > 0) {
-    tools.push(new GenericReadTool(srv, entities))
-  }
-
   // Describe tool — introspect service model
-  const actionNames = Object.keys(actions)
-  if (entityNames.length > 0 || actionNames.length > 0) {
+  if (has_entities || has_actions) {
+    LOG.debug(srv.name, '–', `adding generic 'describe' tool`)
     tools.push(new DescribeTool(srv, entities, actions))
   }
 
+  // Query tool — one tool for reading all entities
+  if (has_entities) {
+    LOG.debug(srv.name, '–', `adding generic 'query' entity tool`)
+    tools.push(new GenericReadTool(srv, entities))
+  }
+
   // Action/function tools — per-action (default) or combined call action
-  const usePerActionTools = cds.env.agents?.per_action_tool !== false
-  if (actionNames.length > 0) {
-    if (usePerActionTools) {
+  if (has_actions) {
+    if (cds.env.mcp?.per_action_tool) {
       for (const [name, action] of Object.entries(actions)) {
+        LOG.debug(srv.name, '–', `adding specific tool to call action '${name}'`)
         tools.push(new PerActionTool(srv, name, action))
       }
     } else {
+      LOG.debug(srv.name, '–', `adding generic 'call' action tool`)
       tools.push(new CallActionTool(srv, actions))
     }
   }
@@ -216,6 +218,10 @@ export function generateTools(srv) {
   // read_file: per-request (needs contextId) — created on-demand via createReadFileTool().
   if (cds.env.agents?.fileIO?.enabled) {
     tools.push(createEmitFilePartTool())
+  }
+
+  if (cds.env.agents?.emitDataParts) {
+    tools.push(createEmitDataPartTool())
   }
 
   return tools
@@ -360,6 +366,32 @@ export function createReadFileTool(fileStore, contextId, userId) {
         "Read the contents of an uploaded file. Use the /uploads/<filename> path from the file manifest. Returns file content for text-based formats.",
       schema: z.object({
         path: z.string().describe("File path, e.g. /uploads/report.csv"),
+      }),
+    },
+  )
+}
+
+/**
+ * Create a tool that emits a DataPart in the A2A response.
+ * The executor's toolResults collection detects `kind: "data"`
+ * and emits the tool result as a data part.
+ */
+export function createEmitDataPartTool() {
+  return tool(
+    async ({ data, mediaType }) => {
+      return {
+        kind: "data",
+        data,
+        mediaType: mediaType ?? "application/json",
+      }
+    },
+    {
+      name: "emit_data_part",
+      description: "Emit a structured A2A DataPart. Only use when instructed.",
+      schema: z.object({
+        // A2A DataPart is specified to be an object in A2A 0.3
+        // https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object
+        data: z.looseObject().describe("Structured object"),
       }),
     },
   )

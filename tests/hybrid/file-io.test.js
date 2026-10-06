@@ -46,7 +46,7 @@ function sendText(service, text, contextId) {
   })
 }
 
-describe("@cap-js/agent - File I/O (CatalogService — React path)", () => {
+describe("File I/O (CatalogService — React path)", () => {
   it("agent reads uploaded CSV and answers question about its contents", async () => {
     const res = await sendWithFile(
       "catalog",

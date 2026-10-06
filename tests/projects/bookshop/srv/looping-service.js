@@ -20,10 +20,10 @@ export default class LoopingService extends cds.ApplicationService {
     const srv = this
     const { createAgent } = await import("langchain")
     const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
-    const { AIMessage } = await import("@langchain/core/messages")
+    const { AIMessage, HumanMessage } = await import("@langchain/core/messages")
 
     const tools = await srv.send("buildTools")
-    const middleware = await srv.send("buildMiddleware")
+    const middleware = await srv.send("buildMiddleware", { tools })
 
     // Mock model that always returns a tool call (forces looping)
     let iteration = 0
@@ -34,17 +34,23 @@ export default class LoopingService extends cds.ApplicationService {
       bindTools() {
         return this
       }
-      async _generate() {
+      async _generate(messages) {
         iteration++
+        const lastHumanMessage = [...messages].reverse().find(HumanMessage.isInstance)
+        const isSingleResponse = lastHumanMessage?.content === "single response"
         const msg = new AIMessage({
-          content: `Iteration ${iteration}`,
-          tool_calls: [
-            {
-              name: "query",
-              args: { cql: "SELECT * FROM Books LIMIT 3" },
-              id: `call-${iteration}`,
-            },
-          ],
+          content: isSingleResponse ? "Single response" : `Iteration ${iteration}`,
+          ...(isSingleResponse
+            ? {}
+            : {
+                tool_calls: [
+                  {
+                    name: "query",
+                    args: { cql: "SELECT * FROM Books LIMIT 3" },
+                    id: `call-${iteration}`,
+                  },
+                ],
+              }),
           usage_metadata: { input_tokens: 50, output_tokens: 50, total_tokens: 100 },
         })
         return { generations: [{ message: msg }] }
