@@ -37,6 +37,33 @@ view Sessions as
   }
   group by session;
 
+@cds.api.ignore
+view QuotaUsage as
+  select from (
+    select from Messages as message {
+      createdAt,
+      createdBy,
+      usageToolCalls,
+      usageLlmTokens,
+      exists (
+        select 1 from Messages as terminal
+        where terminal.prev.ID = message.ID
+          and terminal.role = 'assistant'
+          and terminal.type in ('text', 'failed', 'canceled', 'rejected', 'auth-required')
+      ) ? 0 : 1 as active
+    }
+    where message.role = 'user'
+      and message.prev.ID is null
+      and date(message.createdAt) = date($now)
+  ) as task {
+    sum(task.active) as concurrentTasks,
+    sum(seconds_between(task.createdAt, $now) <= 3600 ? 1 : 0) as lastHourTasks,
+    sum(task.createdBy = $user.id ? task.active : 0) as concurrentTasksThisUser,
+    sum(task.createdBy = $user.id and seconds_between(task.createdAt, $now) <= 3600 ? 1 : 0) as lastHourTasksThisUser,
+    sum(seconds_between(task.createdAt, $now) <= 3600 ? task.usageToolCalls : 0) as lastHourToolCalls,
+    sum(task.usageLlmTokens) as llmTokensThisDay
+  };
+
 /** Reversible pseudonym mappings require restricted retention and access handling. */
 @cds.api.ignore
 @PersonalData: {
