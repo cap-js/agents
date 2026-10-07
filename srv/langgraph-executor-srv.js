@@ -56,8 +56,8 @@ export default class LangGraphExecutor {
     if (result && typeof result.invoke === "function") {
       return new GraphExecutor(result, srv) // langchain executor
     }
-    if (result && typeof result.prompt === "function") {
-      return new PiExecutor(result, srv)
+    if (result?.harness === "pi") {
+      return new PiExecutor(result.factory, srv)
     }
     if (result && typeof result.execute === "function") {
       return result  // result is already an executor
