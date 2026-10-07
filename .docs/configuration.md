@@ -32,50 +32,6 @@ service CatalogService { ... }
 | ------------ | ------------------------------------------------------------------------------------------- |
 | `@agent.llm` | LLM service name from `cds.requires` for a single service. Overrides the default (`"llm"`). |
 
-## Pi executor (proof of concept)
-
-The Pi POC uses a native `@earendil-works/pi-agent-core` loop rather than LangGraph. Enable it
-with the `pi` profile. To try it without credentials, configure `llm` with `kind: "pi-mock"`;
-for example in your development profile.
-
-```jsonc
-{ "cds": { "requires": { "[development]": { "llm": "pi-mock" } } } }
-```
-
-Configure the Pi-specific Anthropic model for a real model:
-
-```sh
-ANTHROPIC_API_KEY=... CDS_ENV=pi cds watch
-```
-
-It reads the same `llm` (or service-specific `@agent.llm`) entry as the default executor:
-
-```jsonc
-{
-  "cds": {
-    "requires": {
-      "llm": {
-        "kind": "pi-anthropic",
-        "model": "claude-sonnet-4-6",
-      },
-      "agent-executor": {
-        "kind": "agent-executor-pi",
-        "thinkingLevel": "off",
-      },
-    },
-  },
-}
-```
-
-Executor implementations are regular `cds.requires.kinds` entries. LangGraph remains the
-default (`agent-executor-langgraph`); `agent-executor-pi` selects Pi. The POC resolves its model
-through the same `buildModel` hook as LangGraph. Pi model kinds such as `pi-anthropic` provide the
-Pi model and stream implementation; switching the `llm` entry or using `@agent.llm` switches
-models without changing the executor. It adapts the existing CDS-generated tools to Pi tools. LangGraph
-features such as checkpoint persistence, HITL interrupts, deep-agent directories, per-run quota
-middleware, and output-file collection are not part of the POC. Pi conversation state is kept in
-memory per tenant, service, and A2A context.
-
 ## `@agent.directory`
 
 Service annotation. Path to the agent directory, overriding the slug convention. Resolved relative to the `.cds` source file.
