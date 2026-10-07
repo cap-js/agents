@@ -31,11 +31,12 @@ entity Messages : managed {
 
 view Sessions as
   select from Messages {
-    key session         as ID,
+    key session      as ID,
+    key agentService,
         min(createdAt)  as createdAt,
         max(modifiedAt) as modifiedAt,
   }
-  group by session;
+  group by session, agentService;
 
 @cds.api.ignore
 view QuotaUsage as
