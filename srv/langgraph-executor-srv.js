@@ -12,7 +12,7 @@ import PiExecutor from '../lib/protocol/pi-executor.js'
  * Graphs cached per feature vector (cds.context.features) in a FIFO cache.
  * Lazy init: graph built on first request (features not available at startup).
  */
-export default class LangGraphExecutor {
+export class LangGraphExecutor {
   static _instance
   _caches = new Map()
 
@@ -74,5 +74,3 @@ export default class LangGraphExecutor {
     return executor.execute(requestContext, eventBus)
   }
 }
-
-export { LangGraphExecutor }
