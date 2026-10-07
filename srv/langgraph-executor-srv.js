@@ -1,6 +1,9 @@
 import cds from "@sap/cds"
 import { GraphExecutor } from "./handlers/graph-executor.js"
 import { GraphCache, hashFeatures } from "./graph-cache.js"
+import PiExecutor from '../lib/protocol/pi-executor.js'
+
+// REVISIT: this is not a langgraph executor, but an executor factory
 
 /**
  * LangGraph-based executor service for @agent annotated services.
@@ -51,10 +54,13 @@ export default class LangGraphExecutor {
     const result = await srv.send("buildGraph", {})
 
     if (result && typeof result.invoke === "function") {
-      return new GraphExecutor(result, srv)
+      return new GraphExecutor(result, srv) // langchain executor
+    }
+    if (result && typeof result.prompt === "function") {
+      return new PiExecutor(result, srv)
     }
     if (result && typeof result.execute === "function") {
-      return result
+      return result  // result is already an executor
     }
 
     throw new Error(

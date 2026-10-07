@@ -223,19 +223,7 @@
         },
         "llm-mock": {
           "impl": "@cap-js/agents/lib/models/mock"
-        },
-        "agent-executor-langgraph": {
-          "impl": "@cap-js/agents/srv/langgraph-executor-srv"
-        },
-        "agent-executor-pi": {
-          "impl": "@cap-js/agents/srv/pi-executor-srv"
-        },
-        "agent-executor-webagent": {
-          "impl": "@cap-js/agents/srv/webagent-executor-srv"
         }
-      },
-      "agent-executor": {
-        "kind": "agent-executor-langgraph"
       },
       "[development]": {
         "llm": "auto"
@@ -250,7 +238,6 @@
         "llm": "aicore"
       },
       "[pi]": {
-        "agent-executor": "pi",
         "[anthropic]": {
           "llm": "pi-anthropic"
         },
@@ -259,7 +246,6 @@
         }
       },
       "[webagent]": {
-        "agent-executor": "webagent",
         "[anthropic]": {
           "llm": "pi-anthropic"
         },
