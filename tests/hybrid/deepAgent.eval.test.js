@@ -178,41 +178,84 @@ describe.concurrent("Auto-built deep agents (zero-code convention)", () => {
       ).toBeTruthy()
     })
 
+    test.concurrent("message/send routes through the auto-deepagent (not the mock executor)", async () => {
+      const res = await sendMessage("zero-code-agent", "Hi")
+      const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
+      expect(
+        text,
+        `mock executor response received — auto-deepagent wiring failed: ${text}`,
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
+    })
+
     test.concurrent(
-      "message/send routes through the auto-deepagent (not the mock executor)",
+      "deepagent internal filesystem tools are never exposed as artifact-update events",
+      { timeout: 120000 },
       async () => {
-        const res = await sendMessage("zero-code-agent", "Hi")
-        const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
+        const DEEPAGENT_FS_TOOLS = [
+          "read_file",
+          "write_file",
+          "edit_file",
+          "delete",
+          "glob",
+          "grep",
+          "execute",
+          "ls",
+        ]
+        const r = await POST(
+          "/a2a/zero-code-agent/",
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "message/stream",
+            params: {
+              message: {
+                kind: "message",
+                messageId: cds.utils.uuid(),
+                role: "user",
+                parts: [{ kind: "text", text: "Get all products and load your skill" }],
+                metadata: { "tool-status-update": {} },
+              },
+            },
+          },
+          { responseType: "text" },
+        )
+        const frames = parseSSEFrames(r.data)
+        const toolCallFrames = frames.filter(
+          (f) =>
+            f.result?.kind === "artifact-update" &&
+            f.result?.artifact?.artifactId?.startsWith("tool-call-"),
+        )
+        const exposedFsTools = toolCallFrames
+          .map((f) => f.result?.artifact?.parts?.[0]?.data?.name)
+          .filter((name) => DEEPAGENT_FS_TOOLS.includes(name))
         expect(
-          text,
-          `mock executor response received — auto-deepagent wiring failed: ${text}`,
-        ).not.toMatch(MOCK_EXECUTOR_TEXT)
+          toolCallFrames.length,
+          "expected at least one tool-call event (query) to verify tool-status-update is working",
+        ).toBeGreaterThan(0)
+        expect(
+          exposedFsTools,
+          `deepagent filesystem tools must never surface as artifact-update events; got: ${exposedFsTools.join(", ")}`,
+        ).toEqual([])
       },
     )
   })
 
   describe.concurrent("@agent.directory annotation (override-card-service)", () => {
-    test.concurrent(
-      "agent card resolved from annotation-pointed dir + @agent.card file",
-      async () => {
-        const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
-        expect(res.status).toBe(200)
-        expect(res.data.name).toBe("card-override-explicit")
-        expect(res.data.version).toBe("2.0.0")
-      },
-    )
+    test.concurrent("agent card resolved from annotation-pointed dir + @agent.card file", async () => {
+      const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
+      expect(res.status).toBe(200)
+      expect(res.data.name).toBe("card-override-explicit")
+      expect(res.data.version).toBe("2.0.0")
+    })
 
-    test.concurrent(
-      "message/send routes through auto-deepagent (annotation-resolved dir)",
-      async () => {
-        const res = await sendMessage("override-card", "Hi")
-        const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-        expect(
-          text,
-          `mock executor response received — @agent.directory wiring failed: ${text}`,
-        ).not.toMatch(MOCK_EXECUTOR_TEXT)
-      },
-    )
+    test.concurrent("message/send routes through auto-deepagent (annotation-resolved dir)", async () => {
+      const res = await sendMessage("override-card", "Hi")
+      const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
+      expect(
+        text,
+        `mock executor response received — @agent.directory wiring failed: ${text}`,
+      ).not.toMatch(MOCK_EXECUTOR_TEXT)
+    })
   })
 
   test.concurrent("includes both auto-generated CDS tools and the user's custom tool", async () => {

@@ -8,14 +8,30 @@
 
 ### Added
 
+- Tool and subagent calls are now exposed as `artifact-update` A2A events so any SSE consumer can observe invocations, arguments, and results; opt-in per request via `userMessage.metadata["tool-status-update"]`; also added to preview
 - Preview now shows context size and token usage
 - OpenAI provider support via llm kind `openai`
+- Model and model parameters are shown in evaluation runs in MLflow
+
+### Changed
+
+- Consider static assertions in tests now in "output_correctness" and "success_rate" metrics of evaluation runs
+- The generic `call` action tool is now the default, matching `@cap-js/mcp`; per-action tools are opt-in via `cds.env.mcp.per_action_tool: true`. This replaces the former `cds.env.agents.per_action_tool` flag (which defaulted to per-action) and resolves the conflicting defaults between `@cap-js/agents` and `@cap-js/mcp`
 
 ### Fixed
 
+- `@agent.hitl` / `@Common.IsActionCritical` are now honored when actions are exposed through the generic `call` action tool (previously human-in-the-loop gating only took effect with per-action tools)
+- Human-in-the-loop edit decisions can no longer repoint the generic `call` action tool to a different action than the one approved
 - Correctly handle non `@cap-js/mcp` tools during PII masking
 - Correctly report A2A messages as failed when AI Core is configured but no AI Core credentials can be found
 - Correctly report input tokens for Anthropic models on AI Core. OpenTelemetry specifies that input_tokens includes cached tokens, but Anthropic did not include the cached tokens in input_tokens
+- Summarize on timeout prompts are now correctly shown in MLflow
+- Evaluation run metrics are now correctly aggregated in MLflow
+- Thinking steps are now correctly separated also inside a turn
+- Tasks are now moved into failed state on server crash to avoid quota issue on unstable servers
+- `@agent.llm` is now correctly considered for feature toggled services
+- SAP HANA Cloud based masking is now retried in case of HANA Cloud NLP connectivity issues
+- HITL tool rejections are now surfaced to the model as a deliberate user decision instead of a tool failure, so it no longer invents technical reasons (e.g. insufficient stock) for an action the user chose to reject
 
 ## Version 0.9.7 - 2026-09-23
 
