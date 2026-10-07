@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { generateTools } from "./tools.js"
+import { generateTools, toPiTools } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
@@ -20,9 +20,15 @@ export default function registerDefaultAgentHandlers(srv) {
   // MCP connections are declared via @agent.mcps annotation on the service:
   //   @agent.mcps: [{ service: 'MyConnection' }, { service: 'AnotherConnection' }]
   // Each service name must be defined as a cds.requires entry in package.json.
-  srv.on("buildTools", async () => {
+  srv.on("buildTools", async (req) => {
     const cdsTools = generateTools(srv)
+    const extraTools = await mcpAndSubagents(srv)
+    const tools = [...cdsTools, ...extraTools]
+    return req.data.harness === 'pi' ? toPiTools(tools) : tools // REVISIT
+  })
 
+  // REVISIT: proper place for this
+  async function mcpAndSubagents(srv) {
     // ── MCP servers and subagents ────────────────────────────────────────────────────────
     // Connect to other @mcp services and @agent services
     function canConnect(s) {
@@ -57,7 +63,7 @@ export default function registerDefaultAgentHandlers(srv) {
               ? services?.filter((s) => s.name !== srv.name && (s.protocols?.agent || s["@agent"]))
               : connect?.map((name) => serviceMap[name]).filter(Boolean) || []
 
-    if (selected.length === 0) return cdsTools
+    if (selected.length === 0) return []
 
     const mcpEntries = []
     const agentEntries = []
@@ -85,10 +91,8 @@ export default function registerDefaultAgentHandlers(srv) {
       } else LOG.warn("Failed to build external tools:", r.reason?.message ?? r.reason)
     }
 
-    return [...cdsTools, ...extraTools]
-  })
-
-  srv.after("buildTools", (tools) => tools)
+    return extraTools
+  }
 
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
@@ -96,6 +100,7 @@ export default function registerDefaultAgentHandlers(srv) {
     const name = def?.["@agent.llm"] || srv?.options?.agent?.llm || "llm"
     const options = cds.requires[name] ?? {}
     let { kind, impl } = options
+    if (req.data.harness === 'pi') impl = "@cap-js/agents/lib/models/pi-generic" // REVISIT
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)
