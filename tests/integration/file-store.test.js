@@ -15,12 +15,13 @@ cds.test(path.join(__dirname, "../projects/bookshop"))
 describe("@cap-js/agent - composition cascade delete", () => {
   it("deleting a Messages row removes its inputFiles children", async () => {
     await cds.connect.to("db")
-    const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
+    const { Messages } = cds.entities("cap.agent")
+    const { inputFiles } = cds.entities("cap.agent.Messages")
 
     const taskId = cds.utils.uuid()
     const contextId = cds.utils.uuid()
 
-    await INSERT.into("cap.agent.Messages").entries({
+    await INSERT.into(Messages).entries({
       ID: taskId,
       session: contextId,
       state: "completed",
@@ -28,7 +29,7 @@ describe("@cap-js/agent - composition cascade delete", () => {
     })
 
     // Insert child inputFiles row directly (bypassing attachments for test isolation)
-    await INSERT.into(InputFiles).entries({
+    await INSERT.into(inputFiles).entries({
       ID: cds.utils.uuid(),
       up__ID: taskId,
       filename: "test.csv",
@@ -36,14 +37,14 @@ describe("@cap-js/agent - composition cascade delete", () => {
     })
 
     // Verify child exists
-    const beforeRows = await SELECT.from(InputFiles).where({ up__ID: taskId })
+    const beforeRows = await SELECT.from(inputFiles).where({ up__ID: taskId })
     expect(beforeRows.length).toBe(1)
 
     // Delete parent
-    await DELETE.from("cap.agent.Messages").where({ ID: taskId })
+    await DELETE.from(Messages).where({ ID: taskId })
 
     // Child must be gone (cascade delete via composition)
-    const after = await SELECT.from(InputFiles).where({ up__ID: taskId })
+    const after = await SELECT.from(inputFiles).where({ up__ID: taskId })
     expect(after.length).toBe(0)
   })
 })
@@ -51,13 +52,14 @@ describe("@cap-js/agent - composition cascade delete", () => {
 describe("@cap-js/agent - CdsFileStore.saveOutputFile upsert", () => {
   it("second saveOutputFile call for same (taskId, filename) updates the row, not inserts", async () => {
     await cds.connect.to("db")
-    const OutputFiles = cds.model.definitions["cap.agent.Messages.outputFiles"]
+    const { Messages } = cds.entities("cap.agent")
+    const { outputFiles } = cds.entities("cap.agent.Messages")
     const store = new CdsFileStore()
 
     const taskId = cds.utils.uuid()
     const contextId = cds.utils.uuid()
 
-    await INSERT.into("cap.agent.Messages").entries({
+    await INSERT.into(Messages).entries({
       ID: taskId,
       session: contextId,
       state: "completed",
@@ -70,7 +72,7 @@ describe("@cap-js/agent - CdsFileStore.saveOutputFile upsert", () => {
     await store.saveOutputFile(taskId, "report.md", "text/markdown", v1)
     await store.saveOutputFile(taskId, "report.md", "text/markdown", v2)
 
-    const rows = await SELECT.from(OutputFiles).where({ up__ID: taskId, filename: "report.md" })
+    const rows = await SELECT.from(outputFiles).where({ up__ID: taskId, filename: "report.md" })
     expect(rows.length, "expected exactly one row after two saves of the same filename").toBe(1)
 
     const fetched = await store.getOutputFile(taskId, "report.md")

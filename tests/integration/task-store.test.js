@@ -3,8 +3,6 @@ cds.test(import.meta.dirname + "/../projects/bookshop")
 import { ensureTaskAnchor } from "../../lib/protocol/persistence/message-store.js"
 import { CdsTaskStore, PERSIST_TASK } from "../../lib/protocol/persistence/task-store.js"
 
-const MESSAGES = "cap.agent.Messages"
-
 function runAs(userId, fn) {
   return cds.tx({ user: new cds.User({ id: userId }) }, fn)
 }
@@ -30,6 +28,7 @@ async function createAnchor(taskId) {
 
 describe("CdsTaskStore", () => {
   it("ignores unmarked SDK saves even when the accumulated task state is durable", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const store = new CdsTaskStore()
     const taskId = `task-${cds.utils.uuid()}`
 
@@ -38,11 +37,12 @@ describe("CdsTaskStore", () => {
       await store.save({ ...task(taskId, "submitted"), status: { state: "submitted" } })
     })
 
-    const row = await SELECT.one.from(MESSAGES).where({ ID: taskId, createdBy: "alice" })
+    const row = await SELECT.one.from(Messages).where({ ID: taskId, createdBy: "alice" })
     expect(row.role).toBe("user")
   })
 
   it("persists durable lifecycle on the initiating message only", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const store = new CdsTaskStore()
     const taskId = `task-${cds.utils.uuid()}`
 
@@ -59,13 +59,14 @@ describe("CdsTaskStore", () => {
       expect(current.status.state).toBe("submitted")
     })
 
-    const row = await SELECT.one.from(MESSAGES).where({ ID: taskId, createdBy: "alice" })
+    const row = await SELECT.one.from(Messages).where({ ID: taskId, createdBy: "alice" })
     expect(row.role).toBe("user")
     expect(row.session).toBe(`context-${taskId}`)
-    expect(await SELECT.from(MESSAGES).where({ session: row.session })).toHaveLength(1)
+    expect(await SELECT.from(Messages).where({ session: row.session })).toHaveLength(1)
   })
 
   it("persists input-required state without thinking artifacts", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const store = new CdsTaskStore()
     const taskId = `task-${cds.utils.uuid()}`
 
@@ -80,7 +81,7 @@ describe("CdsTaskStore", () => {
       )
     })
 
-    const rows = await SELECT.from(MESSAGES)
+    const rows = await SELECT.from(Messages)
       .where({ session: `context-${taskId}`, createdBy: "alice" })
       .orderBy("sequence")
     expect(rows.at(-1).role).toBe("hitl")

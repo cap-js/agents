@@ -4,8 +4,6 @@ import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-sa
 
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
-const MESSAGES = "cap.agent.Messages"
-
 function runAs(userId, fn) {
   return cds.tx({ user: new cds.User({ id: userId }) }, fn)
 }
@@ -24,6 +22,7 @@ function checkpoint(id, messages, extra = {}) {
 
 describe("CdsCheckpointSaver", () => {
   it("stores conversation messages once and keeps reasoning out of persistence", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const saver = new CdsCheckpointSaver()
     const contextId = `conversation-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
@@ -45,7 +44,7 @@ describe("CdsCheckpointSaver", () => {
       ),
     )
 
-    const rows = await SELECT.from(MESSAGES)
+    const rows = await SELECT.from(Messages)
       .where({ session: contextId, agentService: "TestService", createdBy: "alice" })
       .orderBy("sequence")
     expect(rows).toHaveLength(2)
@@ -64,6 +63,7 @@ describe("CdsCheckpointSaver", () => {
   })
 
   it("does not persist non-message LangGraph state", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const saver = new CdsCheckpointSaver()
     const contextId = `state-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
@@ -82,10 +82,11 @@ describe("CdsCheckpointSaver", () => {
     expect(tuple.checkpoint.channel_values.cart).toBe(undefined)
     expect(tuple.metadata).toEqual({})
     expect(tuple.checkpoint.channel_values.messages[0].content).toBe("hello")
-    expect(await SELECT.from(MESSAGES).where({ session: contextId })).toHaveLength(1)
+    expect(await SELECT.from(Messages).where({ session: contextId })).toHaveLength(1)
   })
 
   it("round-trips tool calls through neutral message fields", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const saver = new CdsCheckpointSaver()
     const contextId = `tools-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
@@ -112,7 +113,7 @@ describe("CdsCheckpointSaver", () => {
       ),
     )
 
-    const rows = await SELECT.from(MESSAGES).where({ session: contextId }).orderBy("sequence")
+    const rows = await SELECT.from(Messages).where({ session: contextId }).orderBy("sequence")
     expect(rows[1].query).toEqual({
       toolCalls: [{ id: "call-1", name: "lookup", args: { id: 7 } }],
     })

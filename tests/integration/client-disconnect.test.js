@@ -73,7 +73,7 @@ describe("@cap-js/agents - SSE client disconnect aborts running task", () => {
 
     // Poll the task-anchoring message for the disconnect-triggered cancellation.
     await cds.connect.to("db")
-    const Messages = cds.model.definitions["cap.agent.Messages"]
+    const { Messages } = cds.entities("cap.agent")
     const deadline = Date.now() + 5000
     let state
     // eslint-disable-next-line no-unmodified-loop-condition

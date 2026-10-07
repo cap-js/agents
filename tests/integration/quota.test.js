@@ -294,7 +294,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
-      const row = await SELECT.one.from("cap.agent.Messages").where({ ID: taskId })
+      const { Messages } = cds.entities("cap.agent")
+      const row = await SELECT.one.from(Messages).where({ ID: taskId })
       expect(row).not.toBe(undefined)
       expect(row.agentService).toBe("GraphBookService")
     })
@@ -308,7 +309,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
-      const row = await SELECT.one.from("cap.agent.Messages").where({ ID: taskId })
+      const { Messages } = cds.entities("cap.agent")
+      const row = await SELECT.one.from(Messages).where({ ID: taskId })
       expect(row).not.toBe(undefined)
       expect(row.agentService).toBe("LoopingService")
       expect(
@@ -326,7 +328,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
       await new Promise((r) => setTimeout(r, 200))
 
       const taskId = res.data.result.id
-      const row = await SELECT.one.from("cap.agent.Messages").where({ ID: taskId })
+      const { Messages } = cds.entities("cap.agent")
+      const row = await SELECT.one.from(Messages).where({ ID: taskId })
       expect(row).not.toBe(undefined)
       expect(row.agentService).toBe("LoopingService")
       expect(Number(row.usageLlmTokens)).toBeGreaterThanOrEqual(0)

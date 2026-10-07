@@ -115,7 +115,8 @@ describe.concurrent("product-agent", () => {
 
       await new Promise((r) => setTimeout(r, 1000))
 
-      const [task] = await SELECT.from("cap.agent.Messages")
+      const { Messages } = cds.entities("cap.agent")
+      const [task] = await SELECT.from(Messages)
         .where({ ID: messageId })
         .orderBy("createdAt desc")
         .limit(1)

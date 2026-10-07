@@ -72,9 +72,9 @@ describe("File I/O (CatalogService — React path)", () => {
     const contextId = res.data.result.contextId
     const taskId = res.data.result.id
 
-    const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
+    const { inputFiles } = cds.entities("cap.agent.Messages")
     const rows = await cds.run(
-      SELECT.from(InputFiles).where({ "up_.session": contextId, filename: "reading-list.csv" }),
+      SELECT.from(inputFiles).where({ "up_.session": contextId, filename: "reading-list.csv" }),
     )
     expect(rows.length).toBe(1)
     expect(rows[0].mimeType).toBe("text/csv")
@@ -149,10 +149,10 @@ describe("File I/O (CatalogService — React path)", () => {
     )
     const taskId2 = turn2.data.result.id
 
-    const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
+    const { inputFiles } = cds.entities("cap.agent.Messages")
     // Both rows exist (always-insert)
     const all = await cds.run(
-      SELECT.from(InputFiles).where({ "up_.session": contextId, filename: "data.csv" }),
+      SELECT.from(inputFiles).where({ "up_.session": contextId, filename: "data.csv" }),
     )
     expect(all.length).toBe(2)
 

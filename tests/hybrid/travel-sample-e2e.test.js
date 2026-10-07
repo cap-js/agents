@@ -57,7 +57,8 @@ afterAll(async () => {
 const { POST, axios, GET } = cds.test(TRAVEL_AGENT_DIR)
 
 async function collectToolCallsFromCheckpoints(threadId) {
-  const rows = await SELECT.from("cap.agent.Messages").where({ session: threadId })
+  const { Messages } = cds.entities("cap.agent")
+  const rows = await SELECT.from(Messages).where({ session: threadId })
   const tools = new Set()
 
   for (const row of rows) {
@@ -232,9 +233,9 @@ describe("File I/O (travel-agent — deep-agent path)", () => {
     const contextId = result.contextId
 
     // Persisted upload
-    const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
+    const { inputFiles, outputFiles } = cds.entities("cap.agent.Messages")
     const inputs = await cds.run(
-      SELECT.from(InputFiles).where({
+      SELECT.from(inputFiles).where({
         "up_.session": contextId,
         filename: "trip-requests.csv",
       }),
@@ -256,8 +257,7 @@ describe("File I/O (travel-agent — deep-agent path)", () => {
     )
 
     // Output file persisted in CDS
-    const OutputFiles = cds.model.definitions["cap.agent.Messages.outputFiles"]
-    const outputs = await cds.run(SELECT.from(OutputFiles).where({ up__ID: savedTaskId }))
+    const outputs = await cds.run(SELECT.from(outputFiles).where({ up__ID: savedTaskId }))
     expect(outputs.length >= 1, "expected at least one output file row").toBeTruthy()
 
     // Tool-call witness: deepagents' built-in read_file + write_file fired.

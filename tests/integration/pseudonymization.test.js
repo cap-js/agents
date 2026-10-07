@@ -106,17 +106,17 @@ describe("pseudonymization", () => {
 
       expect(loaded.seed).toBe(sessionId)
       expect(new Map(loaded.mappings).get(hash)).toBe("Emily Brontë")
-      expect(await SELECT.one.from("cap.agent.Messages").where({ session: sessionId })).toBe(
-        undefined,
-      )
+      const { Messages } = cds.entities("cap.agent")
+      expect(await SELECT.one.from(Messages).where({ session: sessionId })).toBe(undefined)
     })
 
     it("does not persist reversible mappings", async () => {
       const first = await sendMessage("pseudo-book", "Who wrote these books?")
       expect(first.status).toBe(200)
       const contextId = first.data.result.contextId
-      const rows = await SELECT.from("cap.agent.Messages").where({ session: contextId })
-      const mappings = await SELECT.from("cap.agent.PseudonymMappings").where({
+      const { Messages, PseudonymMappings } = cds.entities("cap.agent")
+      const rows = await SELECT.from(Messages).where({ session: contextId })
+      const mappings = await SELECT.from(PseudonymMappings).where({
         session_ID: contextId,
       })
       expect(JSON.stringify(rows)).not.toContain("hashToOriginal")
@@ -133,7 +133,8 @@ describe("pseudonymization", () => {
         contextId,
       })
       expect(second.status).toBe(200)
-      const rows = await SELECT.from("cap.agent.Messages").where({ session: contextId })
+      const { Messages } = cds.entities("cap.agent")
+      const rows = await SELECT.from(Messages).where({ session: contextId })
       expect(JSON.stringify(rows)).not.toContain("hashToOriginal")
       expect(JSON.stringify(rows)).not.toContain('"seed"')
     })

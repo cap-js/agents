@@ -56,8 +56,8 @@ function sendFile(service, file) {
 
 async function inputFilesFor(taskId) {
   await cds.connect.to("db")
-  const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
-  return SELECT.from(InputFiles).where({ up__ID: taskId })
+  const { inputFiles } = cds.entities("cap.agent.Messages")
+  return SELECT.from(inputFiles).where({ up__ID: taskId })
 }
 
 describe("@cap-js/agents - inbound FilePart guard (graph-executor)", () => {

@@ -52,7 +52,8 @@ describe("@cap-js/agents - JSON-RPC Protocol", () => {
       /technical issue|issue|technical|not installed|configuration issue/i,
     )
 
-    const rows = await SELECT.from("cap.agent.Messages").where({ session: task.contextId })
+    const { Messages } = cds.entities("cap.agent")
+    const rows = await SELECT.from(Messages).where({ session: task.contextId })
     expect(rows.filter(({ role }) => role === "runtime")).toHaveLength(0)
     expect(rows.filter(({ ID }) => ID === messageId)).toHaveLength(1)
   })
