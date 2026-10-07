@@ -2,6 +2,11 @@ import cds from "@sap/cds"
 import { agentMessage, firstDataPart, partsToText } from "../../../lib/utils/message-handling.js"
 import { audit, short } from "../../../lib/utils/utils.js"
 import * as metrics from "../../../lib/telemetry/metrics.js"
+import { PERSIST_TASK } from "../../../lib/protocol/persistence/task-store.js"
+import {
+  appendMessage,
+  loadLatestHitlRequest,
+} from "../../../lib/protocol/persistence/message-store.js"
 
 const LOG = cds.log("agents")
 
@@ -183,7 +188,9 @@ export function guardHitlEdits(resume, actions = []) {
     const from = original.args?.action
     const to = decision.editedAction?.args?.action
     if (to !== undefined && from !== undefined && to !== from) {
-      throw new Error(`HITL edit must not change the gated action (expected "${from}", got "${to}").`)
+      throw new Error(
+        `HITL edit must not change the gated action (expected "${from}", got "${to}").`,
+      )
     }
   })
   return resume
@@ -255,6 +262,7 @@ function publishInputRequired({ requestContext, eventBus, description, interrupt
         [INPUT_REQUIRED_METADATA_KEY]: { options: approvalOptions() },
       }),
       timestamp: new Date().toISOString(),
+      [PERSIST_TASK]: true,
     },
     final: true,
   })
@@ -282,6 +290,7 @@ export function publishTimeoutHitl({ requestContext, eventBus, description, serv
         [INPUT_REQUIRED_METADATA_KEY]: { options: timeoutOptions() },
       }),
       timestamp: new Date().toISOString(),
+      [PERSIST_TASK]: true,
     },
     final: true,
   })
@@ -291,6 +300,17 @@ export async function resumeTimeoutHitl({ requestContext, eventBus, stream, sign
   const { taskId, contextId } = requestContext
   const decision = partsToText(requestContext.userMessage?.parts).trim()
   if (!decision) throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
+  await appendMessage({
+    ID: requestContext.userMessage.messageId,
+    session: contextId,
+    prev_ID: taskId,
+    role: "hitl",
+    type: "decision",
+    content: requestContext.userMessage.parts,
+    query: { decision },
+    agentService: cds.context?.["agent.service"],
+    requirePrev: true,
+  })
 
   if (/^(continue|approve|yes|confirm|ok)$/i.test(decision)) {
     LOG.info("timeout continuation approved", { conversation: short(contextId) })
@@ -330,8 +350,24 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
   let resume = dataPart !== undefined ? patchRejectMessage(dataPart) : parseResumeDecision(userText)
   let actionRequests = []
 
+  await appendMessage({
+    ID: requestContext.userMessage.messageId,
+    session: contextId,
+    prev_ID: taskId,
+    role: "hitl",
+    type: "decision",
+    content: requestContext.userMessage.parts,
+    query: { resume },
+    agentService: cds.context?.["agent.service"],
+    requirePrev: true,
+  })
+
   if (Array.isArray(resume?.decisions)) {
-    const pending = pendingHitlFromTask(requestContext.task)
+    let pending = pendingHitlFromTask(requestContext.task)
+    if (!pending && cds.db) {
+      const pendingStatus = await loadLatestHitlRequest(contextId)
+      pending = pendingHitlFromTask({ status: pendingStatus })
+    }
     const actionCount = pending?.actionCount ?? (await getPendingHitlActionCount(graph, config))
     actionRequests = pendingActionRequests(requestContext.task, pending)
     const priorDecisionCount = pending?.decisions?.length || 0

@@ -80,6 +80,31 @@ describe("@cap-js/agents - Push Notifications", () => {
     assert.ok(result?.pushNotificationConfig?.url, "expected pushNotificationConfig with url")
   })
 
+  it("keeps notification configs scoped to one task within a shared context", async () => {
+    const first = await sendMessage("catalog", "First task")
+    const contextId = first.data.result.contextId
+    const firstTaskId = first.data.result.id
+    const second = await sendMessage("catalog", "Second task", { contextId })
+    const secondTaskId = second.data.result.id
+
+    await jsonrpc("catalog", "tasks/pushNotificationConfig/set", {
+      taskId: firstTaskId,
+      pushNotificationConfig: {
+        url: `http://127.0.0.1:${webhookPort}/webhook`,
+      },
+    })
+
+    const firstConfig = await jsonrpc("catalog", "tasks/pushNotificationConfig/get", {
+      id: firstTaskId,
+    })
+    const secondConfig = await jsonrpc("catalog", "tasks/pushNotificationConfig/get", {
+      id: secondTaskId,
+    })
+
+    assert.equal(firstConfig.data.result.taskId, firstTaskId)
+    assert.notEqual(secondConfig.data.error, undefined)
+  })
+
   it("tasks/pushNotificationConfig/delete - removes config", async () => {
     const sendRes = await sendMessage("catalog", "What books do you have?")
     const taskId = sendRes.data.result.id

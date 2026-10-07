@@ -8,9 +8,7 @@ import {
   _resetCleanupThrottle,
 } from "../../lib/protocol/persistence/cleanup.js"
 
-const TASKS = "cap.agent.Tasks"
-const CHECKPOINTS = "cap.agent.Checkpoints"
-const CHECKPOINT_WRITES = "cap.agent.CheckpointWrites"
+const TASKS = "cap.agent.Messages"
 const OUTBOX_MESSAGES = "cds.outbox.Messages"
 
 const SERVICE_NAME = "GraphBookService"
@@ -21,36 +19,13 @@ function pastDate(daysAgo) {
 
 async function insertTask({ taskId, agentService = SERVICE_NAME, modifiedAt }) {
   await INSERT.into(TASKS).entries({
-    taskId,
-    contextId: cds.utils.uuid(),
-    state: "completed",
-    data: "{}",
+    ID: taskId,
+    session: taskId,
+    role: "user",
+    type: "text",
     agentService,
     modifiedAt,
     createdAt: modifiedAt,
-  })
-}
-
-async function insertCheckpoint({ taskId, threadId, checkpointId }) {
-  await INSERT.into(CHECKPOINTS).entries({
-    thread_id: threadId,
-    checkpoint_ns: "",
-    checkpoint_id: checkpointId,
-    task_id: taskId,
-    checkpoint: "{}",
-    metadata: "{}",
-  })
-}
-
-async function insertCheckpointWrite({ taskId, threadId, checkpointId, idx = 0 }) {
-  await INSERT.into(CHECKPOINT_WRITES).entries({
-    thread_id: threadId,
-    checkpoint_ns: "",
-    checkpoint_id: checkpointId,
-    task_id: taskId,
-    idx,
-    channel: "__start__",
-    value: "{}",
   })
 }
 
@@ -81,8 +56,8 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
       await cleanupExpiredTasks(SERVICE_NAME)
 
-      const old = await SELECT.one.from(TASKS).where({ taskId: oldTaskId })
-      const recent = await SELECT.one.from(TASKS).where({ taskId: recentTaskId })
+      const old = await SELECT.one.from(TASKS).where({ ID: oldTaskId })
+      const recent = await SELECT.one.from(TASKS).where({ ID: recentTaskId })
 
       expect(old).toBeUndefined()
       expect(recent).toBeDefined()
@@ -96,41 +71,30 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
       await cleanupExpiredTasks(SERVICE_NAME)
 
-      const row = await SELECT.one.from(TASKS).where({ taskId })
+      const row = await SELECT.one.from(TASKS).where({ ID: taskId })
       expect(row).toBeDefined()
     })
 
-    it("should cascade-delete related checkpoints", async () => {
+    it("should delete all rows in an expired session", async () => {
       cds.env.agents.retention = "7d"
 
       const taskId = cds.utils.uuid()
-      const threadId = cds.utils.uuid()
-      const checkpointId = cds.utils.uuid()
-
       await insertTask({ taskId, modifiedAt: pastDate(10) })
-      await insertCheckpoint({ taskId, threadId, checkpointId })
+      await INSERT.into(TASKS).entries({
+        ID: cds.utils.uuid(),
+        session: taskId,
+        sequence: 1,
+        role: "ai",
+        type: "text",
+        content: '"done"',
+        agentService: SERVICE_NAME,
+        modifiedAt: pastDate(10),
+        createdAt: pastDate(10),
+      })
 
       await cleanupExpiredTasks(SERVICE_NAME)
 
-      const cp = await SELECT.one.from(CHECKPOINTS).where({ checkpoint_id: checkpointId })
-      expect(cp).toBeUndefined()
-    })
-
-    it("should cascade-delete related checkpoint writes", async () => {
-      cds.env.agents.retention = "7d"
-
-      const taskId = cds.utils.uuid()
-      const threadId = cds.utils.uuid()
-      const checkpointId = cds.utils.uuid()
-
-      await insertTask({ taskId, modifiedAt: pastDate(10) })
-      await insertCheckpoint({ taskId, threadId, checkpointId })
-      await insertCheckpointWrite({ taskId, threadId, checkpointId })
-
-      await cleanupExpiredTasks(SERVICE_NAME)
-
-      const cw = await SELECT.one.from(CHECKPOINT_WRITES).where({ checkpoint_id: checkpointId })
-      expect(cw).toBeUndefined()
+      expect(await SELECT.from(TASKS).where({ session: taskId })).toHaveLength(0)
     })
 
     it("should do nothing when retention is disabled (false)", async () => {
@@ -141,7 +105,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
       await cleanupExpiredTasks(SERVICE_NAME)
 
-      const row = await SELECT.one.from(TASKS).where({ taskId })
+      const row = await SELECT.one.from(TASKS).where({ ID: taskId })
       expect(row).toBeDefined()
     })
 
@@ -153,7 +117,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
       await cleanupExpiredTasks(SERVICE_NAME)
 
-      const row = await SELECT.one.from(TASKS).where({ taskId })
+      const row = await SELECT.one.from(TASKS).where({ ID: taskId })
       expect(row).toBeDefined()
     })
 
@@ -165,7 +129,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
 
       await cleanupExpiredTasks(SERVICE_NAME)
 
-      const row = await SELECT.one.from(TASKS).where({ taskId })
+      const row = await SELECT.one.from(TASKS).where({ ID: taskId })
       expect(row).toBeUndefined()
     })
   })

@@ -61,7 +61,7 @@ describe("File I/O (CatalogService — React path)", () => {
     expect(text.toLowerCase()).toMatch(/poe|raven|eleonora/)
   })
 
-  it("uploaded file bytes are persisted to Tasks.inputFiles with correct metadata", async () => {
+  it("uploaded file bytes are persisted to Messages.inputFiles with correct metadata", async () => {
     const res = await sendWithFile(
       "catalog",
       "Read the attached reading list and count the total number of entries.",
@@ -72,13 +72,13 @@ describe("File I/O (CatalogService — React path)", () => {
     const contextId = res.data.result.contextId
     const taskId = res.data.result.id
 
-    const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
+    const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
     const rows = await cds.run(
-      SELECT.from(InputFiles).where({ "up_.contextId": contextId, filename: "reading-list.csv" }),
+      SELECT.from(InputFiles).where({ "up_.session": contextId, filename: "reading-list.csv" }),
     )
     expect(rows.length).toBe(1)
     expect(rows[0].mimeType).toBe("text/csv")
-    expect(rows[0].up__taskId).toBe(taskId)
+    expect(rows[0].up__ID).toBe(taskId)
   })
 
   it("agent emits a file artifact via emit_file_part", async () => {
@@ -149,15 +149,15 @@ describe("File I/O (CatalogService — React path)", () => {
     )
     const taskId2 = turn2.data.result.id
 
-    const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
+    const InputFiles = cds.model.definitions["cap.agent.Messages.inputFiles"]
     // Both rows exist (always-insert)
     const all = await cds.run(
-      SELECT.from(InputFiles).where({ "up_.contextId": contextId, filename: "data.csv" }),
+      SELECT.from(InputFiles).where({ "up_.session": contextId, filename: "data.csv" }),
     )
     expect(all.length).toBe(2)
 
     // Latest-wins: the row anchored on task2 is the more recent one
-    const latest = all.find((r) => r.up__taskId === taskId2)
+    const latest = all.find((r) => r.up__ID === taskId2)
     expect(latest, "expected a row anchored on task2").toBeTruthy()
   })
 

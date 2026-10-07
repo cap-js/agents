@@ -10,7 +10,6 @@ import { startServer, stopServer, registerCleanupHandlers } from "../utils/serve
 const BOOKSHOP_DIR = path.resolve(import.meta.dirname, "../projects/bookshop")
 const DB_PATH = path.join(BOOKSHOP_DIR, "db.sqlite")
 const PORT = 4700 + Math.floor(Math.random() * 500)
-const ACTIVE_STATES = ["submitted", "working", "input-required"]
 const execFileAsync = promisify(execFile)
 
 let server
@@ -18,14 +17,15 @@ let server
 function runningTasks() {
   const db = new DatabaseSync(DB_PATH)
   try {
-    const placeholders = ACTIVE_STATES.map(() => "?").join(",")
     return db
       .prepare(
-        "SELECT taskId, state FROM cap_agent_Tasks WHERE state IN (" +
-          placeholders +
-          ") ORDER BY taskId",
+        "SELECT start.ID as taskId FROM cap_agent_Messages start " +
+          "WHERE start.role = 'user' AND start.prev_ID IS NULL " +
+          "AND NOT EXISTS (SELECT 1 FROM cap_agent_Messages done " +
+          "WHERE done.prev_ID = start.ID AND done.role = 'assistant' " +
+          "AND done.type IN ('failed', 'canceled', 'rejected')) ORDER BY taskId",
       )
-      .all(...ACTIVE_STATES)
+      .all()
   } finally {
     db.close()
   }
@@ -34,7 +34,11 @@ function runningTasks() {
 function taskState(taskId) {
   const db = new DatabaseSync(DB_PATH)
   try {
-    return db.prepare("SELECT state FROM cap_agent_Tasks WHERE taskId = ?").get(taskId)?.state
+    return db
+      .prepare(
+        "SELECT type FROM cap_agent_Messages WHERE prev_ID = ? AND role = 'assistant' ORDER BY sequence DESC LIMIT 1",
+      )
+      .get(taskId)?.type
   } finally {
     db.close()
   }

@@ -71,16 +71,19 @@ describe("@cap-js/agents - SSE client disconnect aborts running task", () => {
     // and the H9 disconnect handler abort()s the graph.
     socket.destroy()
 
-    // Poll cap.agent.Tasks for the disconnect-triggered cancellation.
+    // Poll the task-anchoring message for the disconnect-triggered cancellation.
     await cds.connect.to("db")
-    const Tasks = cds.model.definitions["cap.agent.Tasks"]
+    const Messages = cds.model.definitions["cap.agent.Messages"]
     const deadline = Date.now() + 5000
     let state
     // eslint-disable-next-line no-unmodified-loop-condition
     while (Date.now() < deadline) {
       // eslint-disable-next-line no-await-in-loop
-      const row = await SELECT.one.from(Tasks).where({ taskId })
-      state = row?.state
+      const row = await SELECT.one
+        .from(Messages)
+        .where({ prev_ID: taskId, role: "assistant" })
+        .orderBy("sequence desc")
+      state = row?.type
       if (state === "canceled") break
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 50))

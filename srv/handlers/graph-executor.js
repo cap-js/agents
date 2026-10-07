@@ -20,6 +20,8 @@ import {
   resumeTimeoutHitl,
 } from "./graph-executor/hitl.js"
 import { registerShutdownHook } from "./graph-executor/crash-handler.js"
+import { ensureTaskAnchor } from "../../lib/protocol/persistence/message-store.js"
+import { PERSIST_TASK } from "../../lib/protocol/persistence/task-store.js"
 
 const LOG = cds.log("agents")
 
@@ -148,6 +150,8 @@ class GraphExecutor {
     this._abortControllers = new Map()
     /** @type {Map<string, string | undefined>} task tenant by task ID */
     this._taskTenants = new Map()
+    /** @type {Map<string, { contextId: string, serviceName: string }>} active task metadata */
+    this._taskContexts = new Map()
     registerShutdownHook(this)
   }
 
@@ -217,6 +221,7 @@ class GraphExecutor {
       const streamConfig = {
         ...config,
         streamMode: ["messages", "updates"],
+        durability: "exit",
         signal: combinedSignal,
       }
 
@@ -318,27 +323,23 @@ class GraphExecutor {
     // The __interrupt__ captured from the updates stream is preserved — it is an
     // ephemeral signal that may already be cleared from channel_values.
     if (this._graph?.checkpointer) {
-      try {
-        const thread_id = config.configurable?.thread_id
-        let cp = await this._graph.checkpointer.getTuple({ configurable: { thread_id } })
-        if (!cp?.checkpoint?.channel_values && this._graph.checkpointer.latestNamespace) {
-          const ns = await this._graph.checkpointer.latestNamespace(thread_id)
-          if (ns) {
-            cp = await this._graph.checkpointer.getTuple({
-              configurable: { thread_id, checkpoint_ns: ns },
-            })
-          }
+      const thread_id = config.configurable?.thread_id
+      let cp = await this._graph.checkpointer.getTuple({ configurable: { thread_id } })
+      if (!cp?.checkpoint?.channel_values && this._graph.checkpointer.latestNamespace) {
+        const ns = await this._graph.checkpointer.latestNamespace(thread_id)
+        if (ns) {
+          cp = await this._graph.checkpointer.getTuple({
+            configurable: { thread_id, checkpoint_ns: ns },
+          })
         }
-        const channelValues = cp?.checkpoint?.channel_values
-        if (channelValues) {
-          const interrupt = finalState?.__interrupt__
-          finalState = {
-            ...channelValues,
-            ...(interrupt !== undefined && { __interrupt__: interrupt }),
-          }
+      }
+      const channelValues = cp?.checkpoint?.channel_values
+      if (channelValues) {
+        const interrupt = finalState?.__interrupt__
+        finalState = {
+          ...channelValues,
+          ...(interrupt !== undefined && { __interrupt__: interrupt }),
         }
-      } catch {
-        /* best-effort */
       }
     }
 
@@ -358,6 +359,7 @@ class GraphExecutor {
       : timeoutController.signal
     // Pass signal to LangGraph — it checks between node executions
     config.signal = combinedSignal
+    config.durability = "exit"
     try {
       return await graph.invoke(input, config)
     } catch (err) {
@@ -403,6 +405,7 @@ class GraphExecutor {
     const controller = new AbortController()
     this._abortControllers.set(taskId, controller)
     this._taskTenants.set(taskId, cds.context?.tenant)
+    this._taskContexts.set(taskId, { contextId, serviceName })
 
     // A2A context for tracing
     if (!cds.context) {
@@ -417,28 +420,17 @@ class GraphExecutor {
     // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
     const graph = await this._resolveGraph()
     if (cds.env.agents.masking) {
-      await pseudonymizeUserMessage(
-        this._srv,
-        requestContext,
-        graph.checkpointer,
-        `${serviceName}:${contextId}`,
-      )
+      await pseudonymizeUserMessage(this._srv, requestContext)
     }
 
     metrics.concurrentExecutions.add(1, mAttrs)
 
     if (!isResume) {
       if (cds.context?.["agent.new.task"]) {
-        await INSERT.into("cap.agent.Tasks").entries({
+        await ensureTaskAnchor({
           taskId,
           contextId,
-          state: "submitted",
-          data: JSON.stringify({
-            id: taskId,
-            contextId,
-            kind: "task",
-            status: { state: "submitted", timestamp: new Date().toISOString() },
-          }),
+          message: requestContext.userMessage,
           agentService: serviceName,
         })
         delete cds.context["agent.new.task"]
@@ -461,7 +453,7 @@ class GraphExecutor {
       })
     }
 
-    // ── File I/O: persist incoming FileParts to cap.agent.Tasks.inputFiles ──
+    // ── File I/O: persist incoming FileParts to cap.agent.Messages.inputFiles ──
     // Build a manifest string so the LLM sees /uploads/<name> paths, not raw bytes.
     const fileStore = cds.env.agents?.fileIO?.enabled ? new CdsFileStore() : null
     if (fileStore && !isResume) {
@@ -582,7 +574,7 @@ class GraphExecutor {
           recursionLimit: this._recursionLimit || cds.env.agents.recursionLimit || undefined,
           configurable: {
             ...extraConfig,
-            thread_id: `${serviceName}:${contextId}`,
+            thread_id: contextId,
             _taskId: taskId,
             _service: serviceName,
             // Captured at request entry — backends/tools running inside graph
@@ -610,6 +602,10 @@ class GraphExecutor {
           const inputMapper = this._inputMapper || defaultInputMapper
           const rawInput = await inputMapper(requestContext)
           const { _toolMapOverride, ...input } = rawInput
+          const inputMessages = input.messages
+          if (Array.isArray(inputMessages) && inputMessages.length > 0) {
+            inputMessages[inputMessages.length - 1].id ??= taskId
+          }
           if (_toolMapOverride) config.configurable._toolMapOverride = _toolMapOverride
           const streamed = await this._streamWithPublish(
             graph,
@@ -624,7 +620,7 @@ class GraphExecutor {
         }
         // Capture result for usage tracking in finally block
         // (interrupt-only results may have no `messages` — treat as empty)
-        usageData = aggregateUsageData(result.messages || [])
+        usageData = aggregateUsageData(result?.messages || [])
 
         const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         if (requiresHitl(result)) {
@@ -709,7 +705,7 @@ class GraphExecutor {
           },
         })
 
-        // ── File I/O: collect output files from cap.agent.Tasks.outputFiles ──────
+        // ── File I/O: collect output files from cap.agent.Messages.outputFiles ──
         // Covers two sources:
         //   1. emit_file_part tool calls (default graph) — JSON in toolResults/messages
         //   2. write_file '/outputs/*' via OutputsBackend (deep agent) — CDS rows
@@ -828,7 +824,7 @@ class GraphExecutor {
               file: { name: f.name, mimeType: f.mimeType, bytes: f.bytes.toString("base64") },
             })
           }
-          // Re-persist inline file artifacts from downstream agents to Tasks.inputFiles.
+          // Re-persist inline file artifacts from downstream agents to Messages.inputFiles.
           // Exclude emit_file_part outputs — those are this agent's own artifacts, not
           // downstream files, and re-persisting them would create spurious /uploads/ entries.
           // Enforce the same size + MIME guard as inbound uploads so a malicious
@@ -927,6 +923,7 @@ class GraphExecutor {
             state: "completed",
             message: agentMessage(output, undefined, usageMeta),
             timestamp: new Date().toISOString(),
+            [PERSIST_TASK]: true,
           },
           final: true,
           metadata: usageMeta,
@@ -950,6 +947,7 @@ class GraphExecutor {
               state: "canceled",
               message: agentMessage("Task canceled."),
               timestamp: new Date().toISOString(),
+              [PERSIST_TASK]: true,
             },
             final: true,
           })
@@ -1004,6 +1002,7 @@ class GraphExecutor {
               state: "canceled",
               message: agentMessage(summary),
               timestamp: new Date().toISOString(),
+              [PERSIST_TASK]: true,
             },
             final: true,
           })
@@ -1050,6 +1049,7 @@ class GraphExecutor {
             state: "failed",
             message: agentMessage(errorMsg),
             timestamp: new Date().toISOString(),
+            [PERSIST_TASK]: true,
           },
           final: true,
         })
@@ -1060,6 +1060,7 @@ class GraphExecutor {
 
         this._abortControllers.delete(taskId)
         this._taskTenants.delete(taskId)
+        this._taskContexts.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 
         // Update task record with usage data (non-blocking, best effort)
@@ -1071,7 +1072,7 @@ class GraphExecutor {
             let messages = result?.messages
             if (!messages && graph?.checkpointer) {
               try {
-                const thread_id = `${serviceName}:${contextId}`
+                const thread_id = contextId
                 let cp = await graph.checkpointer.getTuple({ configurable: { thread_id } })
                 if (!cp?.checkpoint?.channel_values && graph.checkpointer.latestNamespace) {
                   const ns = await graph.checkpointer.latestNamespace(thread_id)
@@ -1094,7 +1095,7 @@ class GraphExecutor {
               if (recovered?.total_tokens) updates.usageLlmTokens = recovered.total_tokens
             }
             if (messages) updates.usageToolCalls = totalToolCalls(messages)
-            await UPDATE("cap.agent.Tasks").where({ taskId }).with(updates)
+            await UPDATE("cap.agent.Messages").where({ ID: taskId }).with(updates)
           } catch (err) {
             LOG.debug("usage update failed", { conversation: short(contextId), error: err.message })
           }
@@ -1136,6 +1137,7 @@ class GraphExecutor {
           state: "canceled",
           message: agentMessage("Task canceled."),
           timestamp: new Date().toISOString(),
+          [PERSIST_TASK]: true,
         },
         final: true,
       })

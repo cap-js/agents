@@ -4,95 +4,54 @@ using {Attachments} from '@cap-js/attachments';
 namespace cap.agent;
 
 /**
- * Stores A2A task objects for retrieval via tasks/get.
+ * Framework-neutral conversation ledger shared by protocol and agent runtimes.
+ * A2A task IDs are the IDs of the user messages that start those tasks.
  */
-entity Tasks : managed {
-      /**
-       * A2A task ID (server-generated UUID)
-       */
-  key taskId         : String;
-      /**
-       * Groups related tasks into conversations
-       */
-      contextId      : String;
-      /**
-       * Current task state (submitted, working, completed, failed, etc.)
-       */
-      state          : String;
-      /**
-       * Full serialized A2A Task JSON
-       */
-      data           : LargeString;
-      /**
-       * Fully qualified CDS service name
-       */
+entity Messages : managed {
+  key ID       : String;
+      session  : String;
+      sequence : Integer64;
+      prev     : Association to Messages;
+      role     : String;
+      type     : String;
+      content  : LargeString;
+      query    : Map;
       agentService   : String;
-      /**
-       * Combined LLM Input and Output tokens used for this task
-       */
       usageLlmTokens : Integer64 default 0;
-      /**
-       * Amount of tool calls made by this task
-       */
       usageToolCalls : Integer default 0;
 
-      /** Push notification (webhook) configs for this task. Cascade-deleted. */
+      /** Push notification configs for a task-anchoring user message. */
       pushConfigs    : Composition of many PushNotificationConfigs
-                         on pushConfigs.taskId = taskId;
+                         on pushConfigs.task = $self;
 
-      /**
-       * Files received from user or downstream agents for this task.
-       * Conversation-scoped reads use up_.contextId path expression.
-       */
+      /** Files received with this message or emitted during its agent run. */
       inputFiles     : Composition of many Attachments;
-
-      /**
-       * Files written by agent via /outputs/ path for this task.
-       */
       outputFiles    : Composition of many Attachments;
-
-      /** LangGraph checkpoints created by this task. Cascade-deleted. */
-      checkpoints    : Composition of many Checkpoints
-                         on checkpoints.task_id = taskId;
-
-      /** LangGraph checkpoint writes tied to this task. Cascade-deleted. */
-      checkpointWrites : Composition of many CheckpointWrites
-                           on checkpointWrites.task_id = taskId;
 }
 
-entity Checkpoints : managed {
-  key thread_id            : String;
-  key checkpoint_ns        : String default '';
-  key checkpoint_id        : String;
-      task_id              : String;
-      task                 : Association to one Tasks
-                               on task.taskId = task_id;
-      parent_checkpoint_id : String;
-      parent               : Association to one Checkpoints
-                               on parent.checkpoint_id = parent_checkpoint_id;
-      checkpoint           : LargeString;
-      metadata             : LargeString;
-      writes               : Composition of many CheckpointWrites
-                               on  writes.thread_id     = thread_id
-                               and writes.checkpoint_ns = checkpoint_ns
-                               and writes.checkpoint_id = checkpoint_id;
+view Sessions as
+  select from Messages {
+    key session         as ID,
+        min(createdAt)  as createdAt,
+        max(modifiedAt) as modifiedAt,
+  }
+  group by session;
+
+/** Reversible pseudonym mappings require restricted retention and access handling. */
+@cds.api.ignore
+@PersonalData: {
+  EntitySemantics: 'Other',
+  DataSubjectRole: 'User'
+}
+entity PseudonymMappings : managed {
+  key session : Association to one Sessions;
+  key hash    : String @PersonalData.IsPotentiallyPersonal;
+      value   : LargeString @PersonalData.IsPotentiallySensitive;
 }
 
-entity CheckpointWrites {
-  key thread_id     : String;
-  key checkpoint_ns : String default '';
-  key checkpoint_id : String;
-      checkpoint    : Association to one Checkpoints
-                        on  checkpoint.checkpoint_id = checkpoint_id
-                        and checkpoint.checkpoint_ns = checkpoint_ns
-                        and checkpoint.thread_id     = thread_id;
-  key task_id       : String;
-      task          : Association to one Tasks
-                        on task.taskId = task_id;
-  key idx           : Integer;
-      channel       : String;
-      value         : LargeString;
-}
+annotate PseudonymMappings with {
+  createdBy @PersonalData.FieldSemantics: 'DataSubjectID';
+};
 
 /**
  * Stores push notification (webhook) configs registered by clients for task updates.
@@ -109,8 +68,7 @@ entity CheckpointWrites {
  *    and `X-A2A-Notification-Token` header from token field
  */
 entity PushNotificationConfigs : managed {
-  key taskId    : String;
+  key task      : Association to one Messages;
   key configId  : String;
-      task      : Association to one Tasks on task.taskId = taskId;
       url       : String(2048);
 }

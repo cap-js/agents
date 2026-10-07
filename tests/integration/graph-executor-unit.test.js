@@ -132,6 +132,7 @@ describe("GraphExecutor - configMapper", () => {
       )
 
       expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
+      expect(capturedConfig.durability).toBe("exit")
       expect(
         capturedConfig.configurable.myKey,
         "configMapper return value must appear in config.configurable",

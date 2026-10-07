@@ -1,15 +1,16 @@
 import cds from "@sap/cds"
-cds.test(import.meta.dirname + "/../projects/bookshop")
+import { HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages"
 import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
 
-const CHECKPOINTS = "cap.agent.Checkpoints"
-const WRITES = "cap.agent.CheckpointWrites"
+cds.test(import.meta.dirname + "/../projects/bookshop")
+
+const MESSAGES = "cap.agent.Messages"
 
 function runAs(userId, fn) {
   return cds.tx({ user: new cds.User({ id: userId }) }, fn)
 }
 
-function makeCheckpoint(id) {
+function checkpoint(id, messages, extra = {}) {
   return {
     v: 1,
     id,
@@ -17,163 +18,142 @@ function makeCheckpoint(id) {
     channel_versions: {},
     versions_seen: {},
     pending_sends: [],
-    channel_values: {},
+    channel_values: { messages, ...extra },
   }
 }
 
-async function seedCheckpoints(userId, threadId, count) {
-  const saver = new CdsCheckpointSaver()
-  const ids = []
-  await runAs(userId, async () => {
-    let config = { configurable: { thread_id: threadId, checkpoint_ns: "" } }
-    for (let i = 0; i < count; i++) {
-      const cp = makeCheckpoint(`cp-${userId}-${threadId}-${String(i).padStart(3, "0")}`)
-      // eslint-disable-next-line no-await-in-loop
-      config = await saver.put(config, cp, { step: i, source: "loop" })
-      ids.push(cp.id)
-    }
-  })
-  return ids
-}
-
 describe("CdsCheckpointSaver", () => {
-  const saver = new CdsCheckpointSaver()
-
-  describe("list()", () => {
-    it("returns checkpoints in descending order", async () => {
-      const thread = `list-order-${cds.utils.uuid()}`
-      const [id0, id1, id2] = await seedCheckpoints("alice", thread, 3)
-
-      const results = []
-      await runAs("alice", async () => {
-        for await (const t of saver.list({ configurable: { thread_id: thread } })) {
-          results.push(t)
-        }
-      })
-
-      expect(results.length).toBe(3)
-      // Descending order: last seeded first
-      expect(results[0].config.configurable.checkpoint_id).toBe(id2)
-      expect(results[1].config.configurable.checkpoint_id).toBe(id1)
-      expect(results[2].config.configurable.checkpoint_id).toBe(id0)
+  it("stores conversation messages once and keeps reasoning out of persistence", async () => {
+    const saver = new CdsCheckpointSaver()
+    const threadId = `conversation-${cds.utils.uuid()}`
+    const human = new HumanMessage({ id: "user-1", content: "hello" })
+    const assistant = new AIMessage({
+      id: "assistant-1",
+      content: [
+        { type: "reasoning", reasoning: "private" },
+        { type: "text", text: "hello back" },
+      ],
+      additional_kwargs: { reasoning_content: "private" },
     })
 
-    it("respects options.limit", async () => {
-      const thread = `list-limit-${cds.utils.uuid()}`
-      await seedCheckpoints("alice", thread, 10)
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId, _service: "TestService" } },
+        checkpoint("checkpoint-1", [human, assistant]),
+        { source: "loop", step: 0 },
+      ),
+    )
 
-      const results = []
-      await runAs("alice", async () => {
-        for await (const t of saver.list({ configurable: { thread_id: thread } }, { limit: 3 })) {
-          results.push(t)
-        }
-      })
+    const rows = await SELECT.from(MESSAGES)
+      .where({ session: threadId, createdBy: "alice" })
+      .orderBy("sequence")
+    expect(rows).toHaveLength(2)
+    expect(rows.some(({ role }) => role === "runtime")).toBe(false)
+    expect(rows.some(({ query }) => query?.stored)).toBe(false)
+    expect(rows.some(({ content }) => content?.includes("private"))).toBe(false)
 
-      expect(results.length).toBe(3)
-    })
-
-    it("respects options.before for cursor pagination", async () => {
-      const thread = `list-before-${cds.utils.uuid()}`
-      const ids = await seedCheckpoints("alice", thread, 5)
-
-      // ids[2] is the 3rd checkpoint; before it we expect ids[0] and ids[1]
-      const beforeId = ids[2]
-      const results = []
-      await runAs("alice", async () => {
-        for await (const t of saver.list(
-          { configurable: { thread_id: thread } },
-          { before: { configurable: { checkpoint_id: beforeId } } },
-        )) {
-          results.push(t)
-        }
-      })
-
-      const returnedIds = results.map((r) => r.config.configurable.checkpoint_id)
-      expect(
-        returnedIds,
-        "should return exactly the two checkpoints older than the cursor, newest-first",
-      ).toEqual([ids[1], ids[0]])
-    })
-
-    it("isolates checkpoints by user (user B sees nothing from user A)", async () => {
-      const thread = `list-isolation-${cds.utils.uuid()}`
-      await seedCheckpoints("alice", thread, 3)
-
-      const results = []
-      await runAs("bob", async () => {
-        for await (const t of saver.list({ configurable: { thread_id: thread } })) {
-          results.push(t)
-        }
-      })
-
-      expect(results.length).toBe(0)
-    })
-
-    it("yields checkpoint and parentConfig correctly", async () => {
-      const thread = `list-parent-${cds.utils.uuid()}`
-      const ids = await seedCheckpoints("alice", thread, 2)
-
-      const results = []
-      await runAs("alice", async () => {
-        for await (const t of saver.list({ configurable: { thread_id: thread } })) {
-          results.push(t)
-        }
-      })
-
-      // Most recent (ids[1]) has ids[0] as parent
-      const latest = results.find((r) => r.config.configurable.checkpoint_id === ids[1])
-      expect(latest, "latest checkpoint must be present").toBeTruthy()
-      expect(latest.parentConfig?.configurable?.checkpoint_id).toBe(ids[0])
-    })
-
-    it("streams beyond a single batch without imposing a default cap", async () => {
-      // Seeds more than the internal BATCH_SIZE (100) to exercise cursor-paged
-      // batching across multiple SELECTs.
-      const thread = `list-unbounded-${cds.utils.uuid()}`
-      const seeded = 150
-      await seedCheckpoints("alice", thread, seeded)
-
-      let count = 0
-      await runAs("alice", async () => {
-        for await (const _ of saver.list({ configurable: { thread_id: thread } })) {
-          count++
-        }
-      })
-
-      expect(count, "should yield every seeded checkpoint").toBe(seeded)
-    })
+    const tuple = await runAs("alice", () =>
+      saver.getTuple({ configurable: { thread_id: threadId } }),
+    )
+    expect(tuple.checkpoint.channel_values.messages.map((message) => message.content)).toEqual([
+      "hello",
+      [{ type: "text", text: "hello back" }],
+    ])
   })
 
-  describe("deleteThread()", () => {
-    it("deletes only the requesting user's checkpoints", async () => {
-      const thread = `delete-isolation-${cds.utils.uuid()}`
-      await seedCheckpoints("alice", thread, 2)
-      await seedCheckpoints("bob", thread, 2)
+  it("does not persist non-message LangGraph state", async () => {
+    const saver = new CdsCheckpointSaver()
+    const threadId = `state-${cds.utils.uuid()}`
 
-      // Alice deletes her checkpoints for the thread
-      await runAs("alice", () => saver.deleteThread(thread))
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId } },
+        checkpoint("checkpoint-1", [new HumanMessage("hello")], { cart: { book: 201 } }),
+        { source: "loop", step: 4 },
+      ),
+    )
 
-      // Alice's checkpoints are gone
-      const aliceRows = await runAs("alice", () =>
-        SELECT.from(CHECKPOINTS).where({ thread_id: thread, createdBy: "alice" }),
-      )
-      expect(aliceRows.length).toBe(0)
+    const tuple = await runAs("alice", () =>
+      saver.getTuple({ configurable: { thread_id: threadId } }),
+    )
+    expect(tuple.checkpoint.channel_values.cart).toBe(undefined)
+    expect(tuple.metadata).toEqual({})
+    expect(tuple.checkpoint.channel_values.messages[0].content).toBe("hello")
+    expect(await SELECT.from(MESSAGES).where({ session: threadId })).toHaveLength(1)
+  })
 
-      // Bob's checkpoints are intact
-      const bobRows = await runAs("bob", () =>
-        SELECT.from(CHECKPOINTS).where({ thread_id: thread, createdBy: "bob" }),
-      )
-      expect(bobRows.length).toBe(2)
+  it("round-trips tool calls through neutral message fields", async () => {
+    const saver = new CdsCheckpointSaver()
+    const threadId = `tools-${cds.utils.uuid()}`
+    const messages = [
+      new HumanMessage({ id: "user-tool", content: "look it up" }),
+      new AIMessage({
+        id: "assistant-tool",
+        content: "",
+        tool_calls: [{ id: "call-1", name: "lookup", args: { id: 7 } }],
+      }),
+      new ToolMessage({
+        id: "tool-result",
+        content: '{"title":"Wuthering Heights"}',
+        tool_call_id: "call-1",
+        name: "lookup",
+      }),
+    ]
+
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId, _taskId: "user-tool" } },
+        checkpoint("ignored", messages),
+        {},
+      ),
+    )
+
+    const rows = await SELECT.from(MESSAGES).where({ session: threadId }).orderBy("sequence")
+    expect(rows[1].query).toEqual({
+      toolCalls: [{ id: "call-1", name: "lookup", args: { id: 7 } }],
     })
+    expect(rows.some(({ query }) => query?.stored)).toBe(false)
 
-    it("deletes associated writes for the user", async () => {
-      const thread = `delete-writes-${cds.utils.uuid()}`
-      await seedCheckpoints("alice", thread, 2)
-
-      await runAs("alice", () => saver.deleteThread(thread))
-
-      const writeRows = await SELECT.from(WRITES).where({ thread_id: thread })
-      expect(writeRows.length).toBe(0)
+    const tuple = await runAs("alice", () =>
+      saver.getTuple({ configurable: { thread_id: threadId } }),
+    )
+    expect(tuple.checkpoint.channel_values.messages[1].tool_calls[0]).toMatchObject({
+      id: "call-1",
+      name: "lookup",
+      args: { id: 7 },
     })
+    expect(tuple.checkpoint.channel_values.messages[2].tool_call_id).toBe("call-1")
+  })
+
+  it("does not persist LangGraph pending-write metadata", async () => {
+    const saver = new CdsCheckpointSaver()
+    const threadId = `interrupt-${cds.utils.uuid()}`
+    const config = { configurable: { thread_id: threadId } }
+
+    const saved = await runAs("alice", () =>
+      saver.put(config, checkpoint("checkpoint-1", []), { source: "loop", step: 0 }),
+    )
+    await runAs("alice", () =>
+      saver.putWrites(saved, [["__interrupt__", { action: "approve" }]], "node-1"),
+    )
+
+    expect(await runAs("alice", () => saver.getTuple(config))).toBe(undefined)
+  })
+
+  it("isolates and deletes sessions by user", async () => {
+    const saver = new CdsCheckpointSaver()
+    const threadId = `isolated-${cds.utils.uuid()}`
+    await runAs("alice", () => saver.put({}, checkpoint("ignored", []), {}).catch(() => undefined))
+    await runAs("alice", () =>
+      saver.put({ configurable: { thread_id: threadId } }, checkpoint("alice", []), {}),
+    )
+
+    expect(
+      await runAs("bob", () => saver.getTuple({ configurable: { thread_id: threadId } })),
+    ).toBe(undefined)
+    await runAs("alice", () => saver.deleteThread(threadId))
+    expect(
+      await runAs("alice", () => saver.getTuple({ configurable: { thread_id: threadId } })),
+    ).toBe(undefined)
   })
 })

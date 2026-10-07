@@ -74,9 +74,13 @@
   "devDependencies": {
     "@cap-js/cds-test": "^1",
     "@cap-js/sqlite": "^3",
+    "@cap-js/telemetry": "^2",
+    "@cap-js/audit-logging": "^1",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "@vitest/coverage-v8": "^5.0.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-trace-base": "^2.12.0",
     "acorn": "^8.18.0",
     "deepagents": "^1.10.2",
     "openevals": "^0.2.0"

@@ -1,4 +1,5 @@
 import cds from "@sap/cds"
+import { appendMessage } from "../../../lib/protocol/persistence/message-store.js"
 
 const LOG = cds.log("agents")
 
@@ -9,21 +10,29 @@ async function markActiveTasksFailed() {
   for (const executor of registerShutdownHook.executors) {
     for (const taskId of executor._abortControllers.keys()) {
       const tenant = executor._taskTenants.get(taskId)
-      const taskIds = tasksByTenant.get(tenant) || []
-      taskIds.push(taskId)
-      tasksByTenant.set(tenant, taskIds)
+      const tasks = tasksByTenant.get(tenant) || []
+      tasks.push({ taskId, ...executor._taskContexts.get(taskId) })
+      tasksByTenant.set(tenant, tasks)
     }
   }
 
   await Promise.all(
-    [...tasksByTenant].map(async ([tenant, taskIds]) => {
+    [...tasksByTenant].map(async ([tenant, tasks]) => {
       const update = () =>
-        UPDATE("cap.agent.Tasks")
-          .where({
-            taskId: { in: [...new Set(taskIds)] },
-            state: { in: ["submitted", "working", "input-required"] },
-          })
-          .set({ state: "failed" })
+        Promise.all(
+          tasks.map(({ taskId, contextId, serviceName }) =>
+            appendMessage({
+              ID: `crash-${taskId}`,
+              session: contextId,
+              prev_ID: taskId,
+              role: "assistant",
+              type: "failed",
+              content: [],
+              query: { status: { state: "failed" } },
+              agentService: serviceName,
+            }),
+          ),
+        )
 
       if (tenant) return cds.spawn({ tenant, user: cds.User.privileged }, update)
       return update()
