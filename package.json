@@ -109,7 +109,6 @@
   "cds": {
     "agents": {
       "harness": "langchain",
-      "[pi]": { "harness": "pi" },
       "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
@@ -212,15 +211,6 @@
         "openai": {
           "impl": "@cap-js/agents/lib/models/openai"
         },
-        "pi-anthropic": {
-          "impl": "@cap-js/agents/lib/models/pi-anthropic"
-        },
-        "pi-openai": {
-          "impl": "@cap-js/agents/lib/models/pi-openai"
-        },
-        "pi-mock": {
-          "impl": "@cap-js/agents/lib/models/pi-mock"
-        },
         "llm-mock": {
           "impl": "@cap-js/agents/lib/models/mock"
         }
@@ -236,22 +226,6 @@
       },
       "[production]": {
         "llm": "aicore"
-      },
-      "[pi]": {
-        "[anthropic]": {
-          "llm": "pi-anthropic"
-        },
-        "[openai]": {
-          "llm": "pi-openai"
-        }
-      },
-      "[webagent]": {
-        "[anthropic]": {
-          "llm": "pi-anthropic"
-        },
-        "[openai]": {
-          "llm": "pi-openai"
-        }
       }
     },
     "protocols": {
