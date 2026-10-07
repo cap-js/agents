@@ -574,13 +574,9 @@ class GraphExecutor {
           recursionLimit: this._recursionLimit || cds.env.agents.recursionLimit || undefined,
           configurable: {
             ...extraConfig,
-            thread_id: contextId,
+            thread_id: `${serviceName}:${contextId}`,
             _taskId: taskId,
             _service: serviceName,
-            // Captured at request entry — backends/tools running inside graph
-            // callbacks should prefer this over cds.context, which can drift to
-            // "anonymous" across AsyncLocalStorage boundaries.
-            _userId: cds.context?.user?.id,
           },
         }
 
@@ -1072,7 +1068,7 @@ class GraphExecutor {
             let messages = result?.messages
             if (!messages && graph?.checkpointer) {
               try {
-                const thread_id = contextId
+                const thread_id = `${serviceName}:${contextId}`
                 let cp = await graph.checkpointer.getTuple({ configurable: { thread_id } })
                 if (!cp?.checkpoint?.channel_values && graph.checkpointer.latestNamespace) {
                   const ns = await graph.checkpointer.latestNamespace(thread_id)
@@ -1095,7 +1091,8 @@ class GraphExecutor {
               if (recovered?.total_tokens) updates.usageLlmTokens = recovered.total_tokens
             }
             if (messages) updates.usageToolCalls = totalToolCalls(messages)
-            await UPDATE("cap.agent.Messages").where({ ID: taskId }).with(updates)
+            const { Messages } = cds.entities("cap.agent")
+            await UPDATE(Messages).where`ID = ${taskId}`.with(updates)
           } catch (err) {
             LOG.debug("usage update failed", { conversation: short(contextId), error: err.message })
           }

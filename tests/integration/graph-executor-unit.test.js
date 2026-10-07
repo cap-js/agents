@@ -55,22 +55,26 @@ describe("defaultOutputMapper", () => {
 describe("summarizePartialWork", () => {
   it("includes summary instructions and conversation history in one prompt", async () => {
     let messages
+    let checkpointConfig
     const summary = await summarizePartialWork({
       contextId: "summary-context",
       serviceName: "TestService",
       reason: "timeOut",
       approval: true,
       checkpointer: {
-        getTuple: async () => ({
-          checkpoint: {
-            channel_values: {
-              messages: [
-                { _getType: () => "human", content: "Which books are on offer?" },
-                { _getType: () => "ai", content: "I am checking the catalog." },
-              ],
+        getTuple: async (config) => {
+          checkpointConfig = config
+          return {
+            checkpoint: {
+              channel_values: {
+                messages: [
+                  { _getType: () => "human", content: "Which books are on offer?" },
+                  { _getType: () => "ai", content: "I am checking the catalog." },
+                ],
+              },
             },
-          },
-        }),
+          }
+        },
       },
       getModel: async () => ({
         invoke: async (input) => {
@@ -80,6 +84,9 @@ describe("summarizePartialWork", () => {
       }),
     })
 
+    expect(checkpointConfig.configurable).toEqual({
+      thread_id: "TestService:summary-context",
+    })
     expect(messages).toHaveLength(2)
     expect(messages[0]._getType()).toBe("human")
     expect(messages[0].content).toContain("within its time limit")
@@ -209,7 +216,7 @@ describe("GraphExecutor - configMapper", () => {
         fakeEventBus,
       )
 
-      expect(capturedConfig?.configurable?.thread_id, "thread_id must be set").toBeTruthy()
+      expect(capturedConfig?.configurable?.thread_id).toBe("TestService:ctx-3")
       expect(capturedConfig?.configurable?._taskId, "_taskId must be set").toBeTruthy()
     }),
   )

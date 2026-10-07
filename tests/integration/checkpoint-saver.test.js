@@ -25,7 +25,8 @@ function checkpoint(id, messages, extra = {}) {
 describe("CdsCheckpointSaver", () => {
   it("stores conversation messages once and keeps reasoning out of persistence", async () => {
     const saver = new CdsCheckpointSaver()
-    const threadId = `conversation-${cds.utils.uuid()}`
+    const contextId = `conversation-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
     const human = new HumanMessage({ id: "user-1", content: "hello" })
     const assistant = new AIMessage({
       id: "assistant-1",
@@ -38,14 +39,14 @@ describe("CdsCheckpointSaver", () => {
 
     await runAs("alice", () =>
       saver.put(
-        { configurable: { thread_id: threadId, _service: "TestService" } },
+        { configurable: { thread_id: threadId } },
         checkpoint("checkpoint-1", [human, assistant]),
         { source: "loop", step: 0 },
       ),
     )
 
     const rows = await SELECT.from(MESSAGES)
-      .where({ session: threadId, createdBy: "alice" })
+      .where({ session: contextId, agentService: "TestService", createdBy: "alice" })
       .orderBy("sequence")
     expect(rows).toHaveLength(2)
     expect(rows.some(({ role }) => role === "runtime")).toBe(false)
@@ -59,11 +60,13 @@ describe("CdsCheckpointSaver", () => {
       "hello",
       [{ type: "text", text: "hello back" }],
     ])
+    expect(tuple.config.configurable.thread_id).toBe(threadId)
   })
 
   it("does not persist non-message LangGraph state", async () => {
     const saver = new CdsCheckpointSaver()
-    const threadId = `state-${cds.utils.uuid()}`
+    const contextId = `state-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
 
     await runAs("alice", () =>
       saver.put(
@@ -79,12 +82,13 @@ describe("CdsCheckpointSaver", () => {
     expect(tuple.checkpoint.channel_values.cart).toBe(undefined)
     expect(tuple.metadata).toEqual({})
     expect(tuple.checkpoint.channel_values.messages[0].content).toBe("hello")
-    expect(await SELECT.from(MESSAGES).where({ session: threadId })).toHaveLength(1)
+    expect(await SELECT.from(MESSAGES).where({ session: contextId })).toHaveLength(1)
   })
 
   it("round-trips tool calls through neutral message fields", async () => {
     const saver = new CdsCheckpointSaver()
-    const threadId = `tools-${cds.utils.uuid()}`
+    const contextId = `tools-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
     const messages = [
       new HumanMessage({ id: "user-tool", content: "look it up" }),
       new AIMessage({
@@ -108,7 +112,7 @@ describe("CdsCheckpointSaver", () => {
       ),
     )
 
-    const rows = await SELECT.from(MESSAGES).where({ session: threadId }).orderBy("sequence")
+    const rows = await SELECT.from(MESSAGES).where({ session: contextId }).orderBy("sequence")
     expect(rows[1].query).toEqual({
       toolCalls: [{ id: "call-1", name: "lookup", args: { id: 7 } }],
     })
@@ -127,7 +131,7 @@ describe("CdsCheckpointSaver", () => {
 
   it("does not persist LangGraph pending-write metadata", async () => {
     const saver = new CdsCheckpointSaver()
-    const threadId = `interrupt-${cds.utils.uuid()}`
+    const threadId = `TestService:interrupt-${cds.utils.uuid()}`
     const config = { configurable: { thread_id: threadId } }
 
     const saved = await runAs("alice", () =>
@@ -142,7 +146,7 @@ describe("CdsCheckpointSaver", () => {
 
   it("isolates and deletes sessions by user", async () => {
     const saver = new CdsCheckpointSaver()
-    const threadId = `isolated-${cds.utils.uuid()}`
+    const threadId = `TestService:isolated-${cds.utils.uuid()}`
     await runAs("alice", () => saver.put({}, checkpoint("ignored", []), {}).catch(() => undefined))
     await runAs("alice", () =>
       saver.put({ configurable: { thread_id: threadId } }, checkpoint("alice", []), {}),
@@ -155,5 +159,44 @@ describe("CdsCheckpointSaver", () => {
     expect(
       await runAs("alice", () => saver.getTuple({ configurable: { thread_id: threadId } })),
     ).toBe(undefined)
+  })
+
+  it("isolates the same session across agent services", async () => {
+    const saver = new CdsCheckpointSaver()
+    const contextId = `shared-${cds.utils.uuid()}`
+    const firstThread = `FirstService:${contextId}`
+    const secondThread = `SecondService:${contextId}`
+
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: firstThread } },
+        checkpoint("first", [new HumanMessage({ id: cds.utils.uuid(), content: "first" })]),
+        {},
+      ),
+    )
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: secondThread } },
+        checkpoint("second", [new HumanMessage({ id: cds.utils.uuid(), content: "second" })]),
+        {},
+      ),
+    )
+
+    const first = await runAs("alice", () =>
+      saver.getTuple({ configurable: { thread_id: firstThread } }),
+    )
+    const second = await runAs("alice", () =>
+      saver.getTuple({ configurable: { thread_id: secondThread } }),
+    )
+    expect(first.checkpoint.channel_values.messages[0].content).toBe("first")
+    expect(second.checkpoint.channel_values.messages[0].content).toBe("second")
+
+    await runAs("alice", () => saver.deleteThread(firstThread))
+    expect(
+      await runAs("alice", () => saver.getTuple({ configurable: { thread_id: firstThread } })),
+    ).toBe(undefined)
+    expect(
+      await runAs("alice", () => saver.getTuple({ configurable: { thread_id: secondThread } })),
+    ).toBeTruthy()
   })
 })
