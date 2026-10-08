@@ -94,6 +94,28 @@ describe("CdsCheckpointSaver", () => {
     expect(await SELECT.from(Messages).where({ session: contextId })).toHaveLength(1)
   })
 
+  it("persists marked human messages as HITL decisions", async () => {
+    const { Messages } = cds.entities("cap.agent")
+    const saver = new CdsCheckpointSaver()
+    const contextId = `decision-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
+    const decision = new HumanMessage({
+      id: "user-decision",
+      content: "approve",
+      additional_kwargs: { "sap.cds.agents.type": "decision" },
+    })
+
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId } },
+        checkpoint("decision-checkpoint", [decision]),
+      ),
+    )
+
+    const row = await SELECT.one.from(Messages).where({ ID: decision.id })
+    expect(row.type).toBe("decision")
+  })
+
   it("round-trips tool calls through neutral message fields", async () => {
     const { Messages } = cds.entities("cap.agent")
     const saver = new CdsCheckpointSaver()

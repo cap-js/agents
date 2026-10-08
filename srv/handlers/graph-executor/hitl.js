@@ -347,6 +347,12 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
   }
   const { Command } = await import("@langchain/langgraph")
+  const { HumanMessage } = await import("@langchain/core/messages")
+  const decisionMessage = new HumanMessage({
+    id: requestContext.userMessage.messageId,
+    content: userText,
+    additional_kwargs: { "sap.cds.agents.type": "decision" },
+  })
   let resume = dataPart !== undefined ? patchRejectMessage(dataPart) : parseResumeDecision(userText)
   let actionRequests = []
 
@@ -363,6 +369,7 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     const decisions = [...priorDecisions, ...resume.decisions]
     recordHitlDecisions(cds.context?.["agent.service"], actionRequests, resume, priorDecisionCount)
     if (decisions.length < actionCount) {
+      await graph.updateState(config, { messages: [decisionMessage] })
       const interruptData = { actionRequests }
       const nextPending = { ...pending, actionCount, decisions }
       await publishInputRequired({
@@ -395,8 +402,8 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     : await getPreInterruptToolCalls(graph, config)
   guardHitlEdits(resume, originalActions)
   const decisionNote = composeHitlDecisionNote(originalActions, resume)
-  const commandArgs = { resume }
-  if (decisionNote) commandArgs.update = { _hitlDecisionNote: decisionNote }
+  const commandArgs = { resume, update: { messages: [decisionMessage] } }
+  if (decisionNote) commandArgs.update._hitlDecisionNote = decisionNote
   const resumed = await stream(new Command(commandArgs), signal)
   return resumed.state
 }
