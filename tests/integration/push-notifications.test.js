@@ -80,6 +80,26 @@ describe("@cap-js/agents - Push Notifications", () => {
     assert.ok(result?.pushNotificationConfig?.url, "expected pushNotificationConfig with url")
   })
 
+  it("tasks/pushNotificationConfig/set - overwrites an existing config", async () => {
+    const sendRes = await sendMessage("catalog", "What books do you have?")
+    const taskId = sendRes.data.result.id
+    const firstUrl = `http://127.0.0.1:${webhookPort}/first`
+    const secondUrl = `http://127.0.0.1:${webhookPort}/second`
+
+    await jsonrpc("catalog", "tasks/pushNotificationConfig/set", {
+      taskId,
+      pushNotificationConfig: { url: firstUrl },
+    })
+    await jsonrpc("catalog", "tasks/pushNotificationConfig/set", {
+      taskId,
+      pushNotificationConfig: { url: secondUrl },
+    })
+
+    const res = await jsonrpc("catalog", "tasks/pushNotificationConfig/get", { id: taskId })
+    assert.strictEqual(res.data.error, undefined, JSON.stringify(res.data.error))
+    assert.strictEqual(res.data.result.pushNotificationConfig.url, secondUrl)
+  })
+
   it("keeps notification configs scoped to one task within a shared context", async () => {
     const first = await sendMessage("catalog", "First task")
     const contextId = first.data.result.contextId
