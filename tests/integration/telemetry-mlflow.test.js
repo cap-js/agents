@@ -401,15 +401,16 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       UC_TABLE_PREFIX: "myapp",
     }
 
-    const { setupMlflowExporter } = await import("../../lib/telemetry/mlflow/index.js")
-    await setupMlflowExporter()
+    const { resolveMlflowCredentials } = await import("../../lib/telemetry/mlflow/credentials.js")
+    const mlflowCreds = resolveMlflowCredentials()
 
     cds.env.requires.mlflow.credentials = savedCreds
 
-    // setupMlflowExporter logs the ucTableName — verify it was composed correctly
-    const logLine = captured.find((l) => l.includes("ucTableName"))
-    expect(logLine).toBeTruthy()
-    expect(logLine).toContain("main.traces.myapp_otel_spans")
+    expect(mlflowCreds.uc).toEqual({
+      catalog: "main",
+      schema: "traces",
+      tablePrefix: "myapp",
+    })
   })
 
   it("should not add OTLP exporter without mlflow credentials", async () => {

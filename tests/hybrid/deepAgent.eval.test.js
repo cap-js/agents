@@ -115,17 +115,18 @@ describe.concurrent("product-agent", () => {
 
       await new Promise((r) => setTimeout(r, 1000))
 
-      const [task] = await SELECT.from("cap.agent.Tasks")
-        .where(`data like '%${messageId}%'`)
+      const { Messages } = cds.entities("cap.agent")
+      const [task] = await SELECT.from(Messages)
+        .where({ ID: messageId })
         .orderBy("createdAt desc")
         .limit(1)
 
-      if (!task?.taskId || task.state === "completed" || task.state === "failed") {
+      if (!task?.ID || task.state === "completed" || task.state === "failed") {
         await streamPromise.catch(() => {})
         return
       }
 
-      const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: task.taskId })
+      const cancelRes = await jsonrpc("product-agent", "tasks/cancel", { id: task.ID })
       expect(
         cancelRes.data.result?.status?.state === "canceled" ||
           cancelRes.data.error?.code === -32002,

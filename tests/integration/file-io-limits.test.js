@@ -56,12 +56,12 @@ function sendFile(service, file) {
 
 async function inputFilesFor(taskId) {
   await cds.connect.to("db")
-  const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
-  return SELECT.from(InputFiles).where({ up__taskId: taskId })
+  const { inputFiles } = cds.entities("cap.agent.Messages")
+  return SELECT.from(inputFiles).where({ up__ID: taskId })
 }
 
 describe("@cap-js/agents - inbound FilePart guard (graph-executor)", () => {
-  it("oversized inbound FilePart is rejected before decode; no Tasks.inputFiles row is written", async () => {
+  it("oversized inbound FilePart is rejected before decode; no Messages.inputFiles row is written", async () => {
     // Base64 payload that decodes to just over the 1 KiB cap.
     const oversized = Buffer.alloc(
       cds.env.agents.fileIO.maxInputFileSizeBytes + 128,

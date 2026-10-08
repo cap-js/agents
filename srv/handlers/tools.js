@@ -183,20 +183,22 @@ class CallActionTool extends DynamicStructuredTool {
  * @param {object} srv - CDS ApplicationService
  */
 export function generateTools(srv) {
-  const entities = getFilteredEntities(srv), has_entities = Object.keys(entities).length > 0
-  const actions = getFilteredActions(srv), has_actions = Object.keys(actions).length > 0
+  const entities = getFilteredEntities(srv),
+    has_entities = Object.keys(entities).length > 0
+  const actions = getFilteredActions(srv),
+    has_actions = Object.keys(actions).length > 0
 
   const tools = []
 
   // Describe tool — introspect service model
   if (has_entities || has_actions) {
-    LOG.debug(srv.name, '–', `adding generic 'describe' tool`)
+    LOG.debug(srv.name, "–", `adding generic 'describe' tool`)
     tools.push(new DescribeTool(srv, entities, actions))
   }
 
   // Query tool — one tool for reading all entities
   if (has_entities) {
-    LOG.debug(srv.name, '–', `adding generic 'query' entity tool`)
+    LOG.debug(srv.name, "–", `adding generic 'query' entity tool`)
     tools.push(new GenericReadTool(srv, entities))
   }
 
@@ -204,11 +206,11 @@ export function generateTools(srv) {
   if (has_actions) {
     if (cds.env.mcp?.per_action_tool) {
       for (const [name, action] of Object.entries(actions)) {
-        LOG.debug(srv.name, '–', `adding specific tool to call action '${name}'`)
+        LOG.debug(srv.name, "–", `adding specific tool to call action '${name}'`)
         tools.push(new PerActionTool(srv, name, action))
       }
     } else {
-      LOG.debug(srv.name, '–', `adding generic 'call' action tool`)
+      LOG.debug(srv.name, "–", `adding generic 'call' action tool`)
       tools.push(new CallActionTool(srv, actions))
     }
   }
@@ -305,22 +307,20 @@ export function createEmitFilePartTool() {
  *
  * @param {import('../../lib/protocol/persistence/file-store.js').CdsFileStore} fileStore
  * @param {string} [contextId] - If omitted, read from cds.context["agent.context.id"]
- * @param {string} [userId] - If omitted, read from cds.context.user.id
  */
-export function createReadFileTool(fileStore, contextId, userId) {
+export function createReadFileTool(fileStore, contextId) {
   return tool(
     async ({ path: filePath }) => {
       try {
         const resolvedContextId = contextId || cds.context?.["agent.context.id"]
-        const resolvedUserId = userId || cds.context?.user?.id
         const name = filePath.replace(/^\/uploads\//, "")
         if (!fileStore) {
           return `read_file is not available in this context (no file store configured).`
         }
-        const file = await fileStore.getInputFile(resolvedContextId, name, resolvedUserId)
+        const file = await fileStore.getInputFile(resolvedContextId, name)
         if (!file) {
           const available =
-            (await fileStore.listInputFiles(resolvedContextId, resolvedUserId))
+            (await fileStore.listInputFiles(resolvedContextId))
               .map((f) => `/uploads/${f.name}`)
               .join(", ") || "none"
           LOG.info("read_file (not found)", {

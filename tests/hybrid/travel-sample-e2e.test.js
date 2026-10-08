@@ -57,29 +57,16 @@ afterAll(async () => {
 const { POST, axios, GET } = cds.test(TRAVEL_AGENT_DIR)
 
 async function collectToolCallsFromCheckpoints(threadId) {
-  const { BaseCheckpointSaver } = await import("@langchain/langgraph-checkpoint")
-  // Use BaseCheckpointSaver's serde to deserialize checkpoint data
-  const saver = new (class extends BaseCheckpointSaver {})()
-  const serde = saver.serde
-
-  const rows = await SELECT.from("cap.agent.Checkpoints").where({ thread_id: threadId })
+  const { Messages } = cds.entities("cap.agent")
+  const rows = await SELECT.from(Messages).where({ session: threadId })
   const tools = new Set()
 
   for (const row of rows) {
-    let checkpoint
-    try {
-      checkpoint = await serde.loadsTyped("json", row.checkpoint)
-    } catch {
-      continue
-    }
-    const messages = checkpoint?.channel_values?.messages || []
-    for (const msg of messages) {
-      const calls = msg?.tool_calls || msg?.kwargs?.tool_calls
-      if (Array.isArray(calls)) {
-        for (const tc of calls) {
-          const name = tc?.name || tc?.function?.name
-          if (name) tools.add(name)
-        }
+    const calls = row.query?.toolCalls
+    if (Array.isArray(calls)) {
+      for (const tc of calls) {
+        const name = tc?.name || tc?.function?.name
+        if (name) tools.add(name)
       }
     }
   }
@@ -156,7 +143,7 @@ describe("Travel Sample E2E", () => {
     const contextId = res.data.result.contextId
     expect(contextId, "task result must include contextId").toBeTruthy()
 
-    const threadId = `TravelAgentService:${contextId}`
+    const threadId = contextId
     const toolNames = await collectToolCallsFromCheckpoints(threadId)
 
     expect(
@@ -246,10 +233,10 @@ describe("File I/O (travel-agent — deep-agent path)", () => {
     const contextId = result.contextId
 
     // Persisted upload
-    const InputFiles = cds.model.definitions["cap.agent.Tasks.inputFiles"]
+    const { inputFiles, outputFiles } = cds.entities("cap.agent.Messages")
     const inputs = await cds.run(
-      SELECT.from(InputFiles).where({
-        "up_.contextId": contextId,
+      SELECT.from(inputFiles).where({
+        "up_.session": contextId,
         filename: "trip-requests.csv",
       }),
     )
@@ -270,12 +257,11 @@ describe("File I/O (travel-agent — deep-agent path)", () => {
     )
 
     // Output file persisted in CDS
-    const OutputFiles = cds.model.definitions["cap.agent.Tasks.outputFiles"]
-    const outputs = await cds.run(SELECT.from(OutputFiles).where({ up__taskId: savedTaskId }))
+    const outputs = await cds.run(SELECT.from(outputFiles).where({ up__ID: savedTaskId }))
     expect(outputs.length >= 1, "expected at least one output file row").toBeTruthy()
 
     // Tool-call witness: deepagents' built-in read_file + write_file fired.
-    const threadId = `TravelAgentService:${contextId}`
+    const threadId = contextId
     const toolNames = await collectToolCallsFromCheckpoints(threadId)
     expect(
       toolNames.has("read_file"),

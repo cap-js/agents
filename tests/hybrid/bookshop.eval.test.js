@@ -526,7 +526,7 @@ describe.concurrent("HITL DataPart carry", () => {
     expect(dataPart, "expected the interrupt to carry a DataPart").toBeTruthy()
     const original = dataPart.data.actionRequests?.[0]
     expect(original, "expected at least one actionRequest").toBeTruthy()
-    const actionName = original.name === "call"? original.args.action : original.name
+    const actionName = original.name === "call" ? original.args.action : original.name
     expect(actionName).toBe("submitOrder")
 
     const resume = await sendParts(
@@ -551,7 +551,7 @@ describe.concurrent("HITL DataPart carry", () => {
       .filter((p) => p.kind === "text" || p.text)
       .map((p) => p.text)
       .join(" ")
-    expect(finalText).toMatch(/\b3\b/)  // reference to 3 copies
+    expect(finalText).toMatch(/\b3\b/) // reference to 3 copies
     expect(finalText).not.toMatch(/sorry|apolog|mistake|error on my/i)
   })
 })

@@ -29,10 +29,19 @@ describe("@cap-js/agents - JSON-RPC Protocol", () => {
   })
 
   it("message/send - creates and completes a task with proper structure", async () => {
-    const res = await sendMessage("catalog", "What books do you have?")
+    const messageId = cds.utils.uuid()
+    const res = await jsonrpc("catalog", "message/send", {
+      message: {
+        kind: "message",
+        messageId,
+        role: "user",
+        parts: [{ kind: "text", text: "What books do you have?" }],
+      },
+    })
     expect(res.status).toBe(200)
     const task = res.data.result
     expect(task).not.toBe(undefined)
+    expect(task.id).toBe(messageId)
     expect(typeof task.id).toBe("string")
     expect(task.id.length > 0).toBe(true)
     expect(typeof task.contextId).toBe("string")
@@ -42,6 +51,11 @@ describe("@cap-js/agents - JSON-RPC Protocol", () => {
     expect(task.status.message.parts[0].text).not.toMatch(
       /technical issue|issue|technical|not installed|configuration issue/i,
     )
+
+    const { Messages } = cds.entities("cap.agent")
+    const rows = await SELECT.from(Messages).where({ session: task.contextId })
+    expect(rows.filter(({ role }) => role === "runtime")).toHaveLength(0)
+    expect(rows.filter(({ ID }) => ID === messageId)).toHaveLength(1)
   })
 
   it("message/send - subsequent messages with same contextId share conversation", async () => {
@@ -217,7 +231,7 @@ describe("deterministic multi-action HITL", () => {
       taskId: task.id,
     })
     const waiting = first.data.result
-    expect(waiting.status.state).toBe("input-required")
+    expect(waiting.status.state, JSON.stringify(waiting)).toBe("input-required")
     expect(waiting.status.message.parts[0].text).toBe("Approve second action?")
     expect(waiting.status.message.metadata["sap.cds.agents.hitl"].decisions).toEqual([
       { type: "approve" },
@@ -227,6 +241,8 @@ describe("deterministic multi-action HITL", () => {
       contextId,
       taskId: task.id,
     })
-    expect(complete.data.result.status.state).toBe("completed")
+    expect(complete.data.result.status.state, JSON.stringify(complete.data.result)).toBe(
+      "completed",
+    )
   })
 })

@@ -70,13 +70,13 @@ Accept: text/event-stream
 # File I/O scenario — upload CSV, read_file via UploadsBackend, write_file via OutputsBackend.
 #
 # What this exercises end-to-end:
-#   1. Executor stores the CSV bytes in cap.agent.Tasks.inputFiles
+#   1. Executor stores the CSV bytes in cap.agent.Messages.inputFiles
 #   2. Executor adds "[Uploaded files: /uploads/trip-requests.csv ...]" to the LLM message
 #   3. Deep agent calls deepagents' built-in read_file('/uploads/trip-requests.csv')
-#      → routed through UploadsBackend → cap.agent.Tasks.inputFiles → returns CSV text
+#      → routed through UploadsBackend → cap.agent.Messages.inputFiles → returns CSV text
 #   4. Agent searches flights (FRA→JFK), hotel in New York, food/culture activities
 #   5. Agent calls write_file('/outputs/alice-plan.md', '<itinerary>')
-#      → routed through OutputsBackend → cap.agent.Tasks.outputFiles
+#      → routed through OutputsBackend → cap.agent.Messages.outputFiles
 #   6. After graph.invoke(), executor lists output files for the task and emits
 #      alice-plan.md as an A2A FilePart artifact in the response
 #

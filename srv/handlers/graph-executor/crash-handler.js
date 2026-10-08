@@ -1,34 +1,41 @@
 import cds from "@sap/cds"
+import { CdsTaskStore } from "../../../lib/protocol/persistence/task-store.js"
 
 const LOG = cds.log("agents")
 
-// REVISIT: Check if in the future tasks can be picked up again after restart
 async function markActiveTasksFailed() {
-  const tasksByTenant = new Map()
+  const tasksByTenant = {}
 
   for (const executor of registerShutdownHook.executors) {
     for (const taskId of executor._abortControllers.keys()) {
       const tenant = executor._taskTenants.get(taskId)
-      const taskIds = tasksByTenant.get(tenant) || []
-      taskIds.push(taskId)
-      tasksByTenant.set(tenant, taskIds)
+      ;(tasksByTenant[tenant] ??= []).push({ taskId, ...executor._taskContexts.get(taskId) })
     }
   }
 
   await Promise.all(
-    [...tasksByTenant].map(async ([tenant, taskIds]) => {
-      const update = () =>
-        UPDATE("cap.agent.Tasks")
-          .where({
-            taskId: { in: [...new Set(taskIds)] },
-            state: { in: ["submitted", "working", "input-required"] },
-          })
-          .set({ state: "failed" })
-
-      if (tenant) return cds.spawn({ tenant, user: cds.User.privileged }, update)
-      return update()
+    Object.entries(tasksByTenant).map(async ([tenant, tasks]) => {
+      if (tenant) return cds.spawn({ tenant, user: cds.User.privileged }, () => update(tasks))
+      return update(tasks)
     }),
   )
+
+  async function update(tasks) {
+    const store = new CdsTaskStore()
+
+    const proms = []
+    for (const { taskId, contextId, serviceName } of tasks) {
+      proms.push(
+        store.save({
+          id: taskId,
+          contextId,
+          status: { state: "failed" },
+          agentService: serviceName,
+        }),
+      )
+    }
+    await Promise.all(proms)
+  }
 }
 
 export function registerShutdownHook(executor) {

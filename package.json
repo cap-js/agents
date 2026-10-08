@@ -72,8 +72,12 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@cap-js/audit-logging": "^1",
     "@cap-js/cds-test": "^1",
     "@cap-js/sqlite": "^3",
+    "@cap-js/telemetry": "^2",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "@vitest/coverage-v8": "^5.0.1",

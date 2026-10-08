@@ -5,9 +5,8 @@ import cds from "@sap/cds"
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
 const { generateTools } = await import("../../srv/handlers/tools.js")
-const { buildHitlInterruptMap, humanInTheLoopMiddleware } = await import(
-  "../../lib/agents/middleware/hitl.js"
-)
+const { buildHitlInterruptMap, humanInTheLoopMiddleware } =
+  await import("../../lib/agents/middleware/hitl.js")
 
 // HITL is wired by matching tool calls against srv.actions[...]["@agent.hitl"].
 // Per-action tools carry the action name directly; the generic combined "call"

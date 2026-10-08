@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { randomBytes } from "node:crypto"
 import { PseudonymStore } from "../../lib/masking/store.js"
-import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
+import { loadPseudonymSession, savePseudonymSession } from "../../lib/masking/persistence.js"
 import * as pseudo from "../../lib/masking/structured/index.js"
 import { createMockAICore } from "../utils/mock-ai-core.js"
 import { setup, teardown, resetCapture, getSpansAfterRequest } from "../utils/telemetry-utils.js"
@@ -14,23 +14,6 @@ process.env.MOCK_AICORE_PORT = String(mockPort)
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
-
-// Read the deserialized checkpoint state for a graph thread via the checkpoint saver.
-async function latestMaskingState(threadId) {
-  const saver = new CdsCheckpointSaver()
-  const tuple = await saver.getTuple({ configurable: { thread_id: threadId } })
-  const cv = tuple?.checkpoint?.channel_values ?? {}
-  const raw = cv.hashToOriginal
-  const hashToOriginal =
-    raw instanceof Map
-      ? raw
-      : Array.isArray(raw)
-        ? new Map(raw)
-        : raw && typeof raw === "object"
-          ? new Map(Object.entries(raw))
-          : new Map()
-  return { seed: cv.seed, hashToOriginal }
-}
 
 // Minimal in-memory session cache for unit tests (replaces the old loadOrCreate/evict).
 const _sessions = new Map()
@@ -113,60 +96,48 @@ describe("pseudonymization", () => {
       expect(h1).not.toBe(h2)
     })
 
-    it("loads mappings from graph state", async () => {
-      const first = await sendMessage("pseudo-book", "Who wrote these books?")
-      expect(first.status).toBe(200)
-      const contextId = first.data.result.contextId
-      const graphThreadId = `PseudoBookService:${contextId}`
+    it("persists mappings separately with the session ID as seed", async () => {
+      const sessionId = `masking-${cds.utils.uuid()}`
+      const store = new PseudonymStore(sessionId)
+      const hash = store.pseudonymize("Emily Brontë", "name")
 
-      const firstState = await latestMaskingState(graphThreadId)
-      const firstHash = [...firstState.hashToOriginal.entries()].find(
-        ([, value]) => value === "Emily Brontë",
-      )?.[0]
-      expect(firstHash).toMatch(/^name-[0-9a-f]{16}$/)
+      await savePseudonymSession(sessionId, store, "TestService")
+      const loaded = await loadPseudonymSession(sessionId, "TestService")
 
-      // Second call with same contextId: seed + hashToOriginal must be preserved in state.
-      const second = await sendMessage("pseudo-book", "Who wrote these books?", { contextId })
-      expect(second.status).toBe(200)
-
-      const secondState = await latestMaskingState(graphThreadId)
-      expect(secondState.hashToOriginal.get(firstHash)).toBe("Emily Brontë")
+      expect(loaded.seed).toBe(sessionId)
+      expect(new Map(loaded.mappings).get(hash)).toBe("Emily Brontë")
+      const { Messages } = cds.entities("cap.agent")
+      expect(await SELECT.one.from(Messages).where({ session: sessionId })).toBe(undefined)
     })
 
-    it("scrubText replaces PII from prior turn in user message", async () => {
-      // Turn 1: query tool returns authors → structured masking hashes their names.
+    it("does not persist reversible mappings", async () => {
       const first = await sendMessage("pseudo-book", "Who wrote these books?")
       expect(first.status).toBe(200)
       const contextId = first.data.result.contextId
-      const graphThreadId = `PseudoBookService:${contextId}`
+      const { Messages, PseudonymMappings } = cds.entities("cap.agent")
+      const rows = await SELECT.from(Messages).where({ session: contextId })
+      const mappings = await SELECT.from(PseudonymMappings).where({
+        session_ID: contextId,
+        session_agentService: "PseudoBookService",
+      })
+      expect(JSON.stringify(rows)).not.toContain("hashToOriginal")
+      expect(JSON.stringify(rows)).not.toContain('"seed"')
+      expect(JSON.stringify(rows)).not.toContain("Emily Brontë")
+      expect(mappings.some(({ value }) => value === "Emily Brontë")).toBe(true)
+    })
 
-      // Verify "Charlotte Brontë" was hashed in turn 1 (structured masking on tool result).
-      const state = await latestMaskingState(graphThreadId)
-      const charlotteHash = [...state.hashToOriginal.entries()].find(
-        ([, value]) => value === "Charlotte Brontë",
-      )?.[0]
-      expect(charlotteHash).toMatch(/^name-[0-9a-f]{16}$/)
-
-      // Turn 2: user mentions "Charlotte Brontë" in plain text.
-      // PseudoBookService override only replaces "Emily Brontë" → "PSEUDO_EMILY",
-      // so the pseudonymize handler won't catch Charlotte. But session.scrubText()
-      // (runs after srv.send) should replace it using mappings from turn 1.
+    it("does not persist reversible mappings across requests", async () => {
+      const first = await sendMessage("pseudo-book", "Who wrote these books?")
+      expect(first.status).toBe(200)
+      const contextId = first.data.result.contextId
       const second = await sendMessage("pseudo-book", "Tell me more about Charlotte Brontë", {
         contextId,
       })
       expect(second.status).toBe(200)
-
-      // Check HumanMessage in checkpoint — must contain the hash, not the original.
-      const saver = new CdsCheckpointSaver()
-      const tuple = await saver.getTuple({ configurable: { thread_id: graphThreadId } })
-      const messages = tuple?.checkpoint?.channel_values?.messages ?? []
-      const humans = messages.filter((m) => (m._getType?.() ?? m.type) === "human")
-      const lastHuman = humans[humans.length - 1]
-      expect(lastHuman).toBeDefined()
-      const text =
-        typeof lastHuman.content === "string" ? lastHuman.content : lastHuman.content?.[0]?.text
-      expect(text).toContain(charlotteHash)
-      expect(text).not.toContain("Charlotte Brontë")
+      const { Messages } = cds.entities("cap.agent")
+      const rows = await SELECT.from(Messages).where({ session: contextId })
+      expect(JSON.stringify(rows)).not.toContain("hashToOriginal")
+      expect(JSON.stringify(rows)).not.toContain('"seed"')
     })
   })
 
