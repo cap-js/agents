@@ -10,6 +10,22 @@ type MessageRole : String enum {
   tool;
 };
 
+type MessageType : String enum {
+  // user, ai, and system messages
+  text;
+  // user messages
+  decision;
+  // ai messages
+  tool_call;
+  request;
+  auth_required = 'auth-required';
+  canceled;
+  failed;
+  rejected;
+  // tool messages
+  tool_result;
+};
+
 /**
  * Framework-neutral conversation ledger shared by protocol and agent runtimes.
  * A2A task IDs are the IDs of the user messages that start those tasks.
@@ -20,7 +36,7 @@ entity Messages : managed {
       sequence : Integer64;
       prev     : Association to Messages;
       role     : MessageRole;
-      type     : String;
+      type     : MessageType;
       content  : LargeString;
       query    : Map;
       agentService   : String;
