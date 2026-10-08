@@ -2,11 +2,6 @@ import cds from "@sap/cds"
 import { agentMessage, firstDataPart, partsToText } from "../../../lib/utils/message-handling.js"
 import { audit, short } from "../../../lib/utils/utils.js"
 import * as metrics from "../../../lib/telemetry/metrics.js"
-import { PERSIST_TASK } from "../../../lib/protocol/persistence/task-store.js"
-import {
-  appendMessage,
-  loadLatestHitlRequest,
-} from "../../../lib/protocol/persistence/message-store.js"
 
 const LOG = cds.log("agents")
 
@@ -234,10 +229,30 @@ function pendingHitlFromTask(task) {
   return pending
 }
 
+async function persistedDecisions(contextId, taskId, currentMessageId) {
+  const { Messages } = cds.entities("cap.agent")
+  const anchor = await cds.ql.SELECT.one`from ${Messages} { sequence }
+    where ID = ${taskId} and session = ${contextId} and createdBy = $user.id`
+  if (!anchor) return []
+  const rows = await cds.ql.SELECT`from ${Messages} { content }
+    where session = ${contextId} and role = 'user' and type = 'decision'
+      and sequence > ${anchor.sequence} and ID != ${currentMessageId} and createdBy = $user.id
+    order by sequence`
+  return rows.map(({ content }) => parseResumeDecision(content).decisions[0])
+}
+
 function pendingActionRequests(task, pending) {
-  return (
-    pending?.actionRequests || firstDataPart(task?.status?.message?.parts)?.actionRequests || []
-  )
+  if (pending?.actionRequests) return pending.actionRequests
+  const dataActions = firstDataPart(task?.status?.message?.parts)?.actionRequests
+  if (dataActions) return dataActions
+  const text = partsToText(task?.status?.message?.parts)
+  const jsonStart = text.indexOf("{")
+  if (jsonStart < 0) return []
+  try {
+    return JSON.parse(text.slice(jsonStart)).actionRequests || []
+  } catch {
+    return []
+  }
 }
 
 function interruptDescriptionFromTask(task, pending) {
@@ -249,21 +264,24 @@ function interruptDescriptionFromTask(task, pending) {
   )
 }
 
-function publishInputRequired({ requestContext, eventBus, description, interruptData, pending }) {
+async function publishInputRequired({
+  requestContext,
+  eventBus,
+  description,
+  interruptData,
+  metadata,
+}) {
   const { taskId, contextId } = requestContext
+  const status = {
+    state: "input-required",
+    message: agentMessage(description, interruptData, metadata),
+    timestamp: new Date().toISOString(),
+  }
   eventBus.publish({
     kind: "status-update",
     taskId,
     contextId,
-    status: {
-      state: "input-required",
-      message: agentMessage(description, interruptData, {
-        [HITL_METADATA_KEY]: pending,
-        [INPUT_REQUIRED_METADATA_KEY]: { options: approvalOptions() },
-      }),
-      timestamp: new Date().toISOString(),
-      [PERSIST_TASK]: true,
-    },
+    status,
     final: true,
   })
   eventBus.finished()
@@ -273,26 +291,20 @@ export function isTimeoutHitl(task) {
   return task?.status?.message?.metadata?.[TIMEOUT_HITL_METADATA_KEY] === true
 }
 
-export function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
+export async function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
   const { taskId, contextId } = requestContext
   LOG.info(serviceName, "-", "timeout awaiting decision", { conversation: short(contextId) })
   audit("AgentInputRequired", {
     data: { taskId, contextId, service: serviceName, reason: "timeout", description },
   })
-  eventBus.publish({
-    kind: "status-update",
-    taskId,
-    contextId,
-    status: {
-      state: "input-required",
-      message: agentMessage(description, undefined, {
-        [TIMEOUT_HITL_METADATA_KEY]: true,
-        [INPUT_REQUIRED_METADATA_KEY]: { options: timeoutOptions() },
-      }),
-      timestamp: new Date().toISOString(),
-      [PERSIST_TASK]: true,
+  await publishInputRequired({
+    requestContext,
+    eventBus,
+    description,
+    metadata: {
+      [TIMEOUT_HITL_METADATA_KEY]: true,
+      [INPUT_REQUIRED_METADATA_KEY]: { options: timeoutOptions() },
     },
-    final: true,
   })
 }
 
@@ -300,18 +312,6 @@ export async function resumeTimeoutHitl({ requestContext, eventBus, stream, sign
   const { taskId, contextId } = requestContext
   const decision = partsToText(requestContext.userMessage?.parts).trim()
   if (!decision) throw new Error(cds.i18n.messages.at("RESUME_REQUIRES_TEXT"))
-  await appendMessage({
-    ID: requestContext.userMessage.messageId,
-    session: contextId,
-    prev_ID: taskId,
-    role: "hitl",
-    type: "decision",
-    content: requestContext.userMessage.parts,
-    query: { decision },
-    agentService: cds.context?.["agent.service"],
-    requirePrev: true,
-  })
-
   if (/^(continue|approve|yes|confirm|ok)$/i.test(decision)) {
     LOG.info("timeout continuation approved", { conversation: short(contextId) })
     audit("AgentTaskResumed", {
@@ -350,41 +350,33 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
   let resume = dataPart !== undefined ? patchRejectMessage(dataPart) : parseResumeDecision(userText)
   let actionRequests = []
 
-  await appendMessage({
-    ID: requestContext.userMessage.messageId,
-    session: contextId,
-    prev_ID: taskId,
-    role: "hitl",
-    type: "decision",
-    content: requestContext.userMessage.parts,
-    query: { resume },
-    agentService: cds.context?.["agent.service"],
-    requirePrev: true,
-  })
-
   if (Array.isArray(resume?.decisions)) {
     let pending = pendingHitlFromTask(requestContext.task)
-    if (!pending && cds.db) {
-      const pendingStatus = await loadLatestHitlRequest(contextId)
-      pending = pendingHitlFromTask({ status: pendingStatus })
-    }
-    const actionCount = pending?.actionCount ?? (await getPendingHitlActionCount(graph, config))
     actionRequests = pendingActionRequests(requestContext.task, pending)
-    const priorDecisionCount = pending?.decisions?.length || 0
-    const decisions = [...(pending?.decisions || []), ...resume.decisions]
+    const actionCount =
+      pending?.actionCount ??
+      (actionRequests.length || (await getPendingHitlActionCount(graph, config)))
+    const priorDecisions =
+      pending?.decisions ??
+      (await persistedDecisions(contextId, taskId, requestContext.userMessage.messageId))
+    const priorDecisionCount = priorDecisions.length
+    const decisions = [...priorDecisions, ...resume.decisions]
     recordHitlDecisions(cds.context?.["agent.service"], actionRequests, resume, priorDecisionCount)
     if (decisions.length < actionCount) {
-      const interruptData = firstDataPart(requestContext.task?.status?.message?.parts)
+      const interruptData = { actionRequests }
       const nextPending = { ...pending, actionCount, decisions }
-      publishInputRequired({
+      await publishInputRequired({
         requestContext,
         eventBus,
         description: interruptDescriptionFromTask(requestContext.task, nextPending),
         interruptData,
-        pending: {
-          actionCount,
-          decisions,
-          actionRequests: pendingActionRequests(requestContext.task, nextPending),
+        metadata: {
+          [HITL_METADATA_KEY]: {
+            actionCount,
+            decisions,
+            actionRequests: pendingActionRequests(requestContext.task, nextPending),
+          },
+          [INPUT_REQUIRED_METADATA_KEY]: { options: approvalOptions() },
         },
       })
       return undefined
@@ -409,7 +401,7 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
   return resumed.state
 }
 
-export function handleHitlInterrupt({
+export async function handleHitlInterrupt({
   result,
   requestContext,
   eventBus,
@@ -429,15 +421,18 @@ export function handleHitlInterrupt({
   audit("AgentInputRequired", {
     data: { taskId, contextId, service: serviceName, description, interruptData },
   })
-  publishInputRequired({
+  await publishInputRequired({
     requestContext,
     eventBus,
     description,
     interruptData,
-    pending: {
-      actionCount: interruptActionCount(result),
-      decisions: [],
-      actionRequests: interruptData?.actionRequests || interruptActionRequests(result),
+    metadata: {
+      [HITL_METADATA_KEY]: {
+        actionCount: interruptActionCount(result),
+        decisions: [],
+        actionRequests: interruptData?.actionRequests || interruptActionRequests(result),
+      },
+      [INPUT_REQUIRED_METADATA_KEY]: { options: approvalOptions() },
     },
   })
   return true

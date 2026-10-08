@@ -71,19 +71,23 @@ describe("@cap-js/agents - SSE client disconnect aborts running task", () => {
     // and the H9 disconnect handler abort()s the graph.
     socket.destroy()
 
-    // Poll the task-anchoring message for the disconnect-triggered cancellation.
-    await cds.connect.to("db")
-    const { Messages } = cds.entities("cap.agent")
+    // Poll the public task API for the disconnect-triggered cancellation.
     const deadline = Date.now() + 5000
     let state
     // eslint-disable-next-line no-unmodified-loop-condition
     while (Date.now() < deadline) {
       // eslint-disable-next-line no-await-in-loop
-      const row = await SELECT.one
-        .from(Messages)
-        .where({ prev_ID: taskId, role: "assistant" })
-        .orderBy("sequence desc")
-      state = row?.type
+      const response = await fetch(`${t.url}/a2a/slow-agent/`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tasks/get",
+          params: { id: taskId },
+        }),
+      })
+      state = (await response.json()).result?.status?.state
       if (state === "canceled") break
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 50))

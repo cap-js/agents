@@ -57,7 +57,7 @@ describe("CdsCheckpointSaver", () => {
     )
     expect(tuple.checkpoint.channel_values.messages.map((message) => message.content)).toEqual([
       "hello",
-      [{ type: "text", text: "hello back" }],
+      "hello back",
     ])
     expect(tuple.config.configurable.thread_id).toBe(threadId)
   })
@@ -67,18 +67,27 @@ describe("CdsCheckpointSaver", () => {
     const saver = new CdsCheckpointSaver()
     const contextId = `state-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
+    const message = new HumanMessage("hello")
 
     await runAs("alice", () =>
       saver.put(
         { configurable: { thread_id: threadId } },
-        checkpoint("checkpoint-1", [new HumanMessage("hello")], { cart: { book: 201 } }),
+        checkpoint("checkpoint-1", [message], { cart: { book: 201 } }),
         { source: "loop", step: 4 },
+      ),
+    )
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId } },
+        checkpoint("checkpoint-2", [message], { cart: { book: 201 } }),
+        { source: "loop", step: 5 },
       ),
     )
 
     const tuple = await runAs("alice", () =>
       saver.getTuple({ configurable: { thread_id: threadId } }),
     )
+    expect(message.id).toMatch(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/)
     expect(tuple.checkpoint.channel_values.cart).toBe(undefined)
     expect(tuple.metadata).toEqual({})
     expect(tuple.checkpoint.channel_values.messages[0].content).toBe("hello")

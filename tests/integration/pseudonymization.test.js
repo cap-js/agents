@@ -101,8 +101,8 @@ describe("pseudonymization", () => {
       const store = new PseudonymStore(sessionId)
       const hash = store.pseudonymize("Emily Brontë", "name")
 
-      await savePseudonymSession(sessionId, store)
-      const loaded = await loadPseudonymSession(sessionId)
+      await savePseudonymSession(sessionId, store, "TestService")
+      const loaded = await loadPseudonymSession(sessionId, "TestService")
 
       expect(loaded.seed).toBe(sessionId)
       expect(new Map(loaded.mappings).get(hash)).toBe("Emily Brontë")
@@ -118,6 +118,7 @@ describe("pseudonymization", () => {
       const rows = await SELECT.from(Messages).where({ session: contextId })
       const mappings = await SELECT.from(PseudonymMappings).where({
         session_ID: contextId,
+        session_agentService: "PseudoBookService",
       })
       expect(JSON.stringify(rows)).not.toContain("hashToOriginal")
       expect(JSON.stringify(rows)).not.toContain('"seed"')

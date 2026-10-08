@@ -3,16 +3,23 @@ using {Attachments} from '@cap-js/attachments';
 
 namespace cap.agent;
 
+type MessageRole : String enum {
+  user;
+  ai;
+  system;
+  tool;
+};
+
 /**
  * Framework-neutral conversation ledger shared by protocol and agent runtimes.
  * A2A task IDs are the IDs of the user messages that start those tasks.
  */
 entity Messages : managed {
-  key ID       : String;
+  key ID       : UUID;
       session  : String;
       sequence : Integer64;
       prev     : Association to Messages;
-      role     : String;
+      role     : MessageRole;
       type     : String;
       content  : LargeString;
       query    : Map;
@@ -48,13 +55,14 @@ view QuotaUsage as
       usageLlmTokens,
       exists (
         select 1 from Messages as terminal
-        where terminal.prev.ID = message.ID
-          and terminal.role = 'assistant'
+        where terminal.session = message.session
+          and terminal.sequence > message.sequence
+          and terminal.role = 'ai'
           and terminal.type in ('text', 'failed', 'canceled', 'rejected', 'auth-required')
       ) ? 0 : 1 as active
     }
     where message.role = 'user'
-      and message.prev.ID is null
+      and message.type = 'text'
       and date(message.createdAt) = date($now)
   ) as task {
     sum(task.active) as concurrentTasks,

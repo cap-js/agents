@@ -1,9 +1,8 @@
 import cds from "@sap/cds"
-import { appendMessage } from "../../../lib/protocol/persistence/message-store.js"
+import { CdsTaskStore } from "../../../lib/protocol/persistence/task-store.js"
 
 const LOG = cds.log("agents")
 
-// REVISIT: Check if in the future tasks can be picked up again after restart
 async function markActiveTasksFailed() {
   const tasksByTenant = new Map()
 
@@ -18,21 +17,17 @@ async function markActiveTasksFailed() {
 
   await Promise.all(
     [...tasksByTenant].map(async ([tenant, tasks]) => {
-      const update = () =>
-        Promise.all(
-          tasks.map(({ taskId, contextId, serviceName }) =>
-            appendMessage({
-              ID: `crash-${taskId}`,
-              session: contextId,
-              prev_ID: taskId,
-              role: "assistant",
-              type: "failed",
-              content: [],
-              query: { status: { state: "failed" } },
-              agentService: serviceName,
-            }),
-          ),
-        )
+      const update = async () => {
+        const store = new CdsTaskStore()
+        for (const { taskId, contextId, serviceName } of tasks) {
+          await store.save({
+            id: taskId,
+            contextId,
+            status: { state: "failed" },
+            agentService: serviceName,
+          })
+        }
+      }
 
       if (tenant) return cds.spawn({ tenant, user: cds.User.privileged }, update)
       return update()

@@ -20,10 +20,11 @@ function runningTasks() {
     return db
       .prepare(
         "SELECT start.ID as taskId FROM cap_agent_Messages start " +
-          "WHERE start.role = 'user' AND start.prev_ID IS NULL " +
+          "WHERE start.role = 'user' AND start.type = 'text' " +
           "AND NOT EXISTS (SELECT 1 FROM cap_agent_Messages done " +
-          "WHERE done.prev_ID = start.ID AND done.role = 'assistant' " +
-          "AND done.type IN ('failed', 'canceled', 'rejected')) ORDER BY taskId",
+          "WHERE done.session = start.session AND done.sequence > start.sequence " +
+          "AND done.role = 'ai' AND done.type IN ('failed', 'canceled', 'rejected')) " +
+          "ORDER BY taskId",
       )
       .all()
   } finally {
@@ -36,7 +37,11 @@ function taskState(taskId) {
   try {
     return db
       .prepare(
-        "SELECT type FROM cap_agent_Messages WHERE prev_ID = ? AND role = 'assistant' ORDER BY sequence DESC LIMIT 1",
+        "SELECT done.type FROM cap_agent_Messages start " +
+          "JOIN cap_agent_Messages done ON done.session = start.session " +
+          "AND done.sequence > start.sequence " +
+          "WHERE start.ID = ? AND done.role = 'ai' " +
+          "ORDER BY done.sequence DESC LIMIT 1",
       )
       .get(taskId)?.type
   } finally {
@@ -97,9 +102,7 @@ async function startSlowTask() {
 
 describe("task recovery after server crash", () => {
   beforeAll(async () => {
-    for (const suffix of ["", "-shm", "-wal"]) {
-      rmSync(DB_PATH + suffix, { force: true })
-    }
+    for (const suffix of ["", "-shm", "-wal"]) rmSync(DB_PATH + suffix, { force: true })
 
     await execFileAsync("npx", ["cds", "deploy", "--to", "sqlite:db.sqlite"], {
       cwd: BOOKSHOP_DIR,
@@ -107,13 +110,7 @@ describe("task recovery after server crash", () => {
     })
 
     registerCleanupHandlers(() => {
-      if (server?.exitCode == null) {
-        try {
-          server.kill()
-        } catch {
-          /* process already exited */
-        }
-      }
+      if (server?.exitCode == null) server.kill()
     })
 
     server = await startServer(BOOKSHOP_DIR, PORT, "bookshop crash recovery", {

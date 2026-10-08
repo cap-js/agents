@@ -20,8 +20,6 @@ import {
   resumeTimeoutHitl,
 } from "./graph-executor/hitl.js"
 import { registerShutdownHook } from "./graph-executor/crash-handler.js"
-import { ensureTaskAnchor } from "../../lib/protocol/persistence/message-store.js"
-import { PERSIST_TASK } from "../../lib/protocol/persistence/task-store.js"
 
 const LOG = cds.log("agents")
 
@@ -427,10 +425,16 @@ class GraphExecutor {
 
     if (!isResume) {
       if (cds.context?.["agent.new.task"]) {
-        await ensureTaskAnchor({
-          taskId,
-          contextId,
-          message: requestContext.userMessage,
+        const { Messages } = cds.entities("cap.agent")
+        const latest = await cds.ql.SELECT.one`from ${Messages} { max(sequence) as sequence }
+          where session = ${contextId} and createdBy = $user.id`
+        await INSERT.into(Messages).entries({
+          ID: taskId,
+          session: contextId,
+          sequence: Number(latest?.sequence ?? -1) + 1,
+          role: "user",
+          type: "text",
+          content: partsToText(requestContext.userMessage?.parts),
           agentService: serviceName,
         })
         delete cds.context["agent.new.task"]
@@ -620,7 +624,7 @@ class GraphExecutor {
 
         const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         if (requiresHitl(result)) {
-          handleHitlInterrupt({
+          await handleHitlInterrupt({
             result,
             requestContext,
             eventBus,
@@ -919,7 +923,6 @@ class GraphExecutor {
             state: "completed",
             message: agentMessage(output, undefined, usageMeta),
             timestamp: new Date().toISOString(),
-            [PERSIST_TASK]: true,
           },
           final: true,
           metadata: usageMeta,
@@ -935,16 +938,16 @@ class GraphExecutor {
             data: { taskId, contextId, service: serviceName },
           })
 
+          const status = {
+            state: "canceled",
+            message: agentMessage("Task canceled."),
+            timestamp: new Date().toISOString(),
+          }
           eventBus.publish({
             kind: "status-update",
             taskId,
             contextId,
-            status: {
-              state: "canceled",
-              message: agentMessage("Task canceled."),
-              timestamp: new Date().toISOString(),
-              [PERSIST_TASK]: true,
-            },
+            status,
             final: true,
           })
           return
@@ -963,7 +966,7 @@ class GraphExecutor {
             "timeOut",
           )
 
-          publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
+          await publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
           return
         }
 
@@ -990,16 +993,16 @@ class GraphExecutor {
             },
           })
 
+          const status = {
+            state: "canceled",
+            message: agentMessage(summary),
+            timestamp: new Date().toISOString(),
+          }
           eventBus.publish({
             kind: "status-update",
             taskId,
             contextId,
-            status: {
-              state: "canceled",
-              message: agentMessage(summary),
-              timestamp: new Date().toISOString(),
-              [PERSIST_TASK]: true,
-            },
+            status,
             final: true,
           })
           return
@@ -1037,16 +1040,16 @@ class GraphExecutor {
             ? cds.i18n.messages.at(500) || "Internal Server Error"
             : `Agent error: ${err.message}`
 
+        const status = {
+          state: "failed",
+          message: agentMessage(errorMsg),
+          timestamp: new Date().toISOString(),
+        }
         eventBus.publish({
           kind: "status-update",
           taskId,
           contextId,
-          status: {
-            state: "failed",
-            message: agentMessage(errorMsg),
-            timestamp: new Date().toISOString(),
-            [PERSIST_TASK]: true,
-          },
+          status,
           final: true,
         })
       } finally {
@@ -1127,15 +1130,15 @@ class GraphExecutor {
         data: { taskId, service: this._srv.name },
       })
 
+      const status = {
+        state: "canceled",
+        message: agentMessage("Task canceled."),
+        timestamp: new Date().toISOString(),
+      }
       eventBus.publish({
         kind: "status-update",
         taskId,
-        status: {
-          state: "canceled",
-          message: agentMessage("Task canceled."),
-          timestamp: new Date().toISOString(),
-          [PERSIST_TASK]: true,
-        },
+        status,
         final: true,
       })
       eventBus.finished()

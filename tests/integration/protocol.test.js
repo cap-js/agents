@@ -231,7 +231,7 @@ describe("deterministic multi-action HITL", () => {
       taskId: task.id,
     })
     const waiting = first.data.result
-    expect(waiting.status.state).toBe("input-required")
+    expect(waiting.status.state, JSON.stringify(waiting)).toBe("input-required")
     expect(waiting.status.message.parts[0].text).toBe("Approve second action?")
     expect(waiting.status.message.metadata["sap.cds.agents.hitl"].decisions).toEqual([
       { type: "approve" },
@@ -241,6 +241,8 @@ describe("deterministic multi-action HITL", () => {
       contextId,
       taskId: task.id,
     })
-    expect(complete.data.result.status.state).toBe("completed")
+    expect(complete.data.result.status.state, JSON.stringify(complete.data.result)).toBe(
+      "completed",
+    )
   })
 })
