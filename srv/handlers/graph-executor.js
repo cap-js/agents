@@ -322,15 +322,7 @@ class GraphExecutor {
     // ephemeral signal that may already be cleared from channel_values.
     if (this._graph?.checkpointer) {
       const thread_id = config.configurable?.thread_id
-      let cp = await this._graph.checkpointer.getTuple({ configurable: { thread_id } })
-      if (!cp?.checkpoint?.channel_values && this._graph.checkpointer.latestNamespace) {
-        const ns = await this._graph.checkpointer.latestNamespace(thread_id)
-        if (ns) {
-          cp = await this._graph.checkpointer.getTuple({
-            configurable: { thread_id, checkpoint_ns: ns },
-          })
-        }
-      }
+      const cp = await this._graph.checkpointer.getTuple({ configurable: { thread_id } })
       const channelValues = cp?.checkpoint?.channel_values
       if (channelValues) {
         const interrupt = finalState?.__interrupt__
@@ -1072,15 +1064,7 @@ class GraphExecutor {
             if (!messages && graph?.checkpointer) {
               try {
                 const thread_id = `${serviceName}:${contextId}`
-                let cp = await graph.checkpointer.getTuple({ configurable: { thread_id } })
-                if (!cp?.checkpoint?.channel_values && graph.checkpointer.latestNamespace) {
-                  const ns = await graph.checkpointer.latestNamespace(thread_id)
-                  if (ns) {
-                    cp = await graph.checkpointer.getTuple({
-                      configurable: { thread_id, checkpoint_ns: ns },
-                    })
-                  }
-                }
+                const cp = await graph.checkpointer.getTuple({ configurable: { thread_id } })
                 messages = cp?.checkpoint?.channel_values?.messages
               } catch {
                 /* best-effort */
