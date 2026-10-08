@@ -1,26 +1,34 @@
 import { describe, expect, it } from "vitest"
 import cds from "@sap/cds"
 
-import { createExecutor } from "../../lib/executor.js"
-import PiExecutor from "../../srv/pi-executor-srv.js"
+import { LangGraphExecutor } from "../../srv/langgraph-executor-srv.js"
+import PiExecutor from "../../lib/protocol/pi-executor.js"
 
 describe("agent executor selection", () => {
-  it("resolves the Pi executor from cds.requires.kinds", async () => {
-    const previousExecutor = cds.requires["agent-executor"]
-    const previousKind = cds.requires.kinds["agent-executor-pi-test"]
-    cds.requires.kinds["agent-executor-pi-test"] = {
-      impl: "@cap-js/agents/srv/pi-executor-srv",
+  it("resolves the Pi executor when harness is pi", async () => {
+    const previousHarness = cds.env.agents?.harness
+    cds.env.agents ??= {}
+    cds.env.agents.harness = "pi"
+
+    const srv = {
+      name: "TestService",
+      send: async (event) => {
+        if (event === "buildTools") return []
+        if (event === "buildSystemPrompt") return "Be helpful"
+        if (event === "buildModel") return { model: {}, streamFn: async () => {}, getApiKey: () => "" }
+        if (event === "buildGraph") {
+          const agents = await import("../../lib/agents/index.js")
+          return agents.default.for(srv)
+        }
+      },
     }
-    cds.requires["agent-executor"] = { kind: "agent-executor-pi-test" }
 
     try {
-      const executor = await createExecutor({ name: "TestService" })
-      expect(typeof executor.execute).toBe("function")
-      expect(PiExecutor._instance).toBeTruthy()
+      const executorHandle = LangGraphExecutor.for(srv)
+      expect(typeof executorHandle.execute).toBe("function")
     } finally {
-      cds.requires["agent-executor"] = previousExecutor
-      if (previousKind === undefined) delete cds.requires.kinds["agent-executor-pi-test"]
-      else cds.requires.kinds["agent-executor-pi-test"] = previousKind
+      if (previousHarness === undefined) delete cds.env.agents.harness
+      else cds.env.agents.harness = previousHarness
     }
   })
 })

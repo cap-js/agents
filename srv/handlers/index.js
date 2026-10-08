@@ -24,7 +24,7 @@ export default function registerDefaultAgentHandlers(srv) {
     const cdsTools = generateTools(srv)
     const extraTools = await mcpAndSubagents(srv)
     const tools = [...cdsTools, ...extraTools]
-    return req.data.harness === 'pi' ? toPiTools(tools) : tools // REVISIT
+    return req.data?.harness === 'pi' ? toPiTools(tools) : tools // REVISIT
   })
 
   // REVISIT: proper place for this
@@ -100,7 +100,7 @@ export default function registerDefaultAgentHandlers(srv) {
     const name = def?.["@agent.llm"] || srv?.options?.agent?.llm || "llm"
     const options = cds.requires[name] ?? {}
     let { kind, impl } = options
-    if (req.data.harness === 'pi') impl = "@cap-js/agents/lib/models/pi-generic" // REVISIT
+    if (req.data?.harness === 'pi') impl = "@cap-js/agents/lib/models/pi-generic" // REVISIT
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)
