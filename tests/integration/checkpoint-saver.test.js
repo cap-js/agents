@@ -139,6 +139,51 @@ describe("CdsCheckpointSaver", () => {
     expect(tuple.checkpoint.channel_values.messages[2].tool_call_id).toBe("call-1")
   })
 
+  it("sequences only messages after the latest stored message", async () => {
+    const { Messages } = cds.entities("cap.agent")
+    const saver = new CdsCheckpointSaver()
+    const contextId = `sequence-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
+    const firstTask = new HumanMessage({ id: "first-task", content: "first" })
+    const secondTask = new HumanMessage({ id: "second-task", content: "second" })
+
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId, _taskId: firstTask.id } },
+        checkpoint("first-checkpoint", [
+          firstTask,
+          new AIMessage({ id: "first-ai", content: "done" }),
+        ]),
+      ),
+    )
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId, _taskId: secondTask.id } },
+        checkpoint("second-checkpoint", [
+          firstTask,
+          new AIMessage({ id: "first-ai", content: "done" }),
+          secondTask,
+          new AIMessage({ id: "second-ai", content: "done" }),
+        ]),
+      ),
+    )
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId, _taskId: secondTask.id } },
+        checkpoint("second-checkpoint", [
+          firstTask,
+          new AIMessage({ id: "first-ai", content: "done" }),
+          secondTask,
+          new AIMessage({ id: "second-ai", content: "done" }),
+        ]),
+      ),
+    )
+
+    const rows = await SELECT.from(Messages).where({ session: contextId }).orderBy("sequence")
+    expect(rows.map(({ ID }) => ID)).toEqual(["first-task", "first-ai", "second-task", "second-ai"])
+    expect(rows.map(({ sequence }) => Number(sequence))).toEqual([0, 1, 2, 3])
+  })
+
   it("does not persist LangGraph pending-write metadata", async () => {
     const saver = new CdsCheckpointSaver()
     const threadId = `TestService:interrupt-${cds.utils.uuid()}`
