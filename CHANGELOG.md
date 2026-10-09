@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.9 - tbd
+
+### Fixed
+
+- Improved checkpointer by not persisting verbose model state
+
 ## Version 0.9.8 - 2026-10-04
 
 ### Added
