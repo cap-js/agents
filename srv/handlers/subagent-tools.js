@@ -78,7 +78,7 @@ function formatToolResult({ text, files }) {
 /**
  * Wrap an A2A client as a LangChain tool the agent can call.
  */
-function createA2ATool(client, agentCard, serviceName) {
+export function createA2ATool(client, agentCard, serviceName) {
   const subagent = agentCard.name
   const t = tool(
     async ({ message }) => {
@@ -309,41 +309,7 @@ export async function buildSubAgentToolFromConnection(serviceName) {
   const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
   LOG.info(`Connecting to subagent ${serviceName}`, { at: base })
 
-  // revisit: a2a agents may be tenant specific, card per tenant?
-  const initialHeaders = await resolveHeaders()
-  const cardUrl = `${base}/.well-known/agent-card.json`
-  const cardRes = await fetch(cardUrl, {
-    headers: { Accept: "application/json", ...initialHeaders },
-  })
-  if (!cardRes.ok) {
-    throw new Error(
-      `[subagents] Agent card fetch failed for "${serviceName}" at ${cardUrl}: HTTP ${cardRes.status}`,
-    )
-  }
-  const agentCard = await cardRes.json()
-
-  const { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory, RestTransportFactory } =
-    await import("@a2a-js/sdk/client")
-
-  const customFetch = async (url, init = {}) => {
-    const headers = await resolveHeaders()
-    if (getTracer()) {
-      const { context, propagation } = await import("@opentelemetry/api")
-      propagation.inject(context.active(), headers)
-    }
-    return fetch(url, { ...init, headers: { ...headers, ...(init.headers || {}) } })
-  }
-  const factory = new ClientFactory(
-    ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
-      transports: [
-        new JsonRpcTransportFactory({ fetchImpl: customFetch }),
-        new RestTransportFactory({ fetchImpl: customFetch }),
-      ],
-    }),
-  )
-  const client = await factory.createFromAgentCard(agentCard)
-
-  return createA2ATool(client, agentCard, serviceName)
+  return { _a2aDynamic: true, base, serviceName, resolveHeaders }
 }
 
 export function buildSubAgentTool(serviceName) {
