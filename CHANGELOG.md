@@ -9,6 +9,7 @@
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state
+- `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
 
 ## Version 0.9.8 - 2026-10-04
 
