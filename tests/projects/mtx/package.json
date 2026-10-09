@@ -1,8 +1,8 @@
 {
   "name": "agent-mtx-app",
   "version": "0.0.1",
-  "type": "module",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
     "@cap-js/sqlite": ">=1",
