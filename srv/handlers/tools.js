@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 import { DynamicStructuredTool, tool } from "@langchain/core/tools"
-import z from "zod"
+import z, { toJSONSchema } from "zod"
 import {
   createGenericReadToolDefinition,
   createDescribeToolDefinition,
@@ -395,4 +395,44 @@ export function createEmitDataPartTool() {
       }),
     },
   )
+}
+
+/** Convert the existing CDS/LangChain tools to Pi's AgentTool contract. */
+export function toPiTools(tools = []) {
+  return tools
+    .filter((tool) => tool.invoke && (typeof tool.isAllowed !== 'function' || tool.isAllowed()))
+    .map((tool) => {
+      let parameters = { type: 'object', properties: {} }
+      if (tool.schema) {
+        try {
+          parameters = toJSONSchema(tool.schema, { target: 'draft-7' })
+          delete parameters.$schema
+        } catch (error) {
+          LOG.warn(`Could not convert schema for Pi tool ${tool.name}`, error.message)
+        }
+      }
+
+      return {
+        name: tool.name,
+        label: tool.name,
+        description: tool.description || tool.name,
+        parameters,
+        execute: async (_toolCallId, args, signal) => {
+          const result = await tool.invoke(args, { signal })
+          return { content: [{ type: 'text', text: toolText(result) }], details: {} }
+        },
+      }
+    })
+}
+
+function toolText(result) {
+  const value = Array.isArray(result) && result.length === 2 ? result[0] : result
+  if (typeof value === 'string') return value
+  if (value == null) return ''
+  if (Array.isArray(value)) {
+    return value
+      .map((part) => (typeof part === 'string' ? part : part?.text || JSON.stringify(part)))
+      .join('\n')
+  }
+  return JSON.stringify(value)
 }

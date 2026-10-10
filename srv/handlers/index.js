@@ -1,11 +1,11 @@
 import cds from "@sap/cds"
-import { generateTools, createReadFileTool } from "./tools.js"
+import { generateTools, toPiTools } from "./tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
-import { partsToText } from "../../lib/utils/message-handling.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
 import { registerChat } from "./chat.js"
 import { effectiveDefinition } from "../../lib/utils/utils.js"
+import agents from '../../lib/agents/index.js'
 
 const LOG = cds.log("agents")
 
@@ -20,9 +20,15 @@ export default function registerDefaultAgentHandlers(srv) {
   // MCP connections are declared via @agent.mcps annotation on the service:
   //   @agent.mcps: [{ service: 'MyConnection' }, { service: 'AnotherConnection' }]
   // Each service name must be defined as a cds.requires entry in package.json.
-  srv.on("buildTools", async () => {
+  srv.on("buildTools", async (req) => {
     const cdsTools = generateTools(srv)
+    const extraTools = await mcpAndSubagents(srv)
+    const tools = [...cdsTools, ...extraTools]
+    return req.data?.harness === 'pi' ? toPiTools(tools) : tools // REVISIT
+  })
 
+  // REVISIT: proper place for this
+  async function mcpAndSubagents(srv) {
     // ── MCP servers and subagents ────────────────────────────────────────────────────────
     // Connect to other @mcp services and @agent services
     function canConnect(s) {
@@ -57,7 +63,7 @@ export default function registerDefaultAgentHandlers(srv) {
               ? services?.filter((s) => s.name !== srv.name && (s.protocols?.agent || s["@agent"]))
               : connect?.map((name) => serviceMap[name]).filter(Boolean) || []
 
-    if (selected.length === 0) return cdsTools
+    if (selected.length === 0) return []
 
     const mcpEntries = []
     const agentEntries = []
@@ -85,10 +91,8 @@ export default function registerDefaultAgentHandlers(srv) {
       } else LOG.warn("Failed to build external tools:", r.reason?.message ?? r.reason)
     }
 
-    return [...cdsTools, ...extraTools]
-  })
-
-  srv.after("buildTools", (tools) => tools)
+    return extraTools
+  }
 
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
@@ -96,6 +100,7 @@ export default function registerDefaultAgentHandlers(srv) {
     const name = def?.["@agent.llm"] || srv?.options?.agent?.llm || "llm"
     const options = cds.requires[name] ?? {}
     let { kind, impl } = options
+    if (req.data?.harness === 'pi') impl = "@cap-js/agents/lib/models/pi-generic" // REVISIT
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)
@@ -115,68 +120,9 @@ export default function registerDefaultAgentHandlers(srv) {
     return buildMiddleware(srv, req.data)
   })
 
-  // Default buildGraph: if agent dir with AGENTS.md exists → auto-build deep agent.
-  // Otherwise orchestrates sub-events → wires ReAct agent via langchain's createAgent.
+  // Default buildGraph: selects the harness (langchain / deepagents / pi) and builds the model, tool and agent for it
   srv.on("buildGraph", async () => {
-    const { resolveAgentDir, isDeepAgentDir } = await import("../../lib/utils/markdown.js")
-    const agentDir = resolveAgentDir(srv)
-
-    // Auto-built deep agent from AGENTS.md + skills/ convention
-    if (agentDir && isDeepAgentDir(agentDir)) {
-      const { createAutoDeepAgent } = await import("../../lib/agents/markdown/deep-agent.js")
-      return createAutoDeepAgent(srv, agentDir)
-    }
-
-    // Standard ReAct agent via langchain's createAgent
-    const { createAgent } = await import("langchain")
-    const { CdsCheckpointSaver } =
-      await import("../../lib/protocol/persistence/checkpoint-saver.js")
-    const { GraphExecutor } = await import("./graph-executor.js")
-
-    const tools = await srv.send("buildTools")
-
-    // File-IO: add a read_file tool that resolves context at invocation time.
-    // cds.context["agent.context.id"] and user.id are set by GraphExecutor before invoke.
-    if (cds.env.agents?.fileIO?.enabled) {
-      const { CdsFileStore } = await import("../../lib/protocol/persistence/file-store.js")
-      const fileStore = new CdsFileStore()
-      const readFileTool = createReadFileTool(fileStore)
-      tools.push(readFileTool)
-    }
-
-    let model = await srv.send("buildModel", { tools })
-
-    const systemPrompt = await srv.send("buildSystemPrompt")
-    const middleware = await srv.send("buildMiddleware", { tools, model })
-
-    const checkpointer = new CdsCheckpointSaver()
-
-    const agent = createAgent({
-      model,
-      tools,
-      systemPrompt,
-      middleware,
-      checkpointer,
-    })
-
-    return new GraphExecutor(agent, srv, {
-      checkpointer: false, // already set on createAgent
-      // Standard ReAct agents have no built-in recursionLimit default (LangGraph's
-      // fallback is 25, which is too low for multi-tool tasks). Deep agents go through
-      // langgraph-executor-srv.js which passes no recursionLimit → deepagents' 10000 wins.
-      recursionLimit: cds.env.agents?.recursionLimit ?? 100,
-      inputMapper: async (requestContext) => {
-        const { HumanMessage } = await import("@langchain/core/messages")
-        const text = partsToText(requestContext.userMessage?.parts)
-
-        // Append file manifest injected by GraphExecutor.execute() (fileIO path)
-        const fullText = requestContext._fileManifest
-          ? `${text}\n${requestContext._fileManifest}`
-          : text
-
-        return { messages: [new HumanMessage(fullText)] }
-      },
-    })
+    return agents.for(srv)
   })
 
   srv.on("cleanupTasks", async () => {
