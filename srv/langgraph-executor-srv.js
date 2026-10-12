@@ -23,7 +23,7 @@ export class LangGraphExecutor {
       execute: (requestContext, eventBus) => this._execute(srv, requestContext, eventBus),
       cancelTask: async (taskId, eventBus) => {
         const executor = await this._ensureExecutor(srv)
-        return executor.cancelTask(taskId, eventBus)
+        return executor.abort(taskId, eventBus)
       },
       abort: async (taskId) => {
         const executor = await this._ensureExecutor(srv)

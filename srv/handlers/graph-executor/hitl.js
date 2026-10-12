@@ -1,7 +1,8 @@
 import cds from "@sap/cds"
 import { agentMessage, firstDataPart, partsToText } from "../../../lib/utils/message-handling.js"
-import { audit, short } from "../../../lib/utils/utils.js"
+import { short } from "../../../lib/utils/utils.js"
 import * as metrics from "../../../lib/telemetry/metrics.js"
+import { setAuditMetadata } from "../../../lib/auditing.js"
 
 const LOG = cds.log("agents")
 
@@ -183,7 +184,9 @@ export function guardHitlEdits(resume, actions = []) {
     const from = original.args?.action
     const to = decision.editedAction?.args?.action
     if (to !== undefined && from !== undefined && to !== from) {
-      throw new Error(`HITL edit must not change the gated action (expected "${from}", got "${to}").`)
+      throw new Error(
+        `HITL edit must not change the gated action (expected "${from}", got "${to}").`,
+      )
     }
   })
   return resume
@@ -244,6 +247,7 @@ function interruptDescriptionFromTask(task, pending) {
 
 function publishInputRequired({ requestContext, eventBus, description, interruptData, pending }) {
   const { taskId, contextId } = requestContext
+  setAuditMetadata({ interruptData })
   eventBus.publish({
     kind: "status-update",
     taskId,
@@ -268,9 +272,7 @@ export function isTimeoutHitl(task) {
 export function publishTimeoutHitl({ requestContext, eventBus, description, serviceName }) {
   const { taskId, contextId } = requestContext
   LOG.info(serviceName, "-", "timeout awaiting decision", { conversation: short(contextId) })
-  audit("AgentInputRequired", {
-    data: { taskId, contextId, service: serviceName, reason: "timeout", description },
-  })
+  setAuditMetadata({ reason: "timeout" })
   eventBus.publish({
     kind: "status-update",
     taskId,
@@ -294,17 +296,11 @@ export async function resumeTimeoutHitl({ requestContext, eventBus, stream, sign
 
   if (/^(continue|approve|yes|confirm|ok)$/i.test(decision)) {
     LOG.info("timeout continuation approved", { conversation: short(contextId) })
-    audit("AgentTaskResumed", {
-      data: { taskId, contextId, service: cds.context?.["agent.service"], reason: "timeout" },
-    })
     const resumed = await stream(null, signal)
     return resumed.state
   }
 
   LOG.info("timeout continuation declined", { conversation: short(contextId) })
-  audit("AgentTaskCanceled", {
-    data: { taskId, contextId, service: cds.context?.["agent.service"], reason: "timeout" },
-  })
   eventBus.publish({
     kind: "status-update",
     taskId,
@@ -320,7 +316,7 @@ export async function resumeTimeoutHitl({ requestContext, eventBus, stream, sign
 }
 
 export async function resumeHitl({ requestContext, graph, config, eventBus, stream, signal }) {
-  const { taskId, contextId } = requestContext
+  const { contextId } = requestContext
   const dataPart = firstDataPart(requestContext.userMessage?.parts)
   const userText = partsToText(requestContext.userMessage?.parts)
   if (dataPart === undefined && !userText.trim()) {
@@ -358,10 +354,6 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
 
   const decisions = decisionsForAudit(resume, actionRequests)
   LOG.debug("resuming", { conversation: short(contextId), decisions })
-  audit("AgentTaskResumed", {
-    data: { taskId, contextId, service: cds.context?.["agent.service"], decisions },
-  })
-
   const originalActions = actionRequests.length
     ? actionRequests
     : await getPreInterruptToolCalls(graph, config)
@@ -381,7 +373,7 @@ export function handleHitlInterrupt({
   duration,
   onInputRequired,
 }) {
-  const { taskId, contextId } = requestContext
+  const { contextId } = requestContext
   const description = extractInterruptDescription(result)
   const interruptData = extractInterruptData(result)
   const actionRequests = interruptData?.actionRequests || interruptActionRequests(result)
@@ -390,9 +382,6 @@ export function handleHitlInterrupt({
   }
   LOG.info(serviceName, "-", "input-required", { conversation: short(contextId), duration })
   onInputRequired?.(description)
-  audit("AgentInputRequired", {
-    data: { taskId, contextId, service: serviceName, description, interruptData },
-  })
   publishInputRequired({
     requestContext,
     eventBus,

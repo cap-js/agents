@@ -1,7 +1,7 @@
 // Integration tests for the input-file size + MIME allowlist enforcement
 // added for H6 (unbounded base64 decode OOM).
 //
-// The guard lives in srv/handlers/graph-executor.js and uses
+// The guard lives in srv/handlers/graph-executor/fileIO.js and uses
 // Buffer.byteLength (O(1), zero-alloc) to reject oversized or disallowed
 // base64 payloads before Buffer.from() materializes them.
 

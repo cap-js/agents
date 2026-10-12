@@ -1,7 +1,8 @@
 import cds from "@sap/cds"
 
-const { GraphExecutor, messageText, defaultOutputMapper } =
-  await import("../../srv/handlers/graph-executor.js")
+const { GraphExecutor } = await import("../../srv/handlers/graph-executor.js")
+const { messageText, defaultOutputMapper } =
+  await import("../../srv/handlers/graph-executor/helpers.js")
 const { agentMessage } = await import("../../lib/utils/message-handling.js")
 const { summarizePartialWork } = await import("../../lib/agents/summarize-on-timeout.js")
 const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote, requiresHitl } =
