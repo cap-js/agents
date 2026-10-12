@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { generateTools, toPiTools } from "./tools.js"
+import { generateTools, toPiTools } from "../../lib/agents/tools.js"
 import { buildSystemPrompt } from "./system-prompt.js"
 import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"

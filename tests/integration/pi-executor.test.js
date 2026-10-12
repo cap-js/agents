@@ -9,7 +9,7 @@ import {
 
 import PiModel from "../../lib/models/pi-generic.js"
 import PiExecutor from "../../lib/protocol/pi-executor.js"
-import { toPiTools } from "../../srv/handlers/tools.js"
+import { toPiTools } from "../../lib/agents/tools.js"
 
 describe("Pi executor", () => {
   it("adapts existing structured tools to the Pi tool contract", async () => {

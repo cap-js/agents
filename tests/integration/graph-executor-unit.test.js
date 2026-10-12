@@ -7,7 +7,7 @@ const { summarizePartialWork } = await import("../../lib/agents/summarize-on-tim
 const { parseResumeDecision, extractInterruptData, composeHitlDecisionNote, requiresHitl } =
   await import("../../srv/handlers/graph-executor/hitl.js")
 const { firstDataPart } = await import("../../lib/utils/message-handling.js")
-const { createEmitDataPartTool } = await import("../../srv/handlers/tools.js")
+const { createEmitDataPartTool } = await import("../../lib/agents/tools.js")
 
 const fakeEventBus = { publish: () => {}, finished: () => {} }
 
