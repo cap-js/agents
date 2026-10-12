@@ -1,18 +1,14 @@
 import cds from "@sap/cds"
 import { context, trace } from "@opentelemetry/api"
 import { short, ms4 } from "../../lib/utils/utils.js"
-import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
-import * as metrics from "../../lib/telemetry/metrics.js"
-import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
+import { agentMessage } from "../../lib/utils/message-handling.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
 import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
 import { COLLECT_RESULT } from "./chat.js"
-import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
 import {
   handleHitlInterrupt,
   isTimeoutHitl,
-  publishTimeoutHitl,
   requiresHitl,
   resumeHitl,
   resumeTimeoutHitl,
@@ -26,7 +22,14 @@ import {
   messageText,
 } from "./graph-executor/helpers.js"
 import { createFileStore, persistInputFiles, publishOutputFiles } from "./graph-executor/fileIO.js"
-import { aggregateUsageData, recordUsage } from "./graph-executor/usage.js"
+import { aggregateUsageData } from "./graph-executor/usage.js"
+import { handleWorkflowError } from "./graph-executor/error.js"
+import {
+  startWorkflowSpan,
+  telemetryBeforeWorkflow,
+  telemetryAfterWorkflowSuccess,
+  telemetryAfterWorkflowError,
+} from "./graph-executor/telemetry.js"
 
 const LOG = cds.log("agents")
 
@@ -276,8 +279,7 @@ class GraphExecutor {
   }
 
   async execute(requestContext, eventBus) {
-    const tracer = metrics.getTracer()
-    const span = tracer?.startSpan(`workflow CompiledStateGraph ${this._srv.name}`)
+    const span = startWorkflowSpan(this._srv.name)
     if (span && !cds.context["_mlflow.rootSpan"]) cds.context["_mlflow.rootSpan"] = span
     const activeContext = span ? trace.setSpan(context.active(), span) : context.active()
     try {
@@ -315,7 +317,7 @@ class GraphExecutor {
         `${serviceName}:${contextId}`,
       )
     }
-    metrics.concurrentExecutions.add(1, metrics.attrs(serviceName))
+    telemetryBeforeWorkflow()
     return graph
   }
 
@@ -388,54 +390,11 @@ class GraphExecutor {
     const serviceName = cds.context["agent.service"]
     const taskId = cds.context["agent.task.id"]
     const contextId = cds.context["agent.context.id"]
-    const mAttrs = metrics.attrs(serviceName)
-    const span = trace.getActiveSpan()
-    if (span) {
-      span.setAttribute("gen_ai.operation.name", "invoke_agent")
-      span.setAttribute("gen_ai.agent.name", serviceName)
-      span.setAttribute("agent.task.id", taskId)
-      span.setAttribute("agent.context.id", contextId)
-      span.setAttribute("agent.service", serviceName)
-      // MLflow: workflow span carries AGENT type + inputs for the
-      // span-detail view
-      span.setAttribute("mlflow.message.format", "langchain-js")
-      setSpanAttrs(
-        span,
-        mlflowAttrs("AGENT", {
-          inputs: { messages: buildChatMessages(requestContext) },
-          functionName: serviceName,
-        }),
-      )
-      const rootSpan = cds.context["_mlflow.rootSpan"]
-      rootSpan.setAttribute("agent.task.id", cds.context["agent.task.id"])
-      rootSpan.setAttribute("agent.context.id", cds.context["agent.context.id"])
-      rootSpan.setAttribute("agent.service", cds.context["agent.service"])
-      // MLflow: trace correlation on the OTel root span.
-      // - mlflow.spanInputs → Request column in the trace list
-      // - session.id / user.id / mlflow.traceTag.* (via mlflowTraceAttrs) → session
-      //   and tag columns in the trace list.
-      const userText = partsToText(requestContext.userMessage?.parts)
-      setSpanAttrs(
-        rootSpan,
-        mlflowAttrs("CHAIN", {
-          // In case rootSpan is HTTP keep its name, if no name yet given fallback to service
-          functionName: rootSpan.name ?? serviceName,
-          inputs:
-            userText !== undefined
-              ? { messages: [{ role: "user", content: userText }] }
-              : undefined,
-        }),
-      )
-      setSpanAttrs(rootSpan, mlflowTraceAttrs())
-      // Required for MLFLow run linking
-      const evalRunId = cds.context?.["_mlflow.evalRunId"]
-      if (evalRunId) {
-        rootSpan.setAttribute("mlflow.sourceRun", evalRunId)
-        span.setAttribute("mlflow.sourceRun", evalRunId)
-      }
-    }
     let usageData
     let result
+    let outcome
+    let output
+    let workflowError
     try {
       eventBus.publish({
         kind: "status-update",
@@ -477,47 +436,19 @@ class GraphExecutor {
           serviceName,
           duration,
           onInputRequired: (description) => {
-            if (!span) return
-            span.setAttribute("agent.outcome", "input-required")
-            const outputs = {
-              choices: [{ message: { role: "assistant", content: description } }],
-            }
-            setSpanAttrs(span, mlflowAttrs("AGENT", { outputs }))
-            setSpanAttrs(cds.context?.["_mlflow.rootSpan"], mlflowAttrs("CHAIN", { outputs }))
+            outcome = "input-required"
+            output = description
           },
         })
         return
       }
       const outputMapper = this._outputMapper || defaultOutputMapper
-      const output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
+      output = resolvePseudonyms(outputMapper(result)) || "I could not generate a response."
       LOG.info(serviceName, "completed", {
         conversation: short(contextId),
         duration,
       })
-      if (span) {
-        span.setAttribute("agent.outcome", "completed")
-        setSpanAttrs(
-          span,
-          mlflowAttrs("AGENT", {
-            outputs: {
-              choices: [{ message: { role: "assistant", content: output } }],
-            },
-            functionName: serviceName,
-          }),
-        )
-      }
-      const rootSpan = cds.context?.["_mlflow.rootSpan"]
-      if (rootSpan) {
-        setSpanAttrs(
-          rootSpan,
-          mlflowAttrs("CHAIN", {
-            outputs: {
-              choices: [{ message: { role: "assistant", content: output } }],
-            },
-          }),
-        )
-      }
-      metrics.workflowsCompleted.add(1, mAttrs)
+      outcome = "completed"
       // Final artifact: authoritative full response text. Emitted as an event-level
       // replace (append:false) so it never doubles the incrementally-streamed tokens
       // and always leaves Task.artifacts with the complete, correct text — for both
@@ -567,99 +498,20 @@ class GraphExecutor {
         metadata: responseMetadata,
       })
     } catch (err) {
-      await this._handleWorkflowError(err)
+      workflowError = err
+      await handleWorkflowError(this, err)
     } finally {
-      // setSpanAttrs must happen at the end for the linking as else prompt might not yet have been created
-      setSpanAttrs(cds.context["_mlflow.rootSpan"], linkTraceToPrompt())
       this._abortControllers.delete(taskId)
       this._taskTenants.delete(taskId)
-      metrics.concurrentExecutions.add(-1, mAttrs)
-      recordUsage({
+      const telemetry = {
         graph: await this._graph,
         result,
         usageData,
-      })
+      }
+      if (workflowError) telemetryAfterWorkflowError({ ...telemetry, err: workflowError })
+      else telemetryAfterWorkflowSuccess({ ...telemetry, outcome, output })
       eventBus.finished()
     }
-  }
-
-  async _handleWorkflowError(err) {
-    const requestContext = cds.context["agent"].request
-    const eventBus = cds.context["agent.eventBus"]
-    const serviceName = cds.context["agent.service"]
-    const taskId = cds.context["agent.task.id"]
-    const contextId = cds.context["agent.context.id"]
-    const span = trace.getActiveSpan()
-    const outcome =
-      err.name === "AbortError"
-        ? "canceled"
-        : err.name === "TimeoutError"
-          ? "input-required"
-          : err.quotaExceeded
-            ? "quota_exceeded"
-            : "failed"
-    if (span) {
-      span.setAttribute("agent.outcome", outcome)
-      span.setStatus({ code: 2, message: err.message })
-    }
-    if (err.name === "AbortError") {
-      LOG.info(serviceName, "-", "canceled", {
-        conversation: short(contextId),
-      })
-      this._publishFinalStatus("canceled", "Task canceled.")
-      return
-    }
-    if (err.name === "TimeoutError") {
-      LOG.warn(serviceName, "-", "timeout", { conversation: short(contextId) })
-      const summary = await this._summarizePartialWork(taskId, contextId, serviceName, "timeOut")
-      publishTimeoutHitl({
-        requestContext,
-        eventBus,
-        description: summary,
-        serviceName,
-      })
-      return
-    }
-    if (err.quotaExceeded) {
-      LOG.warn(serviceName, "-", "quota exceeded", {
-        conversation: short(contextId),
-        error: err.message,
-      })
-      metrics.errorsTotal.add(1, {
-        ...metrics.attrs(serviceName),
-        "agent.error.code": "quota_exceeded",
-      })
-      const summary = await this._summarizePartialWork(taskId, contextId, serviceName, "quota")
-      this._publishFinalStatus("canceled", summary)
-      return
-    }
-    LOG.error(Object.assign(err, { conversation: short(contextId) }))
-    const errorCode = err.message?.includes("timed out") ? "timeout" : "execution_failed"
-    metrics.errorsTotal.add(1, {
-      ...metrics.attrs(serviceName),
-      "agent.error.code": errorCode,
-    })
-    const production = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
-    const message =
-      production && err.$sanitize !== false
-        ? cds.i18n.messages.at(500) || "Internal Server Error"
-        : `Agent error: ${err.message}`
-    this._publishFinalStatus("failed", message)
-  }
-
-  _publishFinalStatus(state, message) {
-    const eventBus = cds.context["agent.eventBus"]
-    eventBus.publish({
-      kind: "status-update",
-      taskId: cds.context["agent.task.id"],
-      contextId: cds.context["agent.context.id"],
-      status: {
-        state,
-        message: agentMessage(message),
-        timestamp: new Date().toISOString(),
-      },
-      final: true,
-    })
   }
 }
 
