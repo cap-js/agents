@@ -698,6 +698,15 @@
       const AGENT_URL = window.location.pathname.replace(/\/preview\/?$/, "") + "/"
       const AUTH_HEADER = document.querySelector('meta[name="a2a-auth"]')?.content || ""
 
+      const uuidv4 = _ =>
+        "10000000-1000-4000-8000-100000000000"
+          .replace(
+            /[018]/g,
+            c => (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
+          )
+
+      const generateUUID = crypto.randomUUID ?? uuidv4
+
       const fetchCsrfToken = async () => {
         if (document.csrfToken === undefined) {
           const res = await fetch("/", {
@@ -1361,11 +1370,11 @@
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: useStreaming ? "message/stream" : "message/send",
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               params: {
                 message: {
                   role: "user",
-                  messageId: crypto.randomUUID(),
+                  messageId: generateUUID(),
                   taskId,
                   contextId,
                   parts: [{ kind: "text", text: decision }],
@@ -1512,11 +1521,11 @@
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: useStream ? "message/stream" : "message/send",
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               params: {
                 message: {
                   role: "user",
-                  messageId: crypto.randomUUID(),
+                  messageId: generateUUID(),
                   ...(contextId ? { contextId } : {}),
                   parts: [{ kind: "text", text }],
                   metadata: {
@@ -1722,7 +1731,7 @@
             body: JSON.stringify({
               jsonrpc: "2.0",
               method: "tasks/cancel",
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               params: { id: taskId },
             }),
           }).catch(() => {})
