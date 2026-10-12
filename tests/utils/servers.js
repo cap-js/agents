@@ -44,13 +44,15 @@ export function isPortOpen(port) {
  * @param {string} cwd   - Directory of the CAP app to start
  * @param {number} port  - Expected listening port
  * @param {string} label - Human-readable label for error messages
+ * @param {object} [options] - Child process options
+ * @param {object} [options.env] - Environment overrides
  * @returns {Promise<import("node:child_process").ChildProcess>}
  */
-export function startServer(cwd, port, label) {
+export function startServer(cwd, port, label, { env = {} } = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn("npx", ["cds-serve"], {
       cwd,
-      env: { ...process.env, FORCE_COLOR: "false", NODE_ENV: "development" },
+      env: { ...process.env, FORCE_COLOR: "false", NODE_ENV: "development", ...env },
       stdio: ["ignore", "pipe", "pipe"],
     })
 
@@ -98,8 +100,10 @@ export function startServer(cwd, port, label) {
  *
  * @param {import("node:child_process").ChildProcess|null} proc
  * @param {string} cwd - Directory to clean up SQLite files from
+ * @param {object} [options]
+ * @param {boolean} [options.cleanDb=true] - Remove generated SQLite files
  */
-export async function stopServer(proc, cwd) {
+export async function stopServer(proc, cwd, { cleanDb = true } = {}) {
   if (!proc) return
   if (proc.exitCode == null) {
     proc.kill()
@@ -108,6 +112,7 @@ export async function stopServer(proc, cwd) {
       new Promise((resolve) => setTimeout(resolve, 5_000)),
     ])
   }
+  if (!cleanDb) return
   try {
     for (const f of readdirSync(cwd).filter((f) => /^db.*\.sqlite(-shm|-wal)?$/.test(f))) {
       try {

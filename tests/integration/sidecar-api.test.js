@@ -81,8 +81,10 @@ describe("@cap-js/agent - Sidecar Support", () => {
       assert.ok(tools.length > 0)
       assert.ok("query" in toolMap)
       assert.ok("describe" in toolMap)
-      assert.ok("submitOrder" in toolMap)
-      assert.ok("getStock" in toolMap)
+      if (cds.env.mcp?.per_action_tool) {
+        assert.ok("submitOrder" in toolMap)
+        assert.ok("getStock" in toolMap)
+      }
     })
   })
 

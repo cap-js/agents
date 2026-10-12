@@ -2,6 +2,7 @@
   "name": "agent-mtx-app",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
     "@cap-js/sqlite": ">=1",
@@ -17,6 +18,16 @@
       "extensibility": false,
       "[with-mtx]": {
         "multitenancy": true
+      },
+      "llm": {
+        "kind": "aicore",
+        "model": "gpt-5.5",
+        "contentFilter": false
+      },
+      "another-llm": {
+        "kind": "aicore",
+        "model": "gpt-5.6-terra",
+        "contentFilter": false
       },
       "auth": {
         "kind": "mocked",

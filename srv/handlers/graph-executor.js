@@ -19,6 +19,7 @@ import {
   resumeHitl,
   resumeTimeoutHitl,
 } from "./graph-executor/hitl.js"
+import { registerShutdownHook } from "./graph-executor/crash-handler.js"
 
 const LOG = cds.log("agents")
 
@@ -145,6 +146,9 @@ class GraphExecutor {
     this._recursionLimit = options.recursionLimit ?? null
     /** @type {Map<string, AbortController>} per-task abort controllers */
     this._abortControllers = new Map()
+    /** @type {Map<string, string | undefined>} task tenant by task ID */
+    this._taskTenants = new Map()
+    registerShutdownHook(this)
   }
 
   /**
@@ -199,6 +203,7 @@ class GraphExecutor {
     // final visual (collapse to the last turn's bubble at task completion).
     let currentMsgId = null
     let thinkingCount = 0
+    let thinkingMsgId = null
     // Holds a trailing fragment of the previous chunk that is a prefix of a known
     // pseudonym hash. Prepended to the next chunk so split hashes are resolved correctly.
     let pendingPrefix = ""
@@ -247,6 +252,9 @@ class GraphExecutor {
           pendingPrefix = ""
           if (!raw) continue
 
+          if (thinkingMsgId !== null && currentMsgId !== thinkingMsgId) thinkingCount++
+          thinkingMsgId = currentMsgId
+
           // Hashes look like name-8hexchars and never contain spaces.
           // On non-last chunks, slice last token and append to next chunk
           // to avoid unresolved boundaries
@@ -275,7 +283,6 @@ class GraphExecutor {
               parts: [{ kind: "text", text }],
             },
           })
-          if (lastChunk) thinkingCount++
           tokenCount++
         } else if (mode === "updates") {
           // The updates stream yields per-node deltas — { <node>: { messages: [oneNewMessage] } },
@@ -382,8 +389,6 @@ class GraphExecutor {
         reason,
         checkpointer: this._graph?.checkpointer,
         getModel: () => this._srv.send("buildModel"),
-        // Summary runs after graph abort, so no execution-time grace is needed.
-        timeout: 10_000,
       }),
     )
   }
@@ -397,6 +402,7 @@ class GraphExecutor {
     // Cooperative cancellation: per-task AbortController
     const controller = new AbortController()
     this._abortControllers.set(taskId, controller)
+    this._taskTenants.set(taskId, cds.context?.tenant)
 
     // A2A context for tracing
     if (!cds.context) {
@@ -406,6 +412,7 @@ class GraphExecutor {
     cds.context["agent.context.id"] = contextId
     cds.context["agent.service"] = serviceName
     cds.context["agent.eventBus"] = eventBus
+    cds.context["agent.request.metadata"] = requestContext.userMessage?.metadata ?? {}
 
     // REVISIT: Resolve graph early for pseudonymizeUserMessage. Mid-term move into beforeAgent together with Audit & Telemetry which rely on it
     const graph = await this._resolveGraph()
@@ -1052,6 +1059,7 @@ class GraphExecutor {
         setSpanAttrs(rootSpan, linkTraceToPrompt())
 
         this._abortControllers.delete(taskId)
+        this._taskTenants.delete(taskId)
         metrics.concurrentExecutions.add(-1, mAttrs)
 
         // Update task record with usage data (non-blocking, best effort)

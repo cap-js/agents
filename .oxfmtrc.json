@@ -1,0 +1,7 @@
+{
+  "tabWidth": 2,
+  "semi": false,
+  "printWidth": 100,
+  "trailingComma": "all",
+  "ignorePatterns": ["**/__snapshots__", "lib/models/anthropic.js"]
+}

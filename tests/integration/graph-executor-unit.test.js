@@ -80,10 +80,10 @@ describe("summarizePartialWork", () => {
       }),
     })
 
-    expect(messages).toHaveLength(1)
+    expect(messages).toHaveLength(2)
     expect(messages[0]._getType()).toBe("human")
     expect(messages[0].content).toContain("within its time limit")
-    expect(messages[0].content).toContain("Which books are on offer?")
+    expect(messages[1].content).toContain("Which books are on offer?")
     expect(summary).toBe("Catalog checked. Continue running or stop?")
   })
 
@@ -389,12 +389,13 @@ describe("parseResumeDecision", () => {
 describe("composeHitlDecisionNote", () => {
   const originalCall = { id: "tc-1", name: "submitOrder", args: { book: 201, quantity: 3 } }
 
-  it("does not inject a note for approval or rejection", () => {
+  it("injects a note describing user rejections (ignoring approvals)", () => {
     const note = composeHitlDecisionNote(
       [originalCall, { name: "submitOrder", args: { book: 207, quantity: 1 } }],
       { decisions: [{ type: "approve" }, { type: "reject", message: "reject" }] },
     )
-    expect(note).toBeUndefined()
+    expect(note).toContain("User explicitly rejected")
+    expect(note).toContain('"book":207')
   })
 
   it("describes user edits and ignores opaque resumes", () => {

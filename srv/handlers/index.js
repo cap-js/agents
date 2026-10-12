@@ -5,6 +5,7 @@ import buildMiddleware from "../../lib/agents/middleware/index.js"
 import { partsToText } from "../../lib/utils/message-handling.js"
 import { cleanupExpiredTasks } from "../../lib/protocol/persistence/cleanup.js"
 import { registerChat } from "./chat.js"
+import { effectiveDefinition } from "../../lib/utils/utils.js"
 
 const LOG = cds.log("agents")
 
@@ -91,12 +92,16 @@ export default function registerDefaultAgentHandlers(srv) {
 
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
-    const name = srv?.options?.agent?.llm || srv?.definition?.["@agent.llm"] || "llm"
+    const def = effectiveDefinition(srv)
+    const name = def?.["@agent.llm"] || srv?.options?.agent?.llm || "llm"
     const options = cds.requires[name] ?? {}
     let { kind, impl } = options
     if (!impl) impl = cds.requires.kinds[kind]?.impl
     if (!impl) throw new Error("No service implementation found for " + name)
     const { default: LLMProvider } = await import(impl)
+    const { credentials, ...o } = options
+    if (credentials) o.credentials = '{ *** }'
+    LOG.debug (`Creating LLMProvider instance for cds.requires.${name} with options:`, o)
     return new LLMProvider(name, { ...options, ...req.data })
   })
 

@@ -19,7 +19,7 @@ export default class LoopingSqlService extends cds.ApplicationService {
     const { AIMessage } = await import("@langchain/core/messages")
 
     const tools = await srv.send("buildTools")
-    const middleware = await srv.send("buildMiddleware")
+    const middleware = await srv.send("buildMiddleware", { tools })
 
     // Mock model that always returns a SQL-format query tool call (forces looping)
     let iteration = 0

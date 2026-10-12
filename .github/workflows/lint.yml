@@ -1,4 +1,4 @@
-name: Lint & Prettier
+name: Lint
 
 on:
   merge_group:
@@ -24,4 +24,3 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run docs:audit:check
-      - run: npm run prettier:check
