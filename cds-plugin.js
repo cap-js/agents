@@ -103,11 +103,10 @@ cds.on("bootstrap", (app) => {
 
 if (cds.env.requires?.telemetry)
   !(function telemetry() {
-    // Schedule active_users metric computation + MLflow exporter
     cds.on("served", async () => {
-      const { setupActiveUsersMetric } = await import("./lib/telemetry/active-users.js")
+      const { setupGaugeMetrics } = await import("./lib/telemetry/gauge-metrics.js")
       const { setupTraceScrubbing } = await import("./lib/telemetry/span-masking.js")
-      setupActiveUsersMetric()
+      setupGaugeMetrics()
       await setupTraceScrubbing()
       // Defer LangChain patching so the CDS model is fully loaded before patches land.
       // opt-out via cds.env.agents.trace_langchain = false

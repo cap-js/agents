@@ -9,6 +9,7 @@ import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
 import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
 import { triggerCleanup } from "../../lib/protocol/persistence/cleanup.js"
+import { triggerGaugeMetrics } from "../../lib/telemetry/gauge-metrics.js"
 import { COLLECT_RESULT } from "./chat.js"
 import { linkTraceToPrompt } from "../../lib/telemetry/mlflow/tracing.js"
 import {
@@ -455,9 +456,12 @@ class GraphExecutor {
       audit("AgentTaskStarted", {
         data: { taskId, contextId, service: serviceName, userMessage: requestContext.userMessage },
       })
-      // Lazy scheduling task deletion
+      // Lazy scheduling task deletion & reporting metrics
       cds.spawn({}, async () => {
         await triggerCleanup(serviceName)
+        if (cds.env.requires?.telemetry) {
+          await triggerGaugeMetrics(serviceName)
+        }
       })
     }
 
