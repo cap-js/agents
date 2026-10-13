@@ -118,6 +118,16 @@ export async function buildMcpToolsFromConnection(serviceName) {
       LOG.debug(`Resolved destination "${destinationName}"`, { headerKeys: Object.keys(headers) })
       return headers
     }
+    if (typeof credentials === "object" && credentials?.forwardAuthToken) {
+      try {
+        const { retrieveJwt } = await import("@sap-cloud-sdk/connectivity")
+        const jwt = retrieveJwt(cds.context?.http?.req)
+        if (jwt) return { Authorization: `Bearer ${jwt}` }
+        LOG.warn(`Missing JWT token for forwardAuthToken on service "${serviceName}"`)
+      } catch (err) {
+        LOG.warn(`Could not retrieve inbound JWT for "${serviceName}", falling back: ${err.message}`)
+      }
+    }
     const token = credentials?.authTokens?.[0]?.value
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
