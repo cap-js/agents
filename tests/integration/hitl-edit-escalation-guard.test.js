@@ -12,21 +12,27 @@ describe("HITL edit escalation guard", () => {
   })
 
   it("allows a parameters-only edit (action omitted)", () => {
-    const resume = { decisions: [{ type: "edit", editedAction: { args: { parameters: { quantity: 4 } } } }] }
+    const resume = {
+      decisions: [{ type: "edit", editedAction: { args: { parameters: { quantity: 4 } } } }],
+    }
     expect(() => guardHitlEdits(resume, [genericCall("submitOrder")])).not.toThrow()
     expect(guardHitlEdits(resume, [genericCall("submitOrder")])).toBe(resume)
   })
 
   it("allows an edit that keeps the same action", () => {
     const resume = {
-      decisions: [{ type: "edit", editedAction: { args: { action: "submitOrder", parameters: {} } } }],
+      decisions: [
+        { type: "edit", editedAction: { args: { action: "submitOrder", parameters: {} } } },
+      ],
     }
     expect(() => guardHitlEdits(resume, [genericCall("submitOrder")])).not.toThrow()
   })
 
   it("rejects an edit that swaps args.action to a different action", () => {
     const resume = {
-      decisions: [{ type: "edit", editedAction: { args: { action: "deleteEverything", parameters: {} } } }],
+      decisions: [
+        { type: "edit", editedAction: { args: { action: "deleteEverything", parameters: {} } } },
+      ],
     }
     expect(() => guardHitlEdits(resume, [genericCall("submitOrder")])).toThrow(
       /must not change the gated action.*submitOrder.*deleteEverything/,
