@@ -29,8 +29,10 @@ export class LangGraphExecutor {
         return executor.cancelTask(taskId, eventBus)
       },
       abort: async (taskId) => {
+        // REVISIT: abort is not part of a2a executors
+        // It is only used in our own abortOnClose, which may often not be the wanted behavior
         const executor = await this._ensureExecutor(srv)
-        return executor.abort(taskId)
+        return executor.abort?.(taskId)
       },
     }
   }
