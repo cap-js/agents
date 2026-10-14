@@ -1,110 +1,90 @@
-import { describe, expect, it, vi } from "vitest"
-import z from "zod"
+import cds from "@sap/cds"
 import { createModels } from "@earendil-works/pi-ai"
-import {
-  fauxAssistantMessage,
-  fauxProvider,
-  fauxToolCall,
-} from "@earendil-works/pi-ai/providers/faux"
+import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux"
+import createHelpers from "../utils/helpers.js"
 
-import PiModel from "../../lib/models/pi-generic.js"
-import PiExecutor from "../../lib/protocol/pi-executor.js"
-import { toPiTools } from "../../lib/agents/tools.js"
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
+const { sendMessage } = createHelpers({ POST, axios })
 
-describe("Pi executor", () => {
-  it("adapts existing structured tools to the Pi tool contract", async () => {
-    const invoke = vi.fn(async ({ title }) => `created ${title}`)
-    const piTools = toPiTools([
-      {
-        name: "create_book",
-        description: "Create a book",
-        schema: z.object({ title: z.string() }),
-        invoke,
-      },
-      { name: "secret", invoke, isAllowed: () => false },
-    ])
-    const [tool] = piTools
+const faux = fauxProvider({ provider: "anthropic", models: [{ id: "claude-faux" }] })
+const models = createModels()
+models.setProvider(faux.provider)
+const [fauxModel] = faux.models
 
-    expect(piTools).toHaveLength(1)
-    expect(tool.parameters.type).toBe("object")
-    expect(tool.parameters.properties.title.type).toBe("string")
-    expect(await tool.execute("call-1", { title: "Dune" })).toEqual({
-      content: [{ type: "text", text: "created Dune" }],
-      details: {},
-    })
-    expect(invoke).toHaveBeenCalledWith({ title: "Dune" }, { signal: undefined })
-  })
+function setResponses(responses) {
+  faux.setResponses(responses)
+}
 
-  it("configures a Pi model through pi-generic with a built-in provider", async () => {
-    const llm = new PiModel("pi-test-llm", {
-      kind: "anthropic",
-      model: "claude-sonnet-4-6",
-      credentials: {
-        apiKey: "secret",
-        url: "https://example.test",
-      },
-    })
-
-    expect(llm.name).toBe("pi-test-llm")
-    expect(llm.model).toMatchObject({ id: "claude-sonnet-4-6", baseUrl: "https://example.test" })
-    expect(llm.getApiKey()).toBe("secret")
-    expect(llm.streamFn).toBeTypeOf("function")
-  })
-
-  it("runs tools, streams, and completes an A2A task with the real Pi Agent", async () => {
-    const faux = fauxProvider({ provider: "anthropic", models: [{ id: "claude-test" }] })
-    faux.setResponses([
-      fauxAssistantMessage(fauxToolCall("lookup", { id: 7 })),
-      fauxAssistantMessage("Hello from Pi"),
-    ])
-    const models = createModels()
-    models.setProvider(faux.provider)
-
-    const invoke = vi.fn(async ({ id }) => `found ${id}`)
-    const piTools = toPiTools([
-      {
-        name: "lookup",
-        description: "Look up an ID",
-        schema: z.object({ id: z.number() }),
-        invoke,
-      },
-    ])
-    const srv = {
-      name: "PiTestService",
-      send: vi.fn(async (event) =>
-        event === "buildModel"
-          ? {
-              model: models.getModel("anthropic", "claude-test"),
-              streamFn: models.streamSimple.bind(models),
-            }
-          : event === "buildTools"
-            ? piTools
-            : "Be helpful",
-      ),
+describe("@cap-js/agents - Pi executor integration (harness: pi)", () => {
+  beforeAll(async () => {
+    cds.env.agents ??= {}
+    cds.env.agents.harness = 'pi'
+    if (global.cds && global.cds !== cds) {
+      global.cds.env.agents ??= {}
+      global.cds.env.agents.harness = 'pi'
     }
 
-    const { default: create } = await import("../../lib/agents/pi.js")
-    const { factory } = await create(srv)
-    const executor = new PiExecutor(factory, srv)
-
-    const events = []
-    const eventBus = { publish: (event) => events.push(event), finished: vi.fn() }
-
-    await executor.execute(
-      {
-        taskId: "task-1",
-        contextId: "context-1",
-        userMessage: { parts: [{ kind: "text", text: "hello" }] },
-      },
-      eventBus,
+    // Get the service and prepend our faux buildModel handler before the executor
+    // is built. The executor cache is empty at this point (no requests yet).
+    const srv = await cds.connect.to("PiAgentService")
+    srv.prepend((s) =>
+      s.on("buildModel", () => ({
+        model: models.getModel(fauxModel.provider, fauxModel.id),
+        streamFn: models.streamSimple.bind(models),
+        getApiKey: () => "test-key",
+      }))
     )
 
-    expect(events.some((e) => e.kind === "task" && e.status?.state === "working")).toBe(true)
-    expect(events.at(-1)).toMatchObject({ kind: "task", status: { state: "completed" } })
-    expect(invoke).toHaveBeenCalledWith(
-      { id: 7 },
-      expect.objectContaining({ signal: expect.anything() }),
-    )
-    expect(eventBus.finished).toHaveBeenCalledOnce()
+    setResponses([fauxAssistantMessage("warmup")])
+    await sendMessage("pi-agent", "warmup")
+  })
+
+  it("completes a task and returns a completed status via the A2A endpoint", async () => {
+    setResponses([fauxAssistantMessage("Books retrieved successfully")])
+
+    const res = await sendMessage("pi-agent", "List available books")
+
+    expect(res.status).toBe(200)
+    const task = res.data.result
+    expect(task).not.toBe(undefined)
+    expect(typeof task.id).toBe("string")
+    expect(task.status.state).toBe("completed")
+  })
+
+  it("invokes a tool call and resumes to produce the final answer", async () => {
+    setResponses([
+      fauxAssistantMessage(fauxToolCall("query", { cql: "SELECT * FROM Books LIMIT 3" })),
+      fauxAssistantMessage("Here are the books from the catalog"),
+    ])
+
+    const res = await sendMessage("pi-agent", "What books are in the catalog?")
+
+    expect(res.status).toBe(200)
+    const task = res.data.result
+    expect(task.status.state).toBe("completed")
+  })
+
+  it("maintains conversation across multiple turns with the same contextId", async () => {
+    setResponses([fauxAssistantMessage("Sure, here are the books")])
+    const res1 = await sendMessage("pi-agent", "Show me books")
+    const contextId = res1.data.result.contextId
+
+    setResponses([fauxAssistantMessage("Here are more details")])
+    const res2 = await sendMessage("pi-agent", "Tell me more", { contextId })
+
+    expect(res2.data.result.contextId).toBe(contextId)
+    expect(res2.data.result.id).not.toBe(res1.data.result.id)
+    expect(res2.data.result.status.state).toBe("completed")
+  })
+
+  it("returns a failed status when the Pi agent encounters an error", async () => {
+    setResponses([fauxAssistantMessage("", { errorMessage: "Simulated Pi error" })])
+
+    const res = await sendMessage("pi-agent", "Trigger an error")
+
+    expect(res.status).toBe(200)
+    const task = res.data.result
+    expect(task.status.state).toBe("failed")
+    expect(task.status.message.parts[0].text).toBeTruthy()
   })
 })
