@@ -183,7 +183,9 @@ export function guardHitlEdits(resume, actions = []) {
     const from = original.args?.action
     const to = decision.editedAction?.args?.action
     if (to !== undefined && from !== undefined && to !== from) {
-      throw new Error(`HITL edit must not change the gated action (expected "${from}", got "${to}").`)
+      throw new Error(
+        `HITL edit must not change the gated action (expected "${from}", got "${to}").`,
+      )
     }
   })
   return resume
