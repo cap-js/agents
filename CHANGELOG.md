@@ -4,7 +4,15 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.8 - tbd
+## Version 0.9.9 - tbd
+
+### Fixed
+
+- Improved checkpointer by not persisting verbose model state
+- `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
+- Deal with potentially missing crypto.randomUUID fn
+
+## Version 0.9.8 - 2026-10-04
 
 ### Added
 
