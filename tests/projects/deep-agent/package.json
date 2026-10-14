@@ -7,7 +7,7 @@
     "@cap-js/agents": "file:../../../",
     "@cap-js/audit-logging": "^1.3.0",
     "@cap-js/sqlite": "*",
-    "@cap-js/telemetry": "^2",
+    "@cap-js/telemetry": "^2.1.0",
     "@langchain/core": "^1",
     "@langchain/langgraph": "^1",
     "@sap-ai-sdk/langchain": "^2",
