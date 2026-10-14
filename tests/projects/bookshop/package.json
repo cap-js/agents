@@ -12,7 +12,7 @@
     "@cap-js/hana": "^3.1.1",
     "@cap-js/mcp": "^1",
     "@cap-js/telemetry": "^2",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.223.0",
     "@sap/cds": "^10.1.1",
     "@sap/xssec": "^4",
     "zod": "^4.3.6"
