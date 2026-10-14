@@ -6,6 +6,10 @@
 
 ## Version 0.9.9 - tbd
 
+### Added
+
+- Very experimental and limited support for pi agents
+
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state
