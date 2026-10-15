@@ -134,7 +134,6 @@
         ]
       },
       "persistAllCheckpointWrites": false,
-      "activeUsersInterval": "24h",
       "circuitBreaker": {
         "errorThresholdPercentage": 50,
         "volumeThreshold": 10,

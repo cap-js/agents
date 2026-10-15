@@ -340,13 +340,13 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
   })
 
-  describe("active_users metric", () => {
+  describe("gauge metrics", () => {
     it("should compute active users and report gauge via metrics flush", async () => {
       await sendMessage("graph-book", "user activity 1")
       await sendMessage("graph-book", "user activity 2")
 
-      const { computeActiveUsers } = await import("../../lib/telemetry/active-users.js")
-      await computeActiveUsers()
+      const { computeGaugeMetrics } = await import("../../lib/telemetry/gauge-metrics.js")
+      await computeGaugeMetrics()
 
       // Flush metrics — ObservableGauge callback should report cached values
       const { metrics } = await import("@opentelemetry/api")
@@ -360,21 +360,60 @@ describe("@cap-js/agents - Quota enforcement", () => {
       expect(output).toMatch(/GraphBookService/)
     })
 
-    it("should have activeUsersInterval configured", () => {
-      expect(cds.env.agents.activeUsersInterval).not.toBe(undefined)
-      expect(cds.env.agents.activeUsersInterval).not.toBe(0)
+    it("should report conversation count and average conversation length", async () => {
+      const agentService = `GaugeMetricsTest-${cds.utils.uuid()}`
+      const contextA = cds.utils.uuid()
+      const contextB = cds.utils.uuid()
+      await INSERT.into("cap.agent.Tasks").entries([
+        {
+          taskId: cds.utils.uuid(),
+          contextId: contextA,
+          agentService,
+          state: "completed",
+          data: "{}",
+        },
+        {
+          taskId: cds.utils.uuid(),
+          contextId: contextA,
+          agentService,
+          state: "completed",
+          data: "{}",
+        },
+        {
+          taskId: cds.utils.uuid(),
+          contextId: contextB,
+          agentService,
+          state: "completed",
+          data: "{}",
+        },
+      ])
+
+      const { computeGaugeMetrics, observeConversationCount, observeAverageConversationLength } =
+        await import("../../lib/telemetry/gauge-metrics.js")
+      await computeGaugeMetrics()
+
+      const counts = []
+      observeConversationCount({ observe: (value, attrs) => counts.push({ value, attrs }) })
+      const lengths = []
+      observeAverageConversationLength({
+        observe: (value, attrs) => lengths.push({ value, attrs }),
+      })
+
+      expect(counts.find((entry) => entry.attrs["agent.service"] === agentService)?.value).toBe(2)
+      expect(lengths.find((entry) => entry.attrs["agent.service"] === agentService)?.value).toBe(
+        1.5,
+      )
     })
 
-    it("should count distinct users per service via scheduled cds.spawn", async () => {
+    it("should compute metrics after a new A2A task", async () => {
       // Create tasks to establish known state
       await sendMessage("graph-book", "from user A")
       await sendMessage("graph-book", "from user A again")
 
-      // setupActiveUsersMetric() was called during server boot with activeUsersInterval "1s"
-      // Wait for the cds.spawn periodic job to fire and compute active users
-      await new Promise((r) => setTimeout(r, 1500))
+      // GraphExecutor triggers a tenant-bound async computation after task insert.
+      await new Promise((r) => setTimeout(r, 100))
 
-      // Flush metrics — the gauge callback (registered by setupActiveUsersMetric) reports values
+      // Flush metrics — registered gauge callbacks report cached values
       const { metrics } = await import("@opentelemetry/api")
       const meterProvider = metrics.getMeterProvider()
       if (typeof meterProvider.forceFlush !== "function") return // skip if no SDK MeterProvider
@@ -383,6 +422,8 @@ describe("@cap-js/agents - Quota enforcement", () => {
 
       const output = captured.join("")
       expect(output).toMatch(/active_users/)
+      expect(output).toMatch(/agent.conversations/)
+      expect(output).toMatch(/agent.conversation.length.avg/)
       expect(output).toMatch(/GraphBookService/)
       // Same user sent both messages → distinct user count should be 1
       expect(output).toMatch(/value: 1/)
