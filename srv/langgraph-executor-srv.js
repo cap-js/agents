@@ -1,7 +1,7 @@
 import cds from "@sap/cds"
 import { GraphExecutor } from "./handlers/graph-executor.js"
 import { GraphCache, hashFeatures } from "./graph-cache.js"
-import PiExecutor from '../lib/protocol/pi-executor.js'
+import PiExecutor from "../lib/protocol/pi-executor.js"
 
 // REVISIT: this is not a langgraph executor, but an executor factory
 
@@ -62,7 +62,7 @@ export class LangGraphExecutor {
       return new PiExecutor(result.factory, srv)
     }
     if (result && typeof result.execute === "function") {
-      return result  // result is already an executor
+      return result // result is already an executor
     }
 
     throw new Error(

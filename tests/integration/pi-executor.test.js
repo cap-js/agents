@@ -1,6 +1,10 @@
 import cds from "@sap/cds"
 import { createModels } from "@earendil-works/pi-ai"
-import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai/providers/faux"
+import {
+  fauxAssistantMessage,
+  fauxProvider,
+  fauxToolCall,
+} from "@earendil-works/pi-ai/providers/faux"
 import createHelpers from "../utils/helpers.js"
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
@@ -18,10 +22,10 @@ function setResponses(responses) {
 describe("@cap-js/agents - Pi executor integration (harness: pi)", () => {
   beforeAll(async () => {
     cds.env.agents ??= {}
-    cds.env.agents.harness = 'pi'
+    cds.env.agents.harness = "pi"
     if (global.cds && global.cds !== cds) {
       global.cds.env.agents ??= {}
-      global.cds.env.agents.harness = 'pi'
+      global.cds.env.agents.harness = "pi"
     }
 
     // Get the service and prepend our faux buildModel handler before the executor
@@ -32,7 +36,7 @@ describe("@cap-js/agents - Pi executor integration (harness: pi)", () => {
         model: models.getModel(fauxModel.provider, fauxModel.id),
         streamFn: models.streamSimple.bind(models),
         getApiKey: () => "test-key",
-      }))
+      })),
     )
 
     setResponses([fauxAssistantMessage("warmup")])
