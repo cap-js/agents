@@ -51,7 +51,8 @@
     "docs:audit": "node .scripts/generate-audit-docs.js",
     "docs:audit:check": "node .scripts/generate-audit-docs.js --check",
     "format": "npx -y oxfmt@0.70.0",
-    "format:check": "npx -y oxfmt@0.70.0 --check"
+    "format:check": "npx -y oxfmt@0.70.0 --check",
+    "prepare": "git config core.hooksPath .husky"
   },
   "dependencies": {
     "@a2a-js/sdk": "^0.3.12",
