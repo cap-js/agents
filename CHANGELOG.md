@@ -6,12 +6,15 @@
 
 ## Version 0.9.9 - tbd
 
+### Changed
+
+- Use new AI Core API for content filtering to avoid preflight LLM call
+
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state
 - `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
 - Deal with potentially missing crypto.randomUUID fn
-- Improve error handling of content filter
 - Improve error handling of AICore
 - Reduced likelihood of summarization timeout
 
