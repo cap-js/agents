@@ -135,7 +135,7 @@ describe("GraphExecutor - abort/cancellation", () => {
   )
 
   it(
-    "cancelTask aborts running execution",
+    "abort with event bus cancels running execution",
     withCtx(async () => {
       const publishedEvents = []
       const fakeGraph = {
@@ -167,12 +167,12 @@ describe("GraphExecutor - abort/cancellation", () => {
 
       await new Promise((r) => setTimeout(r, 50))
 
-      // cancelTask triggers abort internally
-      await executor.cancelTask("task-cancel-1", fakeEventBus)
+      // abort triggers cancellation internally
+      await executor.abort("task-cancel-1", fakeEventBus)
 
       await executePromise
 
-      // cancelTask publishes its own canceled event + execute() catch publishes one too
+      // abort publishes a canceled event from execute()'s catch
       const canceledEvents = publishedEvents.filter((e) => e.status?.state === "canceled")
       assert.ok(canceledEvents.length >= 1, "at least one canceled status event expected")
     }),
