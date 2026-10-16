@@ -6,6 +6,10 @@
 
 ## Version 0.9.9 - tbd
 
+### Changed
+
+- Use new AI Core API for content filtering to avoid preflight LLM call
+
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state
