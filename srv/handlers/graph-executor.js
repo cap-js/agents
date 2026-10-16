@@ -166,7 +166,10 @@ class GraphExecutor {
   }
 
   async _resolveGraph() {
-    if (this._graph) return this._graph
+    if (this._graph) {
+      this._checkpointer ??= this._graph.checkpointer
+      return this._graph
+    }
     const resolved = await this._rawGraph
     if (!resolved || typeof resolved.invoke !== "function") {
       throw new Error(
@@ -180,6 +183,7 @@ class GraphExecutor {
       resolved.checkpointer = new CdsCheckpointSaver()
       LOG.debug(this._srv.name, "- auto-injected CdsCheckpointSaver")
     }
+    this._checkpointer = resolved.checkpointer
     this._graph = resolved
     return this._graph
   }
@@ -418,12 +422,10 @@ class GraphExecutor {
     if (!isResume) {
       if (cds.context?.["agent.new.task"]) {
         const { Messages } = cds.entities("cap.agent")
-        const latest = await cds.ql.SELECT.one`from ${Messages} { max(sequence) as sequence }
-          where session = ${contextId} and createdBy = $user.id`
         await INSERT.into(Messages).entries({
           ID: taskId,
           session: contextId,
-          sequence: Number(latest?.sequence ?? -1) + 1,
+          sequence: 0,
           role: "user",
           type: "text",
           content: partsToText(requestContext.userMessage?.parts),
@@ -560,12 +562,13 @@ class GraphExecutor {
 
       let usageData
       let result
+      let config
       try {
         const extraConfig = this._configMapper ? await this._configMapper(requestContext) : {}
         if (extraConfig !== null && extraConfig !== undefined && typeof extraConfig !== "object") {
           throw new TypeError(`configMapper must return a plain object, got ${typeof extraConfig}`)
         }
-        const config = {
+        config = {
           // Prefer limit at construction time, then cds.env then defaults (standard langchain -> 25, deepagent -> 10_000).
           recursionLimit: this._recursionLimit || cds.env.agents.recursionLimit || undefined,
           configurable: {
@@ -586,6 +589,7 @@ class GraphExecutor {
             config,
             eventBus,
             signal: controller.signal,
+            checkpointer: this._checkpointer,
             stream: (input, signal) =>
               this._streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal),
           })
@@ -935,6 +939,7 @@ class GraphExecutor {
             message: agentMessage("Task canceled."),
             timestamp: new Date().toISOString(),
           }
+          await persistTerminalMessage(contextId, serviceName, status)
           eventBus.publish({
             kind: "status-update",
             taskId,
@@ -958,7 +963,12 @@ class GraphExecutor {
             "timeOut",
           )
 
-          await publishTimeoutHitl({ requestContext, eventBus, description: summary, serviceName })
+          await publishTimeoutHitl({
+            requestContext,
+            eventBus,
+            description: summary,
+            serviceName,
+          })
           return
         }
 
@@ -990,6 +1000,7 @@ class GraphExecutor {
             message: agentMessage(summary),
             timestamp: new Date().toISOString(),
           }
+          await persistTerminalMessage(contextId, serviceName, status)
           eventBus.publish({
             kind: "status-update",
             taskId,
@@ -1131,6 +1142,21 @@ class GraphExecutor {
 }
 
 export { GraphExecutor, messageText, defaultOutputMapper, agentMessage }
+
+async function persistTerminalMessage(session, agentService, status) {
+  if (typeof cds.entities !== "function") return
+  const { Messages } = cds.entities("cap.agent")
+  if (!Messages) return
+  await INSERT.into(Messages).entries({
+    ID: cds.utils.uuid(),
+    session,
+    sequence: 0,
+    role: "ai",
+    type: status.state,
+    content: partsToText(status.message?.parts),
+    agentService,
+  })
+}
 
 /**
  * @param {[import('@langchain/core/messages').Message]} messages

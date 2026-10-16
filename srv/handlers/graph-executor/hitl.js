@@ -231,28 +231,22 @@ function pendingHitlFromTask(task) {
 
 async function persistedDecisions(contextId, taskId, currentMessageId) {
   const { Messages } = cds.entities("cap.agent")
-  const anchor = await cds.ql.SELECT.one`from ${Messages} { sequence }
+  const anchor = await cds.ql.SELECT.one`from ${Messages} { createdAt, sequence }
     where ID = ${taskId} and session = ${contextId} and createdBy = $user.id`
   if (!anchor) return []
   const rows = await cds.ql.SELECT`from ${Messages} { content }
     where session = ${contextId} and role = 'user' and type = 'decision'
-      and sequence > ${anchor.sequence} and ID != ${currentMessageId} and createdBy = $user.id
-    order by sequence`
+      and (createdAt > ${anchor.createdAt}
+        or (createdAt = ${anchor.createdAt} and sequence > ${anchor.sequence}))
+      and ID != ${currentMessageId} and createdBy = $user.id
+    order by createdAt, sequence`
   return rows.map(({ content }) => parseResumeDecision(content).decisions[0])
 }
 
 function pendingActionRequests(task, pending) {
-  if (pending?.actionRequests) return pending.actionRequests
-  const dataActions = firstDataPart(task?.status?.message?.parts)?.actionRequests
-  if (dataActions) return dataActions
-  const text = partsToText(task?.status?.message?.parts)
-  const jsonStart = text.indexOf("{")
-  if (jsonStart < 0) return []
-  try {
-    return JSON.parse(text.slice(jsonStart)).actionRequests || []
-  } catch {
-    return []
-  }
+  return (
+    pending?.actionRequests || firstDataPart(task?.status?.message?.parts)?.actionRequests || []
+  )
 }
 
 function interruptDescriptionFromTask(task, pending) {
@@ -272,9 +266,10 @@ async function publishInputRequired({
   metadata,
 }) {
   const { taskId, contextId } = requestContext
+  const message = agentMessage(description, interruptData, metadata)
   const status = {
     state: "input-required",
-    message: agentMessage(description, interruptData, metadata),
+    message,
     timestamp: new Date().toISOString(),
   }
   eventBus.publish({
@@ -339,7 +334,16 @@ export async function resumeTimeoutHitl({ requestContext, eventBus, stream, sign
   return undefined
 }
 
-export async function resumeHitl({ requestContext, graph, config, eventBus, stream, signal }) {
+export async function resumeHitl({
+  requestContext,
+  graph,
+  config,
+  eventBus,
+  stream,
+  signal,
+  checkpointer,
+}) {
+  checkpointer ??= graph.checkpointer
   const { taskId, contextId } = requestContext
   const dataPart = firstDataPart(requestContext.userMessage?.parts)
   const userText = partsToText(requestContext.userMessage?.parts)
@@ -370,12 +374,18 @@ export async function resumeHitl({ requestContext, graph, config, eventBus, stre
     recordHitlDecisions(cds.context?.["agent.service"], actionRequests, resume, priorDecisionCount)
     if (decisions.length < actionCount) {
       await graph.updateState(config, { messages: [decisionMessage] })
+      await checkpointer?.putDecision?.(config, decisionMessage)
       const interruptData = { actionRequests }
       const nextPending = { ...pending, actionCount, decisions }
+      const nextAction = actionRequests[decisions.length]
       await publishInputRequired({
         requestContext,
         eventBus,
-        description: interruptDescriptionFromTask(requestContext.task, nextPending),
+        description:
+          nextAction?.description ||
+          (nextAction
+            ? `Approve action: ${nextAction.name}?`
+            : interruptDescriptionFromTask(requestContext.task, nextPending)),
         interruptData,
         metadata: {
           [HITL_METADATA_KEY]: {

@@ -26,9 +26,8 @@ describe("CdsCheckpointSaver", () => {
     const saver = new CdsCheckpointSaver()
     const contextId = `conversation-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
-    const human = new HumanMessage({ id: "user-1", content: "hello" })
+    const human = new HumanMessage({ content: "hello" })
     const assistant = new AIMessage({
-      id: "assistant-1",
       content: [
         { type: "reasoning", reasoning: "private" },
         { type: "text", text: "hello back" },
@@ -60,6 +59,20 @@ describe("CdsCheckpointSaver", () => {
       "hello back",
     ])
     expect(tuple.config.configurable.thread_id).toBe(threadId)
+
+    assistant.content = "updated response"
+    await runAs("alice", () =>
+      saver.put(
+        { configurable: { thread_id: threadId } },
+        checkpoint("checkpoint-2", [assistant, human]),
+      ),
+    )
+    const updated = await SELECT.from(Messages)
+      .where({ session: contextId, agentService: "TestService", createdBy: "alice" })
+      .orderBy("sequence")
+    expect(updated).toHaveLength(2)
+    expect(updated.map(({ query }) => query.messageId)).toEqual([human.id, assistant.id])
+    expect(updated[1].content).toBe("hello back")
   })
 
   it("does not persist non-message LangGraph state", async () => {
@@ -100,7 +113,6 @@ describe("CdsCheckpointSaver", () => {
     const contextId = `decision-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
     const decision = new HumanMessage({
-      id: "user-decision",
       content: "approve",
       additional_kwargs: { "sap.cds.agents.type": "decision" },
     })
@@ -112,8 +124,9 @@ describe("CdsCheckpointSaver", () => {
       ),
     )
 
-    const row = await SELECT.one.from(Messages).where({ ID: decision.id })
+    const row = await SELECT.one.from(Messages).where({ session: contextId })
     expect(row.type).toBe("decision")
+    expect(row.query.messageId).toBe(decision.id)
   })
 
   it("round-trips tool calls through neutral message fields", async () => {
@@ -122,14 +135,15 @@ describe("CdsCheckpointSaver", () => {
     const contextId = `tools-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
     const messages = [
-      new HumanMessage({ id: "user-tool", content: "look it up" }),
+      new HumanMessage({ content: "look it up" }),
       new AIMessage({
-        id: "assistant-tool",
         content: "",
-        tool_calls: [{ id: "call-1", name: "lookup", args: { id: 7 } }],
+        tool_calls: [
+          { id: "call-1", name: "lookup", args: { id: 7 } },
+          { id: "call-2", name: "lookup", args: { id: 8 } },
+        ],
       }),
       new ToolMessage({
-        id: "tool-result",
         content: '{"title":"Wuthering Heights"}',
         tool_call_id: "call-1",
         name: "lookup",
@@ -137,17 +151,20 @@ describe("CdsCheckpointSaver", () => {
     ]
 
     await runAs("alice", () =>
-      saver.put(
-        { configurable: { thread_id: threadId, _taskId: "user-tool" } },
-        checkpoint("ignored", messages),
-        {},
-      ),
+      saver.put({ configurable: { thread_id: threadId } }, checkpoint("ignored", messages), {}),
     )
 
-    const rows = await SELECT.from(Messages).where({ session: contextId }).orderBy("sequence")
+    const rows = await SELECT.from(Messages)
+      .where({ session: contextId })
+      .orderBy("createdAt", "sequence")
+    expect(rows.filter(({ type }) => type === "tool_call")).toHaveLength(2)
     expect(rows[1].query).toEqual({
-      toolCalls: [{ id: "call-1", name: "lookup", args: { id: 7 } }],
+      toolCall: { id: "call-1", name: "lookup", args: { id: 7 } },
+      messageId: messages[1].id,
     })
+    expect(rows[2].query.toolCall.id).toBe("call-2")
+    expect(rows[3].query.messageId).toBe(messages[2].id)
+    expect(rows[3].query.toolCallId).toBe("call-1")
     expect(rows.some(({ query }) => query?.stored)).toBe(false)
 
     const tuple = await runAs("alice", () =>
@@ -158,67 +175,134 @@ describe("CdsCheckpointSaver", () => {
       name: "lookup",
       args: { id: 7 },
     })
+    expect(tuple.checkpoint.channel_values.messages[1].tool_calls[1].id).toBe("call-2")
     expect(tuple.checkpoint.channel_values.messages[2].tool_call_id).toBe("call-1")
   })
 
-  it("sequences only messages after the latest stored message", async () => {
+  it("groups rows by logical message identity without merging adjacent messages", async () => {
+    const { Messages } = cds.entities("cap.agent")
+    const saver = new CdsCheckpointSaver()
+    const contextId = `groups-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
+
+    await runAs("alice", () =>
+      INSERT.into(Messages).entries([
+        {
+          ID: cds.utils.uuid(),
+          session: contextId,
+          sequence: 0,
+          role: "ai",
+          type: "text",
+          content: "first",
+          query: { messageId: "assistant-1" },
+          agentService: "TestService",
+        },
+        {
+          ID: cds.utils.uuid(),
+          session: contextId,
+          sequence: 1,
+          role: "ai",
+          type: "text",
+          content: " message",
+          query: { messageId: "assistant-1" },
+          agentService: "TestService",
+        },
+        {
+          ID: "assistant-2",
+          session: contextId,
+          sequence: 2,
+          role: "ai",
+          type: "text",
+          content: "second",
+          agentService: "TestService",
+        },
+      ]),
+    )
+
+    const tuple = await runAs("alice", () =>
+      saver.getTuple({ configurable: { thread_id: threadId } }),
+    )
+    expect(
+      tuple.checkpoint.channel_values.messages.map(({ id, content }) => ({ id, content })),
+    ).toEqual([
+      { id: expect.any(String), content: "first message" },
+      { id: "assistant-2", content: "second" },
+    ])
+  })
+
+  it("assigns new rows their checkpoint positions without moving existing rows", async () => {
     const { Messages } = cds.entities("cap.agent")
     const saver = new CdsCheckpointSaver()
     const contextId = `sequence-${cds.utils.uuid()}`
     const threadId = `TestService:${contextId}`
-    const firstTask = new HumanMessage({ id: "first-task", content: "first" })
-    const secondTask = new HumanMessage({ id: "second-task", content: "second" })
+    const firstTask = new HumanMessage({ content: "first" })
+    const firstAi = new AIMessage({ content: "done" })
+    const secondTask = new HumanMessage({ content: "second" })
+    const secondAi = new AIMessage({ content: "done" })
 
     await runAs("alice", () =>
       saver.put(
-        { configurable: { thread_id: threadId, _taskId: firstTask.id } },
-        checkpoint("first-checkpoint", [
-          firstTask,
-          new AIMessage({ id: "first-ai", content: "done" }),
-        ]),
+        { configurable: { thread_id: threadId } },
+        checkpoint("first-checkpoint", [firstTask, firstAi]),
       ),
     )
     await runAs("alice", () =>
       saver.put(
-        { configurable: { thread_id: threadId, _taskId: secondTask.id } },
-        checkpoint("second-checkpoint", [
-          firstTask,
-          new AIMessage({ id: "first-ai", content: "done" }),
-          secondTask,
-          new AIMessage({ id: "second-ai", content: "done" }),
-        ]),
+        { configurable: { thread_id: threadId } },
+        checkpoint("second-checkpoint", [firstTask, firstAi, secondTask, secondAi]),
       ),
     )
     await runAs("alice", () =>
       saver.put(
-        { configurable: { thread_id: threadId, _taskId: secondTask.id } },
-        checkpoint("second-checkpoint", [
-          firstTask,
-          new AIMessage({ id: "first-ai", content: "done" }),
-          secondTask,
-          new AIMessage({ id: "second-ai", content: "done" }),
-        ]),
+        { configurable: { thread_id: threadId } },
+        checkpoint("second-checkpoint", [firstTask, firstAi, secondTask, secondAi]),
       ),
     )
 
-    const rows = await SELECT.from(Messages).where({ session: contextId }).orderBy("sequence")
-    expect(rows.map(({ ID }) => ID)).toEqual(["first-task", "first-ai", "second-task", "second-ai"])
-    expect(rows.map(({ sequence }) => Number(sequence))).toEqual([0, 1, 2, 3])
+    const ordered = await SELECT.from(Messages)
+      .where({ session: contextId })
+      .orderBy("createdAt", "sequence")
+    expect(ordered.map(({ sequence }) => Number(sequence))).toEqual([0, 1, 2, 3])
+    expect(ordered.map(({ query }) => query.messageId)).toEqual([
+      firstTask.id,
+      firstAi.id,
+      secondTask.id,
+      secondAi.id,
+    ])
   })
 
-  it("does not persist LangGraph pending-write metadata", async () => {
+  it("persists HITL interrupt metadata on each matching tool-call row", async () => {
+    const { Messages } = cds.entities("cap.agent")
     const saver = new CdsCheckpointSaver()
-    const threadId = `TestService:interrupt-${cds.utils.uuid()}`
+    const contextId = `interrupt-${cds.utils.uuid()}`
+    const threadId = `TestService:${contextId}`
     const config = { configurable: { thread_id: threadId } }
+    const calls = [
+      { id: cds.utils.uuid(), name: "approveMe", args: { id: 1 } },
+      { id: cds.utils.uuid(), name: "skipMe", args: { id: 2 } },
+      { id: cds.utils.uuid(), name: "approveMeToo", args: { id: 3 } },
+    ]
 
-    const saved = await runAs("alice", () =>
-      saver.put(config, checkpoint("checkpoint-1", []), { source: "loop", step: 0 }),
-    )
-    await runAs("alice", () =>
-      saver.putWrites(saved, [["__interrupt__", { action: "approve" }]], "node-1"),
-    )
+    const value = {
+      actionRequests: [
+        { name: "approveMe", args: { id: 1 } },
+        { name: "approveMeToo", args: { id: 3 } },
+      ],
+    }
+    await runAs("alice", async () => {
+      await saver.putWrites(config, [["__interrupt__", [{ value }]]], "node-1")
+      await saver.put(
+        config,
+        checkpoint("checkpoint-1", [new AIMessage({ content: "", tool_calls: calls })]),
+        { source: "loop", step: 0 },
+      )
+    })
 
-    expect(await runAs("alice", () => saver.getTuple(config))).toBe(undefined)
+    const rows = await SELECT.from(Messages).where({ session: contextId }).orderBy("sequence")
+    expect(rows.filter((row) => row.query.inputRequired)).toHaveLength(2)
+    expect(rows.find((row) => row.query.toolCall.id === calls[1].id).query.inputRequired).toBe(
+      undefined,
+    )
   })
 
   it("isolates and deletes sessions by user", async () => {
@@ -247,14 +331,14 @@ describe("CdsCheckpointSaver", () => {
     await runAs("alice", () =>
       saver.put(
         { configurable: { thread_id: firstThread } },
-        checkpoint("first", [new HumanMessage({ id: cds.utils.uuid(), content: "first" })]),
+        checkpoint("first", [new HumanMessage({ content: "first" })]),
         {},
       ),
     )
     await runAs("alice", () =>
       saver.put(
         { configurable: { thread_id: secondThread } },
-        checkpoint("second", [new HumanMessage({ id: cds.utils.uuid(), content: "second" })]),
+        checkpoint("second", [new HumanMessage({ content: "second" })]),
         {},
       ),
     )

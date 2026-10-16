@@ -1,6 +1,6 @@
 import cds from "@sap/cds"
 cds.test(import.meta.dirname + "/../projects/bookshop")
-import { AIMessage, HumanMessage } from "@langchain/core/messages"
+import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages"
 import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
 import { CdsTaskStore } from "../../lib/protocol/persistence/task-store.js"
 
@@ -18,27 +18,166 @@ function task(id, state) {
 }
 
 async function createAnchor(taskId, contextId = `context-${taskId}`) {
-  await saveMessages(taskId, contextId, [new HumanMessage({ id: taskId, content: "" })])
+  const { Messages } = cds.entities("cap.agent")
+  await INSERT.into(Messages).entries({
+    ID: taskId,
+    session: contextId,
+    sequence: 0,
+    role: "user",
+    type: "text",
+    content: "",
+    query: { messageId: taskId },
+    agentService: "TestService",
+  })
 }
 
 async function saveMessages(taskId, contextId, messages) {
   const saver = new CdsCheckpointSaver()
-  await saver.put(
-    { configurable: { thread_id: `TestService:${contextId}`, _taskId: taskId } },
-    {
-      v: 1,
-      id: cds.utils.uuid(),
-      ts: new Date().toISOString(),
-      channel_versions: {},
-      versions_seen: {},
-      pending_sends: [],
-      channel_values: { messages },
+  for (const message of messages) message.id = undefined
+  const config = { configurable: { thread_id: `TestService:${contextId}`, _taskId: taskId } }
+  const stored = await saver.getTuple(config)
+  await saver.put(config, {
+    v: 1,
+    id: cds.utils.uuid(),
+    ts: new Date().toISOString(),
+    channel_versions: {},
+    versions_seen: {},
+    pending_sends: [],
+    channel_values: {
+      messages: [...(stored?.checkpoint.channel_values.messages ?? []), ...messages],
     },
-  )
+  })
+}
+
+async function saveHitl(contextId, actionRequests) {
+  const description =
+    actionRequests[0]?.description || `Approve action: ${actionRequests[0]?.name}?`
+  return description
 }
 
 describe("CdsTaskStore", () => {
-  it("persists durable A2A task state", async () => {
+  it("projects input-required from an unresolved tool call without persisting the status", async () => {
+    const store = new CdsTaskStore()
+    const taskId = cds.utils.uuid()
+    const contextId = `context-${taskId}`
+    const toolCall = { id: cds.utils.uuid(), name: "submitOrder", args: { bookId: 42 } }
+
+    await runAs("alice", async () => {
+      await createAnchor(taskId, contextId)
+      const saver = new CdsCheckpointSaver()
+      await saver.putWrites({ configurable: { thread_id: `TestService:${contextId}` } }, [
+        [
+          "__interrupt__",
+          [{ value: { actionRequests: [{ ...toolCall, description: "Approve order?" }] } }],
+        ],
+      ])
+      await saveMessages(taskId, contextId, [
+        new AIMessage({ content: "", tool_calls: [toolCall] }),
+      ])
+      await saveHitl(contextId, [{ ...toolCall, description: "Approve order?" }])
+
+      const { Messages } = cds.entities("cap.agent")
+      const requestRows = await SELECT.from(Messages).where({ session: contextId, type: "request" })
+      expect(requestRows).toHaveLength(0)
+
+      const current = await store.load(taskId)
+      expect(current.status.state).toBe("input-required")
+      expect(current.status.message.parts[0].text).toBe("Approve order?")
+      expect(current.status.message.parts[1].data.actionRequests).toEqual([
+        { ...toolCall, description: "Approve order?" },
+      ])
+      expect(current.status.message.metadata["sap.cds.agents.hitl"]).toEqual({
+        actionCount: 1,
+        decisions: [],
+        actionRequests: [{ ...toolCall, description: "Approve order?" }],
+      })
+    })
+  })
+
+  it("does not project input-required from a resolved tool call", async () => {
+    const store = new CdsTaskStore()
+    const taskId = cds.utils.uuid()
+    const contextId = `context-${taskId}`
+    const toolCall = { id: cds.utils.uuid(), name: "submitOrder", args: { bookId: 42 } }
+
+    await runAs("alice", async () => {
+      await createAnchor(taskId, contextId)
+      const saver = new CdsCheckpointSaver()
+      await saver.putWrites({ configurable: { thread_id: `TestService:${contextId}` } }, [
+        ["__interrupt__", [{ value: { actionRequests: [toolCall] } }]],
+      ])
+      await saveMessages(taskId, contextId, [
+        new AIMessage({ content: "", tool_calls: [toolCall] }),
+      ])
+
+      expect((await store.load(taskId)).status.state).toBe("input-required")
+
+      await saveMessages(taskId, contextId, [
+        new ToolMessage({ content: "submitted", tool_call_id: toolCall.id }),
+      ])
+
+      expect((await store.load(taskId)).status.state).toBe("submitted")
+    })
+  })
+
+  it("marks only tool-call rows containing HITL action requests", async () => {
+    const store = new CdsTaskStore()
+    const taskId = cds.utils.uuid()
+    const contextId = `context-${taskId}`
+    const approved = { id: cds.utils.uuid(), name: "submitOrder", args: { bookId: 42 } }
+    const skipped = { id: cds.utils.uuid(), name: "getStock", args: { bookId: 42 } }
+    const second = { id: cds.utils.uuid(), name: "deleteOrder", args: { orderId: 7 } }
+    const unrelated = { id: cds.utils.uuid(), name: "listOrders", args: {} }
+    const duplicate = { ...approved, id: cds.utils.uuid() }
+    const actionRequests = [
+      { name: approved.name, args: approved.args },
+      { name: second.name, args: second.args },
+    ]
+
+    await runAs("alice", async () => {
+      await createAnchor(taskId, contextId)
+      const saver = new CdsCheckpointSaver()
+      await saver.putWrites({ configurable: { thread_id: `TestService:${contextId}` } }, [
+        ["__interrupt__", [{ value: { actionRequests } }]],
+      ])
+      await saveMessages(taskId, contextId, [
+        new AIMessage({ content: "", tool_calls: [approved, skipped, duplicate] }),
+        new AIMessage({ content: "", tool_calls: [second] }),
+        new AIMessage({ content: "", tool_calls: [unrelated] }),
+      ])
+      await saveHitl(contextId, actionRequests)
+
+      const { Messages } = cds.entities("cap.agent")
+      const rows = await SELECT.from(Messages).where({ session: contextId, type: "tool_call" })
+      expect(rows.filter((row) => row.query.inputRequired)).toHaveLength(2)
+      expect(rows.find((row) => row.query.toolCall.id === approved.id)).toMatchObject({
+        query: { inputRequired: expect.anything() },
+      })
+      expect(rows.find((row) => row.query.toolCall.id === second.id)).toMatchObject({
+        query: { inputRequired: expect.anything() },
+      })
+      expect(rows.find((row) => row.query.toolCall.id === unrelated.id).query.inputRequired).toBe(
+        undefined,
+      )
+
+      await saveMessages(taskId, contextId, [
+        new ToolMessage({ content: "stock", tool_call_id: skipped.id }),
+      ])
+      expect((await store.load(taskId)).status.state).toBe("input-required")
+
+      await saveMessages(taskId, contextId, [
+        new ToolMessage({ content: "submitted", tool_call_id: approved.id }),
+      ])
+      expect((await store.load(taskId)).status.state).toBe("input-required")
+
+      await saveMessages(taskId, contextId, [
+        new ToolMessage({ content: "deleted", tool_call_id: second.id }),
+      ])
+      expect((await store.load(taskId)).status.state).toBe("submitted")
+    })
+  })
+
+  it("does not persist SDK task state", async () => {
     const store = new CdsTaskStore()
     const taskId = cds.utils.uuid()
 
@@ -58,8 +197,8 @@ describe("CdsTaskStore", () => {
       })
 
       const current = await store.load(taskId)
-      expect(current.status.state).toBe("failed")
-      expect(current.status.message.parts).toEqual([{ kind: "text", text: "Failed" }])
+      expect(current.status.state).toBe("submitted")
+      expect(current.history).toHaveLength(1)
     })
   })
 
@@ -114,12 +253,16 @@ describe("CdsTaskStore", () => {
     const firstTaskId = cds.utils.uuid()
     const secondTaskId = cds.utils.uuid()
 
-    await runAs("alice", async () => {
-      await createAnchor(firstTaskId, contextId)
-      await saveMessages(firstTaskId, contextId, [new AIMessage("First response")])
-      await createAnchor(secondTaskId, contextId)
-      await saveMessages(secondTaskId, contextId, [new AIMessage("Second response")])
+    await runAs("alice", () => createAnchor(firstTaskId, contextId))
+    await runAs("alice", () =>
+      saveMessages(firstTaskId, contextId, [new AIMessage("First response")]),
+    )
+    await runAs("alice", () => createAnchor(secondTaskId, contextId))
+    await runAs("alice", () =>
+      saveMessages(secondTaskId, contextId, [new AIMessage("Second response")]),
+    )
 
+    await runAs("alice", async () => {
       const first = await store.load(firstTaskId)
       const current = await store.load(secondTaskId)
       expect(first.history.map(({ messageId }) => messageId)).toEqual([

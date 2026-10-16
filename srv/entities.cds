@@ -17,7 +17,6 @@ type MessageType : String enum {
   decision;
   // ai messages
   tool_call;
-  request;
   auth_required = 'auth-required';
   canceled;
   failed;
@@ -72,7 +71,8 @@ view QuotaUsage as
       exists (
         select 1 from Messages as terminal
         where terminal.session = message.session
-          and terminal.sequence > message.sequence
+          and (terminal.createdAt > message.createdAt
+            or (terminal.createdAt = message.createdAt and terminal.sequence > message.sequence))
           and terminal.role = 'ai'
           and terminal.type in ('text', 'failed', 'canceled', 'rejected', 'auth-required')
       ) ? 0 : 1 as active

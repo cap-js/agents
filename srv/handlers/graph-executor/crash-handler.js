@@ -1,5 +1,4 @@
 import cds from "@sap/cds"
-import { CdsTaskStore } from "../../../lib/protocol/persistence/task-store.js"
 
 const LOG = cds.log("agents")
 
@@ -21,20 +20,18 @@ async function markActiveTasksFailed() {
   )
 
   async function update(tasks) {
-    const store = new CdsTaskStore()
-
-    const proms = []
-    for (const { taskId, contextId, serviceName } of tasks) {
-      proms.push(
-        store.save({
-          id: taskId,
-          contextId,
-          status: { state: "failed" },
-          agentService: serviceName,
-        }),
-      )
-    }
-    await Promise.all(proms)
+    const { Messages } = cds.entities("cap.agent")
+    await INSERT.into(Messages).entries(
+      tasks.map(({ contextId, serviceName }) => ({
+        ID: cds.utils.uuid(),
+        session: contextId,
+        sequence: 0,
+        role: "ai",
+        type: "failed",
+        content: "",
+        agentService: serviceName,
+      })),
+    )
   }
 }
 
