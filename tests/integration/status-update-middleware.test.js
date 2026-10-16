@@ -147,4 +147,46 @@ describe("@cap-js/agents - Status Update Middleware", () => {
       assert.ok(event.status.message.parts[0].text, "should have text")
     }
   })
+
+  describe("ValueList action status messages", () => {
+    it.each([
+      ["textFirst", "Text first: Wuthering Heights (201)"],
+      ["textLast", "Text last: 201 (Wuthering Heights)"],
+      ["textOnly", "Text only: Wuthering Heights"],
+      ["textSeparate", "Text separate: 201 — Wuthering Heights"],
+      ["textPath", "Text path: Emily Brontë"],
+      ["noText", "No text: 201"],
+      ["plain", "Plain: 201"],
+      ["externalDirect", "External direct: External description (EXT-1)"],
+      ["externalDirectXpr", "External direct xpr: External description (EXT-1)"],
+      ["externalPath", "External path: Active (STATUS-1)"],
+      ["externalPathXpr", "External path xpr: Active (STATUS-1)"],
+    ])("uses ValueList text for %s", async (action, expected) => {
+      const res = await POST(
+        "/a2a/status-update/",
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "message/stream",
+          params: {
+            message: {
+              kind: "message",
+              messageId: cds.utils.uuid(),
+              role: "user",
+              parts: [{ kind: "text", text: action }],
+            },
+          },
+        },
+        { responseType: "text" },
+      )
+      const messages = parseSSEFrames(res.data)
+        .filter((f) => f.result?.kind === "status-update" && !f.result.final)
+        .map((f) => f.result.status?.message?.parts?.[0]?.text)
+
+      assert.ok(
+        messages.includes(expected),
+        `expected ${JSON.stringify(expected)} in ${JSON.stringify(messages)}`,
+      )
+    })
+  })
 })

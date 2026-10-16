@@ -6,6 +6,11 @@
 
 ## Version 0.9.9 - tbd
 
+### Added
+
+- Support custom status messages for actions via an `agent-status-update` message in `@Core.Messages`. Via a `@Common.ValueList` annotation on a property a text value for an identifier can be resolved
+- Custom status messages when spawning subagents replacing unclear message 'Calling task'
+
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state
