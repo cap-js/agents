@@ -7,7 +7,7 @@ using {
 namespace sap.capire.bookshop;
 
 entity Books : managed {
-  key ID       : Integer;
+  key ID       : Integer @Common.Text : title @Common.TextArrangement : #TextFirst;
       title    : localized String(111)  @mandatory;
       descr    : localized String(1111);
       author   : Association to Authors @mandatory;
@@ -111,4 +111,21 @@ entity Profiles {
         email : String;
         label : String;
       };
+}
+
+entity ExternalIdValues {
+  key ID         : Integer;
+      identifier : String @Common.Text: description @Common.TextArrangement: #TextFirst;
+      description: String;
+}
+
+entity ExternalIdStatuses {
+  key ID         : Integer;
+      identifier : String @Common.Text: name @Common.TextArrangement: #TextFirst;
+      name       : String;
+}
+
+entity ExternalIdPaths {
+  key ID         : Integer;
+      status     : Association to ExternalIdStatuses;
 }

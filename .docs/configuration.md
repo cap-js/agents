@@ -142,3 +142,57 @@ Set `cds.agents.fileIO.enabled = true` to let agents receive uploads and emit fi
 ```
 
 Sending a file - A2A clients send a `FilePart` (`{ kind: "file", file: { name, mimeType, bytes } }`) and the plugin persists the file and prepends a `[Uploaded files: /uploads/<name> (<mime>, <size>)]` manifest to the user message. It uses `@cap-js/attachments` to persist the files.
+
+## Status messages
+
+When the agent runs, via A2A status messages are emitted so users know what is happening. The generic messages are:
+
+- `Querying <entity>` for `query` tool calls
+- `Inspecting <entity>` for `describe` tool calls
+- `Calling <action>` for all other tool calls
+- `Processing tool response` when a tool reply is handed over to the LLM
+
+For markdown based agents further messages exist:
+
+- `Delegating work to a subagent` & `Delegating work to multiple subagents` when calling the `task` tool
+- TODO, when the agent interacts with the file system
+
+The status messages for actions can be customized.
+
+```cds
+service CatalogAgent {
+  entity Books as projection on db.Books;
+
+  @Core.Messages : [
+    {
+      code: 'agent-status-update',
+      message: '{i18n>SUBMIT_ORDER}'
+    }
+  ]
+  action submitOrder(
+    @Common.ValueList : {
+      CollectionPath: 'Books',
+      Parameters: [
+        {
+          $Type: 'Common.ValueListParameterInOut',
+          LocalDataProperty: bookID,
+          ValueListProperty: 'ID'
+        }
+      ]
+    }
+    bookID: string
+  );
+
+  annotate Books with {
+    ID @Common.Text: title @Common.TextArrangement: #TextFirst;
+  }
+}
+```
+
+```properties
+SUBMIT_ORDER=Submitting your order for {book}
+```
+
+With this minimal sample, the message would render as "Submitting your order for Wuthering Heights (201)".
+
+`@Common.Text` accepts path values, all kinds of text arrangement are supported and [`@Common.ExternalID`](https://help.sap.com/docs/ABAP_PLATFORM_NEW/468a97775123488ab3345a0c48cadd8f/f49a0f7eaafe444daf4cd62d48120ad0.html) works as well.
