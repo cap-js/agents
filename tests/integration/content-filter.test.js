@@ -5,6 +5,9 @@
  * - Integration tests: InstrumentedOrchestrationClient constructor behavior via buildModel.
  */
 import cds from "@sap/cds"
+import { HumanMessage, SystemMessage } from "@langchain/core/messages"
+import { OrchestrationClient } from "@sap-ai-sdk/langchain"
+import { vi } from "vitest"
 import { buildContentFilter, toSdkFilterFormat } from "../../lib/models/aicore.js"
 import InstrumentedOrchestrationClient from "../../lib/models/aicore.js"
 
@@ -142,12 +145,13 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       expect(model.options.contentFilter.input.azure_content_safety.prompt_shield).toBe(true)
     })
 
-    it("only passes output filter to SDK — input filter stays in options for middleware", async () => {
+    it("scopes SDK input filter after last assistant message", async () => {
       overrideModel(undefined)
       const model = await srv.send("buildModel", {})
-      // SDK receives output only
       expect(model.orchestrationConfig.filtering.output).toBeDefined()
-      expect(model.orchestrationConfig.filtering.input).toBeUndefined()
+      expect(model.orchestrationConfig.filtering.input.filters[0].target_selector).toEqual({
+        after_last_role: "assistant",
+      })
     })
 
     it("applies explicit custom contentFilter object", async () => {
@@ -178,6 +182,44 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       overrideModel(true)
       const model = await srv.send("buildModel", {})
       expect(model.options.contentFilter).toEqual(buildContentFilter())
+    })
+
+    it("uses a request-local system boundary for initial system and human messages", async () => {
+      let callOptions
+      const stream = vi
+        .spyOn(OrchestrationClient.prototype, "_streamResponseChunks")
+        .mockImplementation(async function* (_messages, opts) {
+          callOptions = opts
+          yield { text: "ok", message: {} }
+        })
+
+      try {
+        const model = new InstrumentedOrchestrationClient(MODEL_NAME, {
+          model: MODEL_NAME,
+          contentFilter: true,
+        })
+        await model
+          ._streamResponseChunks(
+            [new SystemMessage("system"), new HumanMessage("human")],
+            {},
+            undefined,
+          )
+          .next()
+
+        const [injectFiltering] = callOptions.customRequestConfig.middleware
+        const request = await injectFiltering({ fn: (config) => config })({
+          data: JSON.stringify({
+            config: { modules: { prompt_templating: {} } },
+          }),
+        })
+        const filter = JSON.parse(request.data).config.modules.filtering
+        expect(filter.input.filters[0].target_selector).toEqual({ after_last_role: "system" })
+        expect(model.orchestrationConfig.filtering.input.filters[0].target_selector).toEqual({
+          after_last_role: "assistant",
+        })
+      } finally {
+        stream.mockRestore()
+      }
     })
   })
 })
