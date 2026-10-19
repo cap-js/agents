@@ -3,7 +3,8 @@ import { AIMessage } from "@langchain/core/messages"
 
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
-const { afterModelHook } = await import("../../lib/agents/middleware/status-update.js")
+const { afterModelHook, statusUpdateMiddleware } =
+  await import("../../lib/agents/middleware/status-update.js")
 
 describe("tool-call data-part updates — generic call tool", () => {
   const emitFor = async (toolCall, toolNames) => {
@@ -44,6 +45,35 @@ describe("tool-call data-part updates — generic call tool", () => {
     expect(data?.type).toBe("tool-call")
     expect(data.name).toBe("submitOrder")
     expect(data.label).toBe("submitOrder")
+  })
+
+  it("keeps deep agent tool names separate from labels", async () => {
+    const middleware = await statusUpdateMiddleware()
+    const toolNames = ["ls", "read_file", "write_file", "edit_file", "delete", "glob", "grep"]
+
+    for (const name of toolNames) {
+      const events = []
+      const ctx = {
+        model: cds.model,
+        "agent.service": "CatalogService",
+        "agent.task.id": `deep-agent-${name}`,
+        "agent.context.id": "c1",
+        "agent.request.metadata": { "tool-status-update": {} },
+        "agent.eventBus": { publish: (e) => events.push(e) },
+      }
+      await cds._with(ctx, async () => {
+        const ai = new AIMessage({
+          content: "",
+          tool_calls: [{ id: `call-${name}`, name, args: {} }],
+        })
+        middleware.afterModel.hook({ messages: [ai] })
+        await new Promise((resolve) => setImmediate(resolve))
+      })
+
+      const data = events.find((e) => e.kind === "artifact-update")?.artifact?.parts?.[0]?.data
+      expect(data?.name).toBe(name)
+      expect(data?.label).not.toBe(name)
+    }
   })
 
   it("translates CatService getStock status and replaces its ValueList key with text", async () => {
