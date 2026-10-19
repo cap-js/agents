@@ -4,7 +4,7 @@ import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/me
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
-import { formatFileSize, sanitizeFilename } from "./tools.js"
+import { formatFileSize, sanitizeFilename } from "../../lib/agents/tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
 import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
