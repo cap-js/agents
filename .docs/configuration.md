@@ -155,7 +155,7 @@ When the agent runs, via A2A status messages are emitted so users know what is h
 For markdown based agents further messages exist:
 
 - `Delegating work to a subagent` & `Delegating work to multiple subagents` when calling the `task` tool
-- TODO, when the agent interacts with the file system
+- Messages that the agent accesses or interacts with its conversation-scoped memory when calling `ls`, `read_file`, `write_file`, `edit_file`, `delete`, `glob` or `grep`.
 
 The status messages for actions can be customized.
 
