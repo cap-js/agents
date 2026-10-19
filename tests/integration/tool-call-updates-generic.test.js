@@ -61,6 +61,7 @@ describe("tool-call data-part updates — generic call tool", () => {
         "agent.request.metadata": { "tool-status-update": {} },
         "agent.eventBus": { publish: (e) => events.push(e) },
       }
+      // eslint-disable-next-line no-await-in-loop
       await cds._with(ctx, async () => {
         const ai = new AIMessage({
           content: "",
