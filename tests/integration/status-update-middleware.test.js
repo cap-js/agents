@@ -161,6 +161,8 @@ describe("@cap-js/agents - Status Update Middleware", () => {
       ["externalDirectXpr", "External direct xpr: External description (EXT-1)"],
       ["externalPath", "External path: Active (STATUS-1)"],
       ["externalPathXpr", "External path xpr: Active (STATUS-1)"],
+      ["externalNested", "External nested: Active (STATUS-1)"],
+      ["externalLocalNested", "External local nested: Active (STATUS-1)"],
     ])("uses ValueList text for %s", async (action, expected) => {
       const res = await POST(
         "/a2a/status-update/",

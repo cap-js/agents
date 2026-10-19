@@ -16,10 +16,12 @@ export default class StatusUpdateService extends cds.ApplicationService {
         "externalDirectXpr",
         "externalPath",
         "externalPathXpr",
+        "externalNested",
+        "externalLocalNested",
       ],
       async (req) => {
         await new Promise((resolve) => setTimeout(resolve, 100))
-        return req.data.book ?? req.data.value
+        return req.data.book ?? req.data.value ?? req.data.input?.value
       },
     )
     return super.init()
@@ -45,7 +47,14 @@ export default class StatusUpdateService extends cds.ApplicationService {
         }
         const human = [...messages].reverse().find(HumanMessage.isInstance)
         const action = String(human?.content)
-        const parameters = action.startsWith("external") ? { value: 1 } : { book: 201 }
+        const parameters =
+          action === "externalNested"
+            ? { value: "STATUS-1" }
+            : action === "externalLocalNested"
+              ? { input: { value: "STATUS-1" } }
+              : action.startsWith("external")
+                ? { value: 1 }
+                : { book: 201 }
         return {
           generations: [
             {

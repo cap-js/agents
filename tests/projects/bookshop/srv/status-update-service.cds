@@ -1,5 +1,9 @@
 using {sap.capire.bookshop as my} from '../db/schema';
 
+type ExternalLookupInput {
+  value : String;
+};
+
 @agent
 service StatusUpdateService {
   @readonly
@@ -93,6 +97,12 @@ service StatusUpdateService {
 
   @Core.Messages: [{ code: 'agent-status-update', message: 'External path xpr: {value}' }]
   action externalPathXpr(value: Integer @Common.ValueList: { CollectionPath: 'ExternalIdPathXpr', Parameters: [{ $Type: 'Common.ValueListParameterInOut', LocalDataProperty: value, ValueListProperty: 'ID' }] }) returns String;
+
+  @Core.Messages: [{ code: 'agent-status-update', message: 'External nested: {value}' }]
+  action externalNested(value: String @Common.ValueList: { CollectionPath: 'ExternalIdPath', Parameters: [{ $Type: 'Common.ValueListParameterInOut', LocalDataProperty: value, ValueListProperty: 'status.identifier' }] }) returns String;
+
+  @Core.Messages: [{ code: 'agent-status-update', message: 'External local nested: {input}' }]
+  action externalLocalNested(input: ExternalLookupInput @Common.ValueList: { CollectionPath: 'ExternalIdPath', Parameters: [{ $Type: 'Common.ValueListParameterInOut', LocalDataProperty: input.value, ValueListProperty: 'status.identifier' }] }) returns String;
 }
 
 annotate StatusUpdateService.BooksTextFirst with { ID @Common.Text: title @Common.TextArrangement: #TextFirst; };
