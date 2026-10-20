@@ -6,6 +6,14 @@
 
 ## Version 0.9.9 - tbd
 
+### Added
+
+- Very experimental and limited support for pi agents
+
+### Changed
+
+- Use new AI Core API for content filtering to avoid preflight LLM call
+
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state

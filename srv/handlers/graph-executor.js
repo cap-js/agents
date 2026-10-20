@@ -1,10 +1,10 @@
 import cds from "@sap/cds"
-import { short, audit } from "../../lib/utils/utils.js"
+import { short, audit, extractErrorDetails } from "../../lib/utils/utils.js"
 import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
-import { formatFileSize, sanitizeFilename } from "./tools.js"
+import { formatFileSize, sanitizeFilename } from "../../lib/agents/tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
 import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
@@ -1037,10 +1037,13 @@ class GraphExecutor {
         })
         // In production, don't reveal internal error details to clients (CDS pattern)
         const PROD = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
-        const errorMsg =
-          PROD && err.$sanitize !== false
-            ? cds.i18n.messages.at(500) || "Internal Server Error"
-            : `Agent error: ${err.message}`
+        const rootErr = extractErrorDetails(err)
+        const errorMsg = (() => {
+          if (rootErr.status % 400 < 100) return err.message
+          if (PROD && rootErr.$sanitize !== false)
+            return cds.i18n.messages.at(500) || "Internal Server Error"
+          return `Agent error: ${err.message}`
+        })()
 
         eventBus.publish({
           kind: "status-update",
