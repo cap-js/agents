@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { short, audit, ms4, extractErrorDetails } from "../../lib/utils/utils.js"
+import { short, audit, extractErrorDetails } from "../../lib/utils/utils.js"
 import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
@@ -188,7 +188,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
+    const maxExecution = cds.utils.ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
@@ -346,7 +346,7 @@ class GraphExecutor {
     return { state: finalState, tokenCount }
   }
   async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
+    const maxExecution = cds.utils.ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
