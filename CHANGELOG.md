@@ -9,6 +9,7 @@
 ### Added
 
 - Very experimental and limited support for pi agents
+- Specifying MLflow log level. Default DEBUG level includes all spans as before, but INFO only shows the root node as well as the chat and tool spans
 
 ### Changed
 

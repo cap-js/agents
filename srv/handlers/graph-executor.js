@@ -3,6 +3,7 @@ import { short, audit, ms4, extractErrorDetails } from "../../lib/utils/utils.js
 import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
+import { setSpanError } from "../../lib/telemetry/tracing.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
 import { formatFileSize, sanitizeFilename } from "../../lib/agents/tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
@@ -1018,7 +1019,7 @@ class GraphExecutor {
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")
-          wfSpan.setStatus({ code: 2, message: err.message })
+          setSpanError(wfSpan, err)
         }
 
         const errorCode = err.message?.includes("timed out") ? "timeout" : "execution_failed"
