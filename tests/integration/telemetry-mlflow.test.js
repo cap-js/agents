@@ -67,6 +67,12 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       )
     })
 
+    it("should set MLflow span log levels", async () => {
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
+      expect(mlflowAttrs("CHAIN")["mlflow.spanLogLevel"]).toBe(10)
+      expect(mlflowAttrs("LLM")["mlflow.spanLogLevel"]).toBe(20)
+    })
+
     it("should not include inputs/outputs/tokenUsage keys when not provided", async () => {
       const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
       const attrs = mlflowAttrs("AGENT")
@@ -122,6 +128,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
     expect(span).not.toBe(undefined)
     expect(span.attributes["mlflow.spanType"]).toBe("AGENT")
+    expect(span.attributes["mlflow.spanLogLevel"]).toBe(20)
     expect(span.attributes["mlflow.experimentId"], "should have experimentId").toBeTruthy()
     expect(span.attributes["mlflow.experimentId"]).toBe("2")
   })
@@ -178,6 +185,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
     expect(span).not.toBe(undefined)
     expect(span.attributes["mlflow.spanType"]).toBe("TOOL")
+    expect(span.attributes["mlflow.spanLogLevel"]).toBe(20)
     expect(span.attributes["mlflow.spanInputs"]).not.toBe(undefined)
   })
 
@@ -233,6 +241,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const chatSpan = findSpan(spans, "chat MockLLM")
     expect(chatSpan).not.toBe(undefined)
     expect(chatSpan.attributes["mlflow.spanType"]).toBe("LLM")
+    expect(chatSpan.attributes["mlflow.spanLogLevel"]).toBe(20)
   })
 
   // ─── RunnableSequence spans ─────────────────────────────────────────
@@ -242,6 +251,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const seqSpans = findSpans(spans, "workflow RunnableSequence")
     expect(seqSpans.length > 0).toBeTruthy()
     expect(seqSpans[0].attributes["mlflow.spanType"]).toBe("CHAIN")
+    expect(seqSpans[0].attributes["mlflow.spanLogLevel"]).toBe(10)
   })
 
   // ─── HTTP span ──────────────────────────────────────────────────────
@@ -253,6 +263,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     // (depends on @cap-js/telemetry wrapping express), so test conditionally
     if (httpSpan) {
       expect(httpSpan.attributes["mlflow.spanType"]).toBe("CHAIN")
+      expect(httpSpan.attributes["mlflow.spanLogLevel"]).toBe(10)
     }
   })
 
