@@ -1039,7 +1039,7 @@ class GraphExecutor {
         const PROD = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
         const rootErr = extractErrorDetails(err)
         const errorMsg = (() => {
-          if (rootErr.contentFilter) return err.message
+          if (rootErr.status % 400 < 100) return err.message
           if (PROD && rootErr.$sanitize !== false)
             return cds.i18n.messages.at(500) || "Internal Server Error"
           return `Agent error: ${err.message}`
