@@ -1,10 +1,11 @@
 import cds from "@sap/cds"
-import { short, audit, ms4 } from "../../lib/utils/utils.js"
+import { short, audit, extractErrorDetails } from "../../lib/utils/utils.js"
 import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
+import { setSpanError } from "../../lib/telemetry/tracing.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
-import { formatFileSize, sanitizeFilename } from "./tools.js"
+import { formatFileSize, sanitizeFilename } from "../../lib/agents/tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
 import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
@@ -187,7 +188,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
+    const maxExecution = cds.utils.ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
@@ -345,7 +346,7 @@ class GraphExecutor {
     return { state: finalState, tokenCount }
   }
   async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
+    const maxExecution = cds.utils.ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
     // instead of AbortSignal.timeout() which uses an unreffed timer
@@ -1018,7 +1019,7 @@ class GraphExecutor {
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")
-          wfSpan.setStatus({ code: 2, message: err.message })
+          setSpanError(wfSpan, err)
         }
 
         const errorCode = err.message?.includes("timed out") ? "timeout" : "execution_failed"
@@ -1037,10 +1038,13 @@ class GraphExecutor {
         })
         // In production, don't reveal internal error details to clients (CDS pattern)
         const PROD = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
-        const errorMsg =
-          PROD && err.$sanitize !== false
-            ? cds.i18n.messages.at(500) || "Internal Server Error"
-            : `Agent error: ${err.message}`
+        const rootErr = extractErrorDetails(err)
+        const errorMsg = (() => {
+          if (rootErr.status % 400 < 100) return err.message
+          if (PROD && rootErr.$sanitize !== false)
+            return cds.i18n.messages.at(500) || "Internal Server Error"
+          return `Agent error: ${err.message}`
+        })()
 
         eventBus.publish({
           kind: "status-update",

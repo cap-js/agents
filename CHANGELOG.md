@@ -10,12 +10,20 @@
 
 - Support custom status messages for actions via an `agent-status-update` message in `@Core.Messages`. Via a `@Common.ValueList` annotation on a property a text value for an identifier can be resolved
 - Custom status messages when spawning subagents replacing unclear message 'Calling task'
+- Very experimental and limited support for pi agents
+- Specifying MLflow log level. Default DEBUG level includes all spans as before, but INFO only shows the root node as well as the chat and tool spans
+
+### Changed
+
+- Use new AI Core API for content filtering to avoid preflight LLM call
 
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state
 - `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
 - Deal with potentially missing crypto.randomUUID fn
+- Reduced likelihood of summarization timeout
+- Show message if falling back from auto config of llm to mock
 
 ## Version 0.9.8 - 2026-10-04
 
