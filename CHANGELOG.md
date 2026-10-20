@@ -15,6 +15,7 @@
 - Improved checkpointer by not persisting verbose model state
 - `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
 - Deal with potentially missing crypto.randomUUID fn
+- Show message if falling back from auto config of llm to mock
 
 ## Version 0.9.8 - 2026-10-04
 
