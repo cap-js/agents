@@ -8,10 +8,10 @@ import { vi, describe, it, expect, beforeEach } from "vitest"
 
 // ── Mock MultiServerMCPClient before importing the middleware ─────────────────
 
-const mockGetTools = vi.fn()
+const mockListTools = vi.fn()
 vi.mock("@langchain/mcp-adapters", () => ({
-  MultiServerMCPClient: vi.fn().mockImplementation(function () {
-    this.getTools = mockGetTools
+  MCPAdapter: vi.fn().mockImplementation(function () {
+    this.listTools = mockListTools
   }),
 }))
 
@@ -37,7 +37,7 @@ async function resolveTools(toolFilter) {
   const mcpConfig = makeMcpConfig(toolFilter)
   // Set up cds.context and invoke wrapModelCall
   cds.context = { __mcpDynamicTools: {} }
-  mockGetTools.mockResolvedValueOnce(makeFakeTools("query", "describe", "insert"))
+  mockListTools.mockResolvedValueOnce(makeFakeTools("query", "describe", "insert"))
 
   let capturedTools
   const middleware = remoteMcpMiddleware()
@@ -55,7 +55,7 @@ async function resolveTools(toolFilter) {
 
 describe("remoteMcpMiddleware — mcp.tools filter", () => {
   beforeEach(() => {
-    mockGetTools.mockReset()
+    mockListTools.mockReset()
     cds.context = {}
   })
 
