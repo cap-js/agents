@@ -104,13 +104,12 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
     })
 
     it("remote MCP connection (FlightsService) is represented as a dynamic placeholder", () => {
-      const placeholder = tools.find((t) => t._mcpDynamic)
+      const placeholder = tools.find((t) => t._dynamicTools)
       expect(
         placeholder,
-        `expected a _mcpDynamic placeholder — got: ${tools.map((t) => t.name ?? t.mcpUrl).join(", ")}`,
+        `expected a _dynamicTools placeholder — got: ${tools.map((t) => t.name ?? "(placeholder)").join(", ")}`,
       ).toBeTruthy()
-      expect(placeholder.mcpUrl).toBeTruthy()
-      expect(typeof placeholder.resolveHeaders).toBe("function")
+      expect(typeof placeholder._dynamicTools).toBe("function")
     })
 
     it("subagent tools present for hotel and activity services", () => {
@@ -157,7 +156,7 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
         const localTools = tools.filter((t) => t.name?.startsWith(PREFIX))
         expect(
           localTools.length > 0,
-          `expected tools prefixed with ${PREFIX}, got: ${tools.map((t) => t.name ?? t.mcpUrl).join(", ")}`,
+          `expected tools prefixed with ${PREFIX}, got: ${tools.map((t) => t.name ?? "(placeholder)").join(", ")}`,
         ).toBe(true)
       })
 
@@ -176,7 +175,7 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
   })
 
   // ── Remote MCP tool invocation via agent graph ─────────────────────────
-  // Remote MCP tools are resolved dynamically per-request inside remoteMcpMiddleware.
+  // Remote MCP tools are resolved dynamically per-request inside dynamicToolsMiddleware.
   // They are not present in the buildTools array; we exercise them by running a full
   // agent graph with a fake model that calls the specific tool exactly once.
 

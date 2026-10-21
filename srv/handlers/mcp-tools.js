@@ -65,11 +65,11 @@ export async function buildMcpToolsLocally(serviceName) {
 /**
  * Build a dynamic MCP placeholder from a CAP MCP connection.
  * Resolves the destination URL and auth-header factory; the actual tools/list
- * call is deferred to remoteMcpMiddleware which runs per-request with the
+ * call is deferred to dynamicToolsMiddleware which runs per-request with the
  * current user's credentials.
  *
  * @param {string} serviceName - cds.requires service key
- * @returns {Promise<{ _mcpDynamic: true, mcpUrl: string, resolveHeaders: () => Promise<object> }>}
+ * @returns {Promise<{ _dynamicTools: () => Promise<Tool[]> }>}
  */
 export async function buildMcpToolsFromConnection(serviceName) {
   let endpoints = cds.service.endpoints4({
@@ -133,7 +133,23 @@ export async function buildMcpToolsFromConnection(serviceName) {
   }
 
   const toolFilter = cds.requires[serviceName]?.mcp?.tools
-  return { _mcpDynamic: true, mcpUrl, serviceName, resolveHeaders, toolFilter }
+  return {
+    serviceName,
+    _dynamicTools: async () => {
+      const headers = await resolveHeaders()
+      const client = new (await import("@langchain/mcp-adapters")).MultiServerMCPClient({
+        mcpServers: { default: { transport: "http", url: mcpUrl, headers } },
+      })
+      let raw = await client.getTools()
+      if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
+      for (const t of raw) {
+        t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
+        t.name = toolName(`${serviceName}_${t.name}`)
+      }
+      LOG.debug(`Got ${raw.length} MCP tools from ${mcpUrl}: ${raw.map((t) => t.name).join(", ")}`)
+      return raw
+    },
+  }
 }
 
 export async function buildMcpTools(serviceName) {
