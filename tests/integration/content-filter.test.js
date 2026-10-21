@@ -142,12 +142,13 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       expect(model.options.contentFilter.input.azure_content_safety.prompt_shield).toBe(true)
     })
 
-    it("only passes output filter to SDK — input filter stays in options for middleware", async () => {
+    it("scopes SDK input filter after last assistant message", async () => {
       overrideModel(undefined)
       const model = await srv.send("buildModel", {})
-      // SDK receives output only
       expect(model.orchestrationConfig.filtering.output).toBeDefined()
-      expect(model.orchestrationConfig.filtering.input).toBeUndefined()
+      expect(model.orchestrationConfig.filtering.input.filters[0].target_selector).toEqual({
+        after_last_role: "assistant",
+      })
     })
 
     it("applies explicit custom contentFilter object", async () => {

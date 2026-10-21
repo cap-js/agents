@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { generateTools } from "./tools.js"
+import { generateTools } from "../../lib/agents/tools.js"
 import { toolName, mcpToolKind } from "../../lib/utils/utils.js"
 
 const LOG = cds.log("agents:mcp")
@@ -137,10 +137,11 @@ export async function buildMcpToolsFromConnection(serviceName) {
     serviceName,
     _dynamicTools: async () => {
       const headers = await resolveHeaders()
-      const client = new (await import("@langchain/mcp-adapters")).MultiServerMCPClient({
-        mcpServers: { default: { transport: "http", url: mcpUrl, headers } },
+      const client = new (await import("@langchain/mcp-adapters")).MCPAdapter({
+        servers: { default: { transport: "http", url: mcpUrl, headers } },
+        prefixToolNameWithServerName: false,
       })
-      let raw = await client.getTools()
+      let raw = await client.listTools()
       if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
       for (const t of raw) {
         t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }

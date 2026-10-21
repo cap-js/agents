@@ -1,6 +1,9 @@
 import cds from "@sap/cds"
 import { GraphExecutor } from "./handlers/graph-executor.js"
 import { GraphCache, hashFeatures } from "./graph-cache.js"
+import PiExecutor from "../lib/protocol/pi-executor.js"
+
+// REVISIT: this is not a langgraph executor, but an executor factory
 
 /**
  * LangGraph-based executor service for @agent annotated services.
@@ -26,8 +29,10 @@ export class LangGraphExecutor {
         return executor.cancelTask(taskId, eventBus)
       },
       abort: async (taskId) => {
+        // REVISIT: abort is not part of a2a executors
+        // It is only used in our own abortOnClose, which may often not be the wanted behavior
         const executor = await this._ensureExecutor(srv)
-        return executor.abort(taskId)
+        return executor.abort?.(taskId)
       },
     }
   }
@@ -51,10 +56,13 @@ export class LangGraphExecutor {
     const result = await srv.send("buildGraph", {})
 
     if (result && typeof result.invoke === "function") {
-      return new GraphExecutor(result, srv)
+      return new GraphExecutor(result, srv) // langchain executor
+    }
+    if (result?.harness === "pi") {
+      return new PiExecutor(result.factory, srv)
     }
     if (result && typeof result.execute === "function") {
-      return result
+      return result // result is already an executor
     }
 
     throw new Error(

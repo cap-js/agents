@@ -1,22 +1,22 @@
 /**
  * Unit-style tests for the mcp.tools filter in dynamicToolsMiddleware.
  *
- * Mocks MultiServerMCPClient so no real MCP server is needed.
+ * Mocks MCPAdapter so no real MCP server is needed.
  */
 import cds from "@sap/cds"
 import { vi, describe, it, expect, beforeEach } from "vitest"
 import { toolName, mcpToolKind } from "../../lib/utils/utils.js"
 
-// ── Mock MultiServerMCPClient before importing the middleware ─────────────────
+// ── Mock MCPAdapter before importing the middleware ───────────────────────────
 
-const mockGetTools = vi.fn()
+const mockListTools = vi.fn()
 vi.mock("@langchain/mcp-adapters", () => ({
-  MultiServerMCPClient: vi.fn().mockImplementation(function () {
-    this.getTools = mockGetTools
+  MCPAdapter: vi.fn().mockImplementation(function () {
+    this.listTools = mockListTools
   }),
 }))
 
-const { MultiServerMCPClient } = await import("@langchain/mcp-adapters")
+const { MCPAdapter } = await import("@langchain/mcp-adapters")
 const { dynamicToolsMiddleware } = await import("../../lib/agents/middleware/dynamic-tools.js")
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -31,10 +31,11 @@ function makeMcpPlaceholder(toolFilter) {
   return {
     serviceName,
     _dynamicTools: async () => {
-      const client = new MultiServerMCPClient({
-        mcpServers: { default: { transport: "http", url: mcpUrl, headers: {} } },
+      const client = new MCPAdapter({
+        servers: { default: { transport: "http", url: mcpUrl, headers: {} } },
+        prefixToolNameWithServerName: false,
       })
-      let raw = await client.getTools()
+      let raw = await client.listTools()
       if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
       for (const t of raw) {
         t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
@@ -48,7 +49,7 @@ function makeMcpPlaceholder(toolFilter) {
 async function resolveTools(toolFilter) {
   const placeholder = makeMcpPlaceholder(toolFilter)
   cds.context = { _dynamicTools: {} }
-  mockGetTools.mockResolvedValueOnce(makeFakeTools("query", "describe", "insert"))
+  mockListTools.mockResolvedValueOnce(makeFakeTools("query", "describe", "insert"))
 
   let capturedTools
   const middleware = dynamicToolsMiddleware()
@@ -66,7 +67,7 @@ async function resolveTools(toolFilter) {
 
 describe("dynamicToolsMiddleware — mcp.tools filter", () => {
   beforeEach(() => {
-    mockGetTools.mockReset()
+    mockListTools.mockReset()
     cds.context = {}
   })
 
