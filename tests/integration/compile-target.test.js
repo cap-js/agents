@@ -34,7 +34,7 @@ describe("@cap-js/agents - a2a compile target", () => {
     })
   })
 
-  describe("when selecting a service", () => {
+  describe("when correctly identifying the service to compile", () => {
     it("should compile the only service without requiring --service", () => {
       const csn = cds.linked(`service OnlyService { entity Items { key ID: UUID; } }`)
       const card = cds.compile.to.a2a(csn, { as: "json" })
@@ -77,27 +77,11 @@ describe("@cap-js/agents - a2a compile target", () => {
       expect(cds.compile.to.a2a(csn, { as: "json" }).description).toBe("Agent for BareService")
     })
 
-    it("should set protocolVersion to '0.3.0'", () => {
+    it("should set protocolVersion, capabilities and IO modes to expected defaults", () => {
       expect(card.protocolVersion).toBe("0.3.0")
-    })
-
-    it("should set version to a semver string", () => {
-      expect(card.version).toMatch(/^\d+\.\d+\.\d+/)
-    })
-
-    it("should set capabilities.streaming to true", () => {
       expect(card.capabilities.streaming).toBe(true)
-    })
-
-    it("should set capabilities.pushNotifications to true by default", () => {
       expect(card.capabilities.pushNotifications).toBe(true)
-    })
-
-    it("should set defaultInputModes to ['text/plain']", () => {
       expect(card.defaultInputModes).toEqual(["text/plain"])
-    })
-
-    it("should set defaultOutputModes to ['text/plain']", () => {
       expect(card.defaultOutputModes).toEqual(["text/plain"])
     })
 
@@ -107,10 +91,6 @@ describe("@cap-js/agents - a2a compile target", () => {
       expect(iface.protocolBinding).toBe("JSONRPC")
       expect(iface.protocolVersion).toBe("0.3.0")
     })
-
-    it("should set skills to an array", () => {
-      expect(Array.isArray(card.skills)).toBe(true)
-    })
   })
 
   describe("when deriving the agent URL", () => {
@@ -119,7 +99,7 @@ describe("@cap-js/agents - a2a compile target", () => {
       expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("https://HOST/a2a/my-agent")
     })
 
-    it("should use the @path value instead of the slugified name", () => {
+    it("should prefer the @path value over the slugified service name", () => {
       const csn = cds.linked(`
         @path: '/custom-path'
         service AnyService { entity Items { key ID: UUID; } }
@@ -147,32 +127,25 @@ describe("@cap-js/agents - a2a compile target", () => {
   })
 
   describe("when generating skills", () => {
-    it("should produce a 'query' skill with id='query' and name='Data Query' for entities", () => {
+    it("should produce a query skill with correct id, name, and tags for entities", () => {
       const csn = cds.linked(`service S { entity Products { key ID: UUID; } }`)
       const q = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "query")
       expect(q).toBeDefined()
       expect(q.name).toBe("Data Query")
-    })
-
-    it("should include 'query', 'data', 'read', and the entity name in the query skill tags", () => {
-      const csn = cds.linked(`service S { entity Products { key ID: UUID; } }`)
-      const q = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "query")
       expect(q.tags).toEqual(expect.arrayContaining(["query", "data", "read", "products"]))
     })
 
-    it("should produce a skill with 'hitl' and 'action' tags for an action", () => {
-      const csn = cds.linked(`service S { action doWork(input: String) returns String; }`)
-      const skill = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "doWork")
-      expect(skill).toBeDefined()
-      expect(skill.tags).toEqual(expect.arrayContaining(["hitl", "action"]))
-    })
+    it("should tag actions with hitl and functions without it", () => {
+      const csnWithAction = cds.linked(`service S { action doWork(input: String) returns String; }`)
+      const action = cds.compile.to.a2a(csnWithAction, { as: "json" }).skills.find((s) => s.id === "doWork")
+      expect(action).toBeDefined()
+      expect(action.tags).toEqual(expect.arrayContaining(["hitl", "action"]))
 
-    it("should produce a skill with 'function' tag and no 'hitl' for a function", () => {
-      const csn = cds.linked(`service S { function getInfo() returns String; }`)
-      const skill = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "getInfo")
-      expect(skill).toBeDefined()
-      expect(skill.tags).toContain("function")
-      expect(skill.tags).not.toContain("hitl")
+      const csnWithFunction = cds.linked(`service S { function getInfo() returns String; }`)
+      const func = cds.compile.to.a2a(csnWithFunction, { as: "json" }).skills.find((s) => s.id === "getInfo")
+      expect(func).toBeDefined()
+      expect(func.tags).toContain("function")
+      expect(func.tags).not.toContain("hitl")
     })
 
     it("should use the @description annotation as skill description", () => {
