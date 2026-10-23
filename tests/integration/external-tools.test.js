@@ -175,73 +175,37 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
     })
   })
 
-  // ── Remote MCP tool invocation via agent graph ─────────────────────────
+  // ── Remote MCP tool invocation via srv.chat ────────────────────────────
   // Remote MCP tools are resolved dynamically per-request inside remoteMcpMiddleware.
   // They are not present in the buildTools array; we exercise them by running a full
-  // agent graph with a fake model that calls the specific tool exactly once.
+  // agent graph with the mock model's explicit tool-call command.
 
   describe("MCP tool invocation (flightsservice tools against real xflights)", () => {
-    async function invokeViaGraph(toolName, toolArgs) {
-      const { createAgent } = await import("langchain")
-      const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
-      const { AIMessage, HumanMessage, ToolMessage } = await import("@langchain/core/messages")
-
+    async function invokeViaChat(toolName, toolArgs) {
       const srv = cds.services.TravelAgentService
-      const tools = await srv.send("buildTools")
-      const middleware = await srv.send("buildMiddleware", { tools })
-
-      // Single-shot fake model: first call issues the tool call, second ends.
-      let turn = 0
-      class OneShotModel extends BaseChatModel {
-        _llmType() {
-          return "oneshot-mock"
-        }
-        bindTools() {
-          return this
-        }
-        async _generate() {
-          turn++
-          if (turn === 1) {
-            return {
-              generations: [
-                {
-                  message: new AIMessage({
-                    content: "",
-                    tool_calls: [{ name: toolName, args: toolArgs, id: "tc1" }],
-                  }),
-                },
-              ],
-            }
-          }
-          return { generations: [{ message: new AIMessage("done") }] }
-        }
-      }
-
-      const agent = createAgent({ model: new OneShotModel({}), tools, middleware })
-      return cds.tx({ user: new cds.User.Privileged() }, async () => {
-        const result = await agent.invoke({ messages: [new HumanMessage("go")] })
-        return result.messages.find((m) => ToolMessage.isInstance(m) && m.name === toolName)
-      })
+      const command = `${toolName} ${JSON.stringify(toolArgs)}`
+      const result = await srv.chat(command, { _details: true })
+      return result.toolCalls.find((call) => call.tool === toolName)
     }
 
     it("flightsservice_query returns real airport data from xflights SQLite", async () => {
-      const msg = await invokeViaGraph("flightsservice_query", { cql: "SELECT * FROM Airports" })
-      expect(msg, "expected a ToolMessage for flightsservice_query").toBeTruthy()
-      const result = extractText(msg.content)
+      const call = await invokeViaChat("flightsservice_query", { cql: "SELECT * FROM Airports" })
+      expect(call, "expected a tool call for flightsservice_query").toBeTruthy()
+      const result = extractText(call.result)
       expect(
         result && result.length > 0,
-        `tool result should be non-empty, got: ${msg.content}`,
+        `tool result should be non-empty, got: ${JSON.stringify(call.result)}`,
       ).toBe(true)
       expect(result).toMatch(/FRA|JFK|Frankfurt|New York|Airport/i)
     })
 
     it("flightsservice_describe returns schema information for the Flights entity", async () => {
-      const msg = await invokeViaGraph("flightsservice_describe", { entity: "Flights" })
-      expect(msg, "expected a ToolMessage for flightsservice_describe").toBeTruthy()
-      const result = extractText(msg.content)
+      const call = await invokeViaChat("flightsservice_describe", { entity: "Flights" })
+      expect(call, "expected a tool call for flightsservice_describe").toBeTruthy()
+      const result = extractText(call.result)
       expect(
         result && result.length > 0,
-        `describe should return non-empty, got: ${msg.content}`,
+        `describe should return non-empty, got: ${JSON.stringify(call.result)}`,
       ).toBe(true)
       expect(result).toMatch(/date|price|flight|ID/i)
     })
