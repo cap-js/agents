@@ -9,6 +9,14 @@
     "@sap/cds": "^10.1.1"
   },
   "cds": {
+    "requires": {
+      "[test]": {
+        "llm": "mock",
+        "[hybrid]": {
+          "llm": "aicore"
+        }
+      }
+    },
     "server": {
       "port": 4006
     }

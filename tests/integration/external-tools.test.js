@@ -318,8 +318,8 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
 
     expect(modelCalls).toBe(2)
     expect(hotelResult, "expected the hotel subagent tool to run").toBeTruthy()
+    expect(hotelResult.content).toContain("[Mock LLM]")
     expect(hotelResult.content).toMatch(/Le Marais Grand Hotel/i)
-    expect(hotelResult.content).toMatch(/Montmartre Boutique Inn/i)
     expect(result.messages.at(-1).content).toBe("Hotel search delegated.")
   })
 
