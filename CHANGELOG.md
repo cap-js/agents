@@ -11,7 +11,7 @@
 - Remote A2A connections now authenticate when fetching agent cards
 - MCP authentication with forwardAuthToken also works from local subagents
 
-## Version 0.9.9 - tbd
+## Version 0.9.9 - 2026-10-23
 
 ### Added
 
