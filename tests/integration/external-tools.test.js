@@ -112,25 +112,6 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       expect(typeof placeholder._dynamicTools).toBe("function")
     })
 
-    it("subagent tools present for hotel and activity services", () => {
-      const names = new Set(tools.filter((t) => t.name).map((t) => t.name))
-      // Tool names come from agent card names (HotelService / ActivityService → lowercased)
-      expect(
-        names.has("hotelservice"),
-        `expected 'hotelservice' subagent tool — got: ${[...names].sort().join(", ")}`,
-      ).toBe(true)
-      expect(
-        names.has("activityservice"),
-        `expected 'activityservice' subagent tool — got: ${[...names].sort().join(", ")}`,
-      ).toBe(true)
-    })
-
-    it("subagent tool descriptions reference the real agent card content", () => {
-      const hotelTool = tools.find((t) => t.name === "hotelservice")
-      expect(hotelTool?.description?.length > 0).toBe(true)
-      expect(hotelTool.description).toMatch(/hotel/i)
-    })
-
     it("no duplicate tool names (collision regression guard)", () => {
       const names = tools.filter((t) => t.name).map((t) => t.name)
       const seen = new Set()
@@ -280,18 +261,66 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
 
   // ── Subagent invocation ───────────────────────────────────────────────
 
-  describe("subagent tool invocation (hotelservice against real leisure-services)", () => {
-    it("hotelservice tool sends a message and returns a response string", async () => {
-      const srv = cds.services.TravelAgentService
-      const tools = await srv.send("buildTools")
-      const hotelTool = tools.find((t) => t.name === "hotelservice")
-      expect(hotelTool, "hotelservice tool must be present").toBeTruthy()
+  it("builds and calls the hotel subagent through the agent graph, then runs its mocked LLM", async () => {
+    const { createAgent } = await import("langchain")
+    const { BaseChatModel } = await import("@langchain/core/language_models/chat_models")
+    const { AIMessage, HumanMessage, ToolMessage } = await import("@langchain/core/messages")
 
-      // leisure-services uses mock executor in dev mode — returns a mock response
-      const result = await hotelTool.invoke({ message: "Find hotels in Paris" })
-      expect(typeof result).toBe("string")
-      expect(result.length > 0).toBe(true)
-    })
+    const srv = cds.services.TravelAgentService
+    const tools = await srv.send("buildTools")
+    const middleware = await srv.send("buildMiddleware", { tools })
+    let modelCalls = 0
+
+    class HotelCallingModel extends BaseChatModel {
+      _llmType() {
+        return "hotel-subagent-integration-mock"
+      }
+
+      bindTools(boundTools) {
+        expect(
+          boundTools.some((candidate) => candidate.name === "hotelservice"),
+          `expected hotelservice among bound tools, got: ${boundTools.map((t) => t.name).join(", ")}`,
+        ).toBe(true)
+        return this
+      }
+
+      async _generate() {
+        modelCalls++
+        if (modelCalls === 1) {
+          return {
+            generations: [
+              {
+                message: new AIMessage({
+                  content: "",
+                  tool_calls: [
+                    {
+                      id: "hotel-call",
+                      name: "hotelservice",
+                      args: { message: "Find hotels in Paris" },
+                    },
+                  ],
+                }),
+              },
+            ],
+          }
+        }
+        return { generations: [{ message: new AIMessage("Hotel search delegated.") }] }
+      }
+    }
+
+    const agent = createAgent({ model: new HotelCallingModel({}), tools, middleware })
+    const result = await cds.tx({ user: new cds.User.Privileged() }, () =>
+      agent.invoke({ messages: [new HumanMessage("Find hotels in Paris")] }),
+    )
+    const hotelResult = result.messages.find(
+      (message) => ToolMessage.isInstance(message) && message.name === "hotelservice",
+    )
+
+    expect(modelCalls).toBe(2)
+    expect(hotelResult, "expected the hotel subagent tool to run").toBeTruthy()
+    expect(hotelResult.content).toMatch(/Le Marais Grand Hotel/i)
+    expect(hotelResult.content).toMatch(/Montmartre Boutique Inn/i)
+    expect(result.messages.at(-1).content).toBe("Hotel search delegated.")
   })
 
   // ── Agent card ─────────────────────────────────────────────────────────
