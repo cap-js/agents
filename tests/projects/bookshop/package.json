@@ -19,8 +19,7 @@
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1",
-    "@langchain/anthropic": "^1.5.1",
-    "@sap/cds-dk": "^10.1.2"
+    "@langchain/anthropic": "^1.5.1"
   },
   "cds": {
     "agents": {
