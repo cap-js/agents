@@ -8,6 +8,8 @@
 
 ### Added
 
+- Support custom status messages for actions via an `agent-status-update` message in `@Core.Messages`. Via a `@Common.ValueList` annotation on a property a text value for an identifier can be resolved
+- Custom status messages when spawning subagents replacing unclear message 'Calling task'
 - Very experimental and limited support for pi agents
 - Specifying MLflow log level. Default DEBUG level includes all spans as before, but INFO only shows the root node as well as the chat and tool spans
 
