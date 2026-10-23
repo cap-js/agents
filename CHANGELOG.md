@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- Declare the `langsmith` dependency the deep-agent (`deepagents`) path imports, so it resolves on installs that don't reproduce the lockfile's hoisting (e.g. a fresh `npm i` or the CDS 9 CI leg)
 - Improved checkpointer by not persisting verbose model state
 - `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
 - Deal with potentially missing crypto.randomUUID fn
