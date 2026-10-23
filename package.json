@@ -50,8 +50,8 @@
     "watch:deep-agent": "cds w tests/projects/deep-agent --profile hybrid",
     "docs:audit": "node .scripts/generate-audit-docs.js",
     "docs:audit:check": "node .scripts/generate-audit-docs.js --check",
-    "format": "npx -y oxfmt@0.70.0",
-    "format:check": "npx -y oxfmt@0.70.0 --check",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "prepare": "git config core.hooksPath .husky"
   },
   "dependencies": {
@@ -82,7 +82,8 @@
     "@vitest/coverage-v8": "^5.0.1",
     "acorn": "^8.18.0",
     "deepagents": "^1.10.2",
-    "openevals": "^0.2.0"
+    "openevals": "^0.2.0",
+    "oxfmt": ">=0.70.0"
   },
   "peerDependencies": {
     "@cap-js/audit-logging": ">=1",
