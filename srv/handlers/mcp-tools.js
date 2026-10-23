@@ -65,11 +65,11 @@ export async function buildMcpToolsLocally(serviceName) {
 /**
  * Build a dynamic MCP placeholder from a CAP MCP connection.
  * Resolves the destination URL and auth-header factory; the actual tools/list
- * call is deferred to remoteMcpMiddleware which runs per-request with the
+ * call is deferred to dynamicToolsMiddleware which runs per-request with the
  * current user's credentials.
  *
  * @param {string} serviceName - cds.requires service key
- * @returns {Promise<{ _mcpDynamic: true, mcpUrl: string, resolveHeaders: () => Promise<object> }>}
+ * @returns {Promise<{ _dynamicTools: () => Promise<Tool[]> }>}
  */
 export async function buildMcpToolsFromConnection(serviceName) {
   let endpoints = cds.service.endpoints4({
@@ -118,12 +118,41 @@ export async function buildMcpToolsFromConnection(serviceName) {
       LOG.debug(`Resolved destination "${destinationName}"`, { headerKeys: Object.keys(headers) })
       return headers
     }
+    if (typeof credentials === "object" && credentials?.forwardAuthToken) {
+      try {
+        const { retrieveJwt } = await import("@sap-cloud-sdk/connectivity")
+        const jwt = retrieveJwt(cds.context?.http?.req)
+        if (jwt) return { Authorization: `Bearer ${jwt}` }
+        LOG.warn(`Missing JWT token for forwardAuthToken on service "${serviceName}"`)
+      } catch (err) {
+        LOG.warn(
+          `Could not retrieve inbound JWT for "${serviceName}", falling back: ${err.message}`,
+        )
+      }
+    }
     const token = credentials?.authTokens?.[0]?.value
     return token ? { Authorization: `Bearer ${token}` } : {}
   }
 
   const toolFilter = cds.requires[serviceName]?.mcp?.tools
-  return { _mcpDynamic: true, mcpUrl, serviceName, resolveHeaders, toolFilter }
+  return {
+    serviceName,
+    _dynamicTools: async () => {
+      const headers = await resolveHeaders()
+      const client = new (await import("@langchain/mcp-adapters")).MCPAdapter({
+        servers: { default: { transport: "http", url: mcpUrl, headers } },
+        prefixToolNameWithServerName: false,
+      })
+      let raw = await client.listTools()
+      if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
+      for (const t of raw) {
+        t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
+        t.name = toolName(`${serviceName}_${t.name}`)
+      }
+      LOG.debug(`Got ${raw.length} MCP tools from ${mcpUrl}: ${raw.map((t) => t.name).join(", ")}`)
+      return raw
+    },
+  }
 }
 
 export async function buildMcpTools(serviceName) {
