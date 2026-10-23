@@ -287,7 +287,9 @@ export async function buildSubAgentToolFromConnection(serviceName) {
             if (jwt) return { Authorization: `Bearer ${jwt}` }
             LOG.warn(`Missing JWT token for forwardAuthToken on service "${serviceName}"`)
           } catch (err) {
-            LOG.warn(`Could not retrieve inbound JWT for "${serviceName}", falling back: ${err.message}`)
+            LOG.warn(
+              `Could not retrieve inbound JWT for "${serviceName}", falling back: ${err.message}`,
+            )
           }
         }
         const token = typeof credentials === "object" ? credentials?.authTokens?.[0]?.value : null

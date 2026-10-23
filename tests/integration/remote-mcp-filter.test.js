@@ -53,13 +53,10 @@ async function resolveTools(toolFilter) {
 
   let capturedTools
   const middleware = dynamicToolsMiddleware()
-  await middleware.wrapModelCall(
-    { tools: [placeholder] },
-    (req) => {
-      capturedTools = req.tools
-      return {}
-    },
-  )
+  await middleware.wrapModelCall({ tools: [placeholder] }, (req) => {
+    capturedTools = req.tools
+    return {}
+  })
   return capturedTools
 }
 
