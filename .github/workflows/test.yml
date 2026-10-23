@@ -37,7 +37,9 @@ jobs:
         if: matrix.cds-version == '9'
         run: |
           npm i -g @sap/cds-dk@9
+          npm i -f --workspaces @sap/cds@9 @cap-js/sqlite@2 @cap-js/hana@2 @sap/cds-mtxs@3
           npm i -f @sap/cds@9 @cap-js/sqlite@2 @cap-js/hana@2 @sap/cds-mtxs@3
+          npm ls @sap/cds @cap-js/sqlite @cap-js/hana @sap/cds-mtxs --all
           npm explore better-sqlite3 -- npm run install
       - run: npm test
 
