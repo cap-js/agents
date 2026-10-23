@@ -4,6 +4,13 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.10 - tbd
+
+### Fixed
+
+- Remote A2A connections now authenticate when fetching agent cards
+- MCP authentication with forwardAuthToken also works from local subagents
+
 ## Version 0.9.9 - tbd
 
 ### Added
