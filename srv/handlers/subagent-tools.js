@@ -78,7 +78,7 @@ function formatToolResult({ text, files }) {
 /**
  * Wrap an A2A client as a LangChain tool the agent can call.
  */
-function createA2ATool(client, agentCard, serviceName) {
+export function createA2ATool(client, agentCard, serviceName) {
   const subagent = agentCard.name
   const t = tool(
     async ({ message }) => {
@@ -280,7 +280,19 @@ export async function buildSubAgentToolFromConnection(serviceName) {
         }
       }
     : async () => {
-        const token = credentials?.authTokens?.[0]?.value
+        if (typeof credentials === "object" && credentials?.forwardAuthToken) {
+          try {
+            const { retrieveJwt } = await import("@sap-cloud-sdk/connectivity")
+            const jwt = retrieveJwt(cds.context?.http?.req)
+            if (jwt) return { Authorization: `Bearer ${jwt}` }
+            LOG.warn(`Missing JWT token for forwardAuthToken on service "${serviceName}"`)
+          } catch (err) {
+            LOG.warn(
+              `Could not retrieve inbound JWT for "${serviceName}", falling back: ${err.message}`,
+            )
+          }
+        }
+        const token = typeof credentials === "object" ? credentials?.authTokens?.[0]?.value : null
         return token ? { Authorization: `Bearer ${token}` } : {}
       }
 
@@ -309,41 +321,47 @@ export async function buildSubAgentToolFromConnection(serviceName) {
   const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
   LOG.info(`Connecting to subagent ${serviceName}`, { at: base })
 
-  // revisit: a2a agents may be tenant specific, card per tenant?
-  const initialHeaders = await resolveHeaders()
-  const cardUrl = `${base}/.well-known/agent-card.json`
-  const cardRes = await fetch(cardUrl, {
-    headers: { Accept: "application/json", ...initialHeaders },
-  })
-  if (!cardRes.ok) {
-    throw new Error(
-      `[subagents] Agent card fetch failed for "${serviceName}" at ${cardUrl}: HTTP ${cardRes.status}`,
-    )
+  return {
+    serviceName,
+    _dynamicTools: async () => {
+      const headers = await resolveHeaders()
+      const cardUrl = `${base}/.well-known/agent-card.json`
+      const cardRes = await fetch(cardUrl, { headers: { Accept: "application/json", ...headers } })
+      if (!cardRes.ok) {
+        throw new Error(
+          `[subagents] Agent card fetch failed for "${serviceName}" at ${cardUrl}: HTTP ${cardRes.status}`,
+        )
+      }
+      const agentCard = await cardRes.json()
+      LOG.debug(`Fetched agent card for ${serviceName}`, { name: agentCard.name })
+
+      const { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory, RestTransportFactory } =
+        await import("@a2a-js/sdk/client")
+
+      const { getTracer } = await import("../../lib/telemetry/metrics.js")
+      const customFetch = async (url, init = {}) => {
+        const freshHeaders = await resolveHeaders()
+        if (getTracer()) {
+          const { context, propagation } = await import("@opentelemetry/api")
+          propagation.inject(context.active(), freshHeaders)
+        }
+        return fetch(url, { ...init, headers: { ...freshHeaders, ...(init.headers || {}) } })
+      }
+
+      const factory = new ClientFactory(
+        ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
+          transports: [
+            new JsonRpcTransportFactory({ fetchImpl: customFetch }),
+            new RestTransportFactory({ fetchImpl: customFetch }),
+          ],
+        }),
+      )
+      const client = await factory.createFromAgentCard(agentCard)
+      const toolInstance = createA2ATool(client, agentCard, serviceName)
+      LOG.info(`Connected to subagent "${agentCard.name}" (${serviceName})`, { at: base })
+      return [toolInstance]
+    },
   }
-  const agentCard = await cardRes.json()
-
-  const { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory, RestTransportFactory } =
-    await import("@a2a-js/sdk/client")
-
-  const customFetch = async (url, init = {}) => {
-    const headers = await resolveHeaders()
-    if (getTracer()) {
-      const { context, propagation } = await import("@opentelemetry/api")
-      propagation.inject(context.active(), headers)
-    }
-    return fetch(url, { ...init, headers: { ...headers, ...(init.headers || {}) } })
-  }
-  const factory = new ClientFactory(
-    ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
-      transports: [
-        new JsonRpcTransportFactory({ fetchImpl: customFetch }),
-        new RestTransportFactory({ fetchImpl: customFetch }),
-      ],
-    }),
-  )
-  const client = await factory.createFromAgentCard(agentCard)
-
-  return createA2ATool(client, agentCard, serviceName)
 }
 
 export function buildSubAgentTool(serviceName) {
