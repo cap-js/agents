@@ -88,7 +88,7 @@ describe("Prompt caching", () => {
     }, 180000)
   }
 
-  it("uses prompt caching for gpt-5.2 and returns expected temporary-unavailable error", async () => {
+  it("uses prompt caching for gpt-5.2 and returns the underlying error", async () => {
     const { model: modelName, user } = GPT_52_CASE
     cds.env.requires.llm.model = modelName
 
@@ -101,7 +101,9 @@ describe("Prompt caching", () => {
 
     expect(response.status).toBe(200)
     expect(response.data.result?.status?.state).toBe("failed")
-    expect(response.data.result?.status?.message?.parts?.[0]?.text).toBe(
+    const errorMessage = response.data.result?.status?.message?.parts?.[0]?.text
+    expect(errorMessage).toEqual(expect.any(String))
+    expect(errorMessage).not.toBe(
       "Agent error: The agent is temporarily unavailable. Please try again later.",
     )
 

@@ -15,6 +15,6 @@ export default defineConfig({
       reportsDirectory: "coverage/hybrid",
       exclude: ["tests/**", ".scripts/*"],
     },
-    silent: true,
+    silent: "passed-only",
   },
 })
