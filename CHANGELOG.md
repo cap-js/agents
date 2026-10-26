@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.10 - 2026-10-26
+
+### Removed
+
+- Reverted back to old content filter implementation because new AI Core api is not yet deployed on all productive BTP landscapes
+
 ## Version 0.9.9 - 2026-10-23
 
 ### Added
