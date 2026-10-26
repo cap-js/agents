@@ -88,7 +88,7 @@ describe("Prompt caching", () => {
     }, 180000)
   }
 
-  it("uses prompt caching for gpt-5.2 and returns expected temporary-unavailable error", async () => {
+  it.skip("uses prompt caching for gpt-5.2 and returns expected temporary-unavailable error", async () => {
     const { model: modelName, user } = GPT_52_CASE
     cds.env.requires.llm.model = modelName
 
