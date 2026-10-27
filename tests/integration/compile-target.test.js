@@ -52,7 +52,7 @@ describe("@cap-js/agents - a2a compile target", () => {
   })
 
   describe("when generating the agent card", () => {
-    let card
+    let expectedCard
 
     beforeAll(() => {
       const csn = cds.linked(`
@@ -61,15 +61,16 @@ describe("@cap-js/agents - a2a compile target", () => {
           entity Items { key ID: UUID; name: String; }
         }
       `)
-      card = cds.compile.to.a2a(csn, { as: "json" })
+
+      expectedCard = cds.compile.to.a2a(csn, { as: "json" })
     })
 
     it("should set name to the service name", () => {
-      expect(card.name).toBe("StructureTestService")
+      expect(expectedCard.name).toBe("StructureTestService")
     })
 
     it("should use the @description annotation as description", () => {
-      expect(card.description).toBe("A test agent")
+      expect(expectedCard.description).toBe("A test agent")
     })
 
     it("should fall back to 'Agent for {name}' when @description is absent", () => {
@@ -78,25 +79,28 @@ describe("@cap-js/agents - a2a compile target", () => {
     })
 
     it("should set protocolVersion, capabilities and IO modes to expected defaults", () => {
-      expect(card.protocolVersion).toBe("0.3.0")
-      expect(card.capabilities.streaming).toBe(true)
-      expect(card.capabilities.pushNotifications).toBe(true)
-      expect(card.defaultInputModes).toEqual(["text/plain"])
-      expect(card.defaultOutputModes).toEqual(["text/plain"])
+      expect(expectedCard.protocolVersion).toBe("0.3.0")
+      expect(expectedCard.capabilities.streaming).toBe(true)
+      expect(expectedCard.capabilities.pushNotifications).toBe(true)
+      expect(expectedCard.defaultInputModes).toEqual(["text/plain"])
+      expect(expectedCard.defaultOutputModes).toEqual(["text/plain"])
     })
 
-    it("should set supportedInterfaces with matching url and JSONRPC binding at protocolVersion 0.3.0", () => {
-      const [iface] = card.supportedInterfaces
-      expect(iface.url).toBe(card.url)
-      expect(iface.protocolBinding).toBe("JSONRPC")
-      expect(iface.protocolVersion).toBe("0.3.0")
+    it("should expose a single JSONRPC additionalInterfaces entry mirroring the card url", () => {
+      // TODO: Review AI Test
+      expect(expectedCard.preferredTransport).toBe("JSONRPC")
+      expect(expectedCard.url).toBe("/a2a/structure-test")
+      expect(expectedCard.additionalInterfaces).toHaveLength(1)
+      const [iface] = expectedCard.additionalInterfaces
+      expect(iface.transport).toBe("JSONRPC")
+      expect(iface.url).toBe(expectedCard.url)
     })
   })
 
   describe("when deriving the agent URL", () => {
-    it("should use the HOST placeholder and the slugified service name by default", () => {
+    it("should use a relative URL with the slugified service name by default", () => {
       const csn = cds.linked(`service MyAgentService { entity Items { key ID: UUID; } }`)
-      expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("https://HOST/a2a/my-agent")
+      expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("/a2a/my-agent")
     })
 
     it("should prefer the @path value over the slugified service name", () => {
@@ -104,7 +108,7 @@ describe("@cap-js/agents - a2a compile target", () => {
         @path: '/custom-path'
         service AnyService { entity Items { key ID: UUID; } }
       `)
-      expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("https://HOST/a2a/custom-path")
+      expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("/a2a/custom-path")
     })
 
     it("should strip a leading slash from @path before appending it", () => {
@@ -112,17 +116,38 @@ describe("@cap-js/agents - a2a compile target", () => {
         @path: 'no-slash'
         service AnyService { entity Items { key ID: UUID; } }
       `)
-      expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("https://HOST/a2a/no-slash")
+      expect(cds.compile.to.a2a(csn, { as: "json" }).url).toBe("/a2a/no-slash")
     })
 
-    it("should use the @Core.Links rel=via href as proxy URL on both card.url and supportedInterfaces", () => {
-      const csn = cds.linked(`
-        @Core.Links: [{rel: 'via', href: 'https://proxy.example.com/agent'}]
-        service ProxiedService { entity Items { key ID: UUID; } }
-      `)
-      const card = cds.compile.to.a2a(csn, { as: "json" })
-      expect(card.url).toBe("https://proxy.example.com/agent")
-      expect(card.supportedInterfaces[0].url).toBe("https://proxy.example.com/agent")
+    it("should use the hostUrl option as the base of the agent URL", () => {
+      // TODO: Review AI Test
+      const csn = cds.linked(`service AnyService { entity Items { key ID: UUID; } }`)
+      const card = cds.compile.to.a2a(csn, { hostUrl: "https://my.host.com", as: "json" })
+      expect(card.url).toBe("https://my.host.com/a2a/any")
+    })
+
+    it("should prepend https:// when hostUrl has no scheme", () => {
+      // TODO: Review AI Test
+      const csn = cds.linked(`service AnyService { entity Items { key ID: UUID; } }`)
+      expect(cds.compile.to.a2a(csn, { hostUrl: "my.host.com", as: "json" }).url).toBe(
+        "https://my.host.com/a2a/any",
+      )
+    })
+
+    it("should preserve an explicit http:// scheme in hostUrl", () => {
+      // TODO: Review AI Test
+      const csn = cds.linked(`service AnyService { entity Items { key ID: UUID; } }`)
+      expect(cds.compile.to.a2a(csn, { hostUrl: "http://my.host.com", as: "json" }).url).toBe(
+        "http://my.host.com/a2a/any",
+      )
+    })
+
+    it("should strip trailing slashes from hostUrl", () => {
+      // TODO: Review AI Test
+      const csn = cds.linked(`service AnyService { entity Items { key ID: UUID; } }`)
+      expect(cds.compile.to.a2a(csn, { hostUrl: "https://my.host.com//", as: "json" }).url).toBe(
+        "https://my.host.com/a2a/any",
+      )
     })
   })
 
@@ -135,17 +160,20 @@ describe("@cap-js/agents - a2a compile target", () => {
       expect(q.tags).toEqual(expect.arrayContaining(["query", "data", "read", "products"]))
     })
 
-    it("should tag actions with hitl and functions without it", () => {
-      const csnWithAction = cds.linked(`service S { action doWork(input: String) returns String; }`)
-      const action = cds.compile.to.a2a(csnWithAction, { as: "json" }).skills.find((s) => s.id === "doWork")
-      expect(action).toBeDefined()
-      expect(action.tags).toEqual(expect.arrayContaining(["hitl", "action"]))
+    it("should tag an action skill with its name, kind, and hitl", () => {
+      // TODO: Review AI Test
+      const csn = cds.linked(`service S { action doWork(input: String) returns String; }`)
+      const skill = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "doWork")
+      expect(skill).toBeDefined()
+      expect(skill.tags).toEqual(["dowork", "action", "hitl"])
+    })
 
-      const csnWithFunction = cds.linked(`service S { function getInfo() returns String; }`)
-      const func = cds.compile.to.a2a(csnWithFunction, { as: "json" }).skills.find((s) => s.id === "getInfo")
-      expect(func).toBeDefined()
-      expect(func.tags).toContain("function")
-      expect(func.tags).not.toContain("hitl")
+    it("should tag a function skill with its name and kind but not hitl", () => {
+      // TODO: Review AI Test
+      const csn = cds.linked(`service S { function getInfo() returns String; }`)
+      const skill = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "getInfo")
+      expect(skill).toBeDefined()
+      expect(skill.tags).toEqual(["getinfo", "function"])
     })
 
     it("should use the @description annotation as skill description", () => {
@@ -189,13 +217,19 @@ describe("@cap-js/agents - a2a compile target", () => {
       expect(result).not.toBeNull()
     })
 
-    it("should return a formatted JSON string when stdout is not a TTY and as is not set", () => {
-      if (process.stdout.isTTY) return
-
-      const csn = cds.linked(`service S { entity Items { key ID: UUID; } }`)
-      const result = cds.compile.to.a2a(csn, {})
-      expect(result).toBeTypeOf("string")
-      expect(JSON.parse(result)).toBeTypeOf("object")
+    it("should return a 2-space JSON string when neither as:json nor a TTY applies", () => {
+      // TODO: Review AI Test
+      const originalTTY = process.stdout.isTTY
+      process.stdout.isTTY = false
+      try {
+        const csn = cds.linked(`service S { entity Items { key ID: UUID; } }`)
+        const result = cds.compile.to.a2a(csn, {})
+        expect(result).toBeTypeOf("string")
+        expect(result).toContain("\n  ") // 2-space indentation
+        expect(JSON.parse(result).name).toBe("S")
+      } finally {
+        process.stdout.isTTY = originalTTY
+      }
     })
   })
 })
