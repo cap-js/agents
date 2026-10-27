@@ -14,7 +14,6 @@
     "tests/projects/deep-agent/",
     "tests/projects/mtx/mtx/sidecar/",
     "tests/projects/telemetry-debug/",
-    "tests/projects/telemetry-v1/",
     "tests/projects/travel/travel-agent/",
     "tests/projects/travel/xflights/",
     "tests/projects/travel/leisure-services/",
