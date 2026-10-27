@@ -1,7 +1,17 @@
 {
+  "name": "CatalogService",
+  "description": "Browse and order books from the catalog",
+  "version": "1.0.0",
+  "protocolVersion": "0.3.0",
+  "preferredTransport": "JSONRPC",
+  "additionalInterfaces": [
+    {
+      "transport": "JSONRPC"
+    }
+  ],
   "capabilities": {
-    "pushNotifications": true,
     "streaming": true,
+    "pushNotifications": true
   },
   "defaultInputModes": [
     "text/plain",
@@ -9,7 +19,7 @@
     "application/json",
     "application/pdf",
     "image/png",
-    "image/jpeg",
+    "image/jpeg"
   ],
   "defaultOutputModes": [
     "text/plain",
@@ -17,195 +27,182 @@
     "application/json",
     "application/pdf",
     "image/png",
-    "image/jpeg",
+    "image/jpeg"
   ],
-  "description": "Browse and order books from the catalog",
-  "name": "CatalogService",
-  "protocolVersion": "0.3.0",
   "skills": [
     {
-      "description": "Query data from the service. Available entities: 
- Books: Book details with author information 
- ListOfBooks: Browse available books 
- Authors: Pseudonymized authors of the books on offer",
-      "examples": [
-        "Show me all Books",
-      ],
       "id": "query",
       "name": "Data Query",
+      "description": "Query data from the service. Available entities: \n Books: Book details with author information \n ListOfBooks: Browse available books \n Authors: Pseudonymized authors of the books on offer",
+      "examples": [
+        "Show me all Books"
+      ],
       "tags": [
         "query",
         "data",
         "read",
         "books",
         "listofbooks",
-        "authors",
-      ],
+        "authors"
+      ]
     },
     {
-      "description": "Submit an order for a book",
-      "examples": [
-        "Order 2 copies of Wuthering Heights",
-      ],
       "id": "submitOrder",
       "name": "submitOrder",
+      "description": "Submit an order for a book",
+      "examples": [
+        "Order 2 copies of Wuthering Heights"
+      ],
       "tags": [
         "submitorder",
         "action",
-        "hitl",
-      ],
+        "hitl"
+      ]
     },
     {
-      "description": "Get stock level for a specific book",
-      "examples": [
-        "Get stock level for Wuthering Heights",
-      ],
       "id": "getStock",
       "name": "getStock",
+      "description": "Get stock level for a specific book",
+      "examples": [
+        "Get stock level for Wuthering Heights"
+      ],
       "tags": [
         "getstock",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Look up author contact details",
-      "examples": [
-        "Look up author contact details",
-      ],
       "id": "findAuthor",
       "name": "findAuthor",
+      "description": "Look up author contact details",
+      "examples": [
+        "Look up author contact details"
+      ],
       "tags": [
         "findauthor",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Get an author name as a scalar",
-      "examples": [
-        "Get an author name as a scalar",
-      ],
       "id": "authorName",
       "name": "authorName",
+      "description": "Get an author name as a scalar",
+      "examples": [
+        "Get an author name as a scalar"
+      ],
       "tags": [
         "authorname",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Get a masked author secret as a scalar",
-      "examples": [
-        "Get a masked author secret as a scalar",
-      ],
       "id": "authorSecret",
       "name": "authorSecret",
+      "description": "Get a masked author secret as a scalar",
+      "examples": [
+        "Get a masked author secret as a scalar"
+      ],
       "tags": [
         "authorsecret",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Get all names of an author as a scalar array",
-      "examples": [
-        "Get all names of an author as a scalar array",
-      ],
       "id": "authorAllNames",
       "name": "authorAllNames",
+      "description": "Get all names of an author as a scalar array",
+      "examples": [
+        "Get all names of an author as a scalar array"
+      ],
       "tags": [
         "authorallnames",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Get author with a list of nicknames",
-      "examples": [
-        "Get author with a list of nicknames",
-      ],
       "id": "authorWithNicknames",
       "name": "authorWithNicknames",
+      "description": "Get author with a list of nicknames",
+      "examples": [
+        "Get author with a list of nicknames"
+      ],
       "tags": [
         "authorwithnicknames",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "List author names",
-      "examples": [
-        "List author names",
-      ],
       "id": "listAuthorNames",
       "name": "listAuthorNames",
+      "description": "List author names",
+      "examples": [
+        "List author names"
+      ],
       "tags": [
         "listauthornames",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "List author contacts",
-      "examples": [
-        "List author contacts",
-      ],
       "id": "listAuthorContacts",
       "name": "listAuthorContacts",
+      "description": "List author contacts",
+      "examples": [
+        "List author contacts"
+      ],
       "tags": [
         "listauthorcontacts",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Author profile with nested address",
-      "examples": [
-        "Author profile with nested address",
-      ],
       "id": "authorProfile",
       "name": "authorProfile",
+      "description": "Author profile with nested address",
+      "examples": [
+        "Author profile with nested address"
+      ],
       "tags": [
         "authorprofile",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Author dossier using a named type",
-      "examples": [
-        "Author dossier using a named type",
-      ],
       "id": "authorDossier",
       "name": "authorDossier",
+      "description": "Author dossier using a named type",
+      "examples": [
+        "Author dossier using a named type"
+      ],
       "tags": [
         "authordossier",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Author with many past addresses",
-      "examples": [
-        "Author with many past addresses",
-      ],
       "id": "authorWithHistory",
       "name": "authorWithHistory",
+      "description": "Author with many past addresses",
+      "examples": [
+        "Author with many past addresses"
+      ],
       "tags": [
         "authorwithhistory",
-        "function",
-      ],
+        "function"
+      ]
     },
     {
-      "description": "Validate an order (always fails with two errors for testing)",
-      "examples": [
-        "Validate an order (always fails with two errors for testing)",
-      ],
       "id": "validateOrder",
       "name": "validateOrder",
+      "description": "Validate an order (always fails with two errors for testing)",
+      "examples": [
+        "Validate an order (always fails with two errors for testing)"
+      ],
       "tags": [
         "validateorder",
         "action",
-        "hitl",
-      ],
-    },
-  ],
-  "supportedInterfaces": [
-    {
-      "protocolBinding": "JSONRPC",
-      "protocolVersion": "0.3.0",
-    },
-  ],
-  "version": "1.0.0",
+        "hitl"
+      ]
+    }
+  ]
 }
