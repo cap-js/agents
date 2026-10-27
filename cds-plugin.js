@@ -6,7 +6,7 @@ import { patchLangChain } from "./lib/telemetry/tracing.js"
 import { slugified } from "./lib/utils/utils.js"
 import { registerCompileTargets } from "./lib/api.cjs"
 
-registerCompileTargets()
+await registerCompileTargets()
 
 // Enable doc comments in CSN for agent card generation
 cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
