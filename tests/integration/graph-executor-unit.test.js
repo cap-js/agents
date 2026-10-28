@@ -1,4 +1,6 @@
 import cds from "@sap/cds"
+import { createAgent } from "langchain"
+import MockChatModel from "../../lib/models/mock.js"
 
 const { GraphExecutor, messageText, defaultOutputMapper } =
   await import("../../srv/handlers/graph-executor.js")
@@ -772,25 +774,15 @@ describe("emit_data_part tool", () => {
     withCtx(async () => {
       const tool = createEmitDataPartTool()
       const data = { orderId: 99, status: "confirmed" }
+      const agent = createAgent({
+        model: new MockChatModel("graph-executor-unit"),
+        tools: [tool],
+      })
 
       const publishedEvents = []
       const fakeGraph = {
         checkpointer: {},
-        invoke: async () => {
-          // Simulate the LangGraph tool node: the AI calls emit_data_part, LangGraph
-          // invokes it and stores the return value (stringified) as ToolMessage.content.
-          const toolResult = await tool.invoke({ data })
-          return {
-            messages: [
-              {
-                content: "here is your order",
-                tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }],
-              },
-              { content: JSON.stringify(toolResult), tool_call_id: "tc-emit-1" },
-              { content: "Order confirmed." },
-            ],
-          }
-        },
+        invoke: (...args) => agent.invoke(...args),
       }
       const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
@@ -799,7 +791,9 @@ describe("emit_data_part tool", () => {
         {
           taskId: "task-emit-data-1",
           contextId: "ctx-emit-data-1",
-          userMessage: { parts: [{ kind: "text", text: "place order" }] },
+          userMessage: {
+            parts: [{ kind: "text", text: "emit_data_part " + JSON.stringify({ data }) }],
+          },
           task: { status: { state: "working" } },
         },
         capturingEventBus,
