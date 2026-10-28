@@ -37,4 +37,23 @@ describe("Feature Toggles (@agent.card + @agent.directory)", () => {
     expect(resBob.data.result.status.message.parts[0].text).toBe("llm")
     expect(resAlice.data.result.status.message.parts[0].text).toBe("another-llm")
   })
+
+  describe("when @agent.directory is overridden by a feature toggle", () => {
+    it("should resolve the feature-toggled @agent.directory when the feature is active", async () => {
+      const res = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: ALICE })
+      expect(res.status).toBe(200)
+
+      expect(res.data.name).toBe("Experimental Agent")
+      expect(res.data.skills.some((s) => s.tags.includes("experimental"))).toBe(true)
+    })
+
+    it("should not replace the agent metadata when the feature is not active", async () => {
+      // TODO: Review AI Test
+      const res = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: BOB })
+      expect(res.status).toBe(200)
+
+      expect(res.data.name).toBe("MtxTestService")
+      expect(res.data.skills.some((s) => s.tags.includes("experimental"))).toBe(false)
+    })
+  })
 })
