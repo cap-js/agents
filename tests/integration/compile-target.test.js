@@ -11,9 +11,7 @@ describe("@cap-js/agents - a2a compile target", () => {
   describe("when the model is invalid", () => {
     it("should throw when no services are present", () => {
       const csn = cds.linked(`entity Orphan { key ID: UUID; }`)
-      expect(() => cds.compile.to.a2a(csn, { as: "json" })).toThrow(
-        "No service definitions found",
-      )
+      expect(() => cds.compile.to.a2a(csn, { as: "json" })).toThrow("No service definitions found")
     })
 
     it("should throw when multiple services exist and --service is not given", () => {
@@ -183,7 +181,9 @@ describe("@cap-js/agents - a2a compile target", () => {
           action submitOrder(orderID: UUID) returns String;
         }
       `)
-      const skill = cds.compile.to.a2a(csn, { as: "json" }).skills.find((s) => s.id === "submitOrder")
+      const skill = cds.compile.to
+        .a2a(csn, { as: "json" })
+        .skills.find((s) => s.id === "submitOrder")
       expect(skill?.description).toBe("Submit a new order")
     })
 

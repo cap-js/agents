@@ -3,9 +3,7 @@ import cds from "@sap/cds"
 const { GET } = cds.test(import.meta.dirname + "/../projects/agent-card-compile")
 
 describe("@cap-js/agents - agent card compilation", () => {
-
   describe("when the service has only a .cds file with annotations", () => {
-
     it("should use the service name as the card name", async () => {
       // TODO: Review AI Test
       const { data: card } = await GET("/a2a/plain-cds/.well-known/agent-card.json")
@@ -30,7 +28,6 @@ describe("@cap-js/agents - agent card compilation", () => {
   })
 
   describe("when the service has a co-located AGENTS.md and skills", () => {
-
     it("should override the card name, version, and description from the AGENTS.md frontmatter", async () => {
       // TODO: Review AI Test
       const { data: card } = await GET("/a2a/with-agents-md/.well-known/agent-card.json")
@@ -63,7 +60,6 @@ describe("@cap-js/agents - agent card compilation", () => {
   })
 
   describe("when @agent.directory points to a sibling folder", () => {
-
     it("should build the card from the annotated directory when the folder name differs from the slug", async () => {
       // TODO: Review AI Test
       const { data: card } = await GET("/a2a/external-dir/.well-known/agent-card.json")
