@@ -1,6 +1,6 @@
 ---
 name: external-home-agent
-version: "1.0.0"
+version: "4.2.0"
 description: An agent whose metadata lives in a directory resolved by @agent.directory.
 ---
 

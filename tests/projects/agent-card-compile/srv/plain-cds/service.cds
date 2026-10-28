@@ -1,20 +1,32 @@
 // Condition: a service defined by its .cds file only, with no AGENTS.md.
-// The agent card is built from sensible defaults + CDS annotations:
-//   - card name  = the service name
-//   - query skill description includes each entity's @description
-//   - one action skill per action
+// The agent card skills are aggregated from sensible defaults + CDS annotations:
+//   - one "query" skill summarising ALL entities (id, tags, description)
+//   - one skill per action and function, with kind-specific tags and examples
+//   - the query skill is listed before the action/function skills
 
 @agent
 service PlainCdsService {
 
-  @description: 'Books available in the catalog.'
   @readonly
-  entity Books {
-    key ID    : UUID;
-        title : String(100);
+  @description: 'The first simple entity.'
+  entity FirstSimpleEntity {
+    key ID : UUID;
   }
 
-  @description: 'Reserve a book by title. Example: Reserve Moby Dick'
-  @agent.hitl
-  action reserve(title : String) returns String;
+  @readonly
+  @description: 'The second simple entity.'
+  entity SecondSimpleEntity {
+    key ID : UUID;
+  }
+
+  /**
+   * Executes the annotated action.
+   *
+   * Example: run the annotated action
+   * Example: trigger it twice
+   */
+  @description: 'The annotated action.'
+  action annotatedAction() returns String;
+
+  function plainFunction() returns String;
 }
