@@ -78,6 +78,17 @@
           "model": "gpt-4o-mini",
           "contentFilter": false
         },
+        "aicoreLlamaGuard": {
+          "kind": "aicore",
+          "model": "mistralai--mistral-small",
+          "contentFilter": {
+            "input": {
+              "llama_guard_3_8b": {
+                "elections": true
+              }
+            }
+          }
+        },
         "llm": "mock",
         "[hybrid]": {
           "llm": "aicore"
