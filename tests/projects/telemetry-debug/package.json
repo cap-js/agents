@@ -5,8 +5,8 @@
   "type": "module",
   "dependencies": {
     "@cap-js/agents": "file:../../../.",
-    "@cap-js/telemetry": "^2",
-    "@sap/cds": "^10.1.1"
+    "@cap-js/telemetry": "^2.1.1",
+    "@sap/cds": "^10.2.1"
   },
   "devDependencies": {
     "@cap-js/sqlite": ">=1"
