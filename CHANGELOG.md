@@ -4,6 +4,16 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.11 - tbd
+
+### Added
+
+- LLama Guard can now be configured as content filter for AI Core
+
+### Fixed
+
+- Content filtering preflight LLM calls now use mistral-small instead of gpt-4o-mini
+
 ## Version 0.9.10 - 2026-10-26
 
 ### Changed
