@@ -59,12 +59,12 @@ describe("@cap-js/agent - Sidecar Support", () => {
   describe("Agent card and tools work through sidecar API", () => {
     it("agent card is properly generated for service via createAgent", async () => {
       const { createA2AAgent: createAgent } = await import("../../lib/sidecar.js")
-      const { generateAgentCard } = await import("../../lib/protocol/agent-card.js")
+      const { compileAgentCard } = await import("../../lib/protocol/agent-card.js")
       const srv = cds.services["CatalogService"]
       const router = createAgent(srv, { path: "/a2a/catalog" })
       assert.notEqual(router, null)
 
-      const card = generateAgentCard(srv, { path: "/a2a/catalog" })
+      const card = compileAgentCard(srv)
       assert.strictEqual(card.name, "CatalogService")
       assert.ok(card.skills.length > 0)
       assert.ok(card.skills.find((s) => s.id === "query"))
