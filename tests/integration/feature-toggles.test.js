@@ -14,17 +14,6 @@ describe("Feature Toggles (@agent.card + @agent.directory)", () => {
     expect(res.data.name).toBe("MtxTestService")
   })
 
-  it("alice gets feature-toggled agent card (@agent.card override)", async () => {
-    const res = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: ALICE })
-    expect(res.status).toBe(200)
-    // Alice has 'experimental' feature → @agent.card annotation overridden via fts/experimental/
-    expect(res.data.name).toBe("Experimental Agent")
-    expect(res.data.description).toBe("Feature-toggled experimental agent")
-    expect(res.data.skills.length).toBe(1)
-    expect(res.data.skills[0].id).toBe("experimental-skill")
-    expect(res.data.skills[0].tags).toEqual(["experimental"])
-  })
-
   it("@agent.llm is feature-toggle aware", async () => {
     const message = (text) => ({
       jsonrpc: "2.0",

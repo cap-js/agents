@@ -10,6 +10,7 @@
     "url": "git+https://github.com/cap-js/agents.git"
   },
   "workspaces": [
+    "tests/projects/agent-card-compile/",
     "tests/projects/bookshop/",
     "tests/projects/deep-agent/",
     "tests/projects/mtx/mtx/sidecar/",
