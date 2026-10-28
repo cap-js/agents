@@ -18,7 +18,7 @@ describe("when compiling the agent card from cds build output (gen/ folder)", ()
   it("should prefer @source over $location when resolving serviceSourceDir after cds build", () => {
     const savedRoot = cds.root
     cds.root = GEN_SRV_DIR
-    
+
     try {
       const fakeSrv = {
         definition: {
@@ -38,7 +38,6 @@ describe("when compiling the agent card from cds build output (gen/ folder)", ()
 
   it("should successfully serve the agent service in cds watch without producing warnings", async () => {
     const output = await new Promise((resolve, reject) => {
-      
       const cdsWatchProcess = spawn("cds", ["watch"], {
         cwd: GEN_SRV_DIR,
         env: {

@@ -17,7 +17,13 @@ describe("agent card compilation", () => {
       const query = card.skills.find((s) => s.id === "query")
       expect(query.description).toContain("- FirstSimpleEntity: The first simple entity.")
       expect(query.description).toContain("- SecondSimpleEntity: The second simple entity.")
-      expect(query.tags).toEqual(["query", "data", "read", "firstsimpleentity", "secondsimpleentity"])
+      expect(query.tags).toEqual([
+        "query",
+        "data",
+        "read",
+        "firstsimpleentity",
+        "secondsimpleentity",
+      ])
     })
 
     it("should successfully aggregate an action skill from the action name, @description, doc, and kind", async () => {
@@ -85,7 +91,9 @@ describe("agent card compilation", () => {
       const { data: card } = await GET("/a2a/external-dir/.well-known/agent-card.json")
 
       expect(card.version).toBe("4.2.0")
-      expect(card.description).toBe("An agent whose metadata lives in a directory resolved by @agent.directory.")
+      expect(card.description).toBe(
+        "An agent whose metadata lives in a directory resolved by @agent.directory.",
+      )
     })
   })
 })
