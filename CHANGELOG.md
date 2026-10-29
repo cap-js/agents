@@ -10,7 +10,7 @@
 
 - Reverted AI Core content filtering changes since they are not live on all BTP landscapes
 - Dropped support for `@agent.card`, as it was never fully integrated; Resolving agent-card info from `{service}.cds` annotations and `AGENTS.md` (relative path or `@agent.directory`) exclusively
-- Dropped support for `@Core.Link`, as incompatible with mt scenarios
+- Dropped support for `@Core.Links`, as incompatible with mt scenarios
 
 ### Added
 
