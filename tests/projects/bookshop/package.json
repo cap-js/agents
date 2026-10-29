@@ -108,17 +108,10 @@
           "kind": "audit-log-to-console"
         },
         "telemetry": {
-          "kind": "telemetry-to-console",
+          "kind": "telemetry-to-jaeger",
           "tracing": {
-            "exporter": {
-              "module": "@cap-js/telemetry",
-              "class": "ConsoleSpanExporter"
-            }
-          },
-          "metrics": {
-            "exporter": {
-              "module": "@cap-js/telemetry",
-              "class": "ConsoleMetricExporter"
+            "processor": {
+              "kind": "BatchSpanProcessor"
             }
           }
         },
