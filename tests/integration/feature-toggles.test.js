@@ -7,7 +7,6 @@ const ALICE = { username: "alice", password: "" }
 const BOB = { username: "bob", password: "" }
 
 describe("when feature toggles override @agent annotations", () => {
-
   it("should provide an agent card based on default sources to a user without the feature", async () => {
     const res = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: BOB })
 

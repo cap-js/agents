@@ -110,15 +110,14 @@ describe("a2a compile target", () => {
     it("should return a 2-space JSON string when neither as:json nor a TTY applies", () => {
       const originalTTY = process.stdout.isTTY
       process.stdout.isTTY = false
-      
+
       try {
         const csn = cds.linked(`service S { entity Items { key ID: UUID; } }`)
         const result = cds.compile.to.a2a(csn, {})
-      
+
         expect(result).toBeTypeOf("string")
         expect(result).toContain("\n  ") // 2-space indentation
         expect(JSON.parse(result).name).toBe("S")
-      
       } finally {
         process.stdout.isTTY = originalTTY
       }
