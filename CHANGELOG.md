@@ -8,7 +8,7 @@
 
 ### Changed
 
-- OpenTelemetry v3 is now accounted for 
+- OpenTelemetry v3 is now accounted for
 
 ## Version 0.9.10 - 2026-10-26
 
