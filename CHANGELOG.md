@@ -9,6 +9,12 @@
 ### Changed
 
 - Reverted AI Core content filtering changes since they are not live on all BTP landscapes
+- Dropped support for `@agent.card`, as it was never fully integrated; Resolving agent-card info from `{service}.cds` annotations and `AGENTS.md` (relative path or `@agent.directory`) exclusively
+- Dropped support for `@Core.Link`, as incompatible with mt scenarios
+
+### Added
+
+- Expose `compile_to_a2a` via `lib/api.cjs`, as per `@cap-js/ord` plugin convention
 
 ## Version 0.9.9 - 2026-10-23
 
