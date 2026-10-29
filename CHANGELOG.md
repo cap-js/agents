@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.11 - Unreleased
+
+### Changed
+
+- OpenTelemetry v3 is now accounted for 
+
 ## Version 0.9.10 - 2026-10-26
 
 ### Changed
