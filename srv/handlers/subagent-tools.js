@@ -127,7 +127,7 @@ export async function buildSubAgentToolLocally(serviceName) {
   const executor = LangGraphExecutor.for(srv)
 
   const { compileAgentCard } = await import("../../lib/protocol/agent-card.js")
-  const agentCard = compileAgentCard(srv)
+  const agentCard = compileAgentCard(srv.definition)
   LOG.info(`Connecting to subagent ${serviceName}`, "(local)")
 
   const { RequestContext, DefaultExecutionEventBus } = await import("@a2a-js/sdk/server")

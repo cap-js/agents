@@ -64,7 +64,7 @@ describe("@cap-js/agent - Sidecar Support", () => {
       const router = createAgent(srv, { path: "/a2a/catalog" })
       assert.notEqual(router, null)
 
-      const card = compileAgentCard(srv)
+      const card = compileAgentCard(srv.definition)
       assert.strictEqual(card.name, "CatalogService")
       assert.ok(card.skills.length > 0)
       assert.ok(card.skills.find((s) => s.id === "query"))
