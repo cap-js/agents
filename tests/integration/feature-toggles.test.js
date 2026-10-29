@@ -52,7 +52,6 @@ describe("when feature toggles override @agent annotations", () => {
     })
 
     it("should not replace the agent metadata when the feature is not active", async () => {
-      // TODO: Review AI Test
       const res = await GET("/a2a/mtx-test/.well-known/agent-card.json", { auth: BOB })
       expect(res.status).toBe(200)
 
