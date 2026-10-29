@@ -53,15 +53,13 @@ export async function getSpanExporter() {
   if (memExporter) return memExporter
   const { trace } = await import("@opentelemetry/api")
   const { SDK_INFO } = await import("@opentelemetry/core")
+  const { SimpleSpanProcessor, InMemorySpanExporter } = await import("@opentelemetry/sdk-trace")
+  memExporter = new InMemorySpanExporter()
   let exporter
   if (SDK_INFO["telemetry.sdk.version"].startsWith("3")) {
-    const { SimpleSpanProcessor, InMemorySpanExporter } = await import("@opentelemetry/sdk-trace")
-    memExporter = new InMemorySpanExporter()
     exporter = new SimpleSpanProcessor({ exporter: memExporter })
   } else {
     const { SimpleSpanProcessor, InMemorySpanExporter } =
-      await import("@opentelemetry/sdk-trace-base")
-    memExporter = new InMemorySpanExporter()
     exporter = new SimpleSpanProcessor(memExporter)
   }
   const provider = trace.getTracerProvider()

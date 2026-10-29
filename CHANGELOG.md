@@ -10,6 +10,10 @@
 
 - OpenTelemetry v3 is now accounted for
 
+### Removed
+
+- OpenTelemetry v1 support is dropped
+
 ## Version 0.9.10 - 2026-10-26
 
 ### Changed
