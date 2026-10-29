@@ -14,7 +14,7 @@
 
 ### Added
 
-- Expose `compile_to_a2a` via `lib/api.cjs`, as per `@cap-js/ord` plugin convention
+- Register A2A AgentCard compile target via `lib/api.cjs`, as per `@cap-js/ord` plugin convention
 
 ## Version 0.9.9 - 2026-10-23
 
