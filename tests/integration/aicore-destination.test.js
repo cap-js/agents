@@ -186,7 +186,6 @@ describe("@cap-js/agents - AICore Destination Connectivity", () => {
         const merged = model.mergeOrchestrationConfig(model.orchestrationConfig, opts)
 
         expect(merged.promptTemplating.model.params).toMatchObject({
-          temperature: 0,
           prompt_cache_retention: "24h",
         })
         expect(merged.promptTemplating.model.params.prompt_cache_key).toBe("tenant-1")

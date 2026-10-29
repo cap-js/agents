@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.9.8",
+  "version": "0.9.10",
   "description": "CDS plugin for building agents",
   "homepage": "https://cap.cloud.sap/",
   "license": "Apache-2.0",
@@ -15,7 +15,6 @@
     "tests/projects/deep-agent/",
     "tests/projects/mtx/mtx/sidecar/",
     "tests/projects/telemetry-debug/",
-    "tests/projects/telemetry-v1/",
     "tests/projects/travel/travel-agent/",
     "tests/projects/travel/xflights/",
     "tests/projects/travel/leisure-services/",
