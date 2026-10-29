@@ -59,8 +59,9 @@ export async function getSpanExporter() {
   if (SDK_INFO["telemetry.sdk.version"].startsWith("3")) {
     exporter = new SimpleSpanProcessor({ exporter: memExporter })
   } else {
-    const { SimpleSpanProcessor, InMemorySpanExporter } =
-    exporter = new SimpleSpanProcessor(memExporter)
+    const { SimpleSpanProcessor, InMemorySpanExporter } = (exporter = new SimpleSpanProcessor(
+      memExporter,
+    ))
   }
   const provider = trace.getTracerProvider()
   const delegate = provider.getDelegate?.() || provider
