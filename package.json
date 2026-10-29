@@ -76,6 +76,7 @@
     "@cap-js/sqlite": "^3",
     "@earendil-works/pi-agent-core": "^1",
     "@earendil-works/pi-ai": "^1",
+    "@opentelemetry/sdk-trace": ">=2.11",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "@vitest/coverage-v8": "^5.0.1",
