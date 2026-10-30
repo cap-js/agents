@@ -190,7 +190,10 @@
         "auth": "xsuaa"
       },
       "[mlflow]": {
-        "audit-log": false,
+        "audit-log": {
+          "outbox": false,
+          "kind": "audit-log-to-console"
+        },
         "telemetry": {
           "kind": "telemetry-to-console",
           "tracing": {
@@ -204,6 +207,12 @@
               "module": "@cap-js/telemetry",
               "class": "ConsoleMetricExporter"
             }
+          }
+        },
+        "mlflow": {
+          "credentials": {
+            "MLFLOW_HOST": "http://localhost:5678",
+            "MLFLOW_EXPERIMENT_ID": "0"
           }
         }
       }
