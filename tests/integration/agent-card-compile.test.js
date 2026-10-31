@@ -12,7 +12,11 @@ describe("agent card compilation", () => {
     it("should successfully aggregate the required query skill based on available entities", async () => {
       const { data: card } = await GET("/a2a/plain-cds/.well-known/agent-card.json")
 
-      expect(card.skills.map((s) => s.id)).toEqual(["query", "annotatedAction", "plainFunction"])
+      expect(card.skills.map((s) => s.id)).toEqual([
+        "query",
+        "call-annotatedAction",
+        "call-plainFunction",
+      ])
 
       const query = card.skills.find((s) => s.id === "query")
       expect(query.description).toContain("- FirstSimpleEntity: The first simple entity.")
@@ -29,9 +33,9 @@ describe("agent card compilation", () => {
     it("should successfully aggregate an action skill from the action name, @description, doc, and kind", async () => {
       const { data: card } = await GET("/a2a/plain-cds/.well-known/agent-card.json")
 
-      const callActionSkill = card.skills.find((s) => s.id === "annotatedAction")
+      const callActionSkill = card.skills.find((s) => s.id === "call-annotatedAction")
       expect(callActionSkill).toBeDefined()
-      expect(callActionSkill.name).toBe("annotatedAction")
+      expect(callActionSkill.name).toBe("Call annotatedAction")
       expect(callActionSkill.description).toBe("The annotated action.")
       expect(callActionSkill.examples).toEqual(["run the annotated action", "trigger it twice"])
       expect(callActionSkill.tags).toEqual(["annotatedaction", "action", "hitl"])
@@ -40,9 +44,9 @@ describe("agent card compilation", () => {
     it("should apply defaults when aggregating a function skill when no metadata is configured in annotations", async () => {
       const { data: card } = await GET("/a2a/plain-cds/.well-known/agent-card.json")
 
-      const callFunctionSkill = card.skills.find((s) => s.id === "plainFunction")
+      const callFunctionSkill = card.skills.find((s) => s.id === "call-plainFunction")
       expect(callFunctionSkill).toBeDefined()
-      expect(callFunctionSkill.name).toBe("plainFunction")
+      expect(callFunctionSkill.name).toBe("Call plainFunction")
       expect(callFunctionSkill.description).toBe("Get plainFunction")
       expect(callFunctionSkill.examples).toEqual(["Get plainFunction"])
       expect(callFunctionSkill.tags).toEqual(["plainfunction", "function"])
@@ -68,7 +72,7 @@ describe("agent card compilation", () => {
       expect(lookup.examples).toContain("Show me all products")
 
       expect(card.skills.find((s) => s.id === "query")).toBeDefined()
-      expect(card.skills.find((s) => s.id === "serviceAction")).toBeDefined()
+      expect(card.skills.find((s) => s.id === "call-serviceAction")).toBeDefined()
     })
 
     it("should exclude a skill when its SKILL.md sets metadata.private", async () => {

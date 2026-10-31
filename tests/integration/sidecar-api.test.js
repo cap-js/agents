@@ -68,8 +68,8 @@ describe("@cap-js/agent - Sidecar Support", () => {
       assert.strictEqual(card.name, "CatalogService")
       assert.ok(card.skills.length > 0)
       assert.ok(card.skills.find((s) => s.id === "query"))
-      assert.ok(card.skills.find((s) => s.id === "submitOrder"))
-      assert.ok(card.skills.find((s) => s.id === "getStock"))
+      assert.ok(card.skills.find((s) => s.id === "call-submitOrder"))
+      assert.ok(card.skills.find((s) => s.id === "call-getStock"))
     })
 
     it("tools are properly generated for service via sidecar API", async () => {
