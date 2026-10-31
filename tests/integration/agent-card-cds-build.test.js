@@ -14,10 +14,11 @@ afterAll(() => {
   rmSync(path.join(DEEP_AGENT_DIR, "gen"), { recursive: true, force: true })
 })
 
-describe("agent card from cds build output (gen/ folder)", () => {
-  it("serviceSourceDir: prefers @source over $location after cds build", () => {
+describe("when compiling the agent card from cds build output (gen/ folder)", () => {
+  it("should prefer @source over $location when resolving serviceSourceDir after cds build", () => {
     const savedRoot = cds.root
     cds.root = GEN_SRV_DIR
+
     try {
       const fakeSrv = {
         definition: {
@@ -35,9 +36,9 @@ describe("agent card from cds build output (gen/ folder)", () => {
     }
   })
 
-  it("cds watch from gen/srv produces no @agent.directory-not-found warning", async () => {
+  it("should successfully serve the agent service in cds watch without producing warnings", async () => {
     const output = await new Promise((resolve, reject) => {
-      const proc = spawn("cds", ["watch"], {
+      const cdsWatchProcess = spawn("cds", ["watch"], {
         cwd: GEN_SRV_DIR,
         env: {
           ...process.env,
@@ -52,25 +53,25 @@ describe("agent card from cds build output (gen/ folder)", () => {
       const collect = (chunk) => {
         buf += chunk.toString()
       }
-      proc.stdout.on("data", collect)
-      proc.stderr.on("data", collect)
+      cdsWatchProcess.stdout.on("data", collect)
+      cdsWatchProcess.stderr.on("data", collect)
 
       const check = setInterval(() => {
         if (/server listening/i.test(buf)) {
           clearInterval(check)
           clearTimeout(bail)
-          proc.kill()
+          cdsWatchProcess.kill()
           resolve(buf)
         }
       }, 100)
 
       const bail = setTimeout(() => {
         clearInterval(check)
-        proc.kill()
+        cdsWatchProcess.kill()
         reject(new Error(`cds watch did not reach 'server listening' in 20 s.\nOutput:\n${buf}`))
       }, 20_000)
 
-      proc.on("error", (err) => {
+      cdsWatchProcess.on("error", (err) => {
         clearInterval(check)
         clearTimeout(bail)
         reject(err)

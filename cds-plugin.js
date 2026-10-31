@@ -4,8 +4,9 @@ const LOG = cds.log("agents")
 import registerDefaultAgentHandlers from "./srv/handlers/index.js"
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import { slugified } from "./lib/utils/utils.js"
-import cds_compile_to_a2a from "./lib/compile.js"
-cds.compile.to.a2a = cds_compile_to_a2a
+import { registerCompileTargets } from "./lib/api.cjs"
+
+registerCompileTargets()
 
 // Enable doc comments in CSN for agent card generation
 cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
