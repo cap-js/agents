@@ -1,8 +1,9 @@
 import cds from "@sap/cds"
 
-const { GET } = cds.test(import.meta.dirname + "/../projects/agent-card-compile")
 
 describe("agent card compilation", () => {
+  const { GET } = cds.test(import.meta.dirname + "/../projects/agent-card-compile")
+  
   describe("when the service has only a .cds file with annotations", () => {
     it("should use the service name as the card name", async () => {
       const { data: card } = await GET("/a2a/plain-cds/.well-known/agent-card.json")
@@ -54,14 +55,14 @@ describe("agent card compilation", () => {
 
     describe('when the service uses an @Core.Links annotation', () => {
       it('should use the proxy url as top-level url', async () => {
-        const { data: card } = await GET("/a2a/plain-cds-with-proxy/.well-known/agent-card.json")
+        const { data: card } = await GET("/a2a/plain-cds-service-with-proxy/.well-known/agent-card.json")
         expect(card.name).toBe("PlainCdsServiceWithProxy")
         expect(card.url).toBe("https://example.com/agent/with-proxy")
       })
 
       it('should use the proxy url in additionalInterfaces', async () => {
-        const { data: card } = await GET("/a2a/plain-cds-with-proxy/.well-known/agent-card.json")
-        expect(card.name).toBe("PlainCdsSePlainCdsServiceWithProxyrvice")
+        const { data: card } = await GET("/a2a/plain-cds-service-with-proxy/.well-known/agent-card.json")
+        expect(card.name).toBe("PlainCdsServiceWithProxy")
         expect(card.additionalInterfaces).toBeDefined()
         expect(card.additionalInterfaces).toHaveLength(1)
         expect(card.additionalInterfaces[0]?.url).toBe('https://example.com/agent/with-proxy')
