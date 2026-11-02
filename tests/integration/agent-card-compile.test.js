@@ -51,6 +51,22 @@ describe("agent card compilation", () => {
       expect(callFunctionSkill.examples).toEqual(["Get plainFunction"])
       expect(callFunctionSkill.tags).toEqual(["plainfunction", "function"])
     })
+
+    describe('when the service uses an @Core.Links annotation', () => {
+      it('should use the proxy url as top-level url', async () => {
+        const { data: card } = await GET("/a2a/plain-cds-with-proxy/.well-known/agent-card.json")
+        expect(card.name).toBe("PlainCdsServiceWithProxy")
+        expect(card.url).toBe("https://example.com/agent/with-proxy")
+      })
+
+      it('should use the proxy url in additionalInterfaces', async () => {
+        const { data: card } = await GET("/a2a/plain-cds-with-proxy/.well-known/agent-card.json")
+        expect(card.name).toBe("PlainCdsSePlainCdsServiceWithProxyrvice")
+        expect(card.additionalInterfaces).toBeDefined()
+        expect(card.additionalInterfaces).toHaveLength(1)
+        expect(card.additionalInterfaces[0]?.url).toBe('https://example.com/agent/with-proxy')
+      })
+    })
   })
 
   describe("when the service has a co-located AGENTS.md and skills files", () => {
