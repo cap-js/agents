@@ -15,7 +15,7 @@
 ### Changed
 
 - Reverted AI Core content filtering changes since they are not live on all BTP landscapes
-- Dropped support for `@agent.card`, as it was never fully integrated; Resolving agent-card info from `{service}.cds` annotations and `AGENTS.md` (relative path or `@agent.directory`) exclusively
+- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
 
 ### Added
 
