@@ -28,7 +28,7 @@ describe("when compiling the agent card from cds build output (gen/ folder)", ()
           },
         },
       }
-      const dir = serviceSourceDir(fakeSrv)
+      const dir = serviceSourceDir(fakeSrv.definition)
       expect(dir).toBe(path.join(GEN_SRV_DIR, "srv", "colocated-agent"))
       expect(dir).not.toBe(path.join(GEN_SRV_DIR, "srv"))
     } finally {
