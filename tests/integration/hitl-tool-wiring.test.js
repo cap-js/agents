@@ -4,7 +4,7 @@ import cds from "@sap/cds"
 // while getStock is a plain, non-gated function.
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
-const { generateTools } = await import("../../srv/handlers/tools.js")
+const { generateTools } = await import("../../lib/agents/tools.js")
 const { buildHitlInterruptMap, humanInTheLoopMiddleware } =
   await import("../../lib/agents/middleware/hitl.js")
 
