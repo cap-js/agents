@@ -1,0 +1,41 @@
+name: Auto Format
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-format
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm set min-release-age=3
+      - run: npm ci
+      - name: Apply formatting
+        run: npm run format
+      - name: Create or update formatting PR
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          commit-message: "chore: apply oxfmt formatting"
+          title: "chore: apply oxfmt formatting"
+          body: |
+            Automated formatting update.
+
+            `npm run format` produced changes on `main`, so this PR brings the
+            branch back in line with `oxfmt`. Pure mechanical reformat, no logic
+            changes.
+          branch: chore/auto-format
+          delete-branch: true
+          labels: no changelog

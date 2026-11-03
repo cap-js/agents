@@ -4,7 +4,20 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.9 - tbd
+## Version 0.9.11 - Unreleased
+
+### Removed
+
+- OpenTelemetry v1 support is dropped
+- Removed the `cds.agents.streaming` configuration since langchain graphs always have the stream method
+
+## Version 0.9.10 - 2026-10-26
+
+### Changed
+
+- Reverted AI Core content filtering changes since they are not live on all BTP landscapes
+
+## Version 0.9.9 - 2026-10-23
 
 ### Added
 

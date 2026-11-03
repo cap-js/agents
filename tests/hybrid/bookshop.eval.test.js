@@ -559,17 +559,7 @@ describe.concurrent("HITL DataPart carry", () => {
 describe("Token streaming", () => {
   setupErrorDetection()
 
-  let origStreaming
-
-  beforeEach(() => {
-    origStreaming = cds.env.agents?.streaming
-  })
-
-  afterEach(() => {
-    if (cds.env.agents) cds.env.agents.streaming = origStreaming
-  })
-
-  it("emits multiple incremental artifact-update frames (streaming:true)", async () => {
+  it("emits multiple incremental artifact-update frames", async () => {
     const res = await streamMessage("catalog", "Show me all books")
     const frames = parseSSEFrames(res.data)
     const artifactFrames = frames.filter((f) => f.result?.kind === "artifact-update")
@@ -601,27 +591,5 @@ describe("Token streaming", () => {
       (f) => f.result?.kind === "status-update" && f.result?.final === true,
     )
     expect(completed?.result?.status?.state).toBe("completed")
-  }, 180000)
-
-  it("falls back to single artifact frame when streaming:false", async () => {
-    cds.env.agents ??= {}
-    cds.env.agents.streaming = false
-
-    const res = await streamMessage("catalog", "Show me all books")
-    const frames = parseSSEFrames(res.data)
-    const artifactFrames = frames.filter((f) => f.result?.kind === "artifact-update")
-    const incrementalFrames = artifactFrames.filter(
-      (f) => f.result?.append === true && f.result?.lastChunk !== true,
-    )
-    expect(
-      incrementalFrames.length,
-      "expected no incremental token frames when streaming:false",
-    ).toBe(0)
-
-    const completed = frames.find(
-      (f) => f.result?.kind === "status-update" && f.result?.final === true,
-    )
-    expect(completed?.result?.status?.state).toBe("completed")
-    expect(completed?.result?.status?.message?.parts?.[0]?.text?.length).toBeGreaterThan(0)
   }, 180000)
 })
