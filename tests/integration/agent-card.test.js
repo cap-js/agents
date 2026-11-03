@@ -21,7 +21,7 @@ describe("@cap-js/agents - Agent Card Generation", () => {
       expect(submitSkill).not.toBe(undefined)
     })
 
-    it("capabilities.streaming reflects cds.env.agents.streaming config", async () => {
+    it("advertises streaming capability", async () => {
       const res = await GET("/a2a/catalog/.well-known/agent-card.json")
       const card = res.data
       expect(card.capabilities.streaming).toBe(true)

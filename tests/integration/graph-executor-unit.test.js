@@ -1,3 +1,4 @@
+import { createMockGraph } from "../utils/mock-streaming-graph.js"
 import cds from "@sap/cds"
 
 const { GraphExecutor, messageText, defaultOutputMapper } =
@@ -14,6 +15,15 @@ const fakeEventBus = { publish: () => {}, finished: () => {} }
 // Wrap a test body so it runs inside a fresh CDS context (needed by graph-executor
 // paths that read cds.context / call audit()).
 const withCtx = (fn) => () => cds._with({}, fn)
+
+describe("GraphExecutor - graph validation", () => {
+  it("rejects a graph without stream()", async () => {
+    const executor = new GraphExecutor({ invoke: async () => ({}) }, { name: "TestService" })
+    await expect(executor._resolveGraph()).rejects.toThrow(
+      "buildGraph must return a compiled LangGraph graph (with a stream() method)",
+    )
+  })
+})
 
 describe("messageText", () => {
   it("returns string content unchanged", () => {
@@ -105,13 +115,10 @@ describe("GraphExecutor - configMapper", () => {
     withCtx(async () => {
       let capturedConfig
 
-      const fakeGraph = {
-        checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
-        invoke: async (_input, config) => {
-          capturedConfig = config
-          return { messages: [{ content: "ok" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        capturedConfig = config
+        return { messages: [{ content: "ok" }] }
+      })
 
       const executor = new GraphExecutor(
         Promise.resolve(fakeGraph),
@@ -131,7 +138,7 @@ describe("GraphExecutor - configMapper", () => {
         fakeEventBus,
       )
 
-      expect(capturedConfig, "graph.invoke must have been called").toBeTruthy()
+      expect(capturedConfig, "graph.stream must have been called").toBeTruthy()
       expect(
         capturedConfig.configurable.myKey,
         "configMapper return value must appear in config.configurable",
@@ -144,13 +151,10 @@ describe("GraphExecutor - configMapper", () => {
     withCtx(async () => {
       let capturedConfig
 
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          capturedConfig = config
-          return { messages: [{ content: "ok" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        capturedConfig = config
+        return { messages: [{ content: "ok" }] }
+      })
 
       // configMapper must not be able to overwrite reserved keys — they must always be spread last
       const executor = new GraphExecutor(
@@ -188,13 +192,10 @@ describe("GraphExecutor - configMapper", () => {
     withCtx(async () => {
       let capturedConfig
 
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          capturedConfig = config
-          return { messages: [{ content: "ok" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        capturedConfig = config
+        return { messages: [{ content: "ok" }] }
+      })
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
@@ -218,13 +219,10 @@ describe("GraphExecutor - configMapper", () => {
     withCtx(async () => {
       let capturedConfig
 
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          capturedConfig = config
-          return { messages: [{ content: "ok" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        capturedConfig = config
+        return { messages: [{ content: "ok" }] }
+      })
 
       const executor = new GraphExecutor(
         Promise.resolve(fakeGraph),
@@ -256,10 +254,7 @@ describe("GraphExecutor - configMapper", () => {
     withCtx(async () => {
       let publishedEvents = []
 
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async () => ({ messages: [{ content: "ok" }] }),
-      }
+      const fakeGraph = createMockGraph(async () => ({ messages: [{ content: "ok" }] }))
 
       const capturingEventBus = {
         publish: (e) => publishedEvents.push(e),
@@ -454,13 +449,10 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "resumes checkpointed work when timeout continuation is approved",
     withCtx(async () => {
       let capturedInput
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (input) => {
-          capturedInput = input
-          return { messages: [{ content: "done" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (input) => {
+        capturedInput = input
+        return { messages: [{ content: "done" }] }
+      })
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
       await executor.execute(
@@ -486,10 +478,7 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "cancels when timeout continuation is declined",
     withCtx(async () => {
       const publishedEvents = []
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async () => ({ messages: [{ content: "done" }] }),
-      }
+      const fakeGraph = createMockGraph(async () => ({ messages: [{ content: "done" }] }))
       const eventBus = { publish: (event) => publishedEvents.push(event), finished: () => {} }
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
@@ -516,13 +505,10 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "passes an inbound DataPart's data opaquely into Command({ resume })",
     withCtx(async () => {
       let capturedInput
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (input) => {
-          capturedInput = input
-          return { messages: [{ content: "done" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (input) => {
+        capturedInput = input
+        return { messages: [{ content: "done" }] }
+      })
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
@@ -554,13 +540,10 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "adds rejection context to an inbound DataPart before resuming",
     withCtx(async () => {
       let capturedInput
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (input) => {
-          capturedInput = input
-          return { messages: [{ content: "done" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (input) => {
+        capturedInput = input
+        return { messages: [{ content: "done" }] }
+      })
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
@@ -600,10 +583,7 @@ describe("GraphExecutor - HITL DataPart resume", () => {
     "fails the task when a resume has neither text nor a DataPart",
     withCtx(async () => {
       let publishedEvents = []
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async () => ({ messages: [{ content: "done" }] }),
-      }
+      const fakeGraph = createMockGraph(async () => ({ messages: [{ content: "done" }] }))
       const capturingEventBus = {
         publish: (e) => publishedEvents.push(e),
         finished: () => {},
@@ -637,10 +617,7 @@ describe("GraphExecutor - HITL suspend carries a DataPart", () => {
       let publishedEvents = []
 
       const payload = { actionRequests: [{ name: "submitOrder", description: "Approve order?" }] }
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async () => ({ __interrupt__: [{ value: payload }] }),
-      }
+      const fakeGraph = createMockGraph(async () => ({ __interrupt__: [{ value: payload }] }))
 
       const capturingEventBus = {
         publish: (e) => publishedEvents.push(e),
@@ -677,10 +654,9 @@ describe("GraphExecutor - HITL suspend carries a DataPart", () => {
 describe("GraphExecutor - completion carries a DataPart", () => {
   const runToCompletion = async (options) => {
     const publishedEvents = []
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async () => ({ messages: [{ content: "here is your data" }] }),
-    }
+    const fakeGraph = createMockGraph(async () => ({
+      messages: [{ content: "here is your data" }],
+    }))
     const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
     const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, options)
     await executor.execute(
@@ -711,15 +687,12 @@ describe("GraphExecutor - completion carries a DataPart", () => {
 describe("GraphExecutor - tool-result DataParts surface as artifact-update events", () => {
   const runWithToolContent = async (content) => {
     const publishedEvents = []
-    const fakeGraph = {
-      checkpointer: {},
-      invoke: async () => ({
-        messages: [
-          { content: "final answer" },
-          { content, tool_call_id: "tc-1" }, // a ToolMessage carrying embedded parts
-        ],
-      }),
-    }
+    const fakeGraph = createMockGraph(async () => ({
+      messages: [
+        { content: "final answer" },
+        { content, tool_call_id: "tc-1" }, // a ToolMessage carrying embedded parts
+      ],
+    }))
     const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
     const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
     await executor.execute(
@@ -774,24 +747,21 @@ describe("emit_data_part tool", () => {
       const data = { orderId: 99, status: "confirmed" }
 
       const publishedEvents = []
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async () => {
-          // Simulate the LangGraph tool node: the AI calls emit_data_part, LangGraph
-          // invokes it and stores the return value (stringified) as ToolMessage.content.
-          const toolResult = await tool.invoke({ data })
-          return {
-            messages: [
-              {
-                content: "here is your order",
-                tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }],
-              },
-              { content: JSON.stringify(toolResult), tool_call_id: "tc-emit-1" },
-              { content: "Order confirmed." },
-            ],
-          }
-        },
-      }
+      const fakeGraph = createMockGraph(async () => {
+        // Simulate the LangGraph tool node: the AI calls emit_data_part, LangGraph
+        // invokes it and stores the return value (stringified) as ToolMessage.content.
+        const toolResult = await tool.invoke({ data })
+        return {
+          messages: [
+            {
+              content: "here is your order",
+              tool_calls: [{ id: "tc-emit-1", name: tool.name, args: { data } }],
+            },
+            { content: JSON.stringify(toolResult), tool_call_id: "tc-emit-1" },
+            { content: "Order confirmed." },
+          ],
+        }
+      })
       const capturingEventBus = { publish: (e) => publishedEvents.push(e), finished: () => {} }
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
