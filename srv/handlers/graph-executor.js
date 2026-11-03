@@ -167,9 +167,9 @@ class GraphExecutor {
   async _resolveGraph() {
     if (this._graph) return this._graph
     const resolved = await this._rawGraph
-    if (!resolved || typeof resolved.invoke !== "function") {
+    if (!resolved || typeof resolved.stream !== "function") {
       throw new Error(
-        `buildGraph must return a compiled LangGraph graph (with an invoke() method). Got: ${typeof resolved}`,
+        `buildGraph must return a compiled LangGraph graph (with a stream() method). Got: ${typeof resolved}`,
       )
     }
     // Auto-inject CdsCheckpointSaver if graph has no checkpointer (enables multi-turn + HITL)
@@ -210,11 +210,6 @@ class GraphExecutor {
     let pendingPrefix = ""
 
     try {
-      if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
-        const state = await this._invokeWithTimeout(graph, input, config, signal)
-        return { state, tokenCount: 0 }
-      }
-
       const streamConfig = {
         ...config,
         streamMode: ["messages", "updates"],
@@ -344,37 +339,6 @@ class GraphExecutor {
     }
 
     return { state: finalState, tokenCount }
-  }
-  async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = cds.utils.ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
-
-    // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
-    // instead of AbortSignal.timeout() which uses an unreffed timer
-    const timeoutController = new AbortController()
-    const timer = setTimeout(() => timeoutController.abort(), maxExecution)
-
-    // Combine caller-provided abort signal with timeout
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, timeoutController.signal])
-      : timeoutController.signal
-    // Pass signal to LangGraph — it checks between node executions
-    config.signal = combinedSignal
-    try {
-      return await graph.invoke(input, config)
-    } catch (err) {
-      if (combinedSignal.aborted) {
-        // Caller abort takes priority (both can be true simultaneously in a race)
-        if (signal?.aborted) {
-          throw new AbortError("Task execution aborted")
-        }
-        throw new TimeoutError(`Graph execution timed out after ${maxExecution / 1000}s`, {
-          timeout: maxExecution,
-        })
-      }
-      throw err
-    } finally {
-      clearTimeout(timer)
-    }
   }
 
   /**
@@ -695,9 +659,8 @@ class GraphExecutor {
 
         // Final artifact: authoritative full response text. Emitted as an event-level
         // replace (append:false) so it never doubles the incrementally-streamed tokens
-        // and always leaves Task.artifacts with the complete, correct text — for both
-        // the streaming path (supersedes accumulated deltas) and the blocking path
-        // (the sole emit). lastChunk:true signals the response artifact is complete.
+        // and always leaves Task.artifacts with the complete, correct text.
+        // lastChunk:true signals the response artifact is complete.
         eventBus.publish({
           kind: "artifact-update",
           taskId,

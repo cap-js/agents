@@ -107,7 +107,6 @@
   },
   "cds": {
     "agents": {
-      "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",
