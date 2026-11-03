@@ -9,6 +9,7 @@
 ### Removed
 
 - OpenTelemetry v1 support is dropped
+- Removed the `cds.agents.streaming` configuration since langchain graphs always have the stream method
 
 ## Version 0.9.10 - 2026-10-26
 
