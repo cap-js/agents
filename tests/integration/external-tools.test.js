@@ -103,14 +103,6 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       expect(Array.isArray(tools) && tools.length > 0).toBe(true)
     })
 
-    it("ignores a nonexistent remote agent without losing working tools", () => {
-      expect(cds.env.requires.nonexistant.credentials.url).toBe(
-        "http://localhost:4005/a2a/nonexistant",
-      )
-      const names = tools.filter((t) => t.name).map((t) => t.name)
-      expect(names).not.toContain("nonexistant")
-    })
-
     it("remote MCP connection (FlightsService) is represented as a dynamic placeholder", () => {
       const placeholder = tools.find((t) => t._mcpDynamic)
       expect(
@@ -231,6 +223,22 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
         return result.messages.find((m) => ToolMessage.isInstance(m) && m.name === toolName)
       })
     }
+
+    it("continues graph invocation when a configured remote MCP endpoint does not exist", async () => {
+      const srv = cds.services.TravelAgentService
+      const tools = await srv.send("buildTools")
+      expect(tools).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            serviceName: "nonexistant",
+          }),
+        ]),
+      )
+
+      const msg = await invokeViaGraph("flightsservice_query", { cql: "SELECT * FROM Airports" })
+      expect(msg, "working MCP tools must remain callable after another server fails").toBeTruthy()
+      expect(extractText(msg.content)).toMatch(/FRA|JFK|Frankfurt|New York|Airport/i)
+    })
 
     it("flightsservice_query returns real airport data from xflights SQLite", async () => {
       const msg = await invokeViaGraph("flightsservice_query", { cql: "SELECT * FROM Airports" })

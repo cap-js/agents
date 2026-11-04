@@ -36,7 +36,7 @@
         }
       },
       "nonexistant": {
-        "kind": "agent",
+        "kind": "mcp",
         "credentials": {
           "url": "http://localhost:4005/a2a/nonexistant"
         }
