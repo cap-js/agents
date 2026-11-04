@@ -6,6 +6,14 @@
 
 ## Version 0.9.11 - Unreleased
 
+### Changed
+
+- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
+
+### Added
+
+- Register A2A agent card compile target, compatible with ORD plugin
+
 ### Removed
 
 - OpenTelemetry v1 support is dropped
@@ -16,11 +24,6 @@
 ### Changed
 
 - Reverted AI Core content filtering changes since they are not live on all BTP landscapes
-- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
-
-### Added
-
-- Register A2A AgentCard compile target via `lib/api.cjs`, as per `@cap-js/ord` plugin convention
 
 ## Version 0.9.9 - 2026-10-23
 
