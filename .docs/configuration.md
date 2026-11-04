@@ -42,24 +42,6 @@ Service annotation. Path to the agent directory, overriding the slug convention.
 service CatalogService { }
 ```
 
-## `@Core.Links` - to be removed?
-
-<details>
-<summary>Customize Agent Card URL</summary>
-
-If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
-
-```cds
-@agent
-@Core.Links : [
-  {
-      rel : 'via',
-      href : 'https://example.com/agent/catalog',
-  },
-]
-service CatalogService { }
-```
-
 </details>
 
 ## Push Notifications
