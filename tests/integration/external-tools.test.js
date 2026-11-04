@@ -103,6 +103,14 @@ describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", (
       expect(Array.isArray(tools) && tools.length > 0).toBe(true)
     })
 
+    it("ignores a nonexistent remote agent without losing working tools", () => {
+      expect(cds.env.requires.nonexistant.credentials.url).toBe(
+        "http://localhost:4005/a2a/nonexistant",
+      )
+      const names = tools.filter((t) => t.name).map((t) => t.name)
+      expect(names).not.toContain("nonexistant")
+    })
+
     it("remote MCP connection (FlightsService) is represented as a dynamic placeholder", () => {
       const placeholder = tools.find((t) => t._mcpDynamic)
       expect(
