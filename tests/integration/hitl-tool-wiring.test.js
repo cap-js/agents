@@ -1,8 +1,12 @@
 import cds from "@sap/cds"
+import { AIMessage } from "@langchain/core/messages"
+import { fakeModel } from "@langchain/core/testing"
+import createHelpers from "../utils/helpers.js"
 
 // Boot the bookshop test app — CatalogService.submitOrder is annotated @agent.hitl,
 // while getStock is a plain, non-gated function.
-cds.test(import.meta.dirname + "/../projects/bookshop")
+const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
+const { sendMessage } = createHelpers({ POST, axios })
 
 const { generateTools } = await import("../../lib/agents/tools.js")
 const { buildHitlInterruptMap, humanInTheLoopMiddleware } =
@@ -57,6 +61,32 @@ describe("@agent.hitl tool wiring (non-hybrid)", () => {
     const tools = [{ name: "call" }]
     expect(buildHitlInterruptMap(srv, tools)).toEqual({})
     expect(await humanInTheLoopMiddleware(srv, tools)).toEqual([])
+  })
+
+  it("does not execute submitOrder when its paused tool call is rejected", async () => {
+    const srv = service()
+    const model = fakeModel()
+      .respondWithTools([
+        { name: "call", args: { action: "submitOrder", parameters: { book: 201, quantity: 1 } } },
+      ])
+      .respond(new AIMessage("Order declined."))
+    srv.prepend((s) => s.on("buildModel", () => model))
+    const dispatch = vi.spyOn(srv, "send")
+
+    try {
+      const requested = await sendMessage("catalog", "Order one copy of book 201")
+      const task = requested.data.result
+      expect(task.status.state).toBe("input-required")
+
+      const rejected = await sendMessage("catalog", "no", {
+        contextId: task.contextId,
+        taskId: task.id,
+      })
+      expect(rejected.data.result.status.state).toBe("completed")
+      expect(dispatch).not.toHaveBeenCalledWith("submitOrder", expect.anything())
+    } finally {
+      dispatch.mockRestore()
+    }
   })
 
   it("per-action tools gate by matching the action name directly", async () => {
