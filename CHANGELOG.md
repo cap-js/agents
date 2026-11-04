@@ -14,6 +14,10 @@
 
 - Register A2A agent card compile target, compatible with ORD plugin
 
+### Fixed
+
+- Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+
 ### Removed
 
 - OpenTelemetry v1 support is dropped
