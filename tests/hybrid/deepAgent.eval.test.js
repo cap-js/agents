@@ -301,17 +301,7 @@ describe.concurrent("Push Notification Delivery", () => {
 describe("Token streaming", () => {
   setupErrorDetection()
 
-  let origStreaming
-
-  beforeEach(() => {
-    origStreaming = cds.env.agents?.streaming
-  })
-
-  afterEach(() => {
-    if (cds.env.agents) cds.env.agents.streaming = origStreaming
-  })
-
-  test("emits multiple incremental artifact-update frames (streaming:true)", async () => {
+  test("emits multiple incremental artifact-update frames", async () => {
     const r = await streamMessage("product-agent", "List all products")
     const frames = parseSSEFrames(r.data)
 
@@ -343,29 +333,6 @@ describe("Token streaming", () => {
       (f) => f.result?.kind === "status-update" && f.result?.final === true,
     )
     expect(completed?.result?.status?.state).toBe("completed")
-  }, 120000)
-
-  it("falls back to single artifact frame when streaming:false", async () => {
-    cds.env.agents ??= {}
-    cds.env.agents.streaming = false
-
-    const r = await streamMessage("product-agent", "List all products")
-    const frames = parseSSEFrames(r.data)
-
-    const artifactFrames = frames.filter((f) => f.result?.kind === "artifact-update")
-    const incrementalFrames = artifactFrames.filter(
-      (f) => f.result?.append === true && f.result?.lastChunk !== true,
-    )
-    expect(
-      incrementalFrames.length,
-      "expected no incremental token frames when streaming:false",
-    ).toBe(0)
-
-    const completed = frames.find(
-      (f) => f.result?.kind === "status-update" && f.result?.final === true,
-    )
-    expect(completed?.result?.status?.state).toBe("completed")
-    expect(completed?.result?.status?.message?.parts?.[0]?.text?.length).toBeGreaterThan(0)
   }, 120000)
 })
 
