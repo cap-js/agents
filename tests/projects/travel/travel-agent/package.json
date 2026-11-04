@@ -35,6 +35,12 @@
           "url": "http://localhost:4005/mcp/data"
         }
       },
+      "nonexistant": {
+        "kind": "mcp",
+        "credentials": {
+          "url": "http://localhost:4005/a2a/nonexistant"
+        }
+      },
       "hotel": {
         "kind": "agent",
         "credentials": {

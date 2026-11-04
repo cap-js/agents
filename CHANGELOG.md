@@ -6,6 +6,10 @@
 
 ## Version 0.9.11 - Unreleased
 
+### Fixed
+
+- Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+
 ### Removed
 
 - OpenTelemetry v1 support is dropped
