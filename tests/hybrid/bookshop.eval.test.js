@@ -252,25 +252,43 @@ describe.concurrent("bookshop CatalogService — conversation-level judges", () 
   })
 
   describe("bookshop CatalogService — HITL order flow", () => {
-    it("rejected order can be retried after an explicit new request", async () => {
-      const agent = await cds.connect.to("CatalogService")
+    it("rejected order is not executed and can be retried after an explicit new request", async () => {
+      const BOOK_ID = 9003
+      await INSERT.into("sap.capire.bookshop.Books").entries({
+        ID: BOOK_ID,
+        title: "Test Book HITL Reject",
+        author_ID: 101,
+        stock: 5,
+        price: 9.99,
+        currency_code: "USD",
+        genre_ID: 11,
+      })
+      try {
+        const agent = await cds.connect.to("CatalogService")
+        const requested = await agent.chat(`Submit order for 1 copy of book ${BOOK_ID} hitl`)
+        expect(requested.status).toBe("input-required")
 
-      const requested = await agent.chat("Submit order for 1 copy of book 201 hitl")
-      expect(requested.status).toBe("input-required")
+        const rejected = await agent.chat("No, do not place this order.", requested)
+        expect(rejected.status).toBe("completed")
+        const after = await SELECT.one
+          .from("sap.capire.bookshop.Books")
+          .columns("stock")
+          .where({ ID: BOOK_ID })
+        expect(after.stock, "rejected order must leave stock unchanged").toBe(5)
 
-      const rejected = await agent.chat("No, do not place this order.", requested)
-      expect(rejected.status).toBe("completed")
+        const judgement = await judge
+          .criteria("Response confirms order was not placed.")
+          .evaluate(rejected)
+        expect(judgement.score).toBeGreaterThanOrEqual(PASS)
 
-      const judgement = await judge
-        .criteria("Response confirms order was not placed.")
-        .evaluate(rejected)
-      expect(judgement.score).toBeGreaterThanOrEqual(PASS)
-
-      const retried = await agent.chat(
-        "Please place that order now. I explicitly request it.",
-        rejected,
-      )
-      expect(retried.status).toBe("input-required")
+        const retried = await agent.chat(
+          "Please place that order now. I explicitly request it.",
+          rejected,
+        )
+        expect(retried.status).toBe("input-required")
+      } finally {
+        await DELETE.from("sap.capire.bookshop.Books").where({ ID: BOOK_ID })
+      }
     })
 
     it("submitOrder triggers HITL, approve completes order and reduces stock", async () => {
@@ -491,18 +509,46 @@ describe.concurrent("HITL DataPart carry", () => {
     expect(resume.data.result?.status.state).toBe("completed")
   })
 
-  it("DataPart reject completes the task (action skipped, not an error)", async () => {
-    const contextId = cds.utils.uuid()
-    const trigger = await sendParts("catalog", [{ kind: "text", text: ORDER_TEXT }], { contextId })
-    expect(trigger.data.result?.status.state).toBe("input-required")
-    const taskId = trigger.data.result.id
+  it("DataPart reject completes the task without executing the action", async () => {
+    const BOOK_ID = 9004
+    await INSERT.into("sap.capire.bookshop.Books").entries({
+      ID: BOOK_ID,
+      title: "Test Book HITL DataPart Reject",
+      author_ID: 101,
+      stock: 5,
+      price: 9.99,
+      currency_code: "USD",
+      genre_ID: 11,
+    })
+    try {
+      const contextId = cds.utils.uuid()
+      const trigger = await sendParts(
+        "catalog",
+        [
+          {
+            kind: "text",
+            text: `Please submit an order for 1 copy of book with ID ${BOOK_ID}. Go ahead and call submitOrder directly.`,
+          },
+        ],
+        { contextId },
+      )
+      expect(trigger.data.result?.status.state).toBe("input-required")
+      const taskId = trigger.data.result.id
 
-    const resume = await sendParts(
-      "catalog",
-      [{ kind: "data", data: { decisions: [{ type: "reject", message: "Not now" }] } }],
-      { contextId, taskId },
-    )
-    expect(resume.data.result?.status.state).toBe("completed")
+      const resume = await sendParts(
+        "catalog",
+        [{ kind: "data", data: { decisions: [{ type: "reject", message: "Not now" }] } }],
+        { contextId, taskId },
+      )
+      expect(resume.data.result?.status.state).toBe("completed")
+      const after = await SELECT.one
+        .from("sap.capire.bookshop.Books")
+        .columns("stock")
+        .where({ ID: BOOK_ID })
+      expect(after.stock, "rejected order must leave stock unchanged").toBe(5)
+    } finally {
+      await DELETE.from("sap.capire.bookshop.Books").where({ ID: BOOK_ID })
+    }
   })
 
   it("edit decision injects awareness note so the agent doesn't apologize", async () => {

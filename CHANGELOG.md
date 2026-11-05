@@ -17,6 +17,7 @@
 ### Fixed
 
 - Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+- Fixed human in the loop rejection
 
 ### Removed
 
