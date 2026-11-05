@@ -17,6 +17,7 @@
 ### Fixed
 
 - Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+- HITL rejections not being registered due to malformed checkpoint saves
 
 ### Removed
 
