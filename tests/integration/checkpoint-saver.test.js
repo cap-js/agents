@@ -39,6 +39,22 @@ async function seedCheckpoints(userId, threadId, count) {
 describe("CdsCheckpointSaver", () => {
   const saver = new CdsCheckpointSaver()
 
+  it("does not execute rejected tools after checkpoint reload", async () => {
+    const agent = await cds.connect.to("DeterministicHitlService")
+    const pending = await agent.chat("start")
+    expect(pending.status).toBe("input-required")
+
+    const rejected = await agent.chat(
+      { parts: [{ kind: "data", data: { decisions: [{ type: "reject" }, { type: "reject" }] } }] },
+      pending,
+    )
+    expect(rejected.status).toBe("completed")
+    expect(rejected.toolCalls.map(({ tool, outcome }) => ({ tool, outcome }))).toEqual([
+      { tool: "firstAction", outcome: "error" },
+      { tool: "secondAction", outcome: "error" },
+    ])
+  })
+
   describe("list()", () => {
     it("returns checkpoints in descending order", async () => {
       const thread = `list-order-${cds.utils.uuid()}`
