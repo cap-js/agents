@@ -42,32 +42,6 @@ Service annotation. Path to the agent directory, overriding the slug convention.
 service CatalogService { }
 ```
 
-## `@agent.card`
-
-Service annotation. Path to a hand-crafted agent card markdown file. Resolved relative to the `.cds` source file.
-
-```cds
-@agent
-@agent.card: './catalog-card.md'
-service CatalogService { }
-```
-
-<details>
-<summary>Customize Agent Card URL</summary>
-
-If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
-
-```cds
-@agent
-@Core.Links : [
-  {
-      rel : 'via',
-      href : 'https://example.com/agent/catalog',
-  },
-]
-service CatalogService { }
-```
-
 </details>
 
 ## Push Notifications

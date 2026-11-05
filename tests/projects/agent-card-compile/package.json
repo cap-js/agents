@@ -1,0 +1,23 @@
+{
+  "name": "agent-test-agent-card-compile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cap-js/agents": "file:../../../",
+    "@cap-js/sqlite": "*",
+    "@langchain/core": "^1",
+    "@langchain/langgraph": "^1",
+    "@sap-ai-sdk/langchain": "^2",
+    "@sap/cds": "^10.1.1",
+    "zod": "^4"
+  },
+  "cds": {
+    "requires": {
+      "audit-log": false,
+      "[test]": {
+        "llm": "mock"
+      }
+    }
+  }
+}

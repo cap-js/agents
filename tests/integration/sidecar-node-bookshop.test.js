@@ -23,7 +23,7 @@ describe("Node Bookshop Sidecar - HTTP Wiring", () => {
 
     const skillIds = res.data.skills.map((s) => s.id)
     assert.ok(skillIds.includes("query"), "should have query skill")
-    assert.ok(skillIds.includes("submitOrder"), "should have submitOrder skill")
-    assert.ok(skillIds.includes("getStock"), "should have getStock skill")
+    assert.ok(skillIds.includes("call-submitOrder"), "should have call-submitOrder skill")
+    assert.ok(skillIds.includes("call-getStock"), "should have call-getStock skill")
   })
 })

@@ -6,6 +6,14 @@
 
 ## Version 0.9.11 - Unreleased
 
+### Changed
+
+- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
+
+### Added
+
+- Register A2A agent card compile target, compatible with ORD plugin
+
 ### Fixed
 
 - Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
