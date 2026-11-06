@@ -8,7 +8,14 @@
 
 ### Added
 
+- AI Core models allow disabling prompt caching for deployments that do not support its parameters.
+
 - `@cap-js/agents/agent` creates LangChain tool loops with caller-supplied tools, middleware, persistence and execution limits.
+
+### Fixed
+
+- AI Core failures retain useful diagnostics without logging HTTP request credentials.
+
 
 ## Version 0.9.11 - 2026-11-06
 
