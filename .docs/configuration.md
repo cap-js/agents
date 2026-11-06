@@ -42,32 +42,6 @@ Service annotation. Path to the agent directory, overriding the slug convention.
 service CatalogService { }
 ```
 
-## `@agent.card`
-
-Service annotation. Path to a hand-crafted agent card markdown file. Resolved relative to the `.cds` source file.
-
-```cds
-@agent
-@agent.card: './catalog-card.md'
-service CatalogService { }
-```
-
-<details>
-<summary>Customize Agent Card URL</summary>
-
-If your agent is behind a proxy, configure the agent card URL via `@Core.Links`
-
-```cds
-@agent
-@Core.Links : [
-  {
-      rel : 'via',
-      href : 'https://example.com/agent/catalog',
-  },
-]
-service CatalogService { }
-```
-
 </details>
 
 ## Push Notifications
@@ -142,3 +116,47 @@ Set `cds.agents.fileIO.enabled = true` to let agents receive uploads and emit fi
 ```
 
 Sending a file - A2A clients send a `FilePart` (`{ kind: "file", file: { name, mimeType, bytes } }`) and the plugin persists the file and prepends a `[Uploaded files: /uploads/<name> (<mime>, <size>)]` manifest to the user message. It uses `@cap-js/attachments` to persist the files.
+
+## Streaming Tool Updates
+
+A2A clients can opt-in to tool updates via user message metadata when streaming:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"message/stream",
+  "id":"...",
+  "params": {
+    "message": {
+      ...
+      "metadata": {
+        "tool-status-update": { "args":true, "result":true }
+      }
+    },
+  }
+}
+```
+
+The resulting artifact updates may contain [A2A data parts](https://a2a-protocol.org/v0.3.0/specification/#653-datapart-object) with type `tool-call`, for example:
+
+```json
+{
+  "artifactId": "...",
+  "parts":
+    [
+      {
+        "kind": "data",
+        "data":
+          {
+            "type": "tool-call",
+            "name": "sap_capire_flights_flightsservice_describe",
+            "kind": "describe",
+            "label": "sap.capire.flights.FlightsService",
+            "status": "done",
+            "args": "...",
+            "result": "...",
+          },
+      },
+    ],
+},
+```

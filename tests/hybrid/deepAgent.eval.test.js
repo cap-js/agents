@@ -38,13 +38,6 @@ describe.concurrent("product-agent", () => {
     expect(task.status.message.parts[0].kind).toBe("text")
   })
 
-  it("agent card is served", async () => {
-    const cardRes = await axios.get("/a2a/product-agent/.well-known/agent-card.json")
-    expect(cardRes.status).toBe(200)
-    expect(cardRes.data.name).not.toBe(undefined)
-    expect(cardRes.data.url.includes("/a2a/product-agent")).toBeTruthy()
-  })
-
   it("tasks/get retrieves completed task", async () => {
     const taskId = res.data.result.id
     expect(taskId).not.toBe(undefined)
@@ -168,16 +161,6 @@ describe.concurrent("@agent.llm annotation", () => {
 
 describe.concurrent("Auto-built deep agents (zero-code convention)", () => {
   describe.concurrent("Slug-only convention (zero-code-agent)", () => {
-    test.concurrent("agent card auto-generated from <slug>/AGENTS.md + skills/", async () => {
-      const res = await axios.get("/a2a/zero-code-agent/.well-known/agent-card.json")
-      expect(res.status).toBe(200)
-      expect(res.data.name).toBe("zero-code-agent")
-      expect(
-        res.data.skills.find((s) => s.id === "product-listing"),
-        "skills/ scan should yield product-listing",
-      ).toBeTruthy()
-    })
-
     test.concurrent("message/send routes through the auto-deepagent (not the mock executor)", async () => {
       const res = await sendMessage("zero-code-agent", "Hi")
       const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
@@ -238,24 +221,6 @@ describe.concurrent("Auto-built deep agents (zero-code convention)", () => {
         ).toEqual([])
       },
     )
-  })
-
-  describe.concurrent("@agent.directory annotation (override-card-service)", () => {
-    test.concurrent("agent card resolved from annotation-pointed dir + @agent.card file", async () => {
-      const res = await axios.get("/a2a/override-card/.well-known/agent-card.json")
-      expect(res.status).toBe(200)
-      expect(res.data.name).toBe("card-override-explicit")
-      expect(res.data.version).toBe("2.0.0")
-    })
-
-    test.concurrent("message/send routes through auto-deepagent (annotation-resolved dir)", async () => {
-      const res = await sendMessage("override-card", "Hi")
-      const text = res.data.result?.status?.message?.parts?.[0]?.text ?? ""
-      expect(
-        text,
-        `mock executor response received — @agent.directory wiring failed: ${text}`,
-      ).not.toMatch(MOCK_EXECUTOR_TEXT)
-    })
   })
 
   test.concurrent("includes both auto-generated CDS tools and the user's custom tool", async () => {
@@ -336,17 +301,7 @@ describe.concurrent("Push Notification Delivery", () => {
 describe("Token streaming", () => {
   setupErrorDetection()
 
-  let origStreaming
-
-  beforeEach(() => {
-    origStreaming = cds.env.agents?.streaming
-  })
-
-  afterEach(() => {
-    if (cds.env.agents) cds.env.agents.streaming = origStreaming
-  })
-
-  test("emits multiple incremental artifact-update frames (streaming:true)", async () => {
+  test("emits multiple incremental artifact-update frames", async () => {
     const r = await streamMessage("product-agent", "List all products")
     const frames = parseSSEFrames(r.data)
 
@@ -378,29 +333,6 @@ describe("Token streaming", () => {
       (f) => f.result?.kind === "status-update" && f.result?.final === true,
     )
     expect(completed?.result?.status?.state).toBe("completed")
-  }, 120000)
-
-  it("falls back to single artifact frame when streaming:false", async () => {
-    cds.env.agents ??= {}
-    cds.env.agents.streaming = false
-
-    const r = await streamMessage("product-agent", "List all products")
-    const frames = parseSSEFrames(r.data)
-
-    const artifactFrames = frames.filter((f) => f.result?.kind === "artifact-update")
-    const incrementalFrames = artifactFrames.filter(
-      (f) => f.result?.append === true && f.result?.lastChunk !== true,
-    )
-    expect(
-      incrementalFrames.length,
-      "expected no incremental token frames when streaming:false",
-    ).toBe(0)
-
-    const completed = frames.find(
-      (f) => f.result?.kind === "status-update" && f.result?.final === true,
-    )
-    expect(completed?.result?.status?.state).toBe("completed")
-    expect(completed?.result?.status?.message?.parts?.[0]?.text?.length).toBeGreaterThan(0)
   }, 120000)
 })
 

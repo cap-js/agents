@@ -35,10 +35,12 @@ describe("tool-call data-part updates — generic call tool", () => {
   })
 
   it("labels a per-action tool by its own name", () => {
-    const data = emitFor(
-      { id: "x2", name: "submitOrder", args: { book: 1, quantity: 2 } },
-      ["submitOrder", "getStock", "query", "describe"],
-    )
+    const data = emitFor({ id: "x2", name: "submitOrder", args: { book: 1, quantity: 2 } }, [
+      "submitOrder",
+      "getStock",
+      "query",
+      "describe",
+    ])
     expect(data?.type).toBe("tool-call")
     expect(data.name).toBe("submitOrder")
     expect(data.label).toBe("submitOrder")

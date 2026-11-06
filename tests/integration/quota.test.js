@@ -6,7 +6,6 @@ import {
   resetCapture,
   createSendMessage,
 } from "../utils/telemetry-utils.js"
-import { ms4 } from "../../lib/utils/utils.js"
 
 process.env.CDS_TEST_SILENT = "false"
 setup()
@@ -389,7 +388,7 @@ describe("@cap-js/agents - Quota enforcement", () => {
     })
 
     it("should parse interval strings correctly", async () => {
-      const parseInterval = ms4
+      const parseInterval = cds.utils.ms4
       expect(parseInterval("24h")).toBe(24 * 3600000)
       expect(parseInterval("30m")).toBe(30 * 60000)
       expect(parseInterval("60s")).toBe(60000)

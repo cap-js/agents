@@ -4,7 +4,49 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.8 - tbd
+## Version 0.9.11 - 2026-11-06
+
+### Added
+
+- Register A2A agent card compile target, compatible with ORD plugin
+
+### Removed
+
+- OpenTelemetry v1 support is dropped
+- Removed the `cds.agents.streaming` configuration since langchain graphs always have the stream method
+- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
+
+### Fixed
+
+- Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+- Fixed human in the loop rejection
+
+## Version 0.9.10 - 2026-10-26
+
+### Changed
+
+- Reverted AI Core content filtering changes since they are not live on all BTP landscapes
+
+## Version 0.9.9 - 2026-10-23
+
+### Added
+
+- Very experimental and limited support for pi agents
+- Specifying MLflow log level. Default DEBUG level includes all spans as before, but INFO only shows the root node as well as the chat and tool spans
+
+### Changed
+
+- Use new AI Core API for content filtering to avoid preflight LLM call
+
+### Fixed
+
+- Improved checkpointer by not persisting verbose model state
+- `aicore` credentials are now also propagated from `cds.requires.llm.credentials`
+- Deal with potentially missing crypto.randomUUID fn
+- Reduced likelihood of summarization timeout
+- Show message if falling back from auto config of llm to mock
+
+## Version 0.9.8 - 2026-10-04
 
 ### Added
 

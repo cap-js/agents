@@ -11,7 +11,7 @@ import {
   createSendMessageWithParts,
   getSpanExporter,
 } from "../utils/telemetry-utils.js"
-
+import { SDK_INFO } from "@opentelemetry/core"
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
@@ -65,6 +65,12 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       expect(attrs["mlflow.chat.tokenUsage"]).toBe(
         '{"input_tokens":10,"output_tokens":20,"total_tokens":30}',
       )
+    })
+
+    it("should set MLflow span log levels", async () => {
+      const { mlflowAttrs } = await import("../../lib/telemetry/mlflow/index.js")
+      expect(mlflowAttrs("CHAIN")["mlflow.spanLogLevel"]).toBe(10)
+      expect(mlflowAttrs("LLM")["mlflow.spanLogLevel"]).toBe(20)
     })
 
     it("should not include inputs/outputs/tokenUsage keys when not provided", async () => {
@@ -122,6 +128,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const span = findSpan(spans, "workflow CompiledStateGraph GraphBookService")
     expect(span).not.toBe(undefined)
     expect(span.attributes["mlflow.spanType"]).toBe("AGENT")
+    expect(span.attributes["mlflow.spanLogLevel"]).toBe(20)
     expect(span.attributes["mlflow.experimentId"], "should have experimentId").toBeTruthy()
     expect(span.attributes["mlflow.experimentId"]).toBe("2")
   })
@@ -178,6 +185,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const span = findSpan(spans, "execute_tool DynamicStructuredTool query")
     expect(span).not.toBe(undefined)
     expect(span.attributes["mlflow.spanType"]).toBe("TOOL")
+    expect(span.attributes["mlflow.spanLogLevel"]).toBe(20)
     expect(span.attributes["mlflow.spanInputs"]).not.toBe(undefined)
   })
 
@@ -233,6 +241,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const chatSpan = findSpan(spans, "chat MockLLM")
     expect(chatSpan).not.toBe(undefined)
     expect(chatSpan.attributes["mlflow.spanType"]).toBe("LLM")
+    expect(chatSpan.attributes["mlflow.spanLogLevel"]).toBe(20)
   })
 
   // ─── RunnableSequence spans ─────────────────────────────────────────
@@ -242,6 +251,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     const seqSpans = findSpans(spans, "workflow RunnableSequence")
     expect(seqSpans.length > 0).toBeTruthy()
     expect(seqSpans[0].attributes["mlflow.spanType"]).toBe("CHAIN")
+    expect(seqSpans[0].attributes["mlflow.spanLogLevel"]).toBe(10)
   })
 
   // ─── HTTP span ──────────────────────────────────────────────────────
@@ -253,6 +263,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
     // (depends on @cap-js/telemetry wrapping express), so test conditionally
     if (httpSpan) {
       expect(httpSpan.attributes["mlflow.spanType"]).toBe("CHAIN")
+      expect(httpSpan.attributes["mlflow.spanLogLevel"]).toBe(10)
     }
   })
 
@@ -352,6 +363,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       ucTableName: "main.mlflow_traces.myapp_otel_spans",
       BatchSpanProcessor: FakeBatchProcessor,
       OTLPTraceExporter: CapturingExporter,
+      openTelemetryVersion: SDK_INFO["telemetry.sdk.version"],
     })
     proc.onEnd({ attributes: { "mlflow.experimentId": "42" } })
 
@@ -382,6 +394,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       ucTableName: undefined,
       BatchSpanProcessor: FakeBatchProcessor,
       OTLPTraceExporter: CapturingExporter,
+      openTelemetryVersion: SDK_INFO["telemetry.sdk.version"],
     })
     proc.onEnd({ attributes: { "mlflow.experimentId": "99" } })
 

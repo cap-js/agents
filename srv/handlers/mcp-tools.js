@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { generateTools } from "./tools.js"
+import { generateTools } from "../../lib/agents/tools.js"
 import { toolName, mcpToolKind } from "../../lib/utils/utils.js"
 
 const LOG = cds.log("agents:mcp")

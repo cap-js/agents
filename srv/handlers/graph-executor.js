@@ -1,10 +1,11 @@
 import cds from "@sap/cds"
-import { short, audit, ms4 } from "../../lib/utils/utils.js"
+import { short, audit } from "../../lib/utils/utils.js"
 import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
+import { setSpanError } from "../../lib/telemetry/tracing.js"
 import { CdsFileStore } from "../../lib/protocol/persistence/file-store.js"
-import { formatFileSize, sanitizeFilename } from "./tools.js"
+import { formatFileSize, sanitizeFilename } from "../../lib/agents/tools.js"
 import { convertUsageData } from "../../lib/telemetry/chat-tracing.js"
 import { resolvePseudonyms } from "../../lib/masking/index.js"
 import { pseudonymizeUserMessage } from "../../lib/masking/unstructured/index.js"
@@ -166,9 +167,9 @@ class GraphExecutor {
   async _resolveGraph() {
     if (this._graph) return this._graph
     const resolved = await this._rawGraph
-    if (!resolved || typeof resolved.invoke !== "function") {
+    if (!resolved || typeof resolved.stream !== "function") {
       throw new Error(
-        `buildGraph must return a compiled LangGraph graph (with an invoke() method). Got: ${typeof resolved}`,
+        `buildGraph must return a compiled LangGraph graph (with a stream() method). Got: ${typeof resolved}`,
       )
     }
     // Auto-inject CdsCheckpointSaver if graph has no checkpointer (enables multi-turn + HITL)
@@ -187,7 +188,7 @@ class GraphExecutor {
    * per-token artifact-update SSE events as LLM tokens arrive.
    */
   async _streamWithPublish(graph, input, config, eventBus, taskId, contextId, signal) {
-    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
+    const maxExecution = cds.utils.ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
 
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), maxExecution)
@@ -209,11 +210,6 @@ class GraphExecutor {
     let pendingPrefix = ""
 
     try {
-      if (typeof graph.stream !== "function" || cds.env.agents?.streaming === false) {
-        const state = await this._invokeWithTimeout(graph, input, config, signal)
-        return { state, tokenCount: 0 }
-      }
-
       const streamConfig = {
         ...config,
         streamMode: ["messages", "updates"],
@@ -343,37 +339,6 @@ class GraphExecutor {
     }
 
     return { state: finalState, tokenCount }
-  }
-  async _invokeWithTimeout(graph, input, config, signal) {
-    const maxExecution = ms4(cds.env.agents?.quotas?.maxExecutionTimePerTask || "5min")
-
-    // Use explicit AbortController + setTimeout (reffed timer keeps event loop alive)
-    // instead of AbortSignal.timeout() which uses an unreffed timer
-    const timeoutController = new AbortController()
-    const timer = setTimeout(() => timeoutController.abort(), maxExecution)
-
-    // Combine caller-provided abort signal with timeout
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, timeoutController.signal])
-      : timeoutController.signal
-    // Pass signal to LangGraph — it checks between node executions
-    config.signal = combinedSignal
-    try {
-      return await graph.invoke(input, config)
-    } catch (err) {
-      if (combinedSignal.aborted) {
-        // Caller abort takes priority (both can be true simultaneously in a race)
-        if (signal?.aborted) {
-          throw new AbortError("Task execution aborted")
-        }
-        throw new TimeoutError(`Graph execution timed out after ${maxExecution / 1000}s`, {
-          timeout: maxExecution,
-        })
-      }
-      throw err
-    } finally {
-      clearTimeout(timer)
-    }
   }
 
   /**
@@ -694,9 +659,8 @@ class GraphExecutor {
 
         // Final artifact: authoritative full response text. Emitted as an event-level
         // replace (append:false) so it never doubles the incrementally-streamed tokens
-        // and always leaves Task.artifacts with the complete, correct text — for both
-        // the streaming path (supersedes accumulated deltas) and the blocking path
-        // (the sole emit). lastChunk:true signals the response artifact is complete.
+        // and always leaves Task.artifacts with the complete, correct text.
+        // lastChunk:true signals the response artifact is complete.
         eventBus.publish({
           kind: "artifact-update",
           taskId,
@@ -1018,7 +982,7 @@ class GraphExecutor {
 
         if (wfSpan) {
           wfSpan.setAttribute("agent.outcome", "failed")
-          wfSpan.setStatus({ code: 2, message: err.message })
+          setSpanError(wfSpan, err)
         }
 
         const errorCode = err.message?.includes("timed out") ? "timeout" : "execution_failed"
