@@ -52,32 +52,27 @@ The bookshop's `telemetry` profile is preconfigured with OTLP export to `localho
 <details>
 <summary>Metrics</summary>
 
-| Metric                        | Type             | Description                                   | Attributes                                          |
-| ----------------------------- | ---------------- | --------------------------------------------- | --------------------------------------------------- |
-| `agent.requests.total`        | Counter          | Total inbound agent requests                  | `sap.tenantId`, `agent.service`, `agent.method`     |
-| `agent.request.duration`      | Histogram (ms)   | End-to-end agent request duration             | `sap.tenantId`, `agent.service`, `agent.method`     |
-| `agent.errors.total`          | Counter          | Requests resulting in error                   | `sap.tenantId`, `agent.service`, `agent.error.code` |
-| `agent.executions.concurrent` | UpDownCounter    | Currently active workflow executions          | `sap.tenantId`, `agent.service`                     |
-| `agent.workflows.completed`   | Counter          | Completed agent workflows                     | `sap.tenantId`, `agent.service`                     |
-| `agent_actions`               | Counter          | LLM invocations (agent node calls) per tenant | `sap.tenantId`                                      |
-| `agent.llm.input_tokens`      | Counter          | LLM input tokens consumed                     | `sap.tenantId`, `model`, `node`                     |
-| `agent.llm.output_tokens`     | Counter          | LLM output tokens generated                   | `sap.tenantId`, `model`, `node`                     |
-| `agent.llm.invocations`       | Counter          | LLM invocation count                          | `sap.tenantId`, `model`, `node`, `outcome`          |
-| `agent.tool.invocations`      | Counter          | Tool invocation count                         | `sap.tenantId`, `tool`, `outcome`                   |
-| `active_users`                | Observable Gauge | Active users per service (24h rolling window) | `sap.tenantId`, `agent.service`                     |
+| Metric                          | Type             | Description                                                     | Attributes                                          |
+| ------------------------------- | ---------------- | --------------------------------------------------------------- | --------------------------------------------------- |
+| `agent.requests.total`          | Counter          | Total inbound agent requests                                    | `sap.tenantId`, `agent.service`, `agent.method`     |
+| `agent.request.duration`        | Histogram (ms)   | End-to-end agent request duration                               | `sap.tenantId`, `agent.service`, `agent.method`     |
+| `agent.errors.total`            | Counter          | Requests resulting in error                                     | `sap.tenantId`, `agent.service`, `agent.error.code` |
+| `agent.executions.concurrent`   | UpDownCounter    | Currently active workflow executions                            | `sap.tenantId`, `agent.service`                     |
+| `agent.workflows.completed`     | Counter          | Completed agent workflows                                       | `sap.tenantId`, `agent.service`                     |
+| `agent_actions`                 | Counter          | LLM invocations (agent node calls) per tenant                   | `sap.tenantId`                                      |
+| `agent.llm.input_tokens`        | Counter          | LLM input tokens consumed                                       | `sap.tenantId`, `model`, `node`                     |
+| `agent.llm.output_tokens`       | Counter          | LLM output tokens generated                                     | `sap.tenantId`, `model`, `node`                     |
+| `agent.llm.invocations`         | Counter          | LLM invocation count                                            | `sap.tenantId`, `model`, `node`, `outcome`          |
+| `agent.tool.invocations`        | Counter          | Tool invocation count                                           | `sap.tenantId`, `tool`, `outcome`                   |
+| `active_users`                  | Observable Gauge | Active users per tenant and service                             | `sap.tenantId`, `agent.service`                     |
+| `agent.conversations`           | Observable Gauge | Number of conversations per tenant and service                  | `sap.tenantId`, `agent.service`                     |
+| `agent.conversation.length.avg` | Observable Gauge | Average number of tasks per conversation per tenant and service | `sap.tenantId`, `agent.service`                     |
 
 Error codes: `-32603` (JSON-RPC internal error), `execution_failed` (graph error), `timeout` (graph timeout).
 
 All metrics include `sap.tenantId` from `cds.context.tenant` for multi-tenant aggregation.
 
-The `active_users` gauge is computed periodically (default every 24h). To trigger manually:
-
-```js
-const { computeActiveUsers } = await import("@cap-js/agents/lib/telemetry/active-users.js")
-await computeActiveUsers()
-```
-
-Set `cds.agents.activeUsersInterval: 0` to disable automatic scheduling (manual trigger only).
+The `active_users`, `agent.conversations` and `agent.conversation.length.avg` gauges are computed when a task is processed for a service, but with a 24h cooldown between computations.
 
 </details>
 
