@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Version 0.9.12 - tbd
+
+### Added
+
+- `@cap-js/agents/agent` creates LangChain tool loops with caller-supplied tools, middleware, persistence and execution limits.
+
 ## Version 0.9.11 - 2026-11-06
 
 ### Added

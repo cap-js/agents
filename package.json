@@ -31,6 +31,7 @@
   ],
   "type": "module",
   "exports": {
+    "./agent": "./lib/agents/runtime.js",
     "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
     "./eval": "./lib/eval/index.js",
