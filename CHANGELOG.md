@@ -4,25 +4,22 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.11 - Unreleased
-
-### Changed
-
-- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
+## Version 0.9.11 - 2026-11-06
 
 ### Added
 
 - Register A2A agent card compile target, compatible with ORD plugin
 
-### Fixed
-
-- Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
-- Fixed human in the loop rejection
-
 ### Removed
 
 - OpenTelemetry v1 support is dropped
 - Removed the `cds.agents.streaming` configuration since langchain graphs always have the stream method
+- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
+
+### Fixed
+
+- Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+- Fixed human in the loop rejection
 
 ## Version 0.9.10 - 2026-10-26
 
