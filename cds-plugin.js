@@ -5,6 +5,7 @@ import registerDefaultAgentHandlers from "./srv/handlers/index.js"
 import { patchLangChain } from "./lib/telemetry/tracing.js"
 import { slugified } from "./lib/utils/utils.js"
 import { registerCompileTargets } from "./lib/api.cjs"
+import registerAppConfig from "./lib/app-config.js"
 
 registerCompileTargets()
 
@@ -12,6 +13,8 @@ registerCompileTargets()
 cds.env.cdsc = { ...cds.env.cdsc, docComment: true }
 
 cds.on("bootstrap", (app) => {
+  registerAppConfig(app)
+
   // Ensure A2A correlation fields are indexed by SAP Cloud Logging
   const cls_fields = ((cds.env.log ??= {}).cls_custom_fields ??= [])
   if (!cls_fields.includes("agent.task.id")) cls_fields.push("agent.task.id")

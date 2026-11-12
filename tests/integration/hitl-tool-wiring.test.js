@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { AIMessage } from "@langchain/core/messages"
+import { AIMessage, SystemMessage } from "@langchain/core/messages"
 import { fakeModel } from "@langchain/core/testing"
 import createHelpers from "../utils/helpers.js"
 
@@ -40,6 +40,17 @@ describe("@agent.hitl tool wiring (non-hybrid)", () => {
     const srv = service()
     const middleware = await humanInTheLoopMiddleware(srv, generateTools(srv))
     expect(middleware.length).toBeGreaterThan(0)
+  })
+
+  it("adds approval guidance to a custom system prompt without changing it", async () => {
+    const srv = service()
+    const middleware = await humanInTheLoopMiddleware(srv, generateTools(srv))
+    const request = { systemMessage: new SystemMessage("You manage book orders.") }
+    const handler = vi.fn((request) => request)
+    const result = await middleware[0].wrapModelCall(request, handler)
+    expect(result.systemMessage.content).toContain("You manage book orders.")
+    expect(result.systemMessage.content).toContain("Do not ask for a separate text confirmation.")
+    expect(request.systemMessage.content).toBe("You manage book orders.")
   })
 
   it("generic 'call' tool gates per-action via when (interrupts submitOrder, not getStock)", () => {

@@ -8,11 +8,15 @@
 
 ### Added
 
+- `@cap-js/agents` serves `/app-config` with the application title, HCQL entities and agent endpoint.
+
 - AI Core models allow disabling prompt caching for deployments that do not support its parameters.
 
 - `@cap-js/agents/agent` creates LangChain tool loops with caller-supplied tools, middleware, persistence and execution limits.
 
 ### Fixed
+
+- `@agent.hitl` instructs agents to invoke requested actions and collect approval through review controls, including with custom system prompts.
 
 - AI Core failures retain useful diagnostics without logging HTTP request credentials.
 
