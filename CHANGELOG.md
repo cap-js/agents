@@ -38,6 +38,14 @@
 
 - Use new AI Core API for content filtering to avoid preflight LLM call
 
+### Added
+
+- To new OTEL metrics to keep track of the conversation amount and average conversation length
+
+### Changed
+
+- The `active_users` metric is no longer computed in intervals in the background but on demand when an A2A tasks arrives (with a 24h cooldown). This makes the calculation more efficient. With that the `cds.agents.activeUsersInterval` option is removed.
+
 ### Fixed
 
 - Improved checkpointer by not persisting verbose model state

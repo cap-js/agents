@@ -26,7 +26,6 @@
       "fileIO": {
         "enabled": true
       },
-      "activeUsersInterval": "1s",
       "[testTimeout]": {
         "quotas": {
           "maxExecutionTimePerTask": "10s"
@@ -48,9 +47,6 @@
       },
       "[mlflow]": {
         "mlflow": true
-      },
-      "[hybrid]": {
-        "activeUsersInterval": "24h"
       }
     },
     "[production]": {

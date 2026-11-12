@@ -5,7 +5,7 @@ cds.test(import.meta.dirname + "/../projects/bookshop")
 import {
   triggerCleanup,
   cleanupExpiredTasks,
-  _resetCleanupThrottle,
+  deletionThrottle,
 } from "../../lib/protocol/persistence/cleanup.js"
 
 const TASKS = "cap.agent.Tasks"
@@ -62,7 +62,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
   })
 
   beforeEach(async () => {
-    _resetCleanupThrottle()
+    deletionThrottle.reset()
   })
 
   afterEach(() => {
@@ -210,7 +210,7 @@ describe("@cap-js/agents - Task Cleanup", () => {
         await triggerCleanup(SERVICE_NAME)
 
         // Simulate server restart: in-memory throttle is empty but outbox task remains.
-        _resetCleanupThrottle()
+        deletionThrottle.reset()
 
         await triggerCleanup(SERVICE_NAME)
 
