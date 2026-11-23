@@ -1,7 +1,9 @@
 import cds from "@sap/cds"
+import { inspect } from "util"
+import { a2aClient } from "../../lib/remote/a2a.js"
+import { outboundConnection } from "../../lib/remote/http.js"
 import { tool } from "@langchain/core/tools"
 import { z } from "zod"
-import { getTracer } from "../../lib/telemetry/metrics.js"
 import { LangGraphExecutor } from "../langgraph-executor-srv.js"
 import { short, toolName } from "../../lib/utils/utils.js"
 
@@ -10,114 +12,23 @@ const LOG = cds.log("agents:a2a|agents|subagents|a2a")
 const TRUNCATE = cds.env.agents?.truncate || 111
 const truncated = (msg) => (msg?.length > TRUNCATE ? msg.slice(0, TRUNCATE) + "..." : msg)
 
-import { inspect } from "util"
-/**
- * Extract text and file parts from an A2A response (task or message).
- */
-function extractResult(result) {
-  if (!result) return { text: "No response from agent.", files: [] }
-
-  const text = []
-  const files = []
-
-  const processParts = (parts) => {
-    for (const part of parts) {
-      if (part.kind === "text") text.push(part.text)
-      else if (part.kind === "file") files.push(part)
-    }
-  }
-
-  if (result.kind === "task") {
-    if (result.artifacts)
-      for (let artifact of result.artifacts) {
-        if (!artifact.artifactId.startsWith("thinking")) processParts(artifact.parts)
-      }
-    else if (result.status?.message) processParts(result.status.message.parts)
-    if (text.length === 0 && files.length === 0) {
-      return { text: `Task ${result.id}: ${result.status?.state || "unknown"}`, files: [] }
-    }
-  } else if (result.kind === "message") {
-    processParts(result.parts)
-  } else {
-    return { text: JSON.stringify(result), files: [] }
-  }
-
-  return { text: text.join("\n") || "No response.", files }
+export function buildSubAgentTool(serviceName) {
+  return cds.requires[serviceName]?.credentials
+    ? buildSubAgentToolFromConnection(serviceName)
+    : buildSubAgentToolLocally(serviceName)
 }
 
-/**
- * Build the tool description from an agent card (or agent-card-like object).
- */
-function toolDescription(card) {
-  const skills = card.skills?.map((s) => `- ${s.name}: ${s.description}`).join("\n") || ""
-  return (
-    `Delegate to the "${card.name}" agent. ${card.description || ""}` +
-    (skills ? `\n\nSkills:\n${skills}` : "")
-  )
-}
+export async function buildSubAgentToolFromConnection(serviceName) {
+  const connection = outboundConnection(serviceName, "agent")
 
-/**
- * Format an extracted { text, files } pair into the string a tool returns.
- *
- * FileParts are serialized inline as {"kind":"file",...} JSON so the executor's
- * file-collection loop (graph-executor.js) picks them up and re-publishes them
- * as A2A artifacts, plus a human-readable manifest note for the model.
- */
-function formatToolResult({ text, files }) {
-  if (!files || files.length === 0) return text
-  const fileJson = files.map((f) => JSON.stringify({ kind: "file", file: f.file })).join("\n")
-  const manifest = files
-    .filter((f) => f.file?.bytes)
-    .map((f) => `/uploads/${f.file.name} (${f.file.mimeType})`)
-  const manifestNote = manifest.length
-    ? `\n[Files from downstream agent: ${manifest.join(", ")}]`
-    : ""
-  return `${text}${manifestNote}\n${fileJson}`
-}
-
-/**
- * Wrap an A2A client as a LangChain tool the agent can call.
- */
-export function createA2ATool(client, agentCard, serviceName) {
-  const subagent = agentCard.name
-  const t = tool(
-    async ({ message }) => {
-      try {
-        const messageId = cds.utils.uuid()
-        LOG.info(`Sending message to ${subagent}`, { messageId }, "\n\n" + message + "\n")
-        const result = await client.sendMessage({
-          message: {
-            kind: "message",
-            role: "user",
-            messageId,
-            parts: [{ kind: "text", text: message }],
-          },
-        })
-        if (LOG._debug)
-          LOG.trace(`Raw results from ${subagent}`, inspect(result, { depth: null, colors: true }))
-        let response = formatToolResult(extractResult(result))
-        if (response)
-          LOG.info(
-            `Got response from ${subagent}`,
-            { messageId },
-            "\n\n" + truncated(response) + "\n",
-          )
-        return response
-      } catch (err) {
-        LOG.warn("Subagent tool error", { subagent, error: err.message })
-        return `Error communicating with ${subagent}: ${err.message}`
-      }
+  return {
+    serviceName,
+    _dynamicTools: async () => {
+      const { client, agentCard } = await a2aClient(connection, serviceName)
+      const toolInstance = createA2ATool(client, agentCard, serviceName)
+      return [toolInstance]
     },
-    {
-      name: toolName(agentCard.name),
-      description: toolDescription(agentCard),
-      schema: z.object({
-        message: z.string().describe("The request to send to this agent"),
-      }),
-    },
-  )
-  t.metadata = { ...t.metadata, kind: "agent", agentName: agentCard.name, serviceName }
-  return t
+  }
 }
 
 export async function buildSubAgentToolLocally(serviceName) {
@@ -232,140 +143,108 @@ export async function buildSubAgentToolLocally(serviceName) {
   return localTool
 }
 
-export async function buildSubAgentToolFromConnection(serviceName) {
-  let endpoints = cds.service.endpoints4({
-    name: serviceName,
-    definition: cds.model.services[serviceName],
-  })
-  endpoints = Object.fromEntries(endpoints.map((o) => [o.kind, o.path]))
-  const { credentials, kind } = cds.requires[serviceName]
-
-  const destinationName =
-    typeof credentials === "string" ? credentials : (credentials?.destination ?? credentials?.name)
-  const localUrl =
-    typeof credentials === "string"
-      ? null
-      : kind === undefined
-        ? credentials?.url?.replace("undefined", endpoints?.agent)
-        : kind !== "agent" && endpoints?.[kind]
-          ? credentials?.url.replace(endpoints[kind], endpoints.agent)
-          : credentials?.url
-
-  if (!localUrl && !destinationName) {
-    throw new Error(
-      `[subagents] Could not resolve URL or destination name for service "${serviceName}". Check cds.requires config.`,
-    )
-  }
-
-  const resolveHeaders = destinationName
-    ? async () => {
-        try {
-          const { getDestination, buildHeadersForDestination, retrieveJwt } =
-            await import("@sap-cloud-sdk/connectivity")
-          const jwt = retrieveJwt(cds.context?.http?.req)
-          const resolvedDest = await getDestination({ destinationName, jwt })
-          const rawHeaders = await buildHeadersForDestination(resolvedDest)
-          return Object.fromEntries(
-            Object.entries(rawHeaders).map(([k, v]) => [
-              k.replace(/(^|-)(.)/g, (_, sep, c) => sep + c.toUpperCase()),
-              v,
-            ]),
+export function createA2ATool(client, agentCard, serviceName) {
+  const subagent = agentCard.name
+  const t = tool(
+    async ({ message }) => {
+      try {
+        const messageId = cds.utils.uuid()
+        LOG.info(`Sending message to ${subagent}`, { messageId }, "\n\n" + message + "\n")
+        const result = await client.sendMessage({
+          message: {
+            kind: "message",
+            role: "user",
+            messageId,
+            parts: [{ kind: "text", text: message }],
+          },
+        })
+        if (LOG._debug)
+          LOG.trace(`Raw results from ${subagent}`, inspect(result, { depth: null, colors: true }))
+        let response = formatToolResult(extractResult(result))
+        if (response)
+          LOG.info(
+            `Got response from ${subagent}`,
+            { messageId },
+            "\n\n" + truncated(response) + "\n",
           )
-        } catch (err) {
-          LOG.warn(
-            `Could not resolve destination "${destinationName}" via Cloud SDK, falling back: ${err.message}`,
-          )
-          const token = typeof credentials === "object" ? credentials?.authTokens?.[0]?.value : null
-          return token ? { Authorization: `Bearer ${token}` } : {}
-        }
+        return response
+      } catch (err) {
+        LOG.warn("Subagent tool error", { subagent, error: err.message })
+        return `Error communicating with ${subagent}: ${err.message}`
       }
-    : async () => {
-        if (typeof credentials === "object" && credentials?.forwardAuthToken) {
-          try {
-            const { retrieveJwt } = await import("@sap-cloud-sdk/connectivity")
-            const jwt = retrieveJwt(cds.context?.http?.req)
-            if (jwt) return { Authorization: `Bearer ${jwt}` }
-            LOG.warn(`Missing JWT token for forwardAuthToken on service "${serviceName}"`)
-          } catch (err) {
-            LOG.warn(
-              `Could not retrieve inbound JWT for "${serviceName}", falling back: ${err.message}`,
-            )
-          }
-        }
-        const token = typeof credentials === "object" ? credentials?.authTokens?.[0]?.value : null
-        return token ? { Authorization: `Bearer ${token}` } : {}
-      }
+    },
+    {
+      name: toolName(agentCard.name),
+      description: toolDescription(agentCard),
+      schema: z.object({
+        message: z.string().describe("The request to send to this agent"),
+      }),
+    },
+  )
+  t.metadata = { ...t.metadata, kind: "agent", agentName: agentCard.name, serviceName }
+  return t
+}
 
-  // Resolve URL once at build time; headers are resolved fresh on every request.
-  let agentBaseUrl = localUrl
-  if (destinationName) {
-    try {
-      const { getDestination, retrieveJwt } = await import("@sap-cloud-sdk/connectivity")
-      const jwt = retrieveJwt(cds.context?.http?.req)
-      const resolvedDest = await getDestination({ destinationName, jwt })
-      if (resolvedDest?.url) agentBaseUrl = resolvedDest.url
-    } catch (err) {
-      LOG.warn(
-        `Could not resolve destination URL for "${destinationName}", using localUrl: ${err.message}`,
-      )
+/**
+ * Extract text and file parts from an A2A response (task or message).
+ */
+function extractResult(result) {
+  if (!result) return { text: "No response from agent.", files: [] }
+
+  const text = []
+  const files = []
+
+  const processParts = (parts) => {
+    for (const part of parts) {
+      if (part.kind === "text") text.push(part.text)
+      else if (part.kind === "file") files.push(part)
     }
   }
 
-  if (!agentBaseUrl) {
-    throw new Error(
-      `[subagents] Could not resolve URL for service "${serviceName}" after destination lookup.`,
-    )
+  if (result.kind === "task") {
+    if (result.artifacts)
+      for (let artifact of result.artifacts) {
+        if (!artifact.artifactId.startsWith("thinking")) processParts(artifact.parts)
+      }
+    else if (result.status?.message) processParts(result.status.message.parts)
+    if (text.length === 0 && files.length === 0) {
+      return { text: `Task ${result.id}: ${result.status?.state || "unknown"}`, files: [] }
+    }
+  } else if (result.kind === "message") {
+    processParts(result.parts)
+  } else {
+    return { text: JSON.stringify(result), files: [] }
   }
 
-  const path = typeof credentials === "object" ? credentials?.path : null
-  const base = agentBaseUrl.replace(/\/$/, "") + (path ? `/${path.replace(/^\//, "")}` : "")
-  LOG.info(`Connecting to subagent ${serviceName}`, { at: base })
-
-  return {
-    serviceName,
-    _dynamicTools: async () => {
-      const headers = await resolveHeaders()
-      const cardUrl = `${base}/.well-known/agent-card.json`
-      const cardRes = await fetch(cardUrl, { headers: { Accept: "application/json", ...headers } })
-      if (!cardRes.ok) {
-        throw new Error(
-          `[subagents] Agent card fetch failed for "${serviceName}" at ${cardUrl}: HTTP ${cardRes.status}`,
-        )
-      }
-      const agentCard = await cardRes.json()
-      LOG.debug(`Fetched agent card for ${serviceName}`, { name: agentCard.name })
-
-      const { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory, RestTransportFactory } =
-        await import("@a2a-js/sdk/client")
-
-      const { getTracer } = await import("../../lib/telemetry/metrics.js")
-      const customFetch = async (url, init = {}) => {
-        const freshHeaders = await resolveHeaders()
-        if (getTracer()) {
-          const { context, propagation } = await import("@opentelemetry/api")
-          propagation.inject(context.active(), freshHeaders)
-        }
-        return fetch(url, { ...init, headers: { ...freshHeaders, ...(init.headers || {}) } })
-      }
-
-      const factory = new ClientFactory(
-        ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
-          transports: [
-            new JsonRpcTransportFactory({ fetchImpl: customFetch }),
-            new RestTransportFactory({ fetchImpl: customFetch }),
-          ],
-        }),
-      )
-      const client = await factory.createFromAgentCard(agentCard)
-      const toolInstance = createA2ATool(client, agentCard, serviceName)
-      LOG.info(`Connected to subagent "${agentCard.name}" (${serviceName})`, { at: base })
-      return [toolInstance]
-    },
-  }
+  return { text: text.join("\n") || "No response.", files }
 }
 
-export function buildSubAgentTool(serviceName) {
-  return cds.requires[serviceName]?.credentials
-    ? buildSubAgentToolFromConnection(serviceName)
-    : buildSubAgentToolLocally(serviceName)
+/**
+ * Build the tool description from an agent card (or agent-card-like object).
+ */
+function toolDescription(card) {
+  const skills = card.skills?.map((s) => `- ${s.name}: ${s.description}`).join("\n") || ""
+  return (
+    `Delegate to the "${card.name}" agent. ${card.description || ""}` +
+    (skills ? `\n\nSkills:\n${skills}` : "")
+  )
+}
+
+/**
+ * Format an extracted { text, files } pair into the string a tool returns.
+ *
+ * FileParts are serialized inline as {"kind":"file",...} JSON so the executor's
+ * file-collection loop (graph-executor.js) picks them up and re-publishes them
+ * as A2A artifacts, plus a human-readable manifest note for the model.
+ */
+function formatToolResult({ text, files }) {
+  if (!files || files.length === 0) return text
+  const fileJson = files.map((f) => JSON.stringify({ kind: "file", file: f.file })).join("\n")
+  const manifest = files
+    .filter((f) => f.file?.bytes)
+    .map((f) => `/uploads/${f.file.name} (${f.file.mimeType})`)
+  const manifestNote = manifest.length
+    ? `\n[Files from downstream agent: ${manifest.join(", ")}]`
+    : ""
+  return `${text}${manifestNote}\n${fileJson}`
 }

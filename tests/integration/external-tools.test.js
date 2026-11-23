@@ -79,7 +79,7 @@ afterAll(async () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("@cap-js/agents - Declarative MCP + SubAgent wiring (travel sample)", () => {
-  // MCP tools via @langchain/mcp-adapters return { type: "text", text: "..." }
+  // Remote MCP tools return { type: "text", text: "..." }
   // objects; local (in-process) MCP tools return plain strings. Normalize both.
   function extractText(result) {
     if (typeof result === "string") return result
