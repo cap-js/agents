@@ -11,7 +11,7 @@ import {
   createSendMessageWithParts,
   getSpanExporter,
 } from "../utils/telemetry-utils.js"
-
+import { SDK_INFO } from "@opentelemetry/core"
 setup()
 
 const { POST, axios } = cds.test(import.meta.dirname + "/../projects/bookshop")
@@ -363,6 +363,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       ucTableName: "main.mlflow_traces.myapp_otel_spans",
       BatchSpanProcessor: FakeBatchProcessor,
       OTLPTraceExporter: CapturingExporter,
+      openTelemetryVersion: SDK_INFO["telemetry.sdk.version"],
     })
     proc.onEnd({ attributes: { "mlflow.experimentId": "42" } })
 
@@ -393,6 +394,7 @@ describe("@cap-js/agents - MLflow span attributes", () => {
       ucTableName: undefined,
       BatchSpanProcessor: FakeBatchProcessor,
       OTLPTraceExporter: CapturingExporter,
+      openTelemetryVersion: SDK_INFO["telemetry.sdk.version"],
     })
     proc.onEnd({ attributes: { "mlflow.experimentId": "99" } })
 

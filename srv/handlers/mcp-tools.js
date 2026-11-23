@@ -138,19 +138,25 @@ export async function buildMcpToolsFromConnection(serviceName) {
   return {
     serviceName,
     _dynamicTools: async () => {
-      const headers = await resolveHeaders()
-      const client = new (await import("@langchain/mcp-adapters")).MCPAdapter({
-        servers: { default: { transport: "http", url: mcpUrl, headers } },
-        prefixToolNameWithServerName: false,
-      })
-      let raw = await client.listTools()
-      if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
-      for (const t of raw) {
-        t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
-        t.name = toolName(`${serviceName}_${t.name}`)
+      try {
+        const headers = await resolveHeaders()
+        const client = new (await import("@langchain/mcp-adapters")).MCPAdapter({
+          servers: { default: { transport: "http", url: mcpUrl, headers } },
+          prefixToolNameWithServerName: false,
+        })
+        let raw = await client.listTools()
+        if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
+        for (const t of raw) {
+          t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
+          t.name = toolName(`${serviceName}_${t.name}`)
+        }
+        LOG.debug(`Got ${raw.length} MCP tools from ${mcpUrl}: ${raw.map((t) => t.name).join(", ")}`)
+        return raw
+      } catch (err) {
+        LOG.warn(`Failed to build MCP tools for "${serviceName}": ${err?.message ?? err}`)
+        // The middleware caches this result for the request; a new request can retry.
+        return []
       }
-      LOG.debug(`Got ${raw.length} MCP tools from ${mcpUrl}: ${raw.map((t) => t.name).join(", ")}`)
-      return raw
     },
   }
 }

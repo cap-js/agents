@@ -7,12 +7,6 @@ using {sap.capire.bookshop as my} from '../db/schema';
  */
 @agent
 @odata
-@Core.Links : [
-  {
-      rel : 'via',
-      href : 'https://example.com/agent/circuit-breaker',
-  },
-]
 @description: 'Circuit breaker test agent'
 service CircuitBreakerService {
   @readonly
