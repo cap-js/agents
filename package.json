@@ -1,6 +1,6 @@
 {
   "name": "@cap-js/agents",
-  "version": "0.9.10",
+  "version": "0.9.11",
   "description": "CDS plugin for building agents",
   "homepage": "https://cap.cloud.sap/",
   "license": "Apache-2.0",
@@ -10,6 +10,7 @@
     "url": "git+https://github.com/cap-js/agents.git"
   },
   "workspaces": [
+    "tests/projects/agent-card-compile/",
     "tests/projects/bookshop/",
     "tests/projects/deep-agent/",
     "tests/projects/mtx/mtx/sidecar/",
@@ -33,6 +34,7 @@
     "./package.json": "./package.json",
     "./cds-plugin": "./cds-plugin.js",
     "./eval": "./lib/eval/index.js",
+    "./lib/api": "./lib/api.cjs",
     "./lib/index.cjs": "./lib/index.cjs",
     "./lib/models/*": "./lib/models/*.js",
     "./srv/entities.cds": "./srv/entities.cds",
@@ -41,7 +43,7 @@
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
-    "test:hybrid": "CDS_ENV=test,hybrid,tracing cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
+    "test:hybrid": "CDS_ENV=test,hybrid,mlflow cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
     "watch:hybrid": "DEBUG=agents cds bind --exec -- cds w tests/projects/bookshop",
@@ -76,6 +78,7 @@
     "@cap-js/sqlite": "^3",
     "@earendil-works/pi-agent-core": "^1",
     "@earendil-works/pi-ai": "^1",
+    "@opentelemetry/sdk-trace": ">=2.11",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
     "@vitest/coverage-v8": "^5.0.1",
@@ -106,7 +109,6 @@
   },
   "cds": {
     "agents": {
-      "streaming": true,
       "trace_langchain": true,
       "mlflow": false,
       "connect": "auto",

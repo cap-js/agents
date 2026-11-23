@@ -4,7 +4,7 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
-## Version 0.9.11 - tbd
+## Version 0.9.12 - Unreleased
 
 ### Added
 
@@ -13,6 +13,23 @@
 ### Fixed
 
 - Content filtering preflight LLM calls now use mistral-small instead of gpt-4o-mini
+
+## Version 0.9.11 - 2026-11-06
+
+### Added
+
+- Register A2A agent card compile target, compatible with ORD plugin
+
+### Removed
+
+- OpenTelemetry v1 support is dropped
+- Removed the `cds.agents.streaming` configuration since langchain graphs always have the stream method
+- Dropped support for `@agent.card`, in favor of `AGENT.md` autodiscovery and `@agent.directory`
+
+### Fixed
+
+- Remote MCP discovery failures now log a warning and exclude the unavailable server's tools instead of failing the agent request
+- Fixed human in the loop rejection
 
 ## Version 0.9.10 - 2026-10-26
 

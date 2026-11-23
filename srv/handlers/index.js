@@ -96,7 +96,7 @@ export default function registerDefaultAgentHandlers(srv) {
 
   // Default buildModel: cds.connect.to('llm'), configurable via @agent.llm
   srv.on("buildModel", async (req) => {
-    const def = effectiveDefinition(srv)
+    const def = effectiveDefinition(srv.definition)
     const name = def?.["@agent.llm"] || srv?.options?.agent?.llm || "llm"
     const options = cds.requires[name] ?? {}
     let { kind, impl } = options

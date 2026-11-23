@@ -175,8 +175,8 @@ describe("@cap-js/agents - @protocol enabled agent", () => {
     const graph = await srv.send("buildGraph", {})
     expect(graph).toBeTruthy()
     expect(
-      typeof graph.invoke === "function" || typeof graph.execute === "function",
-      "buildGraph must return a compiled LangGraph (invoke) or GraphExecutor (execute)",
+      typeof graph.stream === "function" || typeof graph.execute === "function",
+      "buildGraph must return a compiled LangGraph (stream) or GraphExecutor (execute)",
     ).toBe(true)
   })
 })
