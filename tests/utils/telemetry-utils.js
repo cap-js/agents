@@ -52,18 +52,12 @@ let memExporter
 export async function getSpanExporter() {
   if (memExporter) return memExporter
   const { trace } = await import("@opentelemetry/api")
-  const { SimpleSpanProcessor, InMemorySpanExporter } =
-    await import("@opentelemetry/sdk-trace-base")
+  const { SimpleSpanProcessor, InMemorySpanExporter } = await import("@opentelemetry/sdk-trace")
   memExporter = new InMemorySpanExporter()
+  const exporter = new SimpleSpanProcessor({ exporter: memExporter })
   const provider = trace.getTracerProvider()
   const delegate = provider.getDelegate?.() || provider
-  if (delegate.addSpanProcessor) {
-    // OTEL SDK v1: addSpanProcessor exists on BasicTracerProvider
-    delegate.addSpanProcessor(new SimpleSpanProcessor(memExporter))
-  } else if (delegate._activeSpanProcessor?._spanProcessors) {
-    // OTEL SDK v2: no addSpanProcessor — push directly into MultiSpanProcessor
-    delegate._activeSpanProcessor._spanProcessors.push(new SimpleSpanProcessor(memExporter))
-  }
+  delegate._activeSpanProcessor._spanProcessors.push(exporter)
   return memExporter
 }
 

@@ -1,3 +1,4 @@
+import { createMockGraph } from "../utils/mock-streaming-graph.js"
 import assert from "node:assert/strict"
 import cds from "@sap/cds"
 
@@ -12,16 +13,13 @@ describe("GraphExecutor - abort/cancellation", () => {
   const withCtx = (fn) => () => cds._with({}, fn)
 
   it(
-    "passes signal to graph.invoke via config",
+    "passes signal to graph.stream via config",
     withCtx(async () => {
       let capturedConfig
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          capturedConfig = config
-          return { messages: [{ content: "ok" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        capturedConfig = config
+        return { messages: [{ content: "ok" }] }
+      })
       const fakeEventBus = { publish: () => {}, finished: () => {} }
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
@@ -36,7 +34,7 @@ describe("GraphExecutor - abort/cancellation", () => {
         fakeEventBus,
       )
 
-      assert.ok(capturedConfig.signal, "signal must be passed to graph.invoke config")
+      assert.ok(capturedConfig.signal, "signal must be passed to graph.stream config")
       assert.ok(capturedConfig.signal instanceof AbortSignal, "signal must be an AbortSignal")
       assert.strictEqual(capturedConfig.signal.aborted, false, "signal should not be aborted yet")
     }),
@@ -46,17 +44,14 @@ describe("GraphExecutor - abort/cancellation", () => {
     "abort(taskId) causes execute to publish canceled status",
     withCtx(async () => {
       const publishedEvents = []
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          // Simulate long-running graph that respects abort signal
-          return new Promise((resolve, reject) => {
-            config.signal.addEventListener("abort", () => {
-              reject(abortError())
-            })
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        // Simulate long-running graph that respects abort signal
+        return new Promise((resolve, reject) => {
+          config.signal.addEventListener("abort", () => {
+            reject(abortError())
           })
-        },
-      }
+        })
+      })
       const fakeEventBus = {
         publish: (e) => publishedEvents.push(e),
         finished: () => {},
@@ -91,7 +86,7 @@ describe("GraphExecutor - abort/cancellation", () => {
   )
 
   it("abort(taskId) is safe to call for unknown taskId", () => {
-    const fakeGraph = { checkpointer: {}, invoke: async () => ({}) }
+    const fakeGraph = createMockGraph(async () => ({}))
     const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
 
     // Should not throw
@@ -101,16 +96,13 @@ describe("GraphExecutor - abort/cancellation", () => {
   it(
     "abort(taskId) is idempotent — calling twice does not throw",
     withCtx(async () => {
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          return new Promise((resolve, reject) => {
-            config.signal.addEventListener("abort", () => {
-              reject(abortError())
-            })
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        return new Promise((resolve, reject) => {
+          config.signal.addEventListener("abort", () => {
+            reject(abortError())
           })
-        },
-      }
+        })
+      })
       const fakeEventBus = { publish: () => {}, finished: () => {} }
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
@@ -138,16 +130,13 @@ describe("GraphExecutor - abort/cancellation", () => {
     "cancelTask aborts running execution",
     withCtx(async () => {
       const publishedEvents = []
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          return new Promise((resolve, reject) => {
-            config.signal.addEventListener("abort", () => {
-              reject(abortError())
-            })
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        return new Promise((resolve, reject) => {
+          config.signal.addEventListener("abort", () => {
+            reject(abortError())
           })
-        },
-      }
+        })
+      })
       const fakeEventBus = {
         publish: (e) => publishedEvents.push(e),
         finished: () => {},
@@ -181,10 +170,7 @@ describe("GraphExecutor - abort/cancellation", () => {
   it(
     "abortController is cleaned up after execution completes",
     withCtx(async () => {
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async () => ({ messages: [{ content: "done" }] }),
-      }
+      const fakeGraph = createMockGraph(async () => ({ messages: [{ content: "done" }] }))
       const fakeEventBus = { publish: () => {}, finished: () => {} }
 
       const executor = new GraphExecutor(Promise.resolve(fakeGraph), { name: "TestService" }, {})
@@ -209,17 +195,14 @@ describe("GraphExecutor - abort/cancellation", () => {
   )
 
   it(
-    "signal is already aborted if abort() called before graph.invoke starts",
+    "signal is already aborted if abort() called before graph.stream starts",
     withCtx(async () => {
-      const fakeGraph = {
-        checkpointer: {},
-        invoke: async (_input, config) => {
-          if (config.signal.aborted) {
-            throw abortError()
-          }
-          return { messages: [{ content: "ok" }] }
-        },
-      }
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        if (config.signal.aborted) {
+          throw abortError()
+        }
+        return { messages: [{ content: "ok" }] }
+      })
       const publishedEvents = []
       const fakeEventBus = {
         publish: (e) => publishedEvents.push(e),
@@ -250,7 +233,7 @@ describe("GraphExecutor - abort/cancellation", () => {
 
       // Graph should see aborted signal (or never run at all)
       const canceledEvent = publishedEvents.find((e) => e.status?.state === "canceled")
-      assert.ok(canceledEvent, "should publish canceled when aborted before invoke")
+      assert.ok(canceledEvent, "should publish canceled when aborted before stream")
     }),
   )
 })
@@ -264,17 +247,14 @@ describe("GraphExecutor - graceful timeout", () => {
     withCtx(async () => {
       const publishedEvents = []
       // Simulate a graph that runs longer than timeout
-      const fakeGraph = {
-        checkpointer: {}, // prevent auto-injection of CdsCheckpointSaver
-        invoke: async (_input, config) => {
-          // Block until signal aborts
-          return new Promise((resolve, reject) => {
-            config.signal.addEventListener("abort", () => {
-              reject(abortError())
-            })
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        // Block until signal aborts
+        return new Promise((resolve, reject) => {
+          config.signal.addEventListener("abort", () => {
+            reject(abortError())
           })
-        },
-      }
+        })
+      })
       const fakeEventBus = {
         publish: (e) => publishedEvents.push(e),
         finished: () => {},
@@ -346,16 +326,13 @@ describe("GraphExecutor - graceful timeout", () => {
           },
         }),
       }
-      const fakeGraph = {
-        checkpointer: fakeCheckpointer,
-        invoke: async (_input, config) => {
-          return new Promise((resolve, reject) => {
-            config.signal.addEventListener("abort", () => {
-              reject(abortError())
-            })
+      const fakeGraph = createMockGraph(async (_input, config) => {
+        return new Promise((resolve, reject) => {
+          config.signal.addEventListener("abort", () => {
+            reject(abortError())
           })
-        },
-      }
+        })
+      }, fakeCheckpointer)
       const fakeEventBus = {
         publish: (e) => publishedEvents.push(e),
         finished: () => {},
