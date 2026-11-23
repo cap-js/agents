@@ -150,7 +150,9 @@ export async function buildMcpToolsFromConnection(serviceName) {
           t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
           t.name = toolName(`${serviceName}_${t.name}`)
         }
-        LOG.debug(`Got ${raw.length} MCP tools from ${mcpUrl}: ${raw.map((t) => t.name).join(", ")}`)
+        LOG.debug(
+          `Got ${raw.length} MCP tools from ${mcpUrl}: ${raw.map((t) => t.name).join(", ")}`,
+        )
         return raw
       } catch (err) {
         LOG.warn(`Failed to build MCP tools for "${serviceName}": ${err?.message ?? err}`)
