@@ -13,7 +13,6 @@ export default class CatalogService extends cds.ApplicationService {
     this.on("submitOrder", async (req) => {
       let { book: id, quantity } = req.data
       let book = await SELECT.one.from(Books, id, (b) => b.stock)
-
       // Validate input data
       if (!book) return req.error(404, `Book #${id} doesn't exist`)
       if (quantity < 1) return req.error(400, `quantity has to be 1 or more`)
