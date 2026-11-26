@@ -51,6 +51,17 @@ All limits are configured via `cds.env.agents.quotas` (defaults provided by the 
 | `maxLLMTokensPerDay`        | Midnight UTC       | Tenant  |
 | `maxIncomingMessageLength`  | — (HTTP 400)       | Request |
 
+Token usage is collected from completed model calls in each graph execution, not
+from the accumulated conversation history. Tokens reported for cached input are
+included in the normalized model usage; they are not added a second time.
+Resuming an interrupted task adds the new execution's tokens to that task's
+`usageLlmTokens` value. Response token-usage metadata describes the current
+execution only.
+
+The daily limit sums recorded task usage for tasks created since midnight UTC.
+Usage is persisted asynchronously, so this is not a strict provider spending
+limit. Previously recorded inflated totals are not corrected automatically.
+
 When exceeded, the response is:
 
 ```
