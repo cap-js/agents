@@ -43,6 +43,7 @@
   "scripts": {
     "lint": "npx eslint .",
     "test": "CDS_ENV=test npx vitest run --config vitest.config.js",
+    "test:checkpointer-validation": "CDS_ENV=test npx vitest run --config vitest.config.checkpointer-validation.js",
     "test:hybrid": "CDS_ENV=test,hybrid,mlflow cds bind --exec -- npx vitest run --config vitest.config.hybrid.js",
     "test:mtx": "CDS_ENV=test npx vitest run --config vitest.config.js tests/integration/mtx.test.js",
     "watch:sample": "cds w tests/projects/bookshop",
@@ -78,6 +79,7 @@
     "@cap-js/sqlite": "^3",
     "@earendil-works/pi-agent-core": "^1",
     "@earendil-works/pi-ai": "^1",
+    "@langchain/langgraph-checkpoint-validation": "^1.2.1",
     "@opentelemetry/sdk-trace": ">=2.11",
     "@sap/cds-mtxs": "^4",
     "@toon-format/toon": ">=2.3",
