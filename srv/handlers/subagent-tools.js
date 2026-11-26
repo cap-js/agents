@@ -338,7 +338,6 @@ export async function buildSubAgentToolFromConnection(serviceName) {
       const { ClientFactory, ClientFactoryOptions, JsonRpcTransportFactory, RestTransportFactory } =
         await import("@a2a-js/sdk/client")
 
-      const { getTracer } = await import("../../lib/telemetry/metrics.js")
       const customFetch = async (url, init = {}) => {
         const freshHeaders = await resolveHeaders()
         if (getTracer()) {
