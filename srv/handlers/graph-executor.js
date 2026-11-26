@@ -536,6 +536,7 @@ class GraphExecutor {
       }
 
       let usageData
+      const usageMessages = []
       let result
       try {
         const extraConfig = this._configMapper ? await this._configMapper(requestContext) : {}
@@ -545,6 +546,17 @@ class GraphExecutor {
         const config = {
           // Prefer limit at construction time, then cds.env then defaults (standard langchain -> 25, deepagent -> 10_000).
           recursionLimit: this._recursionLimit || cds.env.agents.recursionLimit || undefined,
+          callbacks: [
+            {
+              handleLLMEnd(output) {
+                for (const generation of output.generations.flat()) {
+                  if (generation.message?.usage_metadata) {
+                    usageMessages.push({ usage_metadata: generation.message.usage_metadata })
+                  }
+                }
+              },
+            },
+          ],
           configurable: {
             ...extraConfig,
             thread_id: `${serviceName}:${contextId}`,
@@ -587,9 +599,7 @@ class GraphExecutor {
           )
           result = streamed.state
         }
-        // Capture result for usage tracking in finally block
-        // (interrupt-only results may have no `messages` — treat as empty)
-        usageData = aggregateUsageData(result.messages || [])
+        usageData = aggregateUsageData(usageMessages)
 
         const duration = ((Date.now() - t0) / 1000).toFixed(1) + "s"
         if (requiresHitl(result)) {
@@ -1027,8 +1037,8 @@ class GraphExecutor {
         metrics.concurrentExecutions.add(-1, mAttrs)
 
         // Update task record with usage data (non-blocking, best effort)
-        // When result is undefined (quota exceeded, timeout, abort), recover
-        // messages from the checkpoint for usage tracking.
+        // Token usage comes from this execution's model callbacks, not conversation
+        // history. Checkpoint recovery is still needed for the tool-call count.
         const graph = this._graph
         cds.spawn(async () => {
           try {
@@ -1051,11 +1061,10 @@ class GraphExecutor {
               }
             }
             const updates = { agentService: serviceName }
-            if (usageData?.total_tokens != null) {
-              updates.usageLlmTokens = usageData.total_tokens
-            } else if (messages) {
-              const recovered = aggregateUsageData(messages)
-              if (recovered?.total_tokens) updates.usageLlmTokens = recovered.total_tokens
+            const consumed = usageData ?? aggregateUsageData(usageMessages)
+            if (consumed.total_tokens > 0) {
+              // A resumed task keeps usage recorded before its interrupt.
+              updates.usageLlmTokens = { "+=": consumed.total_tokens }
             }
             if (messages) updates.usageToolCalls = totalToolCalls(messages)
             await UPDATE("cap.agent.Tasks").where({ taskId }).with(updates)
