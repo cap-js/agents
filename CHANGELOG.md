@@ -4,6 +4,12 @@
 - The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- Count LLM tokens per task execution instead of re-counting previous conversation turns, while preserving usage across interrupted task resumes
+
 ## Version 0.9.11 - 2026-11-06
 
 ### Added
