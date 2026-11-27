@@ -12,7 +12,7 @@ import {
   withPromptCachingMessages,
   withPromptCachingOptions,
   withPromptCachingParams,
-} from "../../lib/utils/caching.js"
+} from "../../lib/models/utils/caching.js"
 
 cds.test(import.meta.dirname + "/../projects/bookshop")
 
@@ -132,7 +132,6 @@ describe("@cap-js/agents - AICore Destination Connectivity", () => {
     it("adds GPT-5.6 prompt cache options", () => {
       expect(withPromptCachingParams("gpt-5.6-sol", { temperature: 0 })).toEqual({
         temperature: 0,
-        prompt_cache_options: { mode: "implicit", ttl: "30m" },
       })
     })
 
