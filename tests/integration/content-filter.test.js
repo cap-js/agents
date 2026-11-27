@@ -135,19 +135,20 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       )
     })
 
-    it("stores default input filter in options.contentFilter for middleware", async () => {
+    it("stores default input filter in options.contentFilter", async () => {
       overrideModel(undefined)
       const model = await srv.send("buildModel", {})
       expect(model.options.contentFilter.input.azure_content_safety).toBeDefined()
       expect(model.options.contentFilter.input.azure_content_safety.prompt_shield).toBe(true)
     })
 
-    it("only passes output filter to SDK — input filter stays in options for middleware", async () => {
+    it("passes both filters to SDK without scoping input until middleware runs", async () => {
       overrideModel(undefined)
       const model = await srv.send("buildModel", {})
-      // SDK receives output only
       expect(model.orchestrationConfig.filtering.output).toBeDefined()
-      expect(model.orchestrationConfig.filtering.input).toBeUndefined()
+      expect(model.orchestrationConfig.filtering.input).toBeDefined()
+      expect(model.orchestrationConfig.filtering.input.filters[0].target_selector).toBeUndefined()
+      expect(model.orchestrationConfig.filtering.output.filters[0].target_selector).toBeUndefined()
     })
 
     it("applies explicit custom contentFilter object", async () => {
@@ -164,7 +165,7 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       expect(model.orchestrationConfig.filtering.output.filters[0].config.hate).toBe(0) // ALLOW_SAFE → 0
     })
 
-    it("stores custom input filter in options.contentFilter for middleware", async () => {
+    it("stores custom input filter in options.contentFilter", async () => {
       const custom = {
         input: { azure_content_safety: { hate: "ALLOW_SAFE", prompt_shield: true } },
         output: { azure_content_safety: { hate: "ALLOW_SAFE" } },
