@@ -1,11 +1,11 @@
 using {
   cap.agent.Tasks,
-  cap.agent.Checkpoints,
-  cap.agent.CheckpointWrites
+  cap.agent.Sessions,
+  cap.agent.Messages
 } from '../../../../srv/entities';
 
 service AgentDevService {
   entity AgentTasks            as projection on Tasks;
-  entity AgentCheckpoints      as projection on Checkpoints;
-  entity AgentCheckpointWrites as projection on CheckpointWrites;
+  entity AgentSessions      as projection on Sessions;
+  entity AgentMessages as projection on Messages;
 }

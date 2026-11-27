@@ -16,12 +16,12 @@ const initializer = {
   },
   async destroyCheckpointer() {
     // Each upstream suite must see only the state it created.
-    await DELETE.from("cap.agent.CheckpointWrites")
-    await DELETE.from("cap.agent.Checkpoints")
+    await DELETE.from("cap.agent.Messages")
+    await DELETE.from("cap.agent.Sessions")
   },
 }
 
-// Validate both the production default and the full-persistence option.
+// All writes must survive, even if an application still sets the retired option.
 describe.each([false, true])("persistAllCheckpointWrites=%s", (persistAllCheckpointWrites) => {
   let previousSetting
   beforeAll(() => {

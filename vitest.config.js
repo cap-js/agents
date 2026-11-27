@@ -1,6 +1,6 @@
 export default {
   test: {
-    include: ["tests/integration/*.test.js"],
+    include: ["tests/integration/*.test.js", "tests/checkpointer-validation/*.test.js"],
     setupFiles: ["tests/utils/setup.js"],
     globals: true,
     environment: "node",

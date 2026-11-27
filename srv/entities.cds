@@ -1,4 +1,4 @@
-using {managed} from '@sap/cds/common';
+using {cuid, managed} from '@sap/cds/common';
 using {Attachments} from '@cap-js/attachments';
 
 namespace cap.agent;
@@ -51,47 +51,54 @@ entity Tasks : managed {
        */
       outputFiles    : Composition of many Attachments;
 
-      /** LangGraph checkpoints created by this task. Cascade-deleted. */
-      checkpoints    : Composition of many Checkpoints
-                         on checkpoints.task_id = taskId;
-
-      /** LangGraph checkpoint writes tied to this task. Cascade-deleted. */
-      checkpointWrites : Composition of many CheckpointWrites
-                           on checkpointWrites.task_id = taskId;
 }
 
-entity Checkpoints : managed {
-  key thread_id            : String;
-  key checkpoint_ns        : String default '';
-  key checkpoint_id        : String;
-      task_id              : String;
-      task                 : Association to one Tasks
-                               on task.taskId = task_id;
-      parent_checkpoint_id : String;
-      parent               : Association to one Checkpoints
-                               on parent.checkpoint_id = parent_checkpoint_id;
-      checkpoint           : LargeString;
-      metadata             : LargeString;
-      writes               : Composition of many CheckpointWrites
-                               on  writes.thread_id     = thread_id
-                               and writes.checkpoint_ns = checkpoint_ns
-                               and writes.checkpoint_id = checkpoint_id;
+/** Owner-scoped session rows coordinate concurrent message appends. */
+entity Sessions : cuid, managed {
+  key owner    : String;
+      sequence : Integer64; // Last allocated message sequence; initialized once for existing sessions.
+      messages : Composition of many Messages
+                   on messages.session = ID and messages.createdBy = owner;
 }
 
-entity CheckpointWrites {
-  key thread_id     : String;
-  key checkpoint_ns : String default '';
-  key checkpoint_id : String;
-      checkpoint    : Association to one Checkpoints
-                        on  checkpoint.checkpoint_id = checkpoint_id
-                        and checkpoint.checkpoint_ns = checkpoint_ns
-                        and checkpoint.thread_id     = thread_id;
-  key task_id       : String;
-      task          : Association to one Tasks
-                        on task.taskId = task_id;
-  key idx           : Integer;
-      channel       : String;
-      value         : LargeString;
+@assert.unique.sequence: [session, createdBy, sequence]
+@assert.unique.order: [createdBy, category, sortKey, ID]
+@assert.unique.scopeOrder: [createdBy, category, scope, sortKey, ID]
+@assert.unique.streamOrder: [createdBy, category, scope, stream, sortKey, ID]
+@assert.unique.streamSequence: [createdBy, category, scope, stream, sequence, ID]
+@assert.unique.parent: [createdBy, prev, ID]
+entity Messages : cuid, managed {
+  session  : UUID; // A2A contextId — groups messages into a conversation
+  sequence : Integer64;
+  scope    : UUID; // Generic logical collection, independent of the adapter's identifiers.
+  stream   : UUID;
+  category : String(32);
+  sortKey  : String(512);
+  @assert.integrity: false // History may refer to an archived or not-yet-written message.
+  prev     : Association to Messages;
+  role     : RoleType;
+  type     : MessageType;
+  content  : LargeString;
+  query    : Map;
+}
+
+type RoleType : String enum {
+  user;
+  assistant;
+  system;
+  tool;
+};
+
+type MessageType : String enum {
+  text;
+  image;
+  file;
+  tool_call;
+  tool_result;
+  reasoning;
+  data;
+  approve;
+  reject;
 }
 
 /**

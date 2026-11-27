@@ -1,9 +1,9 @@
 import cds from "@sap/cds"
 cds.test(import.meta.dirname + "/../projects/bookshop")
 import { CdsCheckpointSaver } from "../../lib/protocol/persistence/checkpoint-saver.js"
+import { sessionId } from "../../lib/protocol/persistence/message-store.js"
 
-const CHECKPOINTS = "cap.agent.Checkpoints"
-const WRITES = "cap.agent.CheckpointWrites"
+const MESSAGES = "cap.agent.Messages"
 
 function runAs(userId, fn) {
   return cds.tx({ user: new cds.User({ id: userId }) }, fn)
@@ -155,24 +155,39 @@ describe("CdsCheckpointSaver", () => {
 
       // Alice's checkpoints are gone
       const aliceRows = await runAs("alice", () =>
-        SELECT.from(CHECKPOINTS).where({ thread_id: thread, createdBy: "alice" }),
+        SELECT.from(MESSAGES).where({ session: sessionId(thread), createdBy: "alice" }),
       )
       expect(aliceRows.length).toBe(0)
 
       // Bob's checkpoints are intact
       const bobRows = await runAs("bob", () =>
-        SELECT.from(CHECKPOINTS).where({ thread_id: thread, createdBy: "bob" }),
+        SELECT.from(MESSAGES).where({ session: sessionId(thread), createdBy: "bob" }),
       )
       expect(bobRows.length).toBe(2)
     })
 
     it("deletes associated writes for the user", async () => {
       const thread = `delete-writes-${cds.utils.uuid()}`
-      await seedCheckpoints("alice", thread, 2)
+      const ids = await seedCheckpoints("alice", thread, 2)
+      await runAs("alice", () =>
+        saver.putWrites(
+          { configurable: { thread_id: thread, checkpoint_id: ids[1] } },
+          [["value", 42]],
+          "task",
+        ),
+      )
+      const before = await SELECT.from(MESSAGES).where({
+        session: sessionId(thread),
+        createdBy: "alice",
+      })
+      expect(before).toHaveLength(3)
 
       await runAs("alice", () => saver.deleteThread(thread))
 
-      const writeRows = await SELECT.from(WRITES).where({ thread_id: thread })
+      const writeRows = await SELECT.from(MESSAGES).where({
+        session: sessionId(thread),
+        createdBy: "alice",
+      })
       expect(writeRows.length).toBe(0)
     })
   })

@@ -57,34 +57,28 @@ afterAll(async () => {
 const { POST, axios, GET } = cds.test(TRAVEL_AGENT_DIR)
 
 async function collectToolCallsFromCheckpoints(threadId) {
-  const { BaseCheckpointSaver } = await import("@langchain/langgraph-checkpoint")
-  // Use BaseCheckpointSaver's serde to deserialize checkpoint data
-  const saver = new (class extends BaseCheckpointSaver {})()
-  const serde = saver.serde
-
-  const rows = await SELECT.from("cap.agent.Checkpoints").where({ thread_id: threadId })
-  const tools = new Set()
-
-  for (const row of rows) {
-    let checkpoint
-    try {
-      checkpoint = await serde.loadsTyped("json", row.checkpoint)
-    } catch {
-      continue
-    }
-    const messages = checkpoint?.channel_values?.messages || []
-    for (const msg of messages) {
-      const calls = msg?.tool_calls || msg?.kwargs?.tool_calls
-      if (Array.isArray(calls)) {
-        for (const tc of calls) {
-          const name = tc?.name || tc?.function?.name
-          if (name) tools.add(name)
+  const { CdsCheckpointSaver } = await import("../../lib/protocol/persistence/checkpoint-saver.js")
+  const task = await SELECT.one
+    .from("cap.agent.Tasks")
+    .columns("createdBy")
+    .where({ contextId: threadId.split(":").at(-1) })
+  return cds.tx({ user: new cds.User({ id: task.createdBy }) }, async () => {
+    const tools = new Set()
+    for await (const { checkpoint } of new CdsCheckpointSaver().list({
+      configurable: { thread_id: threadId },
+    })) {
+      for (const msg of checkpoint.channel_values.messages ?? []) {
+        const calls = msg?.tool_calls || msg?.kwargs?.tool_calls
+        if (Array.isArray(calls)) {
+          for (const tc of calls) {
+            const name = tc?.name || tc?.function?.name
+            if (name) tools.add(name)
+          }
         }
       }
     }
-  }
-
-  return tools
+    return tools
+  })
 }
 
 describe("Travel Sample E2E", () => {

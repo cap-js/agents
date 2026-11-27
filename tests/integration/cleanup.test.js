@@ -9,8 +9,8 @@ import {
 } from "../../lib/protocol/persistence/cleanup.js"
 
 const TASKS = "cap.agent.Tasks"
-const CHECKPOINTS = "cap.agent.Checkpoints"
-const CHECKPOINT_WRITES = "cap.agent.CheckpointWrites"
+const SESSIONS = "cap.agent.Sessions"
+const MESSAGES = "cap.agent.Messages"
 const OUTBOX_MESSAGES = "cds.outbox.Messages"
 
 const SERVICE_NAME = "GraphBookService"
@@ -19,10 +19,15 @@ function pastDate(daysAgo) {
   return new Date(Date.now() - daysAgo * 86_400_000).toISOString()
 }
 
-async function insertTask({ taskId, agentService = SERVICE_NAME, modifiedAt }) {
+async function insertTask({
+  taskId,
+  contextId = cds.utils.uuid(),
+  agentService = SERVICE_NAME,
+  modifiedAt,
+}) {
   await INSERT.into(TASKS).entries({
     taskId,
-    contextId: cds.utils.uuid(),
+    contextId,
     state: "completed",
     data: "{}",
     agentService,
@@ -31,26 +36,19 @@ async function insertTask({ taskId, agentService = SERVICE_NAME, modifiedAt }) {
   })
 }
 
-async function insertCheckpoint({ taskId, threadId, checkpointId }) {
-  await INSERT.into(CHECKPOINTS).entries({
-    thread_id: threadId,
-    checkpoint_ns: "",
-    checkpoint_id: checkpointId,
-    task_id: taskId,
-    checkpoint: "{}",
-    metadata: "{}",
-  })
-}
-
-async function insertCheckpointWrite({ taskId, threadId, checkpointId, idx = 0 }) {
-  await INSERT.into(CHECKPOINT_WRITES).entries({
-    thread_id: threadId,
-    checkpoint_ns: "",
-    checkpoint_id: checkpointId,
-    task_id: taskId,
-    idx,
-    channel: "__start__",
-    value: "{}",
+async function insertSession(contextId, modifiedAt = pastDate(10)) {
+  const owner = cds.context?.user?.id ?? "anonymous"
+  await INSERT.into(SESSIONS).entries({ ID: contextId, owner, createdAt: modifiedAt, modifiedAt })
+  await INSERT.into(MESSAGES).entries({
+    ID: cds.utils.uuid(),
+    session: contextId,
+    sequence: 1,
+    role: "system",
+    type: "data",
+    content: "state",
+    createdBy: owner,
+    createdAt: modifiedAt,
+    modifiedAt,
   })
 }
 
@@ -100,37 +98,44 @@ describe("@cap-js/agents - Task Cleanup", () => {
       expect(row).toBeDefined()
     })
 
-    it("should cascade-delete related checkpoints", async () => {
+    it("deletes an expired session and its messages after its last task expires", async () => {
       cds.env.agents.retention = "7d"
-
-      const taskId = cds.utils.uuid()
-      const threadId = cds.utils.uuid()
-      const checkpointId = cds.utils.uuid()
-
-      await insertTask({ taskId, modifiedAt: pastDate(10) })
-      await insertCheckpoint({ taskId, threadId, checkpointId })
-
+      const contextId = cds.utils.uuid()
+      await insertTask({ taskId: cds.utils.uuid(), contextId, modifiedAt: pastDate(10) })
+      await insertSession(contextId)
       await cleanupExpiredTasks(SERVICE_NAME)
-
-      const cp = await SELECT.one.from(CHECKPOINTS).where({ checkpoint_id: checkpointId })
-      expect(cp).toBeUndefined()
+      expect(await SELECT.from(SESSIONS).where({ ID: contextId })).toHaveLength(0)
+      expect(await SELECT.from(MESSAGES).where({ session: contextId })).toHaveLength(0)
     })
 
-    it("should cascade-delete related checkpoint writes", async () => {
+    it("keeps the complete session while another service still has a task in it", async () => {
       cds.env.agents.retention = "7d"
-
-      const taskId = cds.utils.uuid()
-      const threadId = cds.utils.uuid()
-      const checkpointId = cds.utils.uuid()
-
-      await insertTask({ taskId, modifiedAt: pastDate(10) })
-      await insertCheckpoint({ taskId, threadId, checkpointId })
-      await insertCheckpointWrite({ taskId, threadId, checkpointId })
-
+      const contextId = cds.utils.uuid()
+      await insertTask({ taskId: cds.utils.uuid(), contextId, modifiedAt: pastDate(10) })
+      await insertTask({
+        taskId: cds.utils.uuid(),
+        contextId,
+        agentService: "OtherService",
+        modifiedAt: pastDate(1),
+      })
+      await insertSession(contextId)
       await cleanupExpiredTasks(SERVICE_NAME)
+      expect(await SELECT.from(SESSIONS).where({ ID: contextId })).toHaveLength(1)
+      expect(await SELECT.from(MESSAGES).where({ session: contextId })).toHaveLength(1)
+    })
 
-      const cw = await SELECT.one.from(CHECKPOINT_WRITES).where({ checkpoint_id: checkpointId })
-      expect(cw).toBeUndefined()
+    it("keeps a recent session and collects it later after its last task has expired", async () => {
+      cds.env.agents.retention = "7d"
+      const contextId = cds.utils.uuid()
+      await insertTask({ taskId: cds.utils.uuid(), contextId, modifiedAt: pastDate(10) })
+      await insertSession(contextId, pastDate(1))
+      await cleanupExpiredTasks(SERVICE_NAME)
+      expect(await SELECT.from(MESSAGES).where({ session: contextId })).toHaveLength(1)
+      await UPDATE(SESSIONS)
+        .set({ modifiedAt: pastDate(10) })
+        .where({ ID: contextId })
+      await cleanupExpiredTasks(SERVICE_NAME)
+      expect(await SELECT.from(MESSAGES).where({ session: contextId })).toHaveLength(0)
     })
 
     it("should do nothing when retention is disabled (false)", async () => {

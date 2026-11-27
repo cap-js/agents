@@ -26,7 +26,7 @@ If you have questions about one of the issues, please comment on them, and one o
 
 ### Checkpointer validation
 
-Run `npm run test:checkpointer-validation` to check `CdsCheckpointSaver` against LangGraph's upstream contract. This diagnostic suite currently reports existing contract gaps and runs separately from `npm test`. See the [validation setup and baseline](tests/checkpointer-validation/README.md) for details.
+Run `npm run test:checkpointer-validation` to check `CdsCheckpointSaver` against LangGraph's upstream contract. The suite also runs in `npm test` and CI. See the [storage design and validation results](tests/checkpointer-validation/README.md) for details.
 
 ### Contribution requirements
 
