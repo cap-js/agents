@@ -6,10 +6,16 @@
 
 ## Version 0.9.12 - Unreleased
 
+### Added
+
+- Model support for gpt-6-luna and gpt-6.1-sol
+- LLama Guard can now be configured as content filter for AI Core
+
 ### Fixed
 
+- Content filtering preflight LLM calls now use mistral-small instead of gpt-4o-mini
 - Remote A2A connections now authenticate when fetching agent cards
-- MCP authentication with forwardAuthToken also works from local subagents
+- MCP authentication works with forwardAuthToken
 
 ## Version 0.9.11 - 2026-11-06
 
