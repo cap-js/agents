@@ -115,7 +115,7 @@ export default function registerDefaultAgentHandlers(srv) {
     return buildSystemPrompt(srv)
   })
 
-  // Default buildMiddleware: quota enforcement, content filtering, agent_actions metric
+  // Default buildMiddleware: quota enforcement, agent_actions metric
   srv.on("buildMiddleware", async (req) => {
     return buildMiddleware(srv, req.data)
   })

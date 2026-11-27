@@ -11,9 +11,9 @@
 - Model support for gpt-6-luna and gpt-6.1-sol
 - LLama Guard can now be configured as content filter for AI Core
 
-### Fixed
+### Changed
 
-- Content filtering preflight LLM calls now use mistral-small instead of gpt-4o-mini
+- AI Core input filtering now runs in the main model request, scoped to new user and tool messages, without a preflight LLM call
 
 ## Version 0.9.11 - 2026-11-06
 
