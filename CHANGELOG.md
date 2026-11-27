@@ -15,6 +15,11 @@
 
 - AI Core input filtering now runs in the main model request, scoped to new user and tool messages, without a preflight LLM call
 
+### Fixed
+
+- Redact rejected user and tool input from conversation checkpoints so follow-up requests can recover without replaying blocked content
+- Return filtered tool results to the model as safe errors so it can continue with a different query or source
+
 ## Version 0.9.11 - 2026-11-06
 
 ### Added

@@ -142,13 +142,12 @@ describe("@cap-js/agents - Content Filter Configuration", () => {
       expect(model.options.contentFilter.input.azure_content_safety.prompt_shield).toBe(true)
     })
 
-    it("passes both filters to SDK and scopes input after the last assistant", async () => {
+    it("passes both filters to SDK without scoping input until middleware runs", async () => {
       overrideModel(undefined)
       const model = await srv.send("buildModel", {})
       expect(model.orchestrationConfig.filtering.output).toBeDefined()
-      expect(model.orchestrationConfig.filtering.input.filters[0].target_selector).toEqual({
-        after_last_role: "assistant",
-      })
+      expect(model.orchestrationConfig.filtering.input).toBeDefined()
+      expect(model.orchestrationConfig.filtering.input.filters[0].target_selector).toBeUndefined()
       expect(model.orchestrationConfig.filtering.output.filters[0].target_selector).toBeUndefined()
     })
 

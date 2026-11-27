@@ -1,5 +1,5 @@
 import cds from "@sap/cds"
-import { short, audit, extractErrorDetails } from "../../lib/utils/utils.js"
+import { short, audit } from "../../lib/utils/utils.js"
 import { agentMessage, partsToText, buildChatMessages } from "../../lib/utils/message-handling.js"
 import * as metrics from "../../lib/telemetry/metrics.js"
 import { mlflowAttrs, mlflowTraceAttrs, setSpanAttrs } from "../../lib/telemetry/mlflow/index.js"
@@ -999,15 +999,12 @@ class GraphExecutor {
             task: requestContext.task,
           },
         })
-        // Follow CDS HTTP semantics: expose 4xx messages, sanitize 5xx in production.
+        // In production, don't reveal internal error details to clients (CDS pattern)
         const PROD = process.env.NODE_ENV === "production" || process.env.CDS_ENV === "prod"
-        const { error: rootError, status = 500 } = extractErrorDetails(err)
         const errorMsg =
-          status >= 400 && status < 500
-            ? rootError.message
-            : PROD && status >= 500
-              ? cds.i18n.messages.at(status) || "Internal Server Error"
-              : `Agent error: ${err.message}`
+          PROD && err.$sanitize !== false
+            ? cds.i18n.messages.at(500) || "Internal Server Error"
+            : `Agent error: ${err.message}`
 
         eventBus.publish({
           kind: "status-update",
