@@ -1,12 +1,13 @@
 /**
- * Unit-style tests for the mcp.tools filter in remoteMcpMiddleware.
+ * Unit-style tests for the mcp.tools filter in dynamicToolsMiddleware.
  *
- * Mocks MultiServerMCPClient so no real MCP server is needed.
+ * Mocks MCPAdapter so no real MCP server is needed.
  */
 import cds from "@sap/cds"
 import { vi, describe, it, expect, beforeEach } from "vitest"
+import { toolName, mcpToolKind } from "../../lib/utils/utils.js"
 
-// ── Mock MultiServerMCPClient before importing the middleware ─────────────────
+// ── Mock MCPAdapter before importing the middleware ───────────────────────────
 
 const mockListTools = vi.fn()
 vi.mock("@langchain/mcp-adapters", () => ({
@@ -15,45 +16,53 @@ vi.mock("@langchain/mcp-adapters", () => ({
   }),
 }))
 
-const { remoteMcpMiddleware } = await import("../../lib/agents/middleware/remote-mcp.js")
+const { MCPAdapter } = await import("@langchain/mcp-adapters")
+const { dynamicToolsMiddleware } = await import("../../lib/agents/middleware/dynamic-tools.js")
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function makeMcpConfig(toolFilter) {
-  return {
-    _mcpDynamic: true,
-    mcpUrl: "http://mock-mcp/mcp",
-    serviceName: "testservice",
-    resolveHeaders: async () => ({}),
-    toolFilter,
-  }
-}
 
 function makeFakeTools(...names) {
   return names.map((name) => ({ name, invoke: vi.fn(), schema: { type: "object" } }))
 }
 
+function makeMcpPlaceholder(toolFilter) {
+  const mcpUrl = "http://mock-mcp/mcp"
+  const serviceName = "testservice"
+  return {
+    serviceName,
+    _dynamicTools: async () => {
+      const client = new MCPAdapter({
+        servers: { default: { transport: "http", url: mcpUrl, headers: {} } },
+        prefixToolNameWithServerName: false,
+      })
+      let raw = await client.listTools()
+      if (toolFilter?.length) raw = raw.filter((t) => toolFilter.includes(t.name))
+      for (const t of raw) {
+        t.metadata = { ...t.metadata, serviceName, kind: mcpToolKind(t.name) }
+        t.name = toolName(`${serviceName}_${t.name}`)
+      }
+      return raw
+    },
+  }
+}
+
 async function resolveTools(toolFilter) {
-  const mcpConfig = makeMcpConfig(toolFilter)
-  // Set up cds.context and invoke wrapModelCall
-  cds.context = { __mcpDynamicTools: {} }
+  const placeholder = makeMcpPlaceholder(toolFilter)
+  cds.context = { _dynamicTools: {} }
   mockListTools.mockResolvedValueOnce(makeFakeTools("query", "describe", "insert"))
 
   let capturedTools
-  const middleware = remoteMcpMiddleware()
-  await middleware.wrapModelCall(
-    { tools: [mcpConfig] }, // MCP placeholder — resolved and filtered by the middleware
-    (req) => {
-      capturedTools = req.tools
-      return {}
-    },
-  )
+  const middleware = dynamicToolsMiddleware()
+  await middleware.wrapModelCall({ tools: [placeholder] }, (req) => {
+    capturedTools = req.tools
+    return {}
+  })
   return capturedTools
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("remoteMcpMiddleware — mcp.tools filter", () => {
+describe("dynamicToolsMiddleware — mcp.tools filter", () => {
   beforeEach(() => {
     mockListTools.mockReset()
     cds.context = {}
@@ -86,7 +95,6 @@ describe("remoteMcpMiddleware — mcp.tools filter", () => {
 
   it("filter matches raw MCP tool names, not the prefixed names", async () => {
     // "query" is the raw name; "testservice_query" is the prefixed name exposed to the agent.
-    // The filter must be specified using raw names (as declared in the MCP server).
     const withRawName = await resolveTools(["query"])
     expect(withRawName.map((t) => t.name)).toContain("testservice_query")
 

@@ -1229,12 +1229,11 @@ describe("pseudonymization — remote MCP tool name prefix", () => {
     cds.context["agent.service"] = "CatalogService"
     cds.context["agent.context.id"] = `remote-mcp-${Date.now()}`
     cds.context["agent.masking.tools"] = true
-    // __mcpDynamicTools mirrors what remoteMcpMiddleware caches after tools/list.
-    cds.context.__mcpDynamicTools = {
-      "http://mock-mcp/mcp": {
-        serviceName: "CatalogService",
-        tools: [{ name: "catalogservice_query" }, { name: "catalogservice_findauthor" }],
-      },
+    cds.context._dynamicTools = {
+      CatalogService: [
+        { name: "catalogservice_query", metadata: { serviceName: "CatalogService" } },
+        { name: "catalogservice_findauthor", metadata: { serviceName: "CatalogService" } },
+      ],
     }
     // Create session directly — unit tests have no checkpointer.
     cds.context["agent.pseudonyms"] = new PseudonymStore(randomBytes(16).toString("hex"))

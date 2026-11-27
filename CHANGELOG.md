@@ -14,6 +14,8 @@
 ### Fixed
 
 - Content filtering preflight LLM calls now use mistral-small instead of gpt-4o-mini
+- Remote A2A connections now authenticate when fetching agent cards
+- MCP authentication works with forwardAuthToken
 
 ## Version 0.9.11 - 2026-11-06
 
