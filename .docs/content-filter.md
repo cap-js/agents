@@ -43,6 +43,27 @@ Azure content safety levels: ALLOW_SAFE -> ALLOW_SAFE_LOW -> ALLOW_SAFE_LOW_MEDI
 }
 ```
 
+**LLama Guard:**
+
+LLama Guard (`llama_guard_3_8b`) can be configured as an alternative or additional content filter provider:
+
+```json
+{ "cds": { "requires": { "kinds": { "aicore": {
+      "contentFilter": {
+        "input": {
+          "llama_guard_3_8b": {
+            "violent_crimes": true,
+            "elections": true
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+See [SAP AI Core content filtering](https://help.sap.com/docs/sap-ai-core/generative-ai/input-filtering) for details.
+
 **Per-service override:**
 
 Define a dedicated LLM service in `cds.requires` and set its `contentFilter`, then bind a service to it via [`@agent.llm`](./configuration.md#using-multiple-models):

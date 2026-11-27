@@ -6,9 +6,14 @@
 
 ## Version 0.9.12 - Unreleased
 
-### Fixed
+### Added
 
 - Model support for gpt-6-luna and gpt-6.1-sol
+- LLama Guard can now be configured as content filter for AI Core
+
+### Fixed
+
+- Content filtering preflight LLM calls now use mistral-small instead of gpt-4o-mini
 
 ## Version 0.9.11 - 2026-11-06
 
